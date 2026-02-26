@@ -16,7 +16,7 @@ CREATE TABLE ROLES(
 
 CREATE TABLE USERS(
     user_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    full_name VARCHAR(50) NOT NULL,
+    full_name BOOLEAN DEFAULT TRUE,
     email VARCHAR(100) NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     role_id UUID REFERENCES ROLES(role_id),
