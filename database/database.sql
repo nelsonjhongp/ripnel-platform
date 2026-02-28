@@ -65,12 +65,11 @@ CREATE Table COMUNISTAS (
     active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)
+);
 
 create table lenguages (
     lenguage_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(50) NOT NULL
-)
 );
 
 CREATE TABLE SIZES(
