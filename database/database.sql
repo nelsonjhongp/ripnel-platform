@@ -7,6 +7,7 @@ SELECT uuid_generate_v4() as generated_uuid;
 -- 1. SEGURIDAD Y ACCESO
 -- ==========================================
 
+
 CREATE TABLE ROLES(
     role_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), 
     name VARCHAR(20) NOT NULL,
@@ -16,18 +17,33 @@ CREATE TABLE ROLES(
 
 CREATE TABLE USERS(
     user_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    full_name VARCHAR(30) NOT NULL,
+    full_name BOOLEAN DEFAULT TRUE,
     email VARCHAR(100) NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     role_id UUID REFERENCES ROLES(role_id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_ats TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE USERS_ROLES(
     user_id UUID REFERENCES USERS(user_id),
     role_id UUID REFERENCES ROLES(role_id),
     PRIMARY KEY (user_id, role_id)
+);
+
+-- ==========================================
+-- 2. UBICACIONES
+-- ==========================================
+
+CREATE TABLE LOCATIONS(
+    location_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    address VARCHAR(255) NOT NULL,
+    active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE CUSTOMERS(
@@ -41,36 +57,20 @@ CREATE TABLE CUSTOMERS(
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- ==========================================
--- 2. MAESTROS Y CATÁLOGO
--- ==========================================
-
-CREATE TABLE LOCATIONS(
-    location_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(100) NOT NULL,
-    type VARCHAR(50) NOT NULL,
-    address VARCHAR(255) NOT NULL,
+CREATE Table COMUNISTAS (
+    comunista_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    full_name VARCHAR(50) NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    phone VARCHAR(20),
     active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+)
 
-CREATE TABLE CATEGORIES(
-    category_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(50) NOT NULL,
-    description TEXT,
-    active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE COLORS(
-    color_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(30) NOT NULL,
-    hex_code VARCHAR(7) NOT NULL,
-    active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+create table lenguages (
+    lenguage_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(50) NOT NULL
+)
 );
 
 CREATE TABLE SIZES(
