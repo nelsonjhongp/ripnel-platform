@@ -1,5 +1,6 @@
 CREATE DATABASE DB_RIPNEL;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 SELECT uuid_generate_v4() as generated_uuid;
 
 -- ==========================================
@@ -223,6 +224,60 @@ BEGIN
   END IF;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Audit function that redacts sensitive fields (e.g. password_hash)
+CREATE OR REPLACE FUNCTION audit_if_changes_redact()
+RETURNS trigger AS $$
+DECLARE
+  v_row jsonb;
+BEGIN
+  IF (TG_OP = 'DELETE') THEN
+    v_row := to_jsonb(OLD) - 'password_hash';
+    INSERT INTO audit_log(table_name, operation, changed_by, row_data)
+    VALUES (TG_TABLE_NAME, 'D', current_setting('app.current_user', true)::UUID, v_row);
+    RETURN OLD;
+  ELSIF (TG_OP = 'UPDATE') THEN
+    v_row := to_jsonb(NEW) - 'password_hash';
+    INSERT INTO audit_log(table_name, operation, changed_by, row_data)
+    VALUES (TG_TABLE_NAME, 'U', current_setting('app.current_user', true)::UUID, v_row);
+    RETURN NEW;
+  ELSE
+    v_row := to_jsonb(NEW) - 'password_hash';
+    INSERT INTO audit_log(table_name, operation, changed_by, row_data)
+    VALUES (TG_TABLE_NAME, 'I', current_setting('app.current_user', true)::UUID, v_row);
+    RETURN NEW;
+  END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Attach redact trigger to `users` so password hashes are never stored in audit_log
+CREATE TRIGGER trg_audit_users_redact
+AFTER INSERT OR UPDATE OR DELETE ON users
+FOR EACH ROW EXECUTE FUNCTION audit_if_changes_redact();
+
+-- Ensure `pgcrypto` exists for optional DB-side password hashing
+
+
+-- Optional: trigger to hash plaintext passwords on INSERT/UPDATE using bcrypt (pgcrypto)
+-- Note: it's recommended to hash passwords in the application layer. Use this only if
+-- your app cannot hash before sending to the DB.
+CREATE OR REPLACE FUNCTION hash_password()
+RETURNS trigger AS $$
+BEGIN
+  IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN
+    IF NEW.password_hash IS NOT NULL THEN
+      IF (NEW.password_hash NOT LIKE '$2a$%' AND NEW.password_hash NOT LIKE '$2b$%' AND NEW.password_hash NOT LIKE '$2y$%') THEN
+        NEW.password_hash := crypt(NEW.password_hash, gen_salt('bf', 12));
+      END IF;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_hash_password
+BEFORE INSERT OR UPDATE ON users
+FOR EACH ROW EXECUTE FUNCTION hash_password();
 
 -- Function to get current price
 CREATE OR REPLACE FUNCTION get_current_price(p_variant_id UUID, p_date DATE DEFAULT CURRENT_DATE)
