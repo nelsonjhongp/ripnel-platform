@@ -1,5 +1,7 @@
 /* ============================================================
    RIPNEL MVP - PostgreSQL Schema (pgAdmin 4)
+   Script único: SCHEMA + PATCH (idempotente)
+
    Base operativa (tiendas + almacén) con:
    - Productos STYLE -> VARIANT (SKU + barcode)
    - Stock por ubicación + Kardex (stock_movements)
@@ -80,7 +82,7 @@ CREATE TABLE IF NOT EXISTS users (
   user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   full_name VARCHAR(120) NOT NULL,
   email VARCHAR(120) NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL, -- hash (bcrypt/argon2) generado en backend
+  password_hash TEXT NOT NULL, -- hash (bcrypt/argon2) en backend
   role_id UUID REFERENCES roles(role_id),
   active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -279,7 +281,11 @@ CREATE TABLE IF NOT EXISTS pricing_rules (
 -- Solo 1 regla por tipo (MVP)
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_pricing_rules_rule_type') THEN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'uq_pricing_rules_rule_type'
+      AND conrelid = 'pricing_rules'::regclass
+  ) THEN
     ALTER TABLE pricing_rules
       ADD CONSTRAINT uq_pricing_rules_rule_type UNIQUE (rule_type);
   END IF;
@@ -374,14 +380,12 @@ CREATE INDEX IF NOT EXISTS idx_transfer_lines_transfer
 
 CREATE TABLE IF NOT EXISTS sales (
   sale_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  sale_number VARCHAR(30) UNIQUE, -- correlativo interno (backend puede generar P-/B-/F-)
+  sale_number VARCHAR(30) UNIQUE, -- backend puede generar P-/B-/F-
   location_id UUID NOT NULL REFERENCES locations(location_id),
   seller_user_id UUID NOT NULL REFERENCES users(user_id),
 
-  -- Cliente “formal” (si existe en catálogo)
   customer_id UUID REFERENCES customers(customer_id),
 
-  -- Cliente “anotado” como en papel (sirve para proforma y casos sin registro formal)
   customer_name_text VARCHAR(160),
   customer_doc_type VARCHAR(10),     -- dni/ruc/none
   customer_doc_number VARCHAR(20),
@@ -393,9 +397,6 @@ CREATE TABLE IF NOT EXISTS sales (
 
   currency VARCHAR(3) NOT NULL DEFAULT 'PEN',
 
-  -- Impuestos internos:
-  -- Proforma: NO IGV -> tax_rate=0, tax_amount=0, subtotal=total
-  -- Boleta/Factura: tax_rate normalmente 0.18 (si lo usan)
   tax_rate NUMERIC(5,4) NOT NULL DEFAULT 0.0,
   subtotal_amount NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (subtotal_amount >= 0),
   tax_amount NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (tax_amount >= 0),
@@ -410,24 +411,8 @@ CREATE TABLE IF NOT EXISTS sales (
   CHECK (customer_doc_type IS NULL OR customer_doc_type IN ('dni','ruc','none')),
   CHECK (tax_rate >= 0 AND tax_rate <= 1),
 
-  -- Regla negocio: proforma SIN IGV
-  CHECK (
-    document_type <> 'proforma'
-    OR (tax_rate = 0 AND tax_amount = 0)
-  )
+  CHECK (document_type <> 'proforma' OR (tax_rate = 0 AND tax_amount = 0))
 );
-
-CREATE INDEX IF NOT EXISTS idx_sales_location_date
-  ON sales(location_id, created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_sales_status_created
-  ON sales(status, created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_sales_doc_created
-  ON sales(document_type, created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_sales_seller_created
-  ON sales(seller_user_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS sales_details (
   sale_detail_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -436,21 +421,16 @@ CREATE TABLE IF NOT EXISTS sales_details (
 
   quantity INT NOT NULL CHECK (quantity > 0),
 
-  -- Precio calculado por lista vigente (retail/wholesale)
   unit_price_list NUMERIC(10,2) CHECK (unit_price_list >= 0),
-
-  -- Precio aplicado real (casi siempre igual a list; override raro)
   unit_price_final NUMERIC(10,2) NOT NULL CHECK (unit_price_final >= 0),
 
   price_type_applied VARCHAR(20) NOT NULL DEFAULT 'retail',
-  pricing_basis VARCHAR(30) NOT NULL DEFAULT 'auto',  -- auto / manual_override
+  pricing_basis VARCHAR(30) NOT NULL DEFAULT 'auto',
   override_reason VARCHAR(200),
 
-  -- Auditoría del override (quién/ cuándo) - útil para casos raros
   overridden_by UUID REFERENCES users(user_id),
   overridden_at TIMESTAMPTZ,
 
-  -- Totales por línea (backend los calcula)
   line_subtotal NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (line_subtotal >= 0),
   line_tax      NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (line_tax >= 0),
   line_total    NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (line_total >= 0),
@@ -461,7 +441,6 @@ CREATE TABLE IF NOT EXISTS sales_details (
   CHECK (price_type_applied IN ('retail','wholesale')),
   CHECK (pricing_basis IN ('auto','manual_override')),
 
-  -- Si hay override manual, debe haber motivo y auditoría
   CHECK (
     (pricing_basis = 'auto'
       AND override_reason IS NULL
@@ -474,15 +453,8 @@ CREATE TABLE IF NOT EXISTS sales_details (
       AND overridden_at IS NOT NULL)
   ),
 
-  -- En una venta, un SKU (variant) debe aparecer una sola vez
   UNIQUE (sale_id, variant_id)
 );
-
-CREATE INDEX IF NOT EXISTS idx_sales_details_sale
-  ON sales_details(sale_id);
-
-CREATE INDEX IF NOT EXISTS idx_sales_details_variant
-  ON sales_details(variant_id);
 
 CREATE TABLE IF NOT EXISTS sales_payments (
   payment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -496,14 +468,8 @@ CREATE TABLE IF NOT EXISTS sales_payments (
   CHECK (method IN ('cash','yape','plin','transfer'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_sales_payments_sale
-  ON sales_payments(sale_id);
-
-CREATE INDEX IF NOT EXISTS idx_sales_payments_method_paid
-  ON sales_payments(method, paid_at DESC);
-
 -- ============================================================
--- 9.1) CAJA (cierres diarios) - opcional pero recomendado
+-- 9.1) CAJA (cierres diarios) - opcional
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS cash_closings (
@@ -532,13 +498,13 @@ CREATE TABLE IF NOT EXISTS cash_closings (
 );
 
 -- ============================================================
--- 10) CAMBIOS / REPOSICIONES (sin reembolso)
+-- 10) CAMBIOS / REPOSICIONES
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS exchanges (
   exchange_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   exchange_number VARCHAR(30) UNIQUE,
-  sale_id UUID REFERENCES sales(sale_id), -- opcional
+  sale_id UUID REFERENCES sales(sale_id),
   location_id UUID NOT NULL REFERENCES locations(location_id),
 
   status VARCHAR(20) NOT NULL DEFAULT 'draft',
@@ -585,7 +551,86 @@ CREATE OR REPLACE FUNCTION get_current_style_size_price(
 $$ LANGUAGE sql;
 
 -- ============================================================
--- 12) updated_at triggers (tablas clave)
+-- 12) PATCH INTEGRADO (para BD existentes)
+--     Evita errores cuando ya existían tablas sin columnas nuevas.
+-- ============================================================
+
+DO $$
+BEGIN
+  -- SALES: document_type y columnas nuevas
+  IF to_regclass('public.sales') IS NOT NULL THEN
+    ALTER TABLE sales
+      ADD COLUMN IF NOT EXISTS document_type VARCHAR(20) NOT NULL DEFAULT 'proforma',
+      ADD COLUMN IF NOT EXISTS customer_name_text VARCHAR(160),
+      ADD COLUMN IF NOT EXISTS customer_doc_type VARCHAR(10),
+      ADD COLUMN IF NOT EXISTS customer_doc_number VARCHAR(20),
+      ADD COLUMN IF NOT EXISTS customer_address_text VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS currency VARCHAR(3) NOT NULL DEFAULT 'PEN',
+      ADD COLUMN IF NOT EXISTS tax_rate NUMERIC(5,4) NOT NULL DEFAULT 0.0,
+      ADD COLUMN IF NOT EXISTS subtotal_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS tax_amount NUMERIC(12,2) NOT NULL DEFAULT 0;
+
+    -- Normaliza datos existentes (proforma por defecto, sin IGV)
+    UPDATE sales
+    SET
+      document_type   = COALESCE(document_type, 'proforma'),
+      tax_rate        = CASE WHEN COALESCE(document_type,'proforma')='proforma' THEN 0 ELSE tax_rate END,
+      tax_amount      = CASE WHEN COALESCE(document_type,'proforma')='proforma' THEN 0 ELSE COALESCE(tax_amount,0) END,
+      subtotal_amount = CASE WHEN COALESCE(document_type,'proforma')='proforma' THEN COALESCE(total_amount,0) ELSE COALESCE(subtotal_amount,0) END;
+  END IF;
+
+  -- SALES_DETAILS: columnas de override/auditoría y totales por línea
+  IF to_regclass('public.sales_details') IS NOT NULL THEN
+    ALTER TABLE sales_details
+      ADD COLUMN IF NOT EXISTS unit_price_list NUMERIC(10,2),
+      ADD COLUMN IF NOT EXISTS price_type_applied VARCHAR(20) NOT NULL DEFAULT 'retail',
+      ADD COLUMN IF NOT EXISTS pricing_basis VARCHAR(30) NOT NULL DEFAULT 'auto',
+      ADD COLUMN IF NOT EXISTS override_reason VARCHAR(200),
+      ADD COLUMN IF NOT EXISTS overridden_by UUID,
+      ADD COLUMN IF NOT EXISTS overridden_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS line_subtotal NUMERIC(12,2) NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS line_tax NUMERIC(12,2) NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS line_total NUMERIC(12,2) NOT NULL DEFAULT 0;
+
+    UPDATE sales_details
+    SET
+      price_type_applied = COALESCE(price_type_applied,'retail'),
+      pricing_basis      = COALESCE(pricing_basis,'auto');
+  END IF;
+END$$;
+
+-- ============================================================
+-- 13) ÍNDICES (después del patch, para que existan las columnas)
+-- ============================================================
+
+-- ventas (consultas comunes)
+CREATE INDEX IF NOT EXISTS idx_sales_location_date
+  ON sales(location_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_sales_status_created
+  ON sales(status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_sales_doc_created
+  ON sales(document_type, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_sales_seller_created
+  ON sales(seller_user_id, created_at DESC);
+
+-- detalles/pagos
+CREATE INDEX IF NOT EXISTS idx_sales_details_sale
+  ON sales_details(sale_id);
+
+CREATE INDEX IF NOT EXISTS idx_sales_details_variant
+  ON sales_details(variant_id);
+
+CREATE INDEX IF NOT EXISTS idx_sales_payments_sale
+  ON sales_payments(sale_id);
+
+CREATE INDEX IF NOT EXISTS idx_sales_payments_method_paid
+  ON sales_payments(method, paid_at DESC);
+
+-- ============================================================
+-- 14) Triggers updated_at (tablas clave)
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION set_updated_at()
@@ -642,7 +687,7 @@ BEFORE UPDATE ON cash_closings
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ============================================================
--- 13) Seeds mínimos
+-- 15) Seeds mínimos
 -- ============================================================
 
 INSERT INTO roles(name, description)
@@ -664,10 +709,17 @@ SET min_qty    = EXCLUDED.min_qty,
     updated_at = CURRENT_TIMESTAMP;
 
 -- ============================================================
--- 14) Comentarios “meta” (opcionales pero útiles)
+-- 16) Comentarios “meta”
 -- ============================================================
 
-COMMENT ON TABLE sales IS 'Ventas internas: proforma (sin IGV) y boleta/factura (con IGV interno). Confirmación y stock se manejan en backend con transacciones.';
-COMMENT ON TABLE sales_details IS 'Líneas de venta por SKU (variant). UNIQUE(sale_id, variant_id) para evitar duplicados y facilitar POS.';
-COMMENT ON TABLE stock_movements IS 'Kardex: historial de cambios de stock (IN/OUT/ADJUST) con referencia a venta/transferencia/cambio.';
-COMMENT ON TABLE cash_closings IS 'Cierre diario por tienda con totales por método de pago.';
+COMMENT ON TABLE sales IS
+'Ventas internas: proforma (sin IGV) y boleta/factura (con IGV interno). Confirmación y stock se manejan en backend con transacciones.';
+
+COMMENT ON TABLE sales_details IS
+'Líneas de venta por SKU (variant). UNIQUE(sale_id, variant_id) evita duplicados y facilita el POS.';
+
+COMMENT ON TABLE stock_movements IS
+'Kardex: historial de cambios de stock (IN/OUT/ADJUST) con referencia a venta/transferencia/cambio.';
+
+COMMENT ON TABLE cash_closings IS
+'Cierre diario por tienda con totales por método de pago.';

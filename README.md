@@ -17,11 +17,19 @@ Sistema centralizado de gestión para **RIPNEL**, enfocado en la trazabilidad de
 
 ## 🛠️ Estructura del Proyecto
 
-El sistema está diseñado para resolver el desorden operativo mediante los siguientes módulos clave:
-- **Gestión de Stock:** Registro de movimientos con saldos resultantes (`quantity_new`).
-- **Catálogo Dinámico:** Manejo de variantes por talla, color y marca.
-- **Ventas & Clientes:** Registro transaccional vinculado a vendedores y clientes (DNI/RUC).
-- **Logística:** Traslados documentados entre ubicaciones de la empresa.
+El MVP está organizado en módulos operativos conectados a un esquema PostgreSQL transaccional:
+
+- **Seguridad y Accesos:** `roles`, `users`, `permissions`, `role_permissions`.
+- **Catálogos Maestros:** `garment_types`, `fabrics`, `fabric_details`, `colors`, `sizes`, `targets`.
+- **Núcleo de Producto:** `product_styles`, `style_sizes`, `style_colors`, `product_variants` (SKU + barcode).
+- **Precios y Reglas Comerciales:** `style_size_prices` (retail/wholesale por vigencia) y `pricing_rules` (mínimos mayoristas por modelo).
+- **Inventario y Trazabilidad:** `inventory` (stock por ubicación) y `stock_movements` (kardex IN/OUT/ADJUST con referencias).
+- **Logística Interna:** `stock_transfers` y `stock_transfer_lines` con ciclo de estados (`draft`, `shipped`, `received`, `cancelled`).
+- **Ventas y Cobros:** `sales`, `sales_details`, `sales_payments` con soporte de proforma/boleta/factura, cliente snapshot e impuestos internos.
+- **Operación de Caja:** `cash_closings` para cierre diario por tienda y control de totales por método de pago.
+- **Postventa:** `exchanges` y `exchange_lines` para cambios/reposiciones sin devolución.
+
+Además, el script SQL incluye índices operativos, restricciones de consistencia y triggers de `updated_at` en tablas clave para auditoría y mantenimiento.
 
 ## 📖 Guía Rápida para Desarrolladores
 
@@ -38,3 +46,4 @@ git pull origin develop
 git add .
 git commit -m "feat: descripción de tu cambio"
 git push origin develop
+```
