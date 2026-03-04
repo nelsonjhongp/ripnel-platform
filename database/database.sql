@@ -380,7 +380,7 @@ CREATE INDEX IF NOT EXISTS idx_transfer_lines_transfer
 
 CREATE TABLE IF NOT EXISTS sales (
   sale_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  sale_number VARCHAR(30) UNIQUE, -- backend puede generar P-/B-/F-
+  sale_number VARCHAR(30) UNIQUE, -- backend genera P-/B-/F-
   location_id UUID NOT NULL REFERENCES locations(location_id),
   seller_user_id UUID NOT NULL REFERENCES users(user_id),
 
@@ -406,12 +406,61 @@ CREATE TABLE IF NOT EXISTS sales (
   confirmed_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-  CHECK (status IN ('draft','confirmed','cancelled')),
-  CHECK (document_type IN ('none','proforma','boleta','factura')),
-  CHECK (customer_doc_type IS NULL OR customer_doc_type IN ('dni','ruc','none')),
-  CHECK (tax_rate >= 0 AND tax_rate <= 1),
+  CONSTRAINT chk_sales_status
+    CHECK (status IN ('draft','confirmed','cancelled')),
 
-  CHECK (document_type <> 'proforma' OR (tax_rate = 0 AND tax_amount = 0))
+  CONSTRAINT chk_sales_document_type
+    CHECK (document_type IN ('none','proforma','boleta','factura')),
+
+  CONSTRAINT chk_sales_customer_doc_type
+    CHECK (customer_doc_type IS NULL OR customer_doc_type IN ('dni','ruc','none')),
+
+  CONSTRAINT chk_sales_tax_rate_range
+    CHECK (tax_rate >= 0 AND tax_rate <= 1),
+
+  -- Proforma: sin IGV
+  CONSTRAINT chk_sales_proforma_no_igv
+    CHECK (document_type <> 'proforma' OR (tax_rate = 0 AND tax_amount = 0)),
+
+  -- Al confirmar: correlativo con formato por tipo
+  CONSTRAINT chk_sales_correlative_confirmed
+    CHECK (
+      status <> 'confirmed'
+      OR (
+        sale_number IS NOT NULL
+        AND (
+          (document_type = 'proforma' AND sale_number ~ '^P-[0-9]{6}$')
+          OR (document_type = 'boleta'   AND sale_number ~ '^B-[0-9]{6}$')
+          OR (document_type = 'factura'  AND sale_number ~ '^F-[0-9]{6}$')
+          OR (document_type = 'none'     AND sale_number IS NOT NULL)
+        )
+      )
+    ),
+
+  -- Boleta: DNI + nombre obligatorios al confirmar
+  CONSTRAINT chk_sales_boleta_requires_dni
+    CHECK (
+      status <> 'confirmed'
+      OR document_type <> 'boleta'
+      OR (
+        customer_name_text IS NOT NULL
+        AND customer_doc_type = 'dni'
+        AND customer_doc_number IS NOT NULL
+      )
+    ),
+
+  -- Factura: RUC + nombre(razón social) + dirección obligatorios al confirmar
+  CONSTRAINT chk_sales_factura_requires_ruc_address
+    CHECK (
+      status <> 'confirmed'
+      OR document_type <> 'factura'
+      OR (
+        customer_name_text IS NOT NULL
+        AND customer_doc_type = 'ruc'
+        AND customer_doc_number IS NOT NULL
+        AND customer_address_text IS NOT NULL
+      )
+    )
 );
 
 CREATE TABLE IF NOT EXISTS sales_details (
