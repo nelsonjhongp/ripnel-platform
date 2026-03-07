@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Poppins, Geist } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -22,11 +24,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className={cn(poppins.className, "font-sans", geist.variable)}>
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <body>
-          {children}
-      </body>
-    </html>
+    <SidebarProvider>
+      <TooltipProvider >
+        <html lang="es" className={cn(poppins.className, "font-sans", geist.variable)}>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <body>
+              {children}
+          </body>
+        </html>
+      </TooltipProvider>
+    </SidebarProvider>
   );
 }

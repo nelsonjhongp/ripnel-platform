@@ -1,4 +1,4 @@
-import LoginRipnel from "@/components/Login";
+import LoginRipnel from "@/components/login";
 
 export default function Home() {
   return (

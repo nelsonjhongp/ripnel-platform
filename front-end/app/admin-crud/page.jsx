@@ -1,6 +1,7 @@
-'use client';
+"use client";
 
 import { useState } from 'react';
+import { SidebarShell } from "@/components/sidebar";
 
 export default function AdminCrud() {
   const [usuarios, setUsuarios] = useState([
@@ -143,32 +144,9 @@ export default function AdminCrud() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Sidebar */}
-      <aside className="w-64 bg-gradient-to-b from-violet-700 to-violet-900 text-white shadow-lg">
-        <div className="p-6">
-          <h1 className="text-2xl font-bold mb-8">RIPNEL</h1>
-          <div className="bg-violet-500 p-4 rounded-lg mb-8">
-            <p className="text-sm text-violet-200">Sección</p>
-            <p className="text-xl font-bold">Usuarios y Roles</p>
-          </div>
-        </div>
-
-        {/* Botón Logout */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-violet-800 border-t border-white w-64">
-          <button
-            onClick={handleLogout}
-            className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold transition cursor-pointer"
-          >
-            Cerrar Sesión
-          </button>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        <div className="p-8">
-          <h2 className="text-3xl font-bold text-gray-800 mb-6">Gestión de Usuarios</h2>
+    <SidebarShell>
+      <div className="p-8">
+        <h2 className="text-3xl font-bold text-gray-800 mb-6">Gestión de Usuarios</h2>
 
           {/* Búsqueda y botón agregar */}
           <div className="mb-6 flex gap-4">
@@ -436,7 +414,6 @@ export default function AdminCrud() {
           </div>
 
         </div>
-      </main>
-    </div>
+    </SidebarShell>
   );
 }
