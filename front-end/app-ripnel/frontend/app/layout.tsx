@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
-import { Poppins } from "next/font/google";
+import { Poppins, Geist } from "next/font/google";
 import "./globals.css";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const poppins = Poppins({ 
   weight: ['400', '600', '700'],
@@ -19,9 +22,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className={poppins.className}>
+    <html lang="es" className={cn(poppins.className, "font-sans", geist.variable)}>
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <body> {children}</body>
+      <body>
+          {children}
+      </body>
     </html>
   );
 }

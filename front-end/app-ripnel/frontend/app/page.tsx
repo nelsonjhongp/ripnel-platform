@@ -1,7 +1,7 @@
-import Login from "@/app/components/Login";
+import LoginRipnel from "@/components/Login";
 
 export default function Home() {
   return (
-    <Login/>
+    <LoginRipnel/>
   );
 }
