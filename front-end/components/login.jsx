@@ -39,18 +39,7 @@ export default function LoginRipnel() {
           required
         />
 
-        <FormField
-          label="Sede"
-          type="select"
-          id="sede"
-          required
-          defaultValue=""
-        >
-          <option value="">Selecciona una sede</option>
-          <option value="Almacen">Almacén</option>
-          <option value="Tienda 1">Tienda 1</option>
-          <option value="Tienda 2">Tienda 2</option>
-        </FormField>
+        {/* Sede selector moved to sidebar */}
 
         <CustomButton type="submit">
           Iniciar sesión

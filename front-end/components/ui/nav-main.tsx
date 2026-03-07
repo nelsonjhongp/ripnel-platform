@@ -35,7 +35,7 @@ export function NavMain({
 }) {
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Platform</SidebarGroupLabel>
+      <SidebarGroupLabel>Ripnel</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) =>
           item.items?.length ? (
