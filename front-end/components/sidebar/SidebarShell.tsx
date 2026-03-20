@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { usePathname } from "next/navigation"
 import { AppSidebar } from "./AppSidebar"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import {
@@ -14,7 +15,7 @@ import {
 
 export function SidebarShell({
   children,
-  title = "Panel del usuario",
+  title,
   homeLabel = "Inicio",
   homeUrl = "/sidebar",
 }: {
@@ -23,6 +24,30 @@ export function SidebarShell({
   homeLabel?: string
   homeUrl?: string
 }) {
+  const pathname = usePathname()
+
+  const resolvedTitle = React.useMemo(() => {
+    if (title) return title
+
+    const routeTitles: Record<string, string> = {
+      "/sidebar": "Panel del usuario",
+      "/account": "Cuenta",
+      "/admin-crud": "Gestion de usuarios",
+    }
+
+    if (routeTitles[pathname]) {
+      return routeTitles[pathname]
+    }
+
+    const lastSegment = pathname.split("/").filter(Boolean).pop()
+    if (!lastSegment) return "Panel del usuario"
+
+    return lastSegment
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
+  }, [pathname, title])
+
   return (
     <AppSidebar>
       <header className="flex h-16 shrink-0 items-center gap-2 border-b border-indigo-100 bg-white px-4">
@@ -34,7 +59,7 @@ export function SidebarShell({
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbPage>{title}</BreadcrumbPage>
+              <BreadcrumbPage>{resolvedTitle}</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
