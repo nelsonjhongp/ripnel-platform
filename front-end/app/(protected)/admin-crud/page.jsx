@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from 'react';
-import { SidebarShell } from "@/components/sidebar";
 
 export default function AdminCrud() {
   const [usuarios, setUsuarios] = useState([
@@ -139,12 +138,7 @@ export default function AdminCrud() {
     }
   };
 
-  const handleLogout = () => {
-    window.location.href = '/';
-  };
-
   return (
-    <SidebarShell>
       <div className="p-8">
         <h2 className="text-3xl font-bold text-gray-800 mb-6">Gestión de Usuarios</h2>
 
@@ -414,6 +408,5 @@ export default function AdminCrud() {
           </div>
 
         </div>
-    </SidebarShell>
   );
 }

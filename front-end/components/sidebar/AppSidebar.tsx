@@ -12,12 +12,12 @@ import {
   PieChart,
   Send,
   Settings2,
+  ShoppingCart,
   SquareTerminal,
   User,
 } from "lucide-react"
 
 import { NavMain } from "@/components/ui/nav-main"
-import { NavProjects } from "@/components/ui/nav-projects"
 import { NavSecondary } from "@/components/ui/nav-secondary"
 import { NavUser } from "@/components/ui/nav-user"
 import {
@@ -27,8 +27,9 @@ import {
   SidebarHeader,
   SidebarInset,
 } from "@/components/ui/sidebar"
+import { DropdownButtom } from "@/components/ui/Dropdown-buttom"
 
-import SedeSelector from "./SedeSelector"
+import { NavDocuments } from "../ui/nav-documents"
 
 const data = {
   user: {
@@ -89,8 +90,8 @@ const data = {
     { title: "Support", url: "#", icon: LifeBuoy },
     { title: "Feedback", url: "#", icon: Send },
   ],
-  projects: [
-    { name: "Design Engineering", url: "#", icon: Frame },
+  documents: [
+    { name: "Sistema de compra", url: "purchase-system", icon: ShoppingCart },
     { name: "Sales & Marketing", url: "#", icon: PieChart },
     { name: "Travel", url: "#", icon: Map },
   ],
@@ -123,7 +124,16 @@ export function SideBarBrand({
         <div className="mt-4 bg-violet-500/30 p-3 rounded-md">
           <p className="text-sm text-violet-200">{sectionLabel}</p>
           <p className="text-xl font-bold">{sectionTitle}</p>
-          <SedeSelector />
+          <DropdownButtom
+            id="sede-sidebar"
+            label="Sede"
+            storageKey="sede"
+            options={[
+              { value: "Almacen", label: "Almacen" },
+              { value: "Tienda 1", label: "Tienda 1" },
+              { value: "Tienda 2", label: "Tienda 2" },
+            ]}
+          />
         </div>
       </div>
     </div>
@@ -173,7 +183,7 @@ export function AppSidebar({ children, ...props }: React.PropsWithChildren<React
         </SidebarHeader>
         <SidebarContent>
           <NavMain items={data.navMain} />
-          <NavProjects projects={data.projects} />
+          <NavDocuments items={data.documents} />
           <NavSecondary items={data.navSecondary} className="mt-auto" />
         </SidebarContent>
         <SidebarFooter>
