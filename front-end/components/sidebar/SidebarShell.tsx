@@ -17,7 +17,7 @@ export function SidebarShell({
   children,
   title,
   homeLabel = "Inicio",
-  homeUrl = "/sidebar",
+  homeUrl = "/account",
 }: {
   children: React.ReactNode
   title?: string
