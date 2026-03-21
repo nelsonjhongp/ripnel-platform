@@ -9,7 +9,7 @@ export default function LoginRipnel() {
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    router.push("/sidebar");
+    router.push("/account");
   };
 
     return (
@@ -38,8 +38,6 @@ export default function LoginRipnel() {
           placeholder="Ingrese su contraseña"
           required
         />
-
-        {/* Sede selector moved to sidebar */}
 
         <CustomButton type="submit">
           Iniciar sesión

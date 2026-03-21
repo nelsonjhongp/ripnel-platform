@@ -54,16 +54,6 @@ const data = {
       icon: PieChart,
     },
     {
-      title: "Models",
-      url: "#",
-      icon: Bot,
-      items: [
-        { title: "Genesis", url: "#" },
-        { title: "Explorer", url: "#" },
-        { title: "Quantum", url: "#" },
-      ],
-    },
-    {
       title: "Documentation",
       url: "#",
       icon: BookOpen,
@@ -91,7 +81,7 @@ const data = {
     { title: "Feedback", url: "#", icon: Send },
   ],
   documents: [
-    { name: "Sistema de compra", url: "purchase-system", icon: ShoppingCart },
+    { name: "Sistema de compra", url: "/purchase-system", icon: ShoppingCart },
     { name: "Sales & Marketing", url: "#", icon: PieChart },
     { name: "Travel", url: "#", icon: Map },
   ],
@@ -111,7 +101,7 @@ export function SideBarBrand({
   return (
     <div className="p-4 text-white">
       <div>
-        <Link href="/sidebar" className="flex items-center gap-3">
+        <Link href="/account" className="flex items-center gap-3">
           <div className="flex aspect-square h-9 w-9 items-center justify-center rounded-2xl bg-white/15 text-white ring-1 ring-white/30">
             <Command className="h-4 w-4" />
           </div>
