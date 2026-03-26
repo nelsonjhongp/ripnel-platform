@@ -18,6 +18,7 @@ import {
   Settings,
   Shirt,
   ShoppingBag,
+  ShoppingCart,
   Store,
   Boxes,
   Warehouse,
@@ -80,6 +81,15 @@ const sidebarGroups = [
       { title: "Listado de transferencias", url: "/transferencias/listado-de-transferencias" },
       { title: "Crear transferencia", url: "/transferencias/crear-transferencia" },
       { title: "Recepciones pendientes", url: "/transferencias/recepciones-pendientes" },
+    ],
+  },
+  {
+    title: "Compra",
+    icon: ShoppingCart,
+    items: [
+      { title: "Nueva compra", url: "/purchase-system" },
+      { title: "Checkout", url: "/purchase-system/checkout" },
+      { title: "Pago", url: "/purchase-system/checkout-payment" },
     ],
   },
   {
