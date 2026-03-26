@@ -1,0 +1,13 @@
+{
+  "name": "ripnel-platform",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace @ripnel/backend",
+    "dev:frontend": "npm run dev --workspace @ripnel/frontend",
+    "start:backend": "npm run start --workspace @ripnel/backend",
+    "lint:frontend": "npm run lint --workspace @ripnel/frontend"
+  }
+}
