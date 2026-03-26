@@ -55,6 +55,9 @@ const sidebarGroups = [
       { title: "Tallas", url: "/catalogos/tallas" },
       { title: "Colores", url: "/catalogos/colores" },
       { title: "Tipo de prenda", url: "/catalogos/tipo-prenda" },
+      { title: "Telas", url: "/catalogos/telas" },
+      { title: "Detalle de tela", url: "/catalogos/detalle-de-tela" },
+      { title: "Targets", url: "/catalogos/targets" },
     ],
   },
   {
@@ -107,6 +110,8 @@ const catalogIcons = {
   Tallas: Ruler,
   Colores: Palette,
   "Tipo de prenda": Shirt,
+  Telas: Shirt,
+  "Detalle de tela": Shirt,
 }
 
 const inventoryIcons = {
