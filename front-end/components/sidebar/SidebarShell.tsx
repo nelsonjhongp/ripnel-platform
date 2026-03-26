@@ -33,6 +33,9 @@ export function SidebarShell({
       "/sidebar": "Panel del usuario",
       "/account": "Cuenta",
       "/admin-crud": "Gestion de usuarios",
+      "/inventory": "Inventario",
+      "/kardex": "Kardex",
+      "/transaction-history": "Historial de transacciones",
     }
 
     if (routeTitles[pathname]) {

@@ -5,11 +5,14 @@ import Link from "next/link"
 import {
   BookOpen,
   Bot,
+  ClipboardList,
   Command,
   Frame,
   LifeBuoy,
   Map,
+  Package,
   PieChart,
+  ReceiptText,
   Send,
   Settings2,
   ShoppingCart,
@@ -82,8 +85,9 @@ const data = {
   ],
   documents: [
     { name: "Sistema de compra", url: "/purchase-system", icon: ShoppingCart },
-    { name: "Sales & Marketing", url: "#", icon: PieChart },
-    { name: "Travel", url: "#", icon: Map },
+    { name: "Inventario", url: "/inventory", icon: Package },
+    { name: "Kardex", url: "/kardex", icon: ClipboardList },
+    { name: "Historial transacciones", url: "/transaction-history", icon: ReceiptText },
   ],
 }
 
