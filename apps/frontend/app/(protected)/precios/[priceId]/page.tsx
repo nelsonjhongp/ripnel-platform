@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { PricesMockPage } from "@/components/modules/prices-mock-page"
+import { ListPrices } from "@/components/modules/list-prices"
 
 const pricePages: Record<
   string,
@@ -49,15 +49,15 @@ export default async function PricePage({
   }
 
   if (priceId === "listado-de-precios") {
-    return <PricesMockPage mode="list" />
+    return <ListPrices mode="list" />
   }
 
   if (priceId === "crear-y-editar-precio") {
-    return <PricesMockPage mode="editor" />
+    return <ListPrices mode="editor" />
   }
 
   if (priceId === "regla-mayorista") {
-    return <PricesMockPage mode="rules" />
+    return <ListPrices mode="rules" />
   }
 
   return null
