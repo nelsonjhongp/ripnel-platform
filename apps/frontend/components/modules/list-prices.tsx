@@ -1,103 +1,24 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarRange, PencilLine, ReceiptText, Search, Tags } from "lucide-react";
+import { buildApiUrl } from "@/lib/api";
 
 type PriceMode = "list" | "editor" | "rules";
 
 type PriceRow = {
-  styleCode: string;
-  styleName: string;
-  garmentType: string;
-  status: "Vigente" | "Programado" | "Vencido";
-  validity: string;
-  prices: { sizeCode: string; amount: number }[];
+  style_size_price_id: string;
+  style_code: string;
+  style_name: string;
+  size_code: string;
+  size_name: string;
+  price_type: "retail" | "wholesale";
+  price: number;
+  start_date: string;
+  end_date: string | null;
+  active: boolean;
+  validity_status: "active" | "scheduled" | "expired" | "inactive";
 };
-
-const mockPriceRows: PriceRow[] = [
-  {
-    styleCode: "CAF-RIP",
-    styleName: "Cafarena - Rip",
-    garmentType: "Cafarena",
-    status: "Vigente",
-    validity: "Desde 26/03/2026",
-    prices: [
-      { sizeCode: "ST", amount: 15 },
-      { sizeCode: "L", amount: 17 },
-      { sizeCode: "XL", amount: 18 },
-    ],
-  },
-  {
-    styleCode: "JOG-FTER",
-    styleName: "Jogger - French Terry",
-    garmentType: "Jogger",
-    status: "Vigente",
-    validity: "Desde 26/03/2026",
-    prices: [
-      { sizeCode: "S", amount: 21 },
-      { sizeCode: "M", amount: 21 },
-      { sizeCode: "L", amount: 22 },
-      { sizeCode: "XL", amount: 24 },
-    ],
-  },
-  {
-    styleCode: "LEG-SUP",
-    styleName: "Legging - Suplex",
-    garmentType: "Legging",
-    status: "Programado",
-    validity: "Desde 01/04/2026",
-    prices: [
-      { sizeCode: "S", amount: 15 },
-      { sizeCode: "M", amount: 15 },
-      { sizeCode: "L", amount: 16 },
-      { sizeCode: "XL", amount: 18 },
-    ],
-  },
-  {
-    styleCode: "POL-FLIC",
-    styleName: "Polo Manga Corta - Full Licra",
-    garmentType: "Polo",
-    status: "Vigente",
-    validity: "Desde 26/03/2026",
-    prices: [
-      { sizeCode: "ST", amount: 13 },
-      { sizeCode: "L", amount: 15 },
-      { sizeCode: "XL", amount: 17 },
-    ],
-  },
-  {
-    styleCode: "SHO-CHA",
-    styleName: "Short - Chaliz",
-    garmentType: "Short",
-    status: "Vigente",
-    validity: "Desde 26/03/2026",
-    prices: [{ sizeCode: "ST", amount: 13 }],
-  },
-];
-
-const mockRules = [
-  {
-    name: "Mayorista 6+ prendas",
-    minQty: 6,
-    state: "Activa",
-    validity: "Marzo 2026 - abierto",
-    note: "Aplica descuento comercial sobre el total de la venta.",
-  },
-  {
-    name: "Mayorista 12+ prendas",
-    minQty: 12,
-    state: "Programada",
-    validity: "Desde abril 2026",
-    note: "Pensada para pedidos de reposicion y campañas.",
-  },
-  {
-    name: "Promocion por lanzamiento",
-    minQty: 4,
-    state: "Vencida",
-    validity: "Febrero 2026",
-    note: "Se mantuvo separada para no alterar el historial general.",
-  },
-];
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("es-PE", {
@@ -107,11 +28,11 @@ function formatCurrency(amount: number) {
   }).format(amount);
 }
 
-function StatusBadge({ status }: { status: PriceRow["status"] | string }) {
+function StatusBadge({ status }: { status: PriceRow["validity_status"] | string }) {
   const styles =
-    status === "Vigente" || status === "Activa"
+    status === "active"
       ? "bg-emerald-100 text-emerald-700"
-      : status === "Programado"
+      : status === "scheduled"
       ? "bg-amber-100 text-amber-700"
       : "bg-slate-200 text-slate-600";
 
@@ -123,20 +44,31 @@ function StatusBadge({ status }: { status: PriceRow["status"] | string }) {
 }
 
 function PriceListView() {
+  const [priceRows, setPriceRows] = useState<PriceRow[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    fetch(buildApiUrl("/api/prices"), { cache: "no-store" })
+      .then((res) => res.json())
+      .then((payload) => {
+        setPriceRows(payload.data || []);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
 
   const filteredRows = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
     if (!normalizedSearch) {
-      return mockPriceRows;
+      return priceRows;
     }
 
-    return mockPriceRows.filter(
+    return priceRows.filter(
       (row) =>
-        row.styleCode.toLowerCase().includes(normalizedSearch) ||
-        row.styleName.toLowerCase().includes(normalizedSearch) ||
-        row.garmentType.toLowerCase().includes(normalizedSearch)
+        row.style_code.toLowerCase().includes(normalizedSearch) ||
+        row.style_name.toLowerCase().includes(normalizedSearch)
     );
   }, [search]);
 
@@ -171,14 +103,14 @@ function PriceListView() {
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Styles con precio
             </p>
-            <p className="mt-2 text-2xl font-semibold text-slate-900">{mockPriceRows.length}</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-900">{priceRows.length}</p>
           </article>
           <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Vigentes
             </p>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
-              {mockPriceRows.filter((row) => row.status === "Vigente").length}
+              {priceRows.filter((row) => row.validity_status === "active").length}
             </p>
           </article>
           <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -186,7 +118,7 @@ function PriceListView() {
               Programados
             </p>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
-              {mockPriceRows.filter((row) => row.status === "Programado").length}
+              {priceRows.filter((row) => row.validity_status === "scheduled").length}
             </p>
           </article>
         </div>
@@ -208,34 +140,29 @@ function PriceListView() {
         <div className="mt-4 space-y-3">
           {filteredRows.map((row) => (
             <div
-              key={row.styleCode}
+              key={row.style_code}
               className="rounded-2xl border border-slate-200 p-4 transition hover:border-slate-300"
             >
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-base font-semibold text-slate-900">{row.styleName}</h3>
+                    <h3 className="text-base font-semibold text-slate-900">{row.style_name}</h3>
                     <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                      {row.styleCode}
+                      {row.style_code}
                     </span>
-                    <StatusBadge status={row.status} />
+                    <StatusBadge status={row.validity_status} />
                   </div>
 
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {row.prices.map((price) => (
-                      <span
-                        key={`${row.styleCode}-${price.sizeCode}`}
-                        className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600"
-                      >
-                        {price.sizeCode}: {formatCurrency(price.amount)}
-                      </span>
-                    ))}
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
+                      {row.size_code}: {formatCurrency(row.price)}
+                    </span>
                   </div>
                 </div>
 
                 <div className="text-sm text-slate-500 md:text-right">
-                  <p>{row.garmentType}</p>
-                  <p className="mt-1">{row.validity}</p>
+                  <p>{row.price_type}</p>
+                  <p className="mt-1">{row.start_date}</p>
                 </div>
               </div>
             </div>
@@ -247,8 +174,22 @@ function PriceListView() {
 }
 
 function PriceEditorView() {
-  const [selectedCode, setSelectedCode] = useState(mockPriceRows[1].styleCode);
-  const selectedRow = mockPriceRows.find((row) => row.styleCode === selectedCode) || mockPriceRows[0];
+  const [priceRows, setPriceRows] = useState<PriceRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedCode, setSelectedCode] = useState("");
+
+  useEffect(() => {
+    fetch(buildApiUrl("/api/prices"), { cache: "no-store" })
+      .then((res) => res.json())
+      .then((payload) => {
+        setPriceRows(payload.data || []);
+        setSelectedCode((payload.data || [])[0]?.style_code || "");
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const selectedRow = priceRows.find((row) => row.style_code === selectedCode) || priceRows[0];
 
   return (
     <div className="space-y-5">
@@ -280,9 +221,9 @@ function PriceEditorView() {
                 onChange={(event) => setSelectedCode(event.target.value)}
                 className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-violet-400"
               >
-                {mockPriceRows.map((row) => (
-                  <option key={row.styleCode} value={row.styleCode}>
-                    {row.styleCode} - {row.styleName}
+                {priceRows.map((row) => (
+                  <option key={row.style_code} value={row.style_code}>
+                    {row.style_code} - {row.style_name}
                   </option>
                 ))}
               </select>
@@ -327,9 +268,9 @@ function PriceEditorView() {
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                 Detalle por talla
               </p>
-              <h2 className="mt-1 text-xl font-semibold text-slate-950">{selectedRow.styleName}</h2>
+              <h2 className="mt-1 text-xl font-semibold text-slate-950">{selectedRow?.style_name}</h2>
             </div>
-            <StatusBadge status={selectedRow.status} />
+            {selectedRow && <StatusBadge status={selectedRow.validity_status} />}
           </div>
 
           <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -337,34 +278,31 @@ function PriceEditorView() {
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Codigo
               </p>
-              <p className="mt-2 text-lg font-semibold text-slate-900">{selectedRow.styleCode}</p>
+              <p className="mt-2 text-lg font-semibold text-slate-900">{selectedRow?.style_code}</p>
             </article>
             <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Vigencia
+                Inicio vigencia
               </p>
-              <p className="mt-2 text-lg font-semibold text-slate-900">{selectedRow.validity}</p>
+              <p className="mt-2 text-lg font-semibold text-slate-900">{selectedRow?.start_date}</p>
             </article>
           </div>
 
-          <div className="mt-4 space-y-3">
-            {selectedRow.prices.map((price) => (
-              <div
-                key={`${selectedRow.styleCode}-${price.sizeCode}`}
-                className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
-              >
+          {selectedRow && (
+            <div className="mt-4 space-y-3">
+              <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">Talla {price.sizeCode}</p>
-                  <p className="text-xs text-slate-500">Precio retail vigente</p>
+                  <p className="text-sm font-semibold text-slate-900">Talla {selectedRow.size_code}</p>
+                  <p className="text-xs text-slate-500">Precio {selectedRow.price_type} vigente</p>
                 </div>
                 <input
                   type="text"
-                  defaultValue={price.amount.toFixed(2)}
+                  defaultValue={selectedRow.price.toFixed(2)}
                   className="w-28 rounded-xl border border-slate-300 bg-white px-3 py-2 text-right text-sm outline-none transition focus:border-violet-400"
                 />
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </article>
       </div>
     </div>
@@ -372,6 +310,19 @@ function PriceEditorView() {
 }
 
 function WholesaleRulesView() {
+  const [priceRows, setPriceRows] = useState<PriceRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(buildApiUrl("/api/prices"), { cache: "no-store" })
+      .then((res) => res.json())
+      .then((payload) => {
+        setPriceRows(payload.data || []);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <div className="space-y-5">
       <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)] md:p-6">
@@ -459,31 +410,14 @@ function WholesaleRulesView() {
               <h2 className="mt-1 text-xl font-semibold text-slate-950">Reglas simuladas</h2>
             </div>
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              {mockRules.length} reglas
+              Mockup
             </span>
           </div>
 
           <div className="mt-4 space-y-3">
-            {mockRules.map((rule) => (
-              <div
-                key={rule.name}
-                className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-              >
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-base font-semibold text-slate-900">{rule.name}</h3>
-                      <StatusBadge status={rule.state} />
-                    </div>
-                    <p className="mt-2 text-sm text-slate-500">{rule.note}</p>
-                  </div>
-                  <div className="text-sm text-slate-500 md:text-right">
-                    <p>{rule.minQty} prendas min.</p>
-                    <p className="mt-1">{rule.validity}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500">
+              Reglas comerciales: Conectar backend cuando `pricing_rules` esté disponible.
+            </div>
           </div>
         </article>
       </div>
@@ -491,7 +425,7 @@ function WholesaleRulesView() {
   );
 }
 
-export function PricesMockPage({ mode }: { mode: PriceMode }) {
+export function ListPrices({ mode }: { mode: PriceMode }) {
   return (
     <section className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_45%,#eef2ff_100%)] p-4 md:p-5">
       <div className="mx-auto max-w-7xl">
