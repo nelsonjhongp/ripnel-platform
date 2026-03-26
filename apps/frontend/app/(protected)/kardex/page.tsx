@@ -18,72 +18,12 @@ type KardexMovement = {
 }
 
 const KARDEX_DATA: KardexMovement[] = [
-  {
-    id: 1,
-    date: "2026-03-20 09:12",
-    sku: "RIP-001",
-    product: "Polo Essentials",
-    type: "Entrada",
-    reference: "OC-1042",
-    quantity: 20,
-    balance: 42,
-    user: "M. Valdez",
-  },
-  {
-    id: 2,
-    date: "2026-03-20 15:08",
-    sku: "RIP-222",
-    product: "Zapatilla Runner Pro",
-    type: "Salida",
-    reference: "NV-8821",
-    quantity: 5,
-    balance: 8,
-    user: "L. Perez",
-  },
-  {
-    id: 3,
-    date: "2026-03-21 11:24",
-    sku: "RIP-013",
-    product: "Jean Urban Flex",
-    type: "Salida",
-    reference: "NV-8830",
-    quantity: 3,
-    balance: 14,
-    user: "L. Perez",
-  },
-  {
-    id: 4,
-    date: "2026-03-21 16:50",
-    sku: "RIP-501",
-    product: "Gorra Street Cap",
-    type: "Ajuste",
-    reference: "AJ-149",
-    quantity: 2,
-    balance: 4,
-    user: "R. Rojas",
-  },
-  {
-    id: 5,
-    date: "2026-03-22 09:10",
-    sku: "RIP-411",
-    product: "Mochila City Light",
-    type: "Entrada",
-    reference: "OC-1048",
-    quantity: 12,
-    balance: 16,
-    user: "M. Valdez",
-  },
-  {
-    id: 6,
-    date: "2026-03-22 18:01",
-    sku: "RIP-330",
-    product: "Casaca Softshell",
-    type: "Salida",
-    reference: "NV-8860",
-    quantity: 2,
-    balance: 6,
-    user: "L. Perez",
-  },
+  { id: 1, date: "2026-03-20 09:12", sku: "RIP-001", product: "Polo Essentials", type: "Entrada", reference: "OC-1042", quantity: 20, balance: 42, user: "M. Valdez" },
+  { id: 2, date: "2026-03-20 15:08", sku: "RIP-222", product: "Zapatilla Runner Pro", type: "Salida", reference: "NV-8821", quantity: 5, balance: 8, user: "L. Perez" },
+  { id: 3, date: "2026-03-21 11:24", sku: "RIP-013", product: "Jean Urban Flex", type: "Salida", reference: "NV-8830", quantity: 3, balance: 14, user: "L. Perez" },
+  { id: 4, date: "2026-03-21 16:50", sku: "RIP-501", product: "Gorra Street Cap", type: "Ajuste", reference: "AJ-149", quantity: 2, balance: 4, user: "R. Rojas" },
+  { id: 5, date: "2026-03-22 09:10", sku: "RIP-411", product: "Mochila City Light", type: "Entrada", reference: "OC-1048", quantity: 12, balance: 16, user: "M. Valdez" },
+  { id: 6, date: "2026-03-22 18:01", sku: "RIP-330", product: "Casaca Softshell", type: "Salida", reference: "NV-8860", quantity: 2, balance: 6, user: "L. Perez" },
 ]
 
 const TYPE_OPTIONS: Array<"Todos" | MovementType> = ["Todos", "Entrada", "Salida", "Ajuste"]
@@ -94,7 +34,6 @@ export default function KardexPage() {
 
   const filteredMovements = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
-
     return KARDEX_DATA.filter((movement) => {
       const byType = movementType === "Todos" || movement.type === movementType
       const byQuery =
@@ -108,16 +47,9 @@ export default function KardexPage() {
   }, [query, movementType])
 
   const totals = useMemo(() => {
-    const entradas = filteredMovements
-      .filter((item) => item.type === "Entrada")
-      .reduce((acc, item) => acc + item.quantity, 0)
-
-    const salidas = filteredMovements
-      .filter((item) => item.type === "Salida")
-      .reduce((acc, item) => acc + item.quantity, 0)
-
+    const entradas = filteredMovements.filter((item) => item.type === "Entrada").reduce((acc, item) => acc + item.quantity, 0)
+    const salidas = filteredMovements.filter((item) => item.type === "Salida").reduce((acc, item) => acc + item.quantity, 0)
     const ajustes = filteredMovements.filter((item) => item.type === "Ajuste").length
-
     return { entradas, salidas, ajustes }
   }, [filteredMovements])
 
@@ -127,9 +59,7 @@ export default function KardexPage() {
         <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
           <p className="text-xs uppercase tracking-wide text-violet-600">Trazabilidad de stock</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">Kardex</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Consulta entradas, salidas y ajustes por producto para auditoria y control operativo.
-          </p>
+          <p className="mt-1 text-sm text-slate-600">Consulta entradas, salidas y ajustes por producto para auditoria y control operativo.</p>
         </header>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -196,7 +126,6 @@ export default function KardexPage() {
                   <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Usuario</th>
                 </tr>
               </thead>
-
               <tbody className="divide-y divide-slate-100 bg-white">
                 {filteredMovements.map((movement) => (
                   <tr key={movement.id} className="hover:bg-slate-50">
@@ -241,8 +170,7 @@ export default function KardexPage() {
             Nota operativa
           </p>
           <p className="mt-2 text-sm text-slate-600">
-            Esta vista usa datos de ejemplo. Al conectarla al backend, recomiendo filtrar tambien por rango de fechas
-            y exportar resultados para auditorias.
+            Esta vista usa datos de ejemplo. Al conectarla al backend, recomiendo filtrar tambien por rango de fechas y exportar resultados para auditorias.
           </p>
         </article>
       </div>

@@ -26,12 +26,8 @@ const INVENTORY_ITEMS: InventoryItem[] = [
 const CATEGORIES = ["Todos", "Ropa", "Calzado", "Accesorios"]
 
 function stockStatus(stock: number, minStock: number) {
-  if (stock <= minStock) {
-    return "Critico"
-  }
-  if (stock <= minStock + 4) {
-    return "Bajo"
-  }
+  if (stock <= minStock) return "Critico"
+  if (stock <= minStock + 4) return "Bajo"
   return "Normal"
 }
 
