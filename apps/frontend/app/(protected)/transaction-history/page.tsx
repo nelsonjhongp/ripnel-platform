@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { CreditCard, Filter, ReceiptText, Search } from "lucide-react"
+import { Filter, ReceiptText, Search } from "lucide-react"
 
 type TransactionStatus = "Completada" | "Pendiente" | "Anulada"
 
@@ -17,56 +17,11 @@ type TransactionItem = {
 }
 
 const TRANSACTIONS: TransactionItem[] = [
-  {
-    id: "TRX-10021",
-    date: "2026-03-22 10:15",
-    customer: "Juan Perez",
-    paymentMethod: "Tarjeta",
-    total: 319.8,
-    items: 3,
-    seller: "L. Perez",
-    status: "Completada",
-  },
-  {
-    id: "TRX-10022",
-    date: "2026-03-22 11:08",
-    customer: "Maria Salas",
-    paymentMethod: "Efectivo",
-    total: 89.9,
-    items: 1,
-    seller: "L. Perez",
-    status: "Completada",
-  },
-  {
-    id: "TRX-10023",
-    date: "2026-03-22 12:47",
-    customer: "Empresa Nova SAC",
-    paymentMethod: "Tarjeta",
-    total: 480,
-    items: 4,
-    seller: "C. Silva",
-    status: "Pendiente",
-  },
-  {
-    id: "TRX-10024",
-    date: "2026-03-22 13:19",
-    customer: "Rosa Campos",
-    paymentMethod: "Yape",
-    total: 119.5,
-    items: 1,
-    seller: "C. Silva",
-    status: "Completada",
-  },
-  {
-    id: "TRX-10025",
-    date: "2026-03-22 14:35",
-    customer: "Luis Quispe",
-    paymentMethod: "Efectivo",
-    total: 159,
-    items: 1,
-    seller: "L. Perez",
-    status: "Anulada",
-  },
+  { id: "TRX-10021", date: "2026-03-22 10:15", customer: "Juan Perez", paymentMethod: "Tarjeta", total: 319.8, items: 3, seller: "L. Perez", status: "Completada" },
+  { id: "TRX-10022", date: "2026-03-22 11:08", customer: "Maria Salas", paymentMethod: "Efectivo", total: 89.9, items: 1, seller: "L. Perez", status: "Completada" },
+  { id: "TRX-10023", date: "2026-03-22 12:47", customer: "Empresa Nova SAC", paymentMethod: "Tarjeta", total: 480, items: 4, seller: "C. Silva", status: "Pendiente" },
+  { id: "TRX-10024", date: "2026-03-22 13:19", customer: "Rosa Campos", paymentMethod: "Yape", total: 119.5, items: 1, seller: "C. Silva", status: "Completada" },
+  { id: "TRX-10025", date: "2026-03-22 14:35", customer: "Luis Quispe", paymentMethod: "Efectivo", total: 159, items: 1, seller: "L. Perez", status: "Anulada" },
 ]
 
 const STATUS_OPTIONS: Array<"Todos" | TransactionStatus> = ["Todos", "Completada", "Pendiente", "Anulada"]
@@ -77,6 +32,7 @@ export default function TransactionHistoryPage() {
 
   const filteredTransactions = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase()
+
     return TRANSACTIONS.filter((transaction) => {
       const byStatus = status === "Todos" || transaction.status === status
       const bySearch =
@@ -102,9 +58,7 @@ export default function TransactionHistoryPage() {
         <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
           <p className="text-xs uppercase tracking-wide text-violet-600">Operaciones de venta</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">Historial de transacciones</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Revisa el detalle de ventas realizadas, estado de comprobantes y metodos de pago.
-          </p>
+          <p className="mt-1 text-sm text-slate-600">Revisa el detalle de ventas realizadas, estado de comprobantes y metodos de pago.</p>
         </header>
 
         <div className="grid gap-4 md:grid-cols-3">

@@ -6,6 +6,7 @@ import Image from "next/image"
 import { usePathname } from "next/navigation"
 import {
   ArrowRightLeft,
+  ClipboardList,
   ChevronDown,
   ChevronsUpDown,
   CircleUserRound,
@@ -18,6 +19,7 @@ import {
   Shirt,
   ShoppingBag,
   Store,
+  Boxes,
   Warehouse,
 } from "lucide-react"
 
@@ -80,12 +82,27 @@ const sidebarGroups = [
       { title: "Recepciones pendientes", url: "/transferencias/recepciones-pendientes" },
     ],
   },
+  {
+    title: "Inventario",
+    icon: Boxes,
+    items: [
+      { title: "Stock actual", url: "/inventory" },
+      { title: "Kardex", url: "/kardex" },
+      { title: "Historial de transacciones", url: "/transaction-history" },
+    ],
+  },
 ]
 
 const catalogIcons = {
   Tallas: Ruler,
   Colores: Palette,
   "Tipo de prenda": Shirt,
+}
+
+const inventoryIcons = {
+  "Stock actual": Warehouse,
+  Kardex: ClipboardList,
+  "Historial de transacciones": ReceiptText,
 }
 
 function SidebarLink({
@@ -140,6 +157,8 @@ function SidebarGroupSection({
               const IconComponent =
                 title === "Catalogos"
                   ? catalogIcons[item.title as keyof typeof catalogIcons]
+                  : title === "Inventario"
+                  ? inventoryIcons[item.title as keyof typeof inventoryIcons]
                   : undefined
 
               return (
