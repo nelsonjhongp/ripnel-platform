@@ -1,4 +1,4 @@
-const { createLocation, listLocations } = require('./locations.service');
+const { createLocation, listLocations, patchLocation } = require('./locations.service');
 
 async function getLocations(req, res, next) {
   try {
@@ -26,7 +26,21 @@ async function postLocation(req, res, next) {
   }
 }
 
+async function patchLocationById(req, res, next) {
+  try {
+    const location = await patchLocation(req.params.locationId, req.body);
+
+    res.json({
+      ok: true,
+      data: location,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getLocations,
   postLocation,
+  patchLocationById,
 };

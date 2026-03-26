@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { ModulePlaceholder } from "@/components/modules/module-placeholder"
+import { PricesMockPage } from "@/components/modules/prices-mock-page"
 
 const pricePages: Record<
   string,
@@ -43,18 +43,22 @@ export default async function PricePage({
   params: Promise<{ priceId: string }>
 }) {
   const { priceId } = await params
-  const page = pricePages[priceId]
 
-  if (!page) {
+  if (!pricePages[priceId]) {
     notFound()
   }
 
-  return (
-    <ModulePlaceholder
-      eyebrow="Precios"
-      title={page.title}
-      description={page.description}
-      bullets={page.bullets}
-    />
-  )
+  if (priceId === "listado-de-precios") {
+    return <PricesMockPage mode="list" />
+  }
+
+  if (priceId === "crear-y-editar-precio") {
+    return <PricesMockPage mode="editor" />
+  }
+
+  if (priceId === "regla-mayorista") {
+    return <PricesMockPage mode="rules" />
+  }
+
+  return null
 }

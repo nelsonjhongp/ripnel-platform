@@ -1,28 +1,96 @@
-# RIPNEL Platform
+# &#128085; RIPNEL Platform - MVP
 
-Repositorio base del MVP de inventario y ventas de RIPNEL.
+ERP MVP de RIPNEL orientado a inventario, ventas, precios y transferencias internas, con una arquitectura portable: frontend separado, backend con logica de negocio y PostgreSQL administrado en Supabase.
 
-## Estructura
+![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
+![React](https://img.shields.io/badge/React-19-149ECA?style=for-the-badge&logo=react&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-22-43853D?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![Express](https://img.shields.io/badge/Express-5-1F2937?style=for-the-badge&logo=express&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791?style=for-the-badge&logo=postgresql&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-Postgres-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-Deploy-000000?style=for-the-badge&logo=vercel&logoColor=white)
+![Figma](https://img.shields.io/badge/Figma-Design-F24E1E?style=for-the-badge&logo=figma&logoColor=white)
 
-- `apps/frontend`: aplicacion web en Next.js.
-- `apps/backend`: utilidades y servicios de backend.
-- `database`: scripts SQL y snapshots de esquema.
-- `supabase`: configuracion local y migraciones.
+## Descripcion
 
-## Seguridad y entorno
+RIPNEL Platform busca cubrir el flujo base de un ERP comercial:
 
-- Los archivos `.env` no se suben al repositorio.
-- El backend debe usar `apps/backend/.env` solo en local.
-- El archivo compartible es `apps/backend/.env.example`, con placeholders sin secretos.
-- `supabase/.temp` y otros estados locales quedan ignorados.
+- catalogos operativos;
+- ubicaciones;
+- estilos de producto;
+- variantes con SKU;
+- precios;
+- movimientos posteriores de inventario, ventas y transferencias.
 
-## Puesta en marcha
+El proyecto esta pensado para evolucionar por modulos, manteniendo la logica de negocio en backend y usando SQL explicito sobre PostgreSQL.
 
-1. Instala dependencias del frontend con `npm install --workspace @ripnel/frontend`.
-2. Instala dependencias del backend con `npm install --workspace @ripnel/backend`.
-3. Crea `apps/backend/.env` a partir de `apps/backend/.env.example`.
-4. Levanta el frontend con `npm run dev:frontend`.
+## Arquitectura del proyecto
 
-## Nota
+| Ruta | Rol |
+| --- | --- |
+| `apps/frontend` | Aplicacion web en Next.js con App Router |
+| `apps/backend` | API en Node.js + Express |
+| `database` | Snapshots y referencias SQL |
+| `supabase` | Migraciones, config local y seeds base |
+| `docs` | Documentacion tecnica estable del proyecto |
 
-Si mas adelante agregas variables de entorno en frontend, sigue el mismo patron: archivo local fuera de Git y un `.env.example` con valores de muestra.
+## Stack y reglas base
+
+- Frontend: Next.js 16, React 19, Tailwind CSS 4, shadcn/ui, Radix UI.
+- Backend: Node.js + Express + `pg`.
+- Base de datos: PostgreSQL en Supabase.
+- Persistencia: SQL explicito, sin ORM.
+- Flujo ERP: el frontend consume backend; no habla directo con tablas para operaciones del negocio.
+
+## Inicio rapido
+
+```bash
+npm install
+npm run dev:backend
+npm run dev:frontend
+```
+
+Frontend por defecto:
+
+- `http://localhost:3000`
+
+## Variables de entorno
+
+### Backend
+
+Crear `apps/backend/.env` a partir de `apps/backend/.env.example`.
+
+Variables minimas:
+
+- `PORT`
+- `NODE_ENV`
+- `DATABASE_URL`
+- `JWT_SECRET`
+- `FRONTEND_URL`
+
+### Frontend
+
+Crear `apps/frontend/.env.local` a partir de `apps/frontend/.env.example`.
+
+Variable minima:
+
+- `NEXT_PUBLIC_API_BASE_URL`
+
+## Flujo funcional actual
+
+El flujo base de producto sigue este orden:
+
+`Catalogos -> Estilos -> Variantes -> Precios`
+
+Resumen actual:
+
+- `Estilos` define el style base del producto.
+- `Variantes` configura tallas y colores permitidos y genera SKU.
+- `Barcode` queda para una etapa posterior.
+
+## Documentacion tecnica
+
+- [Workflow Backend + Supabase](./docs/backend-supabase-workflow.md)
+- [Acceso del equipo a Supabase](./docs/supabase-team-access.md)
+- [Flujo de producto](./docs/product-flow.md)
