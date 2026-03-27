@@ -1,10 +1,12 @@
 const { AppError } = require('../../shared/errors');
+const { pool } = require('../../shared/db');
 const {
   findAllPrices,
   findPriceById,
   findStyleById,
   findSizeById,
   insertPrice,
+  closePreviousPricesForNewStart,
   updatePrice,
 } = require('./prices.repo');
 
@@ -109,17 +111,39 @@ async function createPrice(input) {
     throw new AppError('Size is invalid', 400);
   }
 
+  const client = await pool.connect();
+
   try {
-    return await insertPrice({
-      style_id: styleId,
-      size_id: sizeId,
-      price_type: priceType,
-      price,
-      start_date: startDate,
-      end_date: endDate,
-      active,
-    });
+    await client.query('begin');
+
+    await closePreviousPricesForNewStart(
+      {
+        styleId,
+        sizeId,
+        priceType,
+        startDate,
+      },
+      client.query.bind(client)
+    );
+
+    const createdPrice = await insertPrice(
+      {
+        style_id: styleId,
+        size_id: sizeId,
+        price_type: priceType,
+        price,
+        start_date: startDate,
+        end_date: endDate,
+        active,
+      },
+      client.query.bind(client)
+    );
+
+    await client.query('commit');
+    return createdPrice;
   } catch (error) {
+    await client.query('rollback');
+
     if (error.code === '23503') {
       throw new AppError('Price relationships are invalid', 400);
     }
@@ -129,6 +153,8 @@ async function createPrice(input) {
     }
 
     throw error;
+  } finally {
+    client.release();
   }
 }
 
