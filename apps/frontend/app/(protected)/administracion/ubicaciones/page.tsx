@@ -3,12 +3,12 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   Building2,
-  Lock,
-  LockOpen,
   LoaderCircle,
   MapPin,
+  PencilLine,
   Plus,
   RefreshCw,
+  Search,
   Store,
   Warehouse,
 } from "lucide-react";
@@ -83,9 +83,7 @@ function buildLocationCodePreview(name: string, type: LocationItem["type"]) {
     .filter(Boolean)
     .filter(
       (token) =>
-        !["TIENDA", "ALMACEN", "ALMACEN", "TALLER", "TERCERO", "TERCEROS"].includes(
-          token
-        )
+        !["TIENDA", "ALMACEN", "TALLER", "TERCERO", "TERCEROS"].includes(token)
     );
 
   const sourceTokens = tokens.length ? tokens : cleanedName.split(/\s+/).filter(Boolean);
@@ -105,6 +103,10 @@ export default function LocationsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | LocationItem["type"]>("all");
+  const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [manualCodeEnabled, setManualCodeEnabled] = useState(false);
 
@@ -144,12 +146,114 @@ export default function LocationsPage() {
   }, []);
 
   useEffect(() => {
-    if (!manualCodeEnabled) {
+    if (!manualCodeEnabled && !editingLocationId) {
       setFormState((current) =>
         current.code === generatedCode ? current : { ...current, code: generatedCode }
       );
     }
-  }, [generatedCode, manualCodeEnabled]);
+  }, [generatedCode, manualCodeEnabled, editingLocationId]);
+
+  const activeCount = locations.filter((location) => location.active).length;
+  const inactiveCount = locations.length - activeCount;
+  const storeCount = locations.filter((location) => location.type === "store").length;
+  const warehouseCount = locations.filter(
+    (location) => location.type === "warehouse"
+  ).length;
+
+  const filteredLocations = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+
+    return locations.filter((location) => {
+      const matchesStatus =
+        statusFilter === "all" ||
+        (statusFilter === "active" && location.active) ||
+        (statusFilter === "inactive" && !location.active);
+      const matchesType = typeFilter === "all" || location.type === typeFilter;
+
+      if (!matchesStatus || !matchesType) {
+        return false;
+      }
+
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      return [location.name, location.code, location.address, locationTypeLabels[location.type]]
+        .filter((value) => value !== null && value !== undefined)
+        .some((value) => String(value).toLowerCase().includes(normalizedSearch));
+    });
+  }, [locations, search, statusFilter, typeFilter]);
+
+  function resetForm() {
+    setEditingLocationId(null);
+    setFormState(initialFormState);
+    setManualCodeEnabled(false);
+  }
+
+  function updateLocationInList(nextLocation: LocationItem) {
+    setLocations((current) =>
+      current.map((location) =>
+        location.location_id === nextLocation.location_id ? nextLocation : location
+      )
+    );
+  }
+
+  function handleEdit(location: LocationItem) {
+    setEditingLocationId(location.location_id);
+    setFormState({
+      name: location.name,
+      code: location.code || "",
+      type: location.type,
+      address: location.address || "",
+      active: location.active,
+    });
+    setManualCodeEnabled(false);
+    setError(null);
+    setSuccessMessage(null);
+  }
+
+  async function handleToggleActive(location: LocationItem) {
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await fetch(buildApiUrl(`/api/locations/${location.location_id}`), {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          active: !location.active,
+        }),
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.message || "No se pudo actualizar la ubicacion");
+      }
+
+      updateLocationInList(payload.data);
+
+      if (editingLocationId === location.location_id) {
+        setFormState((current) => ({
+          ...current,
+          active: payload.data.active,
+        }));
+      }
+
+      setSuccessMessage(
+        payload.data.active
+          ? "Ubicacion activada correctamente."
+          : "Ubicacion inactivada correctamente."
+      );
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo actualizar la ubicacion"
+      );
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -158,46 +262,64 @@ export default function LocationsPage() {
     setSuccessMessage(null);
 
     try {
-      const response = await fetch(buildApiUrl("/api/locations"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...formState,
-          code: manualCodeEnabled ? formState.code.trim() || null : null,
-          address: formState.address.trim() || null,
-        }),
-      });
+      const isEditing = Boolean(editingLocationId);
+      const response = await fetch(
+        buildApiUrl(
+          isEditing ? `/api/locations/${editingLocationId}` : "/api/locations"
+        ),
+        {
+          method: isEditing ? "PATCH" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(
+            isEditing
+              ? {
+                  name: formState.name,
+                  address: formState.address.trim() || null,
+                  active: formState.active,
+                }
+              : {
+                  ...formState,
+                  code: manualCodeEnabled ? formState.code.trim() || null : null,
+                  address: formState.address.trim() || null,
+                }
+          ),
+        }
+      );
 
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload.message || "No se pudo crear la ubicacion");
+        throw new Error(
+          payload.message ||
+            (isEditing ? "No se pudo actualizar la ubicacion" : "No se pudo crear la ubicacion")
+        );
       }
 
-      setLocations((current) => [payload.data, ...current]);
-      setFormState(initialFormState);
-      setManualCodeEnabled(false);
-      setSuccessMessage(
-        `Ubicacion creada correctamente con codigo ${payload.data.code}.`
-      );
+      if (isEditing) {
+        updateLocationInList(payload.data);
+        setSuccessMessage("Ubicacion actualizada correctamente.");
+      } else {
+        setLocations((current) => [payload.data, ...current]);
+        setSuccessMessage(
+          `Ubicacion creada correctamente con codigo ${payload.data.code}.`
+        );
+      }
+
+      resetForm();
     } catch (requestError) {
       setError(
         requestError instanceof Error
           ? requestError.message
+          : editingLocationId
+          ? "No se pudo actualizar la ubicacion"
           : "No se pudo crear la ubicacion"
       );
     } finally {
       setSubmitting(false);
     }
   }
-
-  const activeCount = locations.filter((location) => location.active).length;
-  const storeCount = locations.filter((location) => location.type === "store").length;
-  const warehouseCount = locations.filter(
-    (location) => location.type === "warehouse"
-  ).length;
 
   return (
     <section className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_45%,#eef2ff_100%)] p-4 md:p-5">
@@ -212,9 +334,8 @@ export default function LocationsPage() {
                 Ubicaciones
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                Primer modulo operativo conectado al backend. Desde aqui puedes
-                listar sedes y crear tiendas, almacenes, talleres o ubicaciones
-                de terceros siguiendo el esquema real de la base.
+                Modulo operativo conectado al backend. Desde aqui puedes listar,
+                crear, editar de forma segura y activar o inactivar sedes reales.
               </p>
             </div>
 
@@ -253,6 +374,83 @@ export default function LocationsPage() {
                 {warehouseCount}
               </p>
             </article>
+            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4 md:col-span-3">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="relative w-full max-w-md">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Buscar por nombre, codigo, direccion o tipo"
+                    className="w-full rounded-2xl border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-violet-400"
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("all")}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                      statusFilter === "all"
+                        ? "bg-slate-900 text-white"
+                        : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    Todos ({locations.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("active")}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                      statusFilter === "active"
+                        ? "bg-emerald-600 text-white"
+                        : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    Activas ({activeCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter("inactive")}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                      statusFilter === "inactive"
+                        ? "bg-slate-600 text-white"
+                        : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    Inactivas ({inactiveCount})
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTypeFilter("all")}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    typeFilter === "all"
+                      ? "bg-violet-600 text-white"
+                      : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  Todos los tipos
+                </button>
+                {locationTypeOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setTypeFilter(option.value)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                      typeFilter === option.value
+                        ? "bg-violet-600 text-white"
+                        : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </article>
           </div>
         </div>
 
@@ -268,7 +466,7 @@ export default function LocationsPage() {
                 </h2>
               </div>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                {locations.length} registros
+                {filteredLocations.length} visibles
               </span>
             </div>
 
@@ -277,15 +475,17 @@ export default function LocationsPage() {
                 <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
                 Cargando ubicaciones...
               </div>
-            ) : locations.length ? (
+            ) : filteredLocations.length ? (
               <div className="mt-4 space-y-3">
-                {locations.map((location) => {
+                {filteredLocations.map((location) => {
                   const Icon = typeIcon(location.type);
 
                   return (
                     <div
                       key={location.location_id}
-                      className="rounded-2xl border border-slate-200 p-4 transition hover:border-slate-300"
+                      className={`rounded-2xl border border-slate-200 p-4 transition hover:border-slate-300 ${
+                        location.active ? "" : "bg-slate-50/80 opacity-80"
+                      }`}
                     >
                       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div className="flex items-start gap-3">
@@ -311,9 +511,31 @@ export default function LocationsPage() {
                               </span>
                             </div>
                             <p className="mt-1 text-sm text-slate-500">
-                              {location.code || "Sin codigo"}{" "}
-                              {location.address ? `• ${location.address}` : ""}
+                              {location.code || "Sin codigo"}
+                              {location.address ? ` - ${location.address}` : ""}
                             </p>
+
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleEdit(location)}
+                                className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                              >
+                                <PencilLine className="h-3.5 w-3.5" />
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleActive(location)}
+                                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                                  location.active
+                                    ? "bg-slate-900 text-white hover:bg-slate-800"
+                                    : "bg-emerald-600 text-white hover:bg-emerald-700"
+                                }`}
+                              >
+                                {location.active ? "Inactivar" : "Activar"}
+                              </button>
+                            </div>
                           </div>
                         </div>
 
@@ -329,12 +551,12 @@ export default function LocationsPage() {
             ) : (
               <div className="mt-4 rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
                 <h3 className="text-lg font-semibold text-slate-900">
-                  Aun no hay ubicaciones
+                  {locations.length ? "No hay resultados para este filtro" : "Aun no hay ubicaciones"}
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Puedes comenzar creando la primera tienda o almacen desde el
-                  formulario lateral. Este modulo ya habla con `locations` en
-                  PostgreSQL.
+                  {locations.length
+                    ? "Prueba otro texto de busqueda o cambia los filtros de estado y tipo."
+                    : "Puedes comenzar creando la primera tienda o almacen desde el formulario lateral."}
                 </p>
               </div>
             )}
@@ -343,14 +565,15 @@ export default function LocationsPage() {
           <article className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)] md:p-6">
             <div className="border-b border-slate-200 pb-4">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                Nuevo registro
+                {editingLocationId ? "Edicion segura" : "Nuevo registro"}
               </p>
               <h2 className="mt-1 text-xl font-semibold text-slate-950">
-                Crear ubicacion
+                {editingLocationId ? "Editar ubicacion" : "Crear ubicacion"}
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-500">
-                Base minima para administrar sedes sin salir del estilo actual
-                del panel.
+                {editingLocationId
+                  ? "Solo se habilitan nombre, direccion y estado. Codigo y tipo quedan bloqueados."
+                  : "Base minima para administrar sedes sin salir del estilo actual del panel."}
               </p>
             </div>
 
@@ -379,36 +602,28 @@ export default function LocationsPage() {
                     <label className="text-sm font-medium text-slate-700">
                       Codigo
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setManualCodeEnabled((current) => {
-                          const next = !current;
+                    {!editingLocationId ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setManualCodeEnabled((current) => {
+                            const next = !current;
 
-                          if (!next) {
-                            setFormState((state) => ({
-                              ...state,
-                              code: generatedCode,
-                            }));
-                          }
+                            if (!next) {
+                              setFormState((state) => ({
+                                ...state,
+                                code: generatedCode,
+                              }));
+                            }
 
-                          return next;
-                        });
-                      }}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 transition hover:text-indigo-700"
-                    >
-                      {manualCodeEnabled ? (
-                        <>
-                          <LockOpen className="h-3.5 w-3.5" />
-                          Manual
-                        </>
-                      ) : (
-                        <>
-                          <Lock className="h-3.5 w-3.5" />
-                          Automatico
-                        </>
-                      )}
-                    </button>
+                            return next;
+                          });
+                        }}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 transition hover:text-indigo-700"
+                      >
+                        {manualCodeEnabled ? "Manual" : "Automatico"}
+                      </button>
+                    ) : null}
                   </div>
                   <input
                     value={formState.code}
@@ -419,11 +634,13 @@ export default function LocationsPage() {
                       }))
                     }
                     placeholder="TD-CEN"
-                    disabled={!manualCodeEnabled}
+                    disabled={editingLocationId !== null || !manualCodeEnabled}
                     className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-violet-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                   />
                   <p className="text-xs leading-5 text-slate-500">
-                    {manualCodeEnabled
+                    {editingLocationId
+                      ? "El codigo queda bloqueado en edicion para mantener estabilidad operativa."
+                      : manualCodeEnabled
                       ? "Puedes editar el codigo manualmente. Si repites uno existente, el backend lo rechazara."
                       : `Vista previa autogenerada: ${generatedCode}. Si ya existe, el backend creara una variante unica.`}
                   </p>
@@ -441,7 +658,8 @@ export default function LocationsPage() {
                         type: event.target.value as LocationItem["type"],
                       }))
                     }
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-violet-400"
+                    disabled={editingLocationId !== null}
+                    className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-violet-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                   >
                     {locationTypeOptions.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -481,7 +699,7 @@ export default function LocationsPage() {
                   }
                   className="h-4 w-4 rounded border-slate-300"
                 />
-                Crear como ubicacion activa
+                {editingLocationId ? "Mantener ubicacion activa" : "Crear como ubicacion activa"}
               </label>
 
               {error ? (
@@ -496,23 +714,40 @@ export default function LocationsPage() {
                 </div>
               ) : null}
 
-              <button
-                type="submit"
-                disabled={submitting}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {submitting ? (
-                  <>
-                    <LoaderCircle className="h-4 w-4 animate-spin" />
-                    Guardando...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-4 w-4" />
-                    Crear ubicacion
-                  </>
-                )}
-              </button>
+              <div className="grid gap-3 md:grid-cols-2">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {submitting ? (
+                    <>
+                      <LoaderCircle className="h-4 w-4 animate-spin" />
+                      Guardando...
+                    </>
+                  ) : editingLocationId ? (
+                    <>
+                      <PencilLine className="h-4 w-4" />
+                      Guardar cambios
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4" />
+                      Crear ubicacion
+                    </>
+                  )}
+                </button>
+
+                {editingLocationId ? (
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="inline-flex w-full items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                  >
+                    Cancelar edicion
+                  </button>
+                ) : null}
+              </div>
             </form>
           </article>
         </div>

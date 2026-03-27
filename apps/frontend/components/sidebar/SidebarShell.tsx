@@ -37,6 +37,9 @@ export function SidebarShell({
       "/inicio": "Inicio",
       "/account-mockup": "Cuenta mockup",
       "/admin-crud": "Gestion de usuarios",
+      "/inventory": "Inventario",
+      "/kardex": "Kardex",
+      "/transaction-history": "Historial de transacciones",
     }
 
     if (routeTitles[pathname]) {

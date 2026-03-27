@@ -6,6 +6,7 @@ import Image from "next/image"
 import { usePathname } from "next/navigation"
 import {
   ArrowRightLeft,
+  ClipboardList,
   ChevronDown,
   ChevronsUpDown,
   CircleUserRound,
@@ -17,7 +18,9 @@ import {
   Settings,
   Shirt,
   ShoppingBag,
+  ShoppingCart,
   Store,
+  Boxes,
   Warehouse,
 } from "lucide-react"
 
@@ -52,6 +55,9 @@ const sidebarGroups = [
       { title: "Tallas", url: "/catalogos/tallas" },
       { title: "Colores", url: "/catalogos/colores" },
       { title: "Tipo de prenda", url: "/catalogos/tipo-prenda" },
+      { title: "Telas", url: "/catalogos/telas" },
+      { title: "Detalle de tela", url: "/catalogos/detalle-de-tela" },
+      { title: "Targets", url: "/catalogos/targets" },
     ],
   },
   {
@@ -80,12 +86,38 @@ const sidebarGroups = [
       { title: "Recepciones pendientes", url: "/transferencias/recepciones-pendientes" },
     ],
   },
+  {
+    title: "Compra",
+    icon: ShoppingCart,
+    items: [
+      { title: "Nueva compra", url: "/purchase-system" },
+      { title: "Checkout", url: "/purchase-system/checkout" },
+      { title: "Pago", url: "/purchase-system/checkout-payment" },
+    ],
+  },
+  {
+    title: "Inventario",
+    icon: Boxes,
+    items: [
+      { title: "Stock actual", url: "/inventory" },
+      { title: "Kardex", url: "/kardex" },
+      { title: "Historial de transacciones", url: "/transaction-history" },
+    ],
+  },
 ]
 
 const catalogIcons = {
   Tallas: Ruler,
   Colores: Palette,
   "Tipo de prenda": Shirt,
+  Telas: Shirt,
+  "Detalle de tela": Shirt,
+}
+
+const inventoryIcons = {
+  "Stock actual": Warehouse,
+  Kardex: ClipboardList,
+  "Historial de transacciones": ReceiptText,
 }
 
 function SidebarLink({
@@ -140,6 +172,8 @@ function SidebarGroupSection({
               const IconComponent =
                 title === "Catalogos"
                   ? catalogIcons[item.title as keyof typeof catalogIcons]
+                  : title === "Inventario"
+                  ? inventoryIcons[item.title as keyof typeof inventoryIcons]
                   : undefined
 
               return (
