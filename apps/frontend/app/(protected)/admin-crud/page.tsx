@@ -180,11 +180,11 @@ export default function AdminCrud() {
           placeholder="Buscar usuario..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          className="flex-1 px-4 py-2 border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 text-gray-900"
+          className="flex-1 px-4 py-2 border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
         />
         <button
           onClick={() => abrirFormulario()}
-          className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-2 rounded-lg font-semibold transition cursor-pointer disabled:opacity-50"
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-semibold transition cursor-pointer disabled:opacity-50"
           disabled={loadingUsers}
         >
           + Nuevo Usuario
@@ -205,7 +205,7 @@ export default function AdminCrud() {
                   type="text"
                   value={formData.full_name}
                   onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                  className="w-full px-3 py-2 border text-gray-900 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  className="w-full px-3 py-2 border text-gray-900 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   placeholder="Nombre completo"
                 />
               </div>
@@ -215,7 +215,7 @@ export default function AdminCrud() {
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3 py-2 border text-gray-900 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  className="w-full px-3 py-2 border text-gray-900 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   placeholder="correo@ripnel.com"
                 />
               </div>
@@ -224,7 +224,7 @@ export default function AdminCrud() {
                 <select
                   value={formData.role_id}
                   onChange={(e) => setFormData({ ...formData, role_id: e.target.value })}
-                  className="w-full px-3 py-2 border text-gray-900 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  className="w-full px-3 py-2 border text-gray-900 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="">Seleccionar rol...</option>
                   {roles.map(r => (
@@ -237,7 +237,7 @@ export default function AdminCrud() {
               <button
                 onClick={guardarUsuario}
                 disabled={loadingForm}
-                className="flex-1 bg-violet-600 hover:bg-violet-700 text-white py-2 rounded-lg font-semibold transition cursor-pointer disabled:opacity-50"
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-semibold transition cursor-pointer disabled:opacity-50"
               >
                 {loadingForm ? 'Guardando...' : 'Guardar'}
               </button>
@@ -276,7 +276,7 @@ export default function AdminCrud() {
                   <td className="px-6 py-3 text-sm text-gray-900">{usuario.full_name}</td>
                   <td className="px-6 py-3 text-sm text-gray-600">{usuario.email}</td>
                   <td className="px-6 py-3 text-sm">
-                    <span className="bg-violet-100 text-violet-800 px-2 py-1 rounded text-xs font-semibold">
+                    <span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-semibold">
                       {roles.find(r => r.role_id === usuario.role_id)?.name || 'N/A'}
                     </span>
                   </td>
@@ -330,11 +330,11 @@ export default function AdminCrud() {
           placeholder="Buscar rol..."
           value={busquedaRol}
           onChange={(e) => setBusquedaRol(e.target.value)}
-          className="flex-1 px-4 py-2 border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 text-gray-900"
+          className="flex-1 px-4 py-2 border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
         />
         <button
           onClick={() => abrirFormularioRol()}
-          className="bg-violet-600 hover:bg-violet-700 text-white px-6 py-2 rounded-lg font-semibold transition cursor-pointer disabled:opacity-50"
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-semibold transition cursor-pointer disabled:opacity-50"
           disabled={loadingRoles}
         >
           + Nuevo Rol
@@ -355,7 +355,7 @@ export default function AdminCrud() {
                   type="text"
                   value={formDataRol.name}
                   onChange={(e) => setFormDataRol({ ...formDataRol, name: e.target.value })}
-                  className="w-full px-3 py-2 border text-gray-900 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  className="w-full px-3 py-2 border text-gray-900 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   placeholder="Nombre del rol"
                 />
               </div>
@@ -364,7 +364,7 @@ export default function AdminCrud() {
                 <textarea
                   value={formDataRol.description}
                   onChange={(e) => setFormDataRol({ ...formDataRol, description: e.target.value })}
-                  className="w-full px-3 py-2 border text-gray-900 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  className="w-full px-3 py-2 border text-gray-900 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   placeholder="Descripción del rol"
                   rows={3}
                 />
@@ -374,7 +374,7 @@ export default function AdminCrud() {
               <button
                 onClick={guardarRol}
                 disabled={loadingFormRol}
-                className="flex-1 bg-violet-600 hover:bg-violet-700 text-white py-2 rounded-lg font-semibold transition cursor-pointer disabled:opacity-50"
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-semibold transition cursor-pointer disabled:opacity-50"
               >
                 {loadingFormRol ? 'Guardando...' : 'Guardar'}
               </button>
@@ -409,7 +409,7 @@ export default function AdminCrud() {
               {rolesFiltrados.map(rol => (
                 <tr key={rol.role_id} className="border-b hover:bg-gray-50 transition">
                   <td className="px-6 py-3 text-sm text-gray-900">
-                    <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-semibold">
+                    <span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-semibold">
                       {rol.name}
                     </span>
                   </td>
