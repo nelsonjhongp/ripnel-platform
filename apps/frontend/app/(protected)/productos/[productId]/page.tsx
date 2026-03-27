@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation"
 import { ModulePlaceholder } from "@/components/modules/module-placeholder"
+import { StylesPage } from "@/components/modules/styles-page"
+import { VariantsPage } from "@/components/modules/variants-page"
 
 const productPages: Record<
   string,
@@ -7,22 +9,22 @@ const productPages: Record<
 > = {
   estilos: {
     title: "Estilos de producto",
-    description: "Espacio para manejar styles, combinaciones base y definicion comercial de cada producto.",
+    description: "Modulo para registrar el style base y su definicion comercial antes de configurar variantes.",
     bullets: [
       "Crear estilos con nombre, codigo y atributos maestros.",
-      "Relacionar tallas, colores y reglas comerciales.",
+      "Mantener tela, target y detalle comercial del producto.",
       "Visualizar estado activo y vigencia del style.",
-      "Servira como nodo principal de precios y variantes.",
+      "Servira como nodo principal para variantes y precios.",
     ],
   },
   variantes: {
     title: "Variantes de producto",
-    description: "Vista pensada para controlar SKU finales por talla, color y otras combinaciones.",
+    description: "Modulo operativo para configurar tallas, colores y generar SKU por combinacion.",
     bullets: [
-      "Generar SKU y barcode desde el style base.",
-      "Consultar stock por variante y ubicacion.",
+      "Configurar tallas y colores permitidos sobre el style base.",
+      "Generar SKU en lote y dejar barcode opcional.",
       "Preparar inventario, ventas y transferencias.",
-      "Lista para integrarse con el backend transaccional.",
+      "Validar combinaciones unicas por talla y color.",
     ],
   },
 }
@@ -37,6 +39,14 @@ export default async function ProductPage({
 
   if (!page) {
     notFound()
+  }
+
+  if (productId === "estilos") {
+    return <StylesPage />
+  }
+
+  if (productId === "variantes") {
+    return <VariantsPage />
   }
 
   return (

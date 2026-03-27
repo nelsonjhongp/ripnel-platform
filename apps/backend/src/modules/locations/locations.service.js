@@ -2,7 +2,9 @@ const { AppError } = require('../../shared/errors');
 const {
   findAllLocations,
   insertLocation,
+  findLocationById,
   findLocationCodesByPrefix,
+  updateLocation,
 } = require('./locations.repo');
 const {
   formatManualLocationCode,
@@ -52,8 +54,51 @@ async function createLocation(input) {
   }
 }
 
+async function patchLocation(locationId, input) {
+  const normalizedLocationId = String(locationId || '').trim();
+
+  if (!normalizedLocationId) {
+    throw new AppError('Location id is required', 400);
+  }
+
+  if ('code' in input || 'type' in input) {
+    throw new AppError('Location code and type cannot be updated', 400);
+  }
+
+  const existingLocation = await findLocationById(normalizedLocationId);
+
+  if (!existingLocation) {
+    throw new AppError('Location not found', 404);
+  }
+
+  if (!('name' in input) && !('address' in input) && !('active' in input)) {
+    throw new AppError('No editable fields were provided for location', 400);
+  }
+
+  const name = 'name' in input ? input.name?.trim() : existingLocation.name;
+  const address =
+    'address' in input ? input.address?.trim() || null : existingLocation.address;
+  const active = 'active' in input ? input.active : existingLocation.active;
+
+  if (!name) {
+    throw new AppError('Location name is required', 400);
+  }
+
+  if (typeof active !== 'boolean') {
+    throw new AppError('Location active state is invalid', 400);
+  }
+
+  return updateLocation({
+    locationId: normalizedLocationId,
+    name,
+    address,
+    active,
+  });
+}
+
 module.exports = {
   listLocations,
   createLocation,
+  patchLocation,
   ALLOWED_LOCATION_TYPES,
 };

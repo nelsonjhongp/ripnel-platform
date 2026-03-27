@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import FormField from "./ui/FormField";
 import CustomButton from "./ui/CustomButton";
@@ -14,9 +15,11 @@ export default function LoginRipnel() {
 
     return (
       <div className="w-3xs mx-auto flex flex-col items-center justify-center min-h-screen py-2">
-      <img
+      <Image
         src="/login_user.png"
-        alt="Vercel Logo"
+        alt="Usuario Ripnel"
+        width={64}
+        height={64}
         className="h-16 w-auto"
       />
 
