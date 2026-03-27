@@ -97,8 +97,8 @@ async function findSizeById(sizeId) {
   return result.rows[0] || null;
 }
 
-async function insertPrice(payload) {
-  const result = await query(
+async function insertPrice(payload, executor = query) {
+  const result = await executor(
     `insert into style_size_prices (
        style_id,
        size_id,
@@ -132,6 +132,24 @@ async function insertPrice(payload) {
   );
 
   return result.rows[0] || null;
+}
+
+async function closePreviousPricesForNewStart(
+  { styleId, sizeId, priceType, startDate },
+  executor = query
+) {
+  await executor(
+    `update style_size_prices
+     set
+       end_date = ($4::date - interval '1 day')::date,
+       updated_at = current_timestamp
+     where style_id = $1
+       and size_id = $2
+       and price_type = $3
+       and start_date < $4::date
+       and (end_date is null or end_date >= $4::date)`,
+    [styleId, sizeId, priceType, startDate]
+  );
 }
 
 async function updatePrice(priceId, payload) {
@@ -168,5 +186,6 @@ module.exports = {
   findStyleById,
   findSizeById,
   insertPrice,
+  closePreviousPricesForNewStart,
   updatePrice,
 };

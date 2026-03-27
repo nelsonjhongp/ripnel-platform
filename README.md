@@ -83,11 +83,35 @@ El flujo base de producto sigue este orden:
 
 `Catalogos -> Estilos -> Variantes -> Precios`
 
-Resumen actual:
+Qué se cambió
 
-- `Estilos` define el style base del producto.
-- `Variantes` configura tallas y colores permitidos y genera SKU.
-- `Barcode` queda para una etapa posterior.
+Editor de precios ahora selecciona por style_size_price_id y muestra style+talla en el selector.
+Cambio en list-prices.tsx.
+Antes buscaba por style_code (ambiguo si había varias tallas del mismo style).
+Ahora usa el id único del precio para seleccionar/editar la fila correcta.
+Creación de precios envuelta en transacción para cierre de vigencia + inserción.
+Cambios en prices.service.js y prices.repo.js.
+Flujo transaccional:
+BEGIN
+closePreviousPricesForNewStart
+insertPrice
+COMMIT
+Si algo falla: ROLLBACK.
+API real para pricing_rules implementada y conectada al frontend.
+Nuevos archivos backend:
+pricing-rules.repo.js
+pricing-rules.service.js
+pricing-rules.controller.js
+pricing-rules.routes.js
+Registro de rutas en app.js:
+GET /api/pricing-rules
+POST /api/pricing-rules
+PATCH /api/pricing-rules/:ruleId
+Vista rules conectada en list-prices.tsx:
+Carga reglas reales
+Crea regla si no existe
+Edita regla existente
+Muestra listado real de reglas
 
 ## Documentacion tecnica
 

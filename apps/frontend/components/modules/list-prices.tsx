@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarRange, PencilLine, ReceiptText, Search, Tags } from "lucide-react";
+import { PencilLine, Search } from "lucide-react";
 import { buildApiUrl } from "@/lib/api";
 
 type PriceMode = "list" | "editor" | "rules";
@@ -19,6 +19,25 @@ type PriceRow = {
   active: boolean;
   validity_status: "active" | "scheduled" | "expired" | "inactive";
 };
+
+type PricingRuleRow = {
+  rule_id: string;
+  rule_type: string;
+  min_qty: number;
+  active: boolean;
+  valid_from: string | null;
+  valid_to: string | null;
+};
+
+function formatDate(dateStr: string | null) {
+  if (!dateStr) return "—";
+  return new Intl.DateTimeFormat("es-PE", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(dateStr));
+}
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("es-PE", {
@@ -45,7 +64,6 @@ function StatusBadge({ status }: { status: PriceRow["validity_status"] | string 
 
 function PriceListView() {
   const [priceRows, setPriceRows] = useState<PriceRow[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
@@ -54,8 +72,7 @@ function PriceListView() {
       .then((payload) => {
         setPriceRows(payload.data || []);
       })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .catch(console.error);
   }, []);
 
   const filteredRows = useMemo(() => {
@@ -70,7 +87,7 @@ function PriceListView() {
         row.style_code.toLowerCase().includes(normalizedSearch) ||
         row.style_name.toLowerCase().includes(normalizedSearch)
     );
-  }, [search]);
+  }, [priceRows, search]);
 
   return (
     <div className="space-y-5">
@@ -81,10 +98,6 @@ function PriceListView() {
               Precios
             </p>
             <h1 className="mt-2 text-2xl font-semibold text-slate-950">Listado de precios</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-              Mockup operativo para revisar vigencias y precios por style y talla
-              antes de conectar el modulo a `style_size_prices`.
-            </p>
           </div>
 
           <div className="relative w-full max-w-sm">
@@ -92,7 +105,7 @@ function PriceListView() {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar por style, codigo o tipo"
+              placeholder="Buscar por código o nombre"
               className="w-full rounded-2xl border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-violet-400"
             />
           </div>
@@ -140,7 +153,7 @@ function PriceListView() {
         <div className="mt-4 space-y-3">
           {filteredRows.map((row) => (
             <div
-              key={row.style_code}
+              key={row.style_size_price_id}
               className="rounded-2xl border border-slate-200 p-4 transition hover:border-slate-300"
             >
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -161,8 +174,8 @@ function PriceListView() {
                 </div>
 
                 <div className="text-sm text-slate-500 md:text-right">
-                  <p>{row.price_type}</p>
-                  <p className="mt-1">{row.start_date}</p>
+                  <p className="capitalize">{row.price_type}</p>
+                  <p className="mt-1">{formatDate(row.start_date)}</p>
                 </div>
               </div>
             </div>
@@ -175,21 +188,105 @@ function PriceListView() {
 
 function PriceEditorView() {
   const [priceRows, setPriceRows] = useState<PriceRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedCode, setSelectedCode] = useState("");
+  const [selectedPriceId, setSelectedPriceId] = useState("");
+  const [priceInput, setPriceInput] = useState("");
+  const [startDateInput, setStartDateInput] = useState("");
+  const [endDateInput, setEndDateInput] = useState("");
+  const [activeInput, setActiveInput] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(buildApiUrl("/api/prices"), { cache: "no-store" })
       .then((res) => res.json())
       .then((payload) => {
         setPriceRows(payload.data || []);
-        setSelectedCode((payload.data || [])[0]?.style_code || "");
+        setSelectedPriceId((payload.data || [])[0]?.style_size_price_id || "");
       })
       .catch(console.error)
-      .finally(() => setLoading(false));
+      .finally(() => undefined);
   }, []);
 
-  const selectedRow = priceRows.find((row) => row.style_code === selectedCode) || priceRows[0];
+  const selectedRow =
+    priceRows.find((row) => row.style_size_price_id === selectedPriceId) || priceRows[0];
+
+  useEffect(() => {
+    if (!selectedRow) {
+      setPriceInput("");
+      setStartDateInput("");
+      setEndDateInput("");
+      setActiveInput(true);
+      return;
+    }
+
+    setPriceInput(String(selectedRow.price));
+    setStartDateInput(selectedRow.start_date?.slice(0, 10) || "");
+    setEndDateInput(selectedRow.end_date?.slice(0, 10) || "");
+    setActiveInput(selectedRow.active);
+    setSaveMessage(null);
+    setSaveError(null);
+  }, [selectedRow]);
+
+  async function handleSavePrice() {
+    if (!selectedRow) {
+      return;
+    }
+
+    const payload = {
+      price: Number(priceInput),
+      start_date: startDateInput,
+      end_date: endDateInput || null,
+      active: activeInput,
+    };
+
+    setSaving(true);
+    setSaveMessage(null);
+    setSaveError(null);
+
+    try {
+      const response = await fetch(
+        buildApiUrl(`/api/prices/${selectedRow.style_size_price_id}`),
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result?.message || "No se pudo actualizar el precio");
+      }
+
+      const updated = result?.data;
+
+      if (!updated) {
+        throw new Error("La API no devolvio el precio actualizado");
+      }
+
+      setPriceRows((currentRows) =>
+        currentRows.map((row) =>
+          row.style_size_price_id === selectedRow.style_size_price_id
+            ? {
+                ...row,
+                price: Number(updated.price),
+                start_date: updated.start_date,
+                end_date: updated.end_date,
+                active: updated.active,
+              }
+            : row
+        )
+      );
+
+      setSaveMessage("Precio actualizado correctamente");
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "No se pudo actualizar el precio");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -217,13 +314,13 @@ function PriceEditorView() {
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-slate-700">Style</label>
               <select
-                value={selectedCode}
-                onChange={(event) => setSelectedCode(event.target.value)}
+                value={selectedRow?.style_size_price_id || ""}
+                onChange={(event) => setSelectedPriceId(event.target.value)}
                 className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-violet-400"
               >
                 {priceRows.map((row) => (
-                  <option key={row.style_code} value={row.style_code}>
-                    {row.style_code} - {row.style_name}
+                  <option key={row.style_size_price_id} value={row.style_size_price_id}>
+                    {row.style_code} - {row.style_name} - Talla {row.size_code}
                   </option>
                 ))}
               </select>
@@ -231,10 +328,11 @@ function PriceEditorView() {
 
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-slate-700">Tipo de precio</label>
-              <select className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-violet-400">
-                <option>Retail</option>
-                <option>Wholesale</option>
-              </select>
+              <input
+                disabled
+                value={selectedRow?.price_type || ""}
+                className="w-full rounded-2xl border border-slate-300 bg-slate-100 px-3 py-2.5 text-sm capitalize text-slate-600 outline-none"
+              />
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
@@ -242,7 +340,8 @@ function PriceEditorView() {
                 <label className="text-sm font-medium text-slate-700">Inicio de vigencia</label>
                 <input
                   type="date"
-                  defaultValue="2026-03-26"
+                  value={startDateInput}
+                  onChange={(event) => setStartDateInput(event.target.value)}
                   className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-violet-400"
                 />
               </div>
@@ -250,15 +349,34 @@ function PriceEditorView() {
                 <label className="text-sm font-medium text-slate-700">Fin de vigencia</label>
                 <input
                   type="date"
+                  value={endDateInput}
+                  onChange={(event) => setEndDateInput(event.target.value)}
                   className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-violet-400"
                 />
               </div>
             </div>
 
-            <button className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700">
+            <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={activeInput}
+                onChange={(event) => setActiveInput(event.target.checked)}
+                className="h-4 w-4 rounded border-slate-300"
+              />
+              Precio activo
+            </label>
+
+            <button
+              onClick={handleSavePrice}
+              disabled={!selectedRow || saving}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
               <PencilLine className="h-4 w-4" />
-              Guardar mockup
+              {saving ? "Guardando..." : "Guardar"}
             </button>
+
+            {saveMessage ? <p className="text-sm text-emerald-700">{saveMessage}</p> : null}
+            {saveError ? <p className="text-sm text-rose-700">{saveError}</p> : null}
           </div>
         </article>
 
@@ -284,7 +402,7 @@ function PriceEditorView() {
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Inicio vigencia
               </p>
-              <p className="mt-2 text-lg font-semibold text-slate-900">{selectedRow?.start_date}</p>
+              <p className="mt-2 text-lg font-semibold text-slate-900">{formatDate(selectedRow?.start_date ?? null)}</p>
             </article>
           </div>
 
@@ -297,7 +415,8 @@ function PriceEditorView() {
                 </div>
                 <input
                   type="text"
-                  defaultValue={selectedRow.price.toFixed(2)}
+                  value={priceInput}
+                  onChange={(event) => setPriceInput(event.target.value)}
                   className="w-28 rounded-xl border border-slate-300 bg-white px-3 py-2 text-right text-sm outline-none transition focus:border-violet-400"
                 />
               </div>
@@ -310,18 +429,102 @@ function PriceEditorView() {
 }
 
 function WholesaleRulesView() {
-  const [priceRows, setPriceRows] = useState<PriceRow[]>([]);
+  const [rules, setRules] = useState<PricingRuleRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [minQtyInput, setMinQtyInput] = useState("3");
+  const [activeInput, setActiveInput] = useState(true);
+  const [validFromInput, setValidFromInput] = useState("");
+  const [validToInput, setValidToInput] = useState("");
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const selectedRule =
+    rules.find((rule) => rule.rule_type === "WHOLESALE_MIN_QTY_TOTAL") || rules[0] || null;
 
   useEffect(() => {
-    fetch(buildApiUrl("/api/prices"), { cache: "no-store" })
+    fetch(buildApiUrl("/api/pricing-rules"), { cache: "no-store" })
       .then((res) => res.json())
       .then((payload) => {
-        setPriceRows(payload.data || []);
+        setRules(payload.data || []);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!selectedRule) {
+      return;
+    }
+
+    setMinQtyInput(String(selectedRule.min_qty));
+    setActiveInput(selectedRule.active);
+    setValidFromInput(selectedRule.valid_from?.slice(0, 10) || "");
+    setValidToInput(selectedRule.valid_to?.slice(0, 10) || "");
+    setSaveMessage(null);
+    setSaveError(null);
+  }, [selectedRule]);
+
+  async function handleSaveRule() {
+    const payload = {
+      min_qty: Number(minQtyInput),
+      active: activeInput,
+      valid_from: validFromInput || null,
+      valid_to: validToInput || null,
+    };
+
+    setSaving(true);
+    setSaveMessage(null);
+    setSaveError(null);
+
+    try {
+      if (selectedRule) {
+        const response = await fetch(
+          buildApiUrl(`/api/pricing-rules/${selectedRule.rule_id}`),
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          }
+        );
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result?.message || "No se pudo actualizar la regla");
+        }
+
+        setRules((currentRules) =>
+          currentRules.map((rule) =>
+            rule.rule_id === selectedRule.rule_id ? result.data : rule
+          )
+        );
+      } else {
+        const response = await fetch(buildApiUrl("/api/pricing-rules"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            rule_type: "WHOLESALE_MIN_QTY_TOTAL",
+            ...payload,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result?.message || "No se pudo crear la regla");
+        }
+
+        setRules((currentRules) => [...currentRules, result.data]);
+      }
+
+      setSaveMessage("Regla mayorista guardada correctamente");
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "No se pudo guardar la regla");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -331,8 +534,7 @@ function WholesaleRulesView() {
         </p>
         <h1 className="mt-2 text-2xl font-semibold text-slate-950">Regla mayorista</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-          Mockup de reglas comerciales por cantidad, pensado para aterrizar el flujo
-          antes de conectar `pricing_rules`.
+          Configura la regla comercial mayorista por cantidad minima total.
         </p>
       </div>
 
@@ -349,7 +551,8 @@ function WholesaleRulesView() {
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-slate-700">Nombre</label>
               <input
-                defaultValue="Mayorista 6+ prendas"
+                defaultValue="Mayorista 3+ prendas"
+                disabled
                 className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-violet-400"
               />
             </div>
@@ -359,17 +562,23 @@ function WholesaleRulesView() {
                 <label className="text-sm font-medium text-slate-700">Cantidad minima</label>
                 <input
                   type="number"
-                  defaultValue={6}
+                  min={1}
+                  value={minQtyInput}
+                  onChange={(event) => setMinQtyInput(event.target.value)}
                   className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-violet-400"
                 />
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-slate-700">Estado</label>
-                <select className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-violet-400">
-                  <option>Activa</option>
-                  <option>Programada</option>
-                  <option>Vencida</option>
-                </select>
+                <label className="inline-flex h-10.5 items-center gap-2 rounded-2xl border border-slate-300 bg-white px-3 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={activeInput}
+                    onChange={(event) => setActiveInput(event.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300"
+                  />
+                  Activa
+                </label>
               </div>
             </div>
 
@@ -378,7 +587,8 @@ function WholesaleRulesView() {
                 <label className="text-sm font-medium text-slate-700">Valida desde</label>
                 <input
                   type="date"
-                  defaultValue="2026-03-26"
+                  value={validFromInput}
+                  onChange={(event) => setValidFromInput(event.target.value)}
                   className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-violet-400"
                 />
               </div>
@@ -386,18 +596,24 @@ function WholesaleRulesView() {
                 <label className="text-sm font-medium text-slate-700">Valida hasta</label>
                 <input
                   type="date"
+                  value={validToInput}
+                  onChange={(event) => setValidToInput(event.target.value)}
                   className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-violet-400"
                 />
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium text-slate-700">Nota comercial</label>
-              <textarea
-                defaultValue="Aplicar beneficio mayorista sobre el total de la venta cuando se cumpla el umbral."
-                className="min-h-24 w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-violet-400"
-              />
-            </div>
+            <button
+              onClick={handleSaveRule}
+              disabled={loading || saving}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <PencilLine className="h-4 w-4" />
+              {saving ? "Guardando..." : "Guardar regla"}
+            </button>
+
+            {saveMessage ? <p className="text-sm text-emerald-700">{saveMessage}</p> : null}
+            {saveError ? <p className="text-sm text-rose-700">{saveError}</p> : null}
           </div>
         </article>
 
@@ -405,19 +621,34 @@ function WholesaleRulesView() {
           <div className="flex items-center justify-between border-b border-slate-200 pb-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                Mockup actual
+                Reglas actuales
               </p>
-              <h2 className="mt-1 text-xl font-semibold text-slate-950">Reglas simuladas</h2>
+              <h2 className="mt-1 text-xl font-semibold text-slate-950">pricing_rules</h2>
             </div>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-              Mockup
-            </span>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{rules.length}</span>
           </div>
 
           <div className="mt-4 space-y-3">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500">
-              Reglas comerciales: Conectar backend cuando `pricing_rules` esté disponible.
-            </div>
+            {rules.map((rule) => (
+              <article key={rule.rule_id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-slate-900">{rule.rule_type}</p>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${rule.active ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>
+                    {rule.active ? "Activa" : "Inactiva"}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-slate-600">Minimo: {rule.min_qty} unidades</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Vigencia: {formatDate(rule.valid_from)} - {formatDate(rule.valid_to)}
+                </p>
+              </article>
+            ))}
+
+            {!loading && rules.length === 0 ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500">
+                No hay reglas creadas todavia.
+              </div>
+            ) : null}
           </div>
         </article>
       </div>
@@ -433,41 +664,6 @@ export function ListPrices({ mode }: { mode: PriceMode }) {
         {mode === "editor" ? <PriceEditorView /> : null}
         {mode === "rules" ? <WholesaleRulesView /> : null}
 
-        <div className="mt-5 grid gap-3 md:grid-cols-3">
-          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)]">
-            <div className="flex items-center gap-2">
-              <ReceiptText className="h-4 w-4 text-slate-400" />
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Estado
-              </p>
-            </div>
-            <p className="mt-2 text-sm text-slate-600">
-              Mockup listo para evolucionar a `style_size_prices`.
-            </p>
-          </article>
-          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)]">
-            <div className="flex items-center gap-2">
-              <CalendarRange className="h-4 w-4 text-slate-400" />
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Vigencias
-              </p>
-            </div>
-            <p className="mt-2 text-sm text-slate-600">
-              El diseño ya contempla periodos activos, programados y vencidos.
-            </p>
-          </article>
-          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)]">
-            <div className="flex items-center gap-2">
-              <Tags className="h-4 w-4 text-slate-400" />
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Siguiente paso
-              </p>
-            </div>
-            <p className="mt-2 text-sm text-slate-600">
-              Solo falta conectar backend cuando `Variantes` y `Styles` ya esten estables.
-            </p>
-          </article>
-        </div>
       </div>
     </section>
   );
