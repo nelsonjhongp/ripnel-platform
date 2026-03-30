@@ -22,6 +22,7 @@ import {
   Store,
   Boxes,
   Warehouse,
+  Users,
 } from "lucide-react"
 
 import {
@@ -46,6 +47,13 @@ const sidebarGroups = [
       { title: "Usuarios", url: "/administracion/usuarios" },
       { title: "Roles", url: "/administracion/roles" },
       { title: "Ubicaciones", url: "/administracion/ubicaciones" },
+    ],
+  },
+  {
+    title: "Clientes",
+    icon: Users,
+    items: [
+      { title: "Clientes", url: "/clientes" },
     ],
   },
   {
