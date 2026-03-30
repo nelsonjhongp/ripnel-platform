@@ -1,0 +1,284 @@
+const { pool } = require('../../shared/db');
+const { AppError } = require('../../shared/errors');
+const { findRoleById } = require('../roles/roles.repo');
+const {
+  findAllUsers,
+  findUserById,
+  insertUser,
+  updateUser,
+  findLocationsByIds,
+  findUserLocationsByUserId,
+  replaceUserLocations,
+} = require('./users.repo');
+
+function normalizeUuid(value) {
+  const normalized = String(value || '').trim();
+  return normalized || null;
+}
+
+function normalizeText(value) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const normalized = String(value).trim();
+  return normalized || null;
+}
+
+function normalizeEmail(value) {
+  const normalized = normalizeText(value);
+
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized.toLowerCase();
+}
+
+function normalizeAssignments(input) {
+  if (!Array.isArray(input)) {
+    return null;
+  }
+
+  return input.map((assignment) => ({
+    location_id: normalizeUuid(assignment && assignment.location_id),
+    is_default: Boolean(assignment && assignment.is_default),
+  }));
+}
+
+async function listUsers() {
+  return findAllUsers();
+}
+
+async function createUser(input = {}) {
+  const fullName = normalizeText(input.full_name);
+  const email = normalizeEmail(input.email);
+  const roleId =
+    input.role_id === null || input.role_id === undefined
+      ? null
+      : normalizeUuid(input.role_id);
+  const active = typeof input.active === 'boolean' ? input.active : true;
+
+  if (!fullName) {
+    throw new AppError('User full_name is required', 400);
+  }
+
+  if (!email) {
+    throw new AppError('User email is required', 400);
+  }
+
+  if (input.role_id !== null && input.role_id !== undefined && !roleId) {
+    throw new AppError('User role_id is invalid', 400);
+  }
+
+  if (typeof active !== 'boolean') {
+    throw new AppError('User active state is invalid', 400);
+  }
+
+  if (roleId) {
+    const role = await findRoleById(roleId);
+
+    if (!role) {
+      throw new AppError('User role_id is invalid', 400);
+    }
+  }
+
+  try {
+    return await insertUser({
+      full_name: fullName,
+      email,
+      password_hash: 'temp_hash',
+      role_id: roleId,
+      active,
+    });
+  } catch (error) {
+    if (error.code === '23505') {
+      throw new AppError('User email already exists', 409);
+    }
+
+    throw error;
+  }
+}
+
+async function patchUser(userId, input = {}) {
+  const normalizedUserId = normalizeUuid(userId);
+
+  if (!normalizedUserId) {
+    throw new AppError('User id is required', 400);
+  }
+
+  const existingUser = await findUserById(normalizedUserId);
+
+  if (!existingUser) {
+    throw new AppError('User not found', 404);
+  }
+
+  if (!('full_name' in input) && !('email' in input) && !('role_id' in input) && !('active' in input)) {
+    throw new AppError('No editable fields were provided for user', 400);
+  }
+
+  const fullName = 'full_name' in input ? normalizeText(input.full_name) : existingUser.full_name;
+  const email = 'email' in input ? normalizeEmail(input.email) : existingUser.email;
+  const roleId =
+    'role_id' in input
+      ? input.role_id === null
+        ? null
+        : normalizeUuid(input.role_id)
+      : existingUser.role_id;
+  const active = 'active' in input ? input.active : existingUser.active;
+
+  if (!fullName) {
+    throw new AppError('User full_name is required', 400);
+  }
+
+  if (!email) {
+    throw new AppError('User email is required', 400);
+  }
+
+  if ('role_id' in input && input.role_id !== null && !roleId) {
+    throw new AppError('User role_id is invalid', 400);
+  }
+
+  if (typeof active !== 'boolean') {
+    throw new AppError('User active state is invalid', 400);
+  }
+
+  if (roleId) {
+    const role = await findRoleById(roleId);
+
+    if (!role) {
+      throw new AppError('User role_id is invalid', 400);
+    }
+  }
+
+  try {
+    return await updateUser(
+      {
+        userId: normalizedUserId,
+        full_name: fullName,
+        email,
+        role_id: roleId,
+        active,
+      }
+    );
+  } catch (error) {
+    if (error.code === '23505') {
+      throw new AppError('User email already exists', 409);
+    }
+
+    throw error;
+  }
+}
+
+function buildUserLocationsPayload(user, assignments) {
+  const defaultAssignment = assignments.find((assignment) => assignment.is_default) || null;
+
+  return {
+    user: {
+      user_id: user.user_id,
+      full_name: user.full_name,
+      email: user.email,
+      role_id: user.role_id,
+      active: user.active,
+    },
+    default_location_id: defaultAssignment ? defaultAssignment.location_id : null,
+    assignments: assignments.map((assignment) => ({
+      location_id: assignment.location_id,
+      is_default: assignment.is_default,
+      location: {
+        location_id: assignment.location_id,
+        name: assignment.name,
+        code: assignment.code,
+        type: assignment.type,
+        address: assignment.address,
+        active: assignment.active,
+      },
+    })),
+  };
+}
+
+async function getUserLocations(userId) {
+  const normalizedUserId = normalizeUuid(userId);
+
+  if (!normalizedUserId) {
+    throw new AppError('User id is required', 400);
+  }
+
+  const user = await findUserById(normalizedUserId);
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  const assignments = await findUserLocationsByUserId(normalizedUserId);
+
+  return buildUserLocationsPayload(user, assignments);
+}
+
+async function updateUserLocations(userId, input = {}) {
+  const normalizedUserId = normalizeUuid(userId);
+  const assignments = normalizeAssignments(input.assignments);
+
+  if (!normalizedUserId) {
+    throw new AppError('User id is required', 400);
+  }
+
+  if (!assignments) {
+    throw new AppError('Assignments must be an array', 400);
+  }
+
+  const user = await findUserById(normalizedUserId);
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  if (assignments.some((assignment) => !assignment.location_id)) {
+    throw new AppError('Each assignment requires a valid location_id', 400);
+  }
+
+  const uniqueIds = new Set(assignments.map((assignment) => assignment.location_id));
+
+  if (uniqueIds.size !== assignments.length) {
+    throw new AppError('Assignments cannot contain duplicated locations', 400);
+  }
+
+  const defaultCount = assignments.filter((assignment) => assignment.is_default).length;
+
+  if (defaultCount > 1) {
+    throw new AppError('Only one default location is allowed per user', 400);
+  }
+
+  if (assignments.length > 0 && defaultCount !== 1) {
+    throw new AppError('A default location is required when assignments are provided', 400);
+  }
+
+  const locations = await findLocationsByIds(Array.from(uniqueIds));
+
+  if (locations.length !== uniqueIds.size) {
+    throw new AppError('One or more locations are invalid', 400);
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('begin');
+    await replaceUserLocations(normalizedUserId, assignments, client.query.bind(client));
+    await client.query('commit');
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  return getUserLocations(normalizedUserId);
+}
+
+module.exports = {
+  listUsers,
+  createUser,
+  patchUser,
+  getUserLocations,
+  updateUserLocations,
+};
