@@ -2,9 +2,11 @@ const {
   listInventory,
   listKardex,
   listAdjustments,
+  searchVariantsForAdjustment,
   getAdjustmentById,
   createAdjustment,
   confirmAdjustmentById,
+  cancelAdjustmentById,
 } = require('./inventory.service');
 
 async function getInventory(req, res, next) {
@@ -29,6 +31,15 @@ async function getAdjustments(req, res, next) {
   try {
     const adjustments = await listAdjustments();
     res.json({ ok: true, data: adjustments });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getAdjustmentVariants(req, res, next) {
+  try {
+    const variants = await searchVariantsForAdjustment(req.query);
+    res.json({ ok: true, data: variants });
   } catch (error) {
     next(error);
   }
@@ -61,11 +72,22 @@ async function postConfirmAdjustment(req, res, next) {
   }
 }
 
+async function postCancelAdjustment(req, res, next) {
+  try {
+    const adjustment = await cancelAdjustmentById(req.params.adjustmentId, req.body);
+    res.json({ ok: true, data: adjustment });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getInventory,
   getKardex,
   getAdjustments,
+  getAdjustmentVariants,
   getAdjustment,
   postAdjustment,
   postConfirmAdjustment,
+  postCancelAdjustment,
 };

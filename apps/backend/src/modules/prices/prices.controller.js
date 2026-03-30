@@ -1,4 +1,9 @@
-const { listPrices, createPrice, patchPrice } = require('./prices.service');
+const {
+  listPrices,
+  listPriceCoverageGaps,
+  createPrice,
+  patchPrice,
+} = require('./prices.service');
 
 async function getPrices(req, res, next) {
   try {
@@ -18,6 +23,15 @@ async function postPrice(req, res, next) {
   }
 }
 
+async function getPriceCoverageGaps(req, res, next) {
+  try {
+    const styles = await listPriceCoverageGaps();
+    res.json({ ok: true, data: styles });
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function patchPriceById(req, res, next) {
   try {
     const price = await patchPrice(req.params.priceId, req.body);
@@ -29,6 +43,7 @@ async function patchPriceById(req, res, next) {
 
 module.exports = {
   getPrices,
+  getPriceCoverageGaps,
   postPrice,
   patchPriceById,
 };

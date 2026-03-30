@@ -61,6 +61,8 @@ async function findAllTransfers(filters = {}) {
          shipped_user.full_name as shipped_by_name,
          st.received_by,
          received_user.full_name as received_by_name,
+         st.cancelled_by,
+         cancelled_user.full_name as cancelled_by_name,
          st.created_at,
          st.shipped_at,
          st.received_at,
@@ -76,6 +78,7 @@ async function findAllTransfers(filters = {}) {
        left join users created_user on created_user.user_id = st.created_by
        left join users shipped_user on shipped_user.user_id = st.shipped_by
        left join users received_user on received_user.user_id = st.received_by
+       left join users cancelled_user on cancelled_user.user_id = st.cancelled_by
        left join stock_transfer_lines stl on stl.transfer_id = st.transfer_id
        group by
          st.transfer_id,
@@ -94,6 +97,8 @@ async function findAllTransfers(filters = {}) {
          shipped_user.full_name,
          st.received_by,
          received_user.full_name,
+         st.cancelled_by,
+         cancelled_user.full_name,
          st.created_at,
          st.shipped_at,
          st.received_at,
@@ -117,6 +122,8 @@ async function findAllTransfers(filters = {}) {
        shipped_by_name,
        received_by,
        received_by_name,
+       cancelled_by,
+       cancelled_by_name,
        created_at,
        shipped_at,
        received_at,
@@ -154,6 +161,8 @@ async function findTransferHeaderById(transferId, executor = query) {
        shipped_user.full_name as shipped_by_name,
        st.received_by,
        received_user.full_name as received_by_name,
+       st.cancelled_by,
+       cancelled_user.full_name as cancelled_by_name,
        st.created_at,
        st.shipped_at,
        st.received_at,
@@ -165,6 +174,7 @@ async function findTransferHeaderById(transferId, executor = query) {
      left join users created_user on created_user.user_id = st.created_by
      left join users shipped_user on shipped_user.user_id = st.shipped_by
      left join users received_user on received_user.user_id = st.received_by
+     left join users cancelled_user on cancelled_user.user_id = st.cancelled_by
      where st.transfer_id = $1`,
     [transferId]
   );
@@ -372,6 +382,37 @@ async function markTransferReceived(transferId, receivedBy, executor = query) {
   return result.rows[0] || null;
 }
 
+async function markTransferCancelled(transferId, cancelledBy, executor = query) {
+  const result = await executor(
+    `update stock_transfers
+     set
+       status = 'cancelled',
+       cancelled_by = $2,
+       cancelled_at = current_timestamp,
+       updated_at = current_timestamp
+     where transfer_id = $1
+     returning
+       transfer_id,
+       transfer_number,
+       from_location_id,
+       to_location_id,
+       status,
+       notes,
+       created_by,
+       shipped_by,
+       received_by,
+       cancelled_by,
+       created_at,
+       shipped_at,
+       received_at,
+       cancelled_at,
+       updated_at`,
+    [transferId, cancelledBy]
+  );
+
+  return result.rows[0] || null;
+}
+
 module.exports = {
   findAllTransfers,
   findTransferHeaderById,
@@ -382,4 +423,5 @@ module.exports = {
   updateTransferLineReceipt,
   markTransferShipped,
   markTransferReceived,
+  markTransferCancelled,
 };

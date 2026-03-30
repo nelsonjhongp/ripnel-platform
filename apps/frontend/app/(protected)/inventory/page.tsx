@@ -21,8 +21,18 @@ type InventoryItem = {
   qty: number;
 };
 
+type PriceCoverageGap = {
+  style_id: string;
+  style_code: string;
+  style_name: string;
+  variant_count: number;
+  inventory_row_count: number;
+  price_row_count: number;
+};
+
 export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([]);
+  const [coverageGaps, setCoverageGaps] = useState<PriceCoverageGap[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -56,6 +66,13 @@ export default function InventoryPage() {
 
   useEffect(() => {
     loadInventory();
+
+    fetch(buildApiUrl("/api/prices/coverage-gaps"), { cache: "no-store" })
+      .then((res) => res.json())
+      .then((payload) => {
+        setCoverageGaps(payload.data || []);
+      })
+      .catch(console.error);
   }, []);
 
   const locationOptions = useMemo(() => {
@@ -103,6 +120,11 @@ export default function InventoryPage() {
     };
   }, [filteredItems]);
 
+  const stylesWithoutCommercialPrice = useMemo(
+    () => new Set(coverageGaps.map((gap) => gap.style_code)),
+    [coverageGaps]
+  );
+
   return (
     <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
       <div className="mx-auto max-w-7xl space-y-5">
@@ -147,6 +169,17 @@ export default function InventoryPage() {
         </div>
 
         <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
+          {coverageGaps.length > 0 ? (
+            <div className="mb-5 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Hay styles con stock sin precio comercial. Inventario puede operar, pero
+              ventas y precios siguen incompletos para:{" "}
+              <span className="font-semibold">
+                {coverageGaps.map((gap) => gap.style_code).join(", ")}
+              </span>
+              .
+            </div>
+          ) : null}
+
           <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -237,7 +270,14 @@ export default function InventoryPage() {
                         {item.sku}
                       </td>
                       <td className="px-3 py-3 text-sm font-semibold text-slate-900">
-                        {item.style_name}
+                        <div className="space-y-1">
+                          <p>{item.style_name}</p>
+                          {stylesWithoutCommercialPrice.has(item.style_code) ? (
+                            <span className="inline-flex rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                              Sin precio comercial
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
                       <td className="px-3 py-3 text-sm text-slate-600">
                         {item.garment_type_name || "Sin tipo"}

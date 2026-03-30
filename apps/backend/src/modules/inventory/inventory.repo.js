@@ -231,6 +231,8 @@ async function findAllAdjustments() {
        created_user.full_name as created_by_name,
        ia.confirmed_by,
        confirmed_user.full_name as confirmed_by_name,
+       ia.cancelled_by,
+       cancelled_user.full_name as cancelled_by_name,
        ia.created_at,
        ia.confirmed_at,
        ia.cancelled_at,
@@ -240,6 +242,7 @@ async function findAllAdjustments() {
      inner join locations l on l.location_id = ia.location_id
      left join users created_user on created_user.user_id = ia.created_by
      left join users confirmed_user on confirmed_user.user_id = ia.confirmed_by
+     left join users cancelled_user on cancelled_user.user_id = ia.cancelled_by
      left join inventory_adjustment_lines ial on ial.adjustment_id = ia.adjustment_id
      group by
        ia.adjustment_id,
@@ -254,12 +257,45 @@ async function findAllAdjustments() {
        created_user.full_name,
        ia.confirmed_by,
        confirmed_user.full_name,
+       ia.cancelled_by,
+       cancelled_user.full_name,
        ia.created_at,
        ia.confirmed_at,
        ia.cancelled_at,
        ia.updated_at
      order by ia.created_at desc`,
     []
+  );
+
+  return result.rows;
+}
+
+async function findAdjustmentVariants(locationId, searchQuery, executor = query) {
+  const result = await executor(
+    `select
+       pv.variant_id,
+       pv.sku,
+       ps.style_code,
+       ps.name as style_name,
+       s.code as size_code,
+       c.name as color_name,
+       coalesce(i.qty, 0)::int as system_qty
+     from product_variants pv
+     inner join product_styles ps on ps.style_id = pv.style_id
+     inner join sizes s on s.size_id = pv.size_id
+     inner join colors c on c.color_id = pv.color_id
+     left join inventory i
+       on i.variant_id = pv.variant_id
+      and i.location_id = $1
+     where (
+       pv.sku ilike $2
+       or ps.style_code ilike $2
+       or ps.name ilike $2
+       or s.code ilike $2
+       or c.name ilike $2
+     )
+     order by ps.name asc, s.sort_order asc, c.name asc`,
+    [locationId, `%${searchQuery}%`]
   );
 
   return result.rows;
@@ -280,6 +316,8 @@ async function findAdjustmentHeaderById(adjustmentId, executor = query) {
        created_user.full_name as created_by_name,
        ia.confirmed_by,
        confirmed_user.full_name as confirmed_by_name,
+       ia.cancelled_by,
+       cancelled_user.full_name as cancelled_by_name,
        ia.created_at,
        ia.confirmed_at,
        ia.cancelled_at,
@@ -288,6 +326,7 @@ async function findAdjustmentHeaderById(adjustmentId, executor = query) {
      inner join locations l on l.location_id = ia.location_id
      left join users created_user on created_user.user_id = ia.created_by
      left join users confirmed_user on confirmed_user.user_id = ia.confirmed_by
+     left join users cancelled_user on cancelled_user.user_id = ia.cancelled_by
      where ia.adjustment_id = $1`,
     [adjustmentId]
   );
@@ -478,6 +517,35 @@ async function confirmAdjustment(adjustmentId, confirmedBy, executor = query) {
   return result.rows[0] || null;
 }
 
+async function cancelAdjustment(adjustmentId, cancelledBy, executor = query) {
+  const result = await executor(
+    `update inventory_adjustments
+     set
+       status = 'cancelled',
+       cancelled_by = $2,
+       cancelled_at = current_timestamp,
+       updated_at = current_timestamp
+     where adjustment_id = $1
+     returning
+       adjustment_id,
+       adjustment_number,
+       location_id,
+       status,
+       reason,
+       notes,
+       created_by,
+       confirmed_by,
+       cancelled_by,
+       created_at,
+       confirmed_at,
+       cancelled_at,
+       updated_at`,
+    [adjustmentId, cancelledBy]
+  );
+
+  return result.rows[0] || null;
+}
+
 async function upsertInventoryQty(locationId, variantId, qty, executor = query) {
   const result = await executor(
     `insert into inventory (location_id, variant_id, qty)
@@ -526,6 +594,7 @@ module.exports = {
   findAllInventory,
   findAllKardex,
   findAllAdjustments,
+  findAdjustmentVariants,
   findAdjustmentHeaderById,
   findAdjustmentLinesByAdjustmentId,
   findLocationById,
@@ -535,6 +604,7 @@ module.exports = {
   insertAdjustment,
   insertAdjustmentLine,
   confirmAdjustment,
+  cancelAdjustment,
   upsertInventoryQty,
   insertStockMovement,
 };

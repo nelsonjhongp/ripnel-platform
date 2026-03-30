@@ -7,6 +7,7 @@ import {
   Search,
   SendHorizonal,
   Truck,
+  X,
 } from "lucide-react";
 import { buildApiUrl } from "@/lib/api";
 import {
@@ -22,6 +23,7 @@ const STATUS_OPTIONS: Array<"all" | TransferStatus> = [
   "draft",
   "shipped",
   "received",
+  "cancelled",
 ];
 
 export function TransfersListPage() {
@@ -31,6 +33,8 @@ export function TransfersListPage() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | TransferStatus>("all");
   const [shippingId, setShippingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function loadTransfers() {
     setLoading(true);
@@ -65,6 +69,7 @@ export function TransfersListPage() {
   async function handleShipTransfer(transferId: string) {
     setShippingId(transferId);
     setError(null);
+    setNotice(null);
 
     try {
       const response = await fetch(
@@ -90,6 +95,39 @@ export function TransfersListPage() {
       );
     } finally {
       setShippingId(null);
+    }
+  }
+
+  async function handleCancelTransfer(transferId: string) {
+    setCancellingId(transferId);
+    setError(null);
+    setNotice(null);
+
+    try {
+      const response = await fetch(
+        buildApiUrl(`/api/transfers/${transferId}/cancel`),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        }
+      );
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.message || "No se pudo cancelar la transferencia");
+      }
+
+      setNotice("Transferencia cancelada.");
+      await loadTransfers();
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo cancelar la transferencia"
+      );
+    } finally {
+      setCancellingId(null);
     }
   }
 
@@ -212,6 +250,12 @@ export function TransfersListPage() {
             </div>
           ) : null}
 
+          {notice ? (
+            <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              {notice}
+            </div>
+          ) : null}
+
           {loading ? (
             <div className="mt-5 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-sm text-slate-500">
               <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -286,19 +330,40 @@ export function TransfersListPage() {
                       </td>
                       <td className="px-3 py-3 text-right text-sm">
                         {transfer.status === "draft" ? (
-                          <button
-                            type="button"
-                            onClick={() => handleShipTransfer(transfer.transfer_id)}
-                            disabled={shippingId === transfer.transfer_id}
-                            className="inline-flex items-center gap-2 rounded-xl border border-violet-300 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-700 transition hover:border-violet-400 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
-                          >
-                            {shippingId === transfer.transfer_id ? (
-                              <LoaderCircle className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <SendHorizonal className="h-4 w-4" />
-                            )}
-                            Enviar
-                          </button>
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleCancelTransfer(transfer.transfer_id)}
+                              disabled={
+                                shippingId === transfer.transfer_id ||
+                                cancellingId === transfer.transfer_id
+                              }
+                              className="inline-flex items-center gap-2 rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition hover:border-rose-400 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {cancellingId === transfer.transfer_id ? (
+                                <LoaderCircle className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <X className="h-4 w-4" />
+                              )}
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleShipTransfer(transfer.transfer_id)}
+                              disabled={
+                                shippingId === transfer.transfer_id ||
+                                cancellingId === transfer.transfer_id
+                              }
+                              className="inline-flex items-center gap-2 rounded-xl border border-violet-300 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-700 transition hover:border-violet-400 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {shippingId === transfer.transfer_id ? (
+                                <LoaderCircle className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <SendHorizonal className="h-4 w-4" />
+                              )}
+                              Enviar
+                            </button>
+                          </div>
                         ) : transfer.status === "shipped" ? (
                           <span className="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">
                             <Truck className="h-4 w-4" />
