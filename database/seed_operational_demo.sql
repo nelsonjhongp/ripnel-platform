@@ -7,6 +7,32 @@
 begin;
 
 -- ============================================================
+-- 0) OPERATIONAL LOCATIONS
+-- ============================================================
+
+insert into locations (
+  name,
+  code,
+  type,
+  address,
+  active
+)
+values (
+  'Taller Central',
+  'TLL-CENT',
+  'workshop',
+  'Taller central de produccion',
+  true
+)
+on conflict (code) do update
+set
+  name = excluded.name,
+  type = excluded.type,
+  address = excluded.address,
+  active = excluded.active,
+  updated_at = current_timestamp;
+
+-- ============================================================
 -- 1) OPERATIONAL USERS
 -- ============================================================
 
@@ -49,9 +75,11 @@ with seeded_assignments(email, location_code, is_default) as (
     ('jean@ripnel.com', 'ALM-CENT', true),
     ('jean@ripnel.com', 'TD-CENT', false),
     ('jean@ripnel.com', 'TD-MONT', false),
+    ('jean@ripnel.com', 'TLL-CENT', false),
     ('nelson@ripnel.com', 'TD-CENT', true),
     ('nelson@ripnel.com', 'ALM-CENT', false),
     ('nelson@ripnel.com', 'TD-MONT', false),
+    ('nelson@ripnel.com', 'TLL-CENT', false),
     ('ventas.centro@ripnel.com', 'TD-CENT', true),
     ('almacen.central@ripnel.com', 'ALM-CENT', true),
     ('tienda.centro@ripnel.com', 'TD-CENT', true),

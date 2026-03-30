@@ -1,455 +1,949 @@
 "use client";
 
-import { useState, useEffect } from 'react';
-import { useSupabaseUsers, useSupabaseRoles } from '@/hooks/useSupabase';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { buildApiUrl } from "@/lib/api";
 
-export default function AdminCrud() {
-  const { usuarios, loading: loadingUsers, error: errorUsers, fetchUsuarios, crearUsuario, actualizarUsuario, eliminarUsuario, toggleActivo } = useSupabaseUsers();
-  const { roles, loading: loadingRoles, error: errorRoles, fetchRoles, crearRol, actualizarRol, eliminarRol } = useSupabaseRoles();
+type ApiResponse<T> = {
+  ok: boolean;
+  data: T;
+  message?: string;
+};
 
-  const [mostrarForm, setMostrarForm] = useState(false);
-  const [editando, setEditando] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ full_name: '', email: '', role_id: '' });
-  const [busqueda, setBusqueda] = useState('');
-  const [loadingForm, setLoadingForm] = useState(false);
+type Role = {
+  role_id: string;
+  name: string;
+  description: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
 
-  const [mostrarFormRol, setMostrarFormRol] = useState(false);
-  const [editandoRol, setEditandoRol] = useState<string | null>(null);
-  const [formDataRol, setFormDataRol] = useState({ name: '', description: '' });
-  const [busquedaRol, setBusquedaRol] = useState('');
-  const [loadingFormRol, setLoadingFormRol] = useState(false);
+type User = {
+  user_id: string;
+  full_name: string;
+  email: string;
+  role_id: string | null;
+  role_name?: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
 
-  // Cargar usuarios y roles al montar
+type Location = {
+  location_id: string;
+  code: string;
+  name: string;
+  type: string;
+  address: string | null;
+  active: boolean;
+};
+
+type UserLocationAssignment = {
+  location_id: string;
+  is_default: boolean;
+  location: Location;
+};
+
+type UserLocationsPayload = {
+  user: Pick<User, "user_id" | "full_name" | "email" | "role_id" | "active">;
+  default_location_id: string | null;
+  assignments: UserLocationAssignment[];
+};
+
+type UserFormState = {
+  full_name: string;
+  email: string;
+  role_id: string;
+  active: boolean;
+};
+
+type RoleFormState = {
+  name: string;
+  description: string;
+  active: boolean;
+};
+
+async function requestJson<T>(path: string, init?: RequestInit) {
+  const response = await fetch(buildApiUrl(path), {
+    headers: {
+      "Content-Type": "application/json",
+      ...(init?.headers || {}),
+    },
+    cache: "no-store",
+    ...init,
+  });
+
+  const payload = (await response.json().catch(() => null)) as ApiResponse<T> | null;
+
+  if (!response.ok || !payload?.ok) {
+    throw new Error(payload?.message || "Request failed");
+  }
+
+  return payload.data;
+}
+
+const emptyUserForm: UserFormState = {
+  full_name: "",
+  email: "",
+  role_id: "",
+  active: true,
+};
+
+const emptyRoleForm: RoleFormState = {
+  name: "",
+  description: "",
+  active: true,
+};
+
+export default function AdminCrudPage() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [availableLocations, setAvailableLocations] = useState<Location[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [loadingRoles, setLoadingRoles] = useState(true);
+  const [loadingLocations, setLoadingLocations] = useState(true);
+  const [usersError, setUsersError] = useState<string | null>(null);
+  const [rolesError, setRolesError] = useState<string | null>(null);
+  const [locationsError, setLocationsError] = useState<string | null>(null);
+
+  const [userQuery, setUserQuery] = useState("");
+  const [roleQuery, setRoleQuery] = useState("");
+
+  const [showUserForm, setShowUserForm] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [userForm, setUserForm] = useState<UserFormState>(emptyUserForm);
+  const [savingUser, setSavingUser] = useState(false);
+
+  const [showRoleForm, setShowRoleForm] = useState(false);
+  const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
+  const [roleForm, setRoleForm] = useState<RoleFormState>(emptyRoleForm);
+  const [savingRole, setSavingRole] = useState(false);
+
+  const [locationsOpen, setLocationsOpen] = useState(false);
+  const [locationsUser, setLocationsUser] = useState<User | null>(null);
+  const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
+  const [defaultLocationId, setDefaultLocationId] = useState<string | null>(null);
+  const [loadingUserLocations, setLoadingUserLocations] = useState(false);
+  const [savingUserLocations, setSavingUserLocations] = useState(false);
+  const [userLocationsError, setUserLocationsError] = useState<string | null>(null);
+
+  const loadUsers = useCallback(async () => {
+    setLoadingUsers(true);
+    setUsersError(null);
+
+    try {
+      const data = await requestJson<User[]>("/api/users");
+      setUsers(data);
+    } catch (error) {
+      setUsersError(error instanceof Error ? error.message : "No se pudo cargar usuarios");
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, []);
+
+  const loadRoles = useCallback(async () => {
+    setLoadingRoles(true);
+    setRolesError(null);
+
+    try {
+      const data = await requestJson<Role[]>("/api/roles");
+      setRoles(data);
+    } catch (error) {
+      setRolesError(error instanceof Error ? error.message : "No se pudo cargar roles");
+    } finally {
+      setLoadingRoles(false);
+    }
+  }, []);
+
+  const loadLocations = useCallback(async () => {
+    setLoadingLocations(true);
+    setLocationsError(null);
+
+    try {
+      const data = await requestJson<Location[]>("/api/locations");
+      setAvailableLocations(data.filter((location) => location.active));
+    } catch (error) {
+      setLocationsError(error instanceof Error ? error.message : "No se pudo cargar sedes");
+    } finally {
+      setLoadingLocations(false);
+    }
+  }, []);
+
   useEffect(() => {
-    fetchUsuarios();
-    fetchRoles();
-  }, [fetchUsuarios, fetchRoles]);
+    void loadUsers();
+    void loadRoles();
+    void loadLocations();
+  }, [loadUsers, loadRoles, loadLocations]);
 
-  const usuariosFiltrados = usuarios.filter(u =>
-    u.full_name.toLowerCase().includes(busqueda.toLowerCase()) ||
-    u.email.toLowerCase().includes(busqueda.toLowerCase())
-  );
+  const filteredUsers = useMemo(() => {
+    const query = userQuery.trim().toLowerCase();
 
-  const rolesFiltrados = roles.filter(r =>
-    r.name.toLowerCase().includes(busquedaRol.toLowerCase()) ||
-    r.description.toLowerCase().includes(busquedaRol.toLowerCase())
-  );
-
-  // CRUD USUARIOS
-  const abrirFormulario = (usuario: typeof usuarios[0] | null = null) => {
-    if (usuario) {
-      setFormData({ full_name: usuario.full_name, email: usuario.email, role_id: usuario.role_id });
-      setEditando(usuario.user_id);
-    } else {
-      setFormData({ full_name: '', email: '', role_id: '' });
-      setEditando(null);
+    if (!query) {
+      return users;
     }
-    setMostrarForm(true);
-  };
 
-  const cerrarFormulario = () => {
-    setMostrarForm(false);
-    setFormData({ full_name: '', email: '', role_id: '' });
-    setEditando(null);
-  };
+    return users.filter((user) => {
+      const roleName = user.role_name || roles.find((role) => role.role_id === user.role_id)?.name || "";
 
-  const guardarUsuario = async () => {
-    if (!formData.full_name || !formData.email || !formData.role_id) {
-      alert('Por favor completa todos los campos');
+      return [user.full_name, user.email, roleName].some((value) =>
+        value.toLowerCase().includes(query),
+      );
+    });
+  }, [userQuery, users, roles]);
+
+  const filteredRoles = useMemo(() => {
+    const query = roleQuery.trim().toLowerCase();
+
+    if (!query) {
+      return roles;
+    }
+
+    return roles.filter((role) =>
+      [role.name, role.description || ""].some((value) => value.toLowerCase().includes(query)),
+    );
+  }, [roleQuery, roles]);
+
+  function openUserForm(user?: User) {
+    if (user) {
+      setEditingUserId(user.user_id);
+      setUserForm({
+        full_name: user.full_name,
+        email: user.email,
+        role_id: user.role_id || "",
+        active: user.active,
+      });
+    } else {
+      setEditingUserId(null);
+      setUserForm(emptyUserForm);
+    }
+
+    setShowUserForm(true);
+  }
+
+  function closeUserForm() {
+    setShowUserForm(false);
+    setEditingUserId(null);
+    setUserForm(emptyUserForm);
+  }
+
+  async function submitUserForm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSavingUser(true);
+
+    try {
+      const payload = {
+        full_name: userForm.full_name,
+        email: userForm.email,
+        role_id: userForm.role_id || null,
+        active: userForm.active,
+      };
+
+      if (editingUserId) {
+        await requestJson<User>(`/api/users/${editingUserId}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await requestJson<User>("/api/users", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      }
+
+      closeUserForm();
+      await loadUsers();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "No se pudo guardar el usuario");
+    } finally {
+      setSavingUser(false);
+    }
+  }
+
+  async function toggleUserActive(user: User) {
+    const targetState = !user.active;
+    const label = targetState ? "activar" : "inactivar";
+
+    if (!window.confirm(`Confirma que deseas ${label} a ${user.full_name}?`)) {
       return;
     }
 
-    setLoadingForm(true);
     try {
-      if (editando) {
-        await actualizarUsuario(editando, {
-          full_name: formData.full_name,
-          email: formData.email,
-          role_id: formData.role_id
-        });
-        alert('Usuario actualizado exitosamente');
-      } else {
-        await crearUsuario({
-          full_name: formData.full_name,
-          email: formData.email,
-          role_id: formData.role_id
-        });
-        alert('Usuario creado exitosamente');
-      }
-      cerrarFormulario();
-    } catch (err) {
-      alert(`Error: ${err instanceof Error ? err.message : 'Error desconocido'}`);
-    } finally {
-      setLoadingForm(false);
+      await requestJson<User>(`/api/users/${user.user_id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ active: targetState }),
+      });
+      await loadUsers();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "No se pudo actualizar el usuario");
     }
-  };
+  }
 
-  const handleEliminarUsuario = async (id: string) => {
-    if (window.confirm('¿Estás seguro de que deseas eliminar este usuario?')) {
-      try {
-        await eliminarUsuario(id);
-        alert('Usuario eliminado exitosamente');
-      } catch (err) {
-        alert(`Error al eliminar: ${err instanceof Error ? err.message : 'Error desconocido'}`);
-      }
-    }
-  };
-
-  const handleToggleActivo = async (id: string, nuevoEstado: boolean) => {
-    try {
-      await toggleActivo(id, nuevoEstado);
-    } catch (err) {
-      alert(`Error: ${err instanceof Error ? err.message : 'Error desconocido'}`);
-    }
-  };
-
-  // CRUD ROLES
-  const abrirFormularioRol = (rol: typeof roles[0] | null = null) => {
-    if (rol) {
-      setFormDataRol({ name: rol.name, description: rol.description });
-      setEditandoRol(rol.role_id);
+  function openRoleForm(role?: Role) {
+    if (role) {
+      setEditingRoleId(role.role_id);
+      setRoleForm({
+        name: role.name,
+        description: role.description || "",
+        active: role.active,
+      });
     } else {
-      setFormDataRol({ name: '', description: '' });
-      setEditandoRol(null);
+      setEditingRoleId(null);
+      setRoleForm(emptyRoleForm);
     }
-    setMostrarFormRol(true);
-  };
 
-  const cerrarFormularioRol = () => {
-    setMostrarFormRol(false);
-    setFormDataRol({ name: '', description: '' });
-    setEditandoRol(null);
-  };
+    setShowRoleForm(true);
+  }
 
-  const guardarRol = async () => {
-    if (!formDataRol.name || !formDataRol.description) {
-      alert('Por favor completa todos los campos');
+  function closeRoleForm() {
+    setShowRoleForm(false);
+    setEditingRoleId(null);
+    setRoleForm(emptyRoleForm);
+  }
+
+  async function submitRoleForm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSavingRole(true);
+
+    try {
+      const payload = {
+        name: roleForm.name,
+        description: roleForm.description,
+        active: roleForm.active,
+      };
+
+      if (editingRoleId) {
+        await requestJson<Role>(`/api/roles/${editingRoleId}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await requestJson<Role>("/api/roles", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      }
+
+      closeRoleForm();
+      await loadRoles();
+      await loadUsers();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "No se pudo guardar el rol");
+    } finally {
+      setSavingRole(false);
+    }
+  }
+
+  async function toggleRoleActive(role: Role) {
+    const targetState = !role.active;
+    const label = targetState ? "activar" : "inactivar";
+
+    if (!window.confirm(`Confirma que deseas ${label} el rol ${role.name}?`)) {
       return;
     }
 
-    setLoadingFormRol(true);
     try {
-      if (editandoRol) {
-        await actualizarRol(editandoRol, {
-          name: formDataRol.name,
-          description: formDataRol.description
-        });
-        alert('Rol actualizado exitosamente');
-      } else {
-        await crearRol({
-          name: formDataRol.name,
-          description: formDataRol.description
-        });
-        alert('Rol creado exitosamente');
-      }
-      cerrarFormularioRol();
-    } catch (err) {
-      alert(`Error: ${err instanceof Error ? err.message : 'Error desconocido'}`);
-    } finally {
-      setLoadingFormRol(false);
+      await requestJson<Role>(`/api/roles/${role.role_id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ active: targetState }),
+      });
+      await loadRoles();
+      await loadUsers();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "No se pudo actualizar el rol");
     }
-  };
+  }
 
-  const handleEliminarRol = async (id: string) => {
-    if (window.confirm('¿Estás seguro de que deseas eliminar este rol?')) {
-      try {
-        await eliminarRol(id);
-        alert('Rol eliminado exitosamente');
-      } catch (err) {
-        alert(`Error al eliminar: ${err instanceof Error ? err.message : 'Error desconocido'}`);
-      }
+  async function openLocationsModal(user: User) {
+    setLocationsOpen(true);
+    setLocationsUser(user);
+    setSelectedLocationIds([]);
+    setDefaultLocationId(null);
+    setUserLocationsError(null);
+    setLoadingUserLocations(true);
+
+    try {
+      const payload = await requestJson<UserLocationsPayload>(`/api/users/${user.user_id}/locations`);
+      setSelectedLocationIds(payload.assignments.map((assignment) => assignment.location_id));
+      setDefaultLocationId(payload.default_location_id);
+    } catch (error) {
+      setUserLocationsError(error instanceof Error ? error.message : "No se pudo cargar sedes");
+    } finally {
+      setLoadingUserLocations(false);
     }
-  };
+  }
+
+  function closeLocationsModal() {
+    setLocationsOpen(false);
+    setLocationsUser(null);
+    setSelectedLocationIds([]);
+    setDefaultLocationId(null);
+    setUserLocationsError(null);
+  }
+
+  function toggleLocation(locationId: string) {
+    setSelectedLocationIds((current) => {
+      if (current.includes(locationId)) {
+        const next = current.filter((value) => value !== locationId);
+        if (defaultLocationId === locationId) {
+          setDefaultLocationId(next[0] || null);
+        }
+        return next;
+      }
+
+      const next = [...current, locationId];
+      if (!defaultLocationId) {
+        setDefaultLocationId(locationId);
+      }
+      return next;
+    });
+  }
+
+  async function saveUserLocations() {
+    if (!locationsUser) {
+      return;
+    }
+
+    if (selectedLocationIds.length > 0 && !defaultLocationId) {
+      setUserLocationsError("Debes elegir una sede default");
+      return;
+    }
+
+    setSavingUserLocations(true);
+    setUserLocationsError(null);
+
+    try {
+      await requestJson<UserLocationsPayload>(`/api/users/${locationsUser.user_id}/locations`, {
+        method: "PUT",
+        body: JSON.stringify({
+          assignments: selectedLocationIds.map((location_id) => ({
+            location_id,
+            is_default: defaultLocationId === location_id,
+          })),
+        }),
+      });
+      closeLocationsModal();
+    } catch (error) {
+      setUserLocationsError(error instanceof Error ? error.message : "No se pudo guardar sedes");
+    } finally {
+      setSavingUserLocations(false);
+    }
+  }
+
+  function roleBadgeClass(active: boolean) {
+    return active ? "bg-indigo-100 text-indigo-800" : "bg-slate-200 text-slate-700";
+  }
+
+  function statusBadgeClass(active: boolean) {
+    return active ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800";
+  }
 
   return (
-    <div className="p-8">
-      {/* SECCIÓN USUARIOS */}
-      <h2 className="text-3xl font-bold text-gray-800 mb-6">Gestión de Usuarios</h2>
+    <div className="space-y-8 p-8">
+      <header className="space-y-2">
+        <h1 className="text-3xl font-bold text-slate-900">Roles y usuarios</h1>
+        <p className="max-w-3xl text-sm text-slate-600">
+          Esta pantalla ya trabaja contra backend. Los usuarios se inactivan, no se eliminan
+          fisicamente. La asignacion de sedes vive aqui para dejar lista la base operativa del
+          equipo.
+        </p>
+      </header>
 
-      {/* Mensajes de error */}
-      {errorUsers && (
-        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
-          Error: {errorUsers}
+      <section className="grid gap-4 md:grid-cols-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="text-sm text-slate-500">Usuarios</div>
+          <div className="mt-2 text-3xl font-semibold text-slate-900">{users.length}</div>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="text-sm text-slate-500">Usuarios activos</div>
+          <div className="mt-2 text-3xl font-semibold text-emerald-700">
+            {users.filter((user) => user.active).length}
+          </div>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="text-sm text-slate-500">Roles</div>
+          <div className="mt-2 text-3xl font-semibold text-indigo-700">{roles.length}</div>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="text-sm text-slate-500">Sedes activas</div>
+          <div className="mt-2 text-3xl font-semibold text-slate-900">
+            {availableLocations.length}
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900">Usuarios</h2>
+            <p className="text-sm text-slate-500">CRUD por backend con rol, estado y sedes.</p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <input
+              type="text"
+              value={userQuery}
+              onChange={(event) => setUserQuery(event.target.value)}
+              placeholder="Buscar por nombre, email o rol"
+              className="min-w-72 rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
+            />
+            <button
+              type="button"
+              onClick={() => openUserForm()}
+              className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+            >
+              Nuevo usuario
+            </button>
+          </div>
+        </div>
+
+        {usersError && (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {usersError}
+          </div>
+        )}
+
+        <div className="overflow-hidden rounded-2xl border border-slate-200">
+          {loadingUsers ? (
+            <div className="px-4 py-6 text-sm text-slate-500">Cargando usuarios...</div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="px-4 py-6 text-sm text-slate-500">
+              No hay usuarios para los filtros actuales.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium text-slate-600">Usuario</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-600">Rol</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-600">Estado</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-600">Actualizado</th>
+                    <th className="px-4 py-3 text-right font-medium text-slate-600">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 bg-white">
+                  {filteredUsers.map((user) => {
+                    const roleName =
+                      user.role_name ||
+                      roles.find((role) => role.role_id === user.role_id)?.name ||
+                      "Sin rol";
+
+                    return (
+                      <tr key={user.user_id}>
+                        <td className="px-4 py-3 align-top">
+                          <div className="font-medium text-slate-900">{user.full_name}</div>
+                          <div className="text-slate-500">{user.email}</div>
+                        </td>
+                        <td className="px-4 py-3 align-top">
+                          <span className="inline-flex rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-medium text-indigo-800">
+                            {roleName}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 align-top">
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusBadgeClass(user.active)}`}
+                          >
+                            {user.active ? "Activo" : "Inactivo"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 align-top text-slate-500">
+                          {new Date(user.updated_at).toLocaleString("es-PE")}
+                        </td>
+                        <td className="px-4 py-3 align-top">
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openLocationsModal(user)}
+                              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                            >
+                              Sedes
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openUserForm(user)}
+                              className="rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-medium text-indigo-700 transition hover:bg-indigo-50"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => toggleUserActive(user)}
+                              className="rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-50"
+                            >
+                              {user.active ? "Inactivar" : "Activar"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900">Roles</h2>
+            <p className="text-sm text-slate-500">
+              Mantenimiento base para el bloque de auth y administracion.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <input
+              type="text"
+              value={roleQuery}
+              onChange={(event) => setRoleQuery(event.target.value)}
+              placeholder="Buscar por nombre o descripcion"
+              className="min-w-72 rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
+            />
+            <button
+              type="button"
+              onClick={() => openRoleForm()}
+              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-500"
+            >
+              Nuevo rol
+            </button>
+          </div>
+        </div>
+
+        {rolesError && (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            {rolesError}
+          </div>
+        )}
+
+        <div className="overflow-hidden rounded-2xl border border-slate-200">
+          {loadingRoles ? (
+            <div className="px-4 py-6 text-sm text-slate-500">Cargando roles...</div>
+          ) : filteredRoles.length === 0 ? (
+            <div className="px-4 py-6 text-sm text-slate-500">
+              No hay roles para los filtros actuales.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium text-slate-600">Rol</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-600">Descripcion</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-600">Estado</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-600">Actualizado</th>
+                    <th className="px-4 py-3 text-right font-medium text-slate-600">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 bg-white">
+                  {filteredRoles.map((role) => (
+                    <tr key={role.role_id}>
+                      <td className="px-4 py-3 align-top">
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${roleBadgeClass(role.active)}`}>
+                          {role.name}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 align-top text-slate-600">{role.description || "-"}</td>
+                      <td className="px-4 py-3 align-top">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusBadgeClass(role.active)}`}
+                        >
+                          {role.active ? "Activo" : "Inactivo"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 align-top text-slate-500">
+                        {new Date(role.updated_at).toLocaleString("es-PE")}
+                      </td>
+                      <td className="px-4 py-3 align-top">
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openRoleForm(role)}
+                            className="rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-medium text-indigo-700 transition hover:bg-indigo-50"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleRoleActive(role)}
+                            className="rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-50"
+                          >
+                            {role.active ? "Inactivar" : "Activar"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {locationsError && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          {locationsError}
         </div>
       )}
 
-      {/* Búsqueda y botón agregar */}
-      <div className="mb-6 flex gap-4">
-        <input
-          type="text"
-          placeholder="Buscar usuario..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="flex-1 px-4 py-2 border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
-        />
-        <button
-          onClick={() => abrirFormulario()}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-semibold transition cursor-pointer disabled:opacity-50"
-          disabled={loadingUsers}
-        >
-          + Nuevo Usuario
-        </button>
-      </div>
-
-      {/* Modal Formulario Usuarios */}
-      {mostrarForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-96">
-            <h3 className="text-xl font-bold mb-4 text-gray-800">
-              {editando ? 'Editar Usuario' : 'Nuevo Usuario'}
+      {showUserForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+            <h3 className="text-xl font-semibold text-slate-900">
+              {editingUserId ? "Editar usuario" : "Nuevo usuario"}
             </h3>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+            <p className="mt-1 text-sm text-slate-500">
+              El password se guarda temporalmente como <code>temp_hash</code> hasta que entre auth.
+            </p>
+
+            <form className="mt-6 space-y-4" onSubmit={submitUserForm}>
+              <label className="block space-y-1">
+                <span className="text-sm font-medium text-slate-700">Nombre completo</span>
                 <input
-                  type="text"
-                  value={formData.full_name}
-                  onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                  className="w-full px-3 py-2 border text-gray-900 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Nombre completo"
+                  required
+                  value={userForm.full_name}
+                  onChange={(event) =>
+                    setUserForm((current) => ({ ...current, full_name: event.target.value }))
+                  }
+                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              </label>
+
+              <label className="block space-y-1">
+                <span className="text-sm font-medium text-slate-700">Email</span>
                 <input
+                  required
                   type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3 py-2 border text-gray-900 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="correo@ripnel.com"
+                  value={userForm.email}
+                  onChange={(event) =>
+                    setUserForm((current) => ({ ...current, email: event.target.value }))
+                  }
+                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
+              </label>
+
+              <label className="block space-y-1">
+                <span className="text-sm font-medium text-slate-700">Rol</span>
                 <select
-                  value={formData.role_id}
-                  onChange={(e) => setFormData({ ...formData, role_id: e.target.value })}
-                  className="w-full px-3 py-2 border text-gray-900 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  value={userForm.role_id}
+                  onChange={(event) =>
+                    setUserForm((current) => ({ ...current, role_id: event.target.value }))
+                  }
+                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
                 >
-                  <option value="">Seleccionar rol...</option>
-                  {roles.map(r => (
-                    <option key={r.role_id} value={r.role_id}>{r.name}</option>
+                  <option value="">Sin rol</option>
+                  {roles.map((role) => (
+                    <option key={role.role_id} value={role.role_id}>
+                      {role.name}
+                    </option>
                   ))}
                 </select>
-              </div>
-            </div>
-            <div className="flex gap-2 mt-6">
-              <button
-                onClick={guardarUsuario}
-                disabled={loadingForm}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-semibold transition cursor-pointer disabled:opacity-50"
-              >
-                {loadingForm ? 'Guardando...' : 'Guardar'}
-              </button>
-              <button
-                onClick={cerrarFormulario}
-                disabled={loadingForm}
-                className="flex-1 bg-gray-400 hover:bg-gray-500 text-white py-2 rounded-lg font-semibold transition cursor-pointer disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              </label>
 
-      {/* Tabla de Usuarios */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        {loadingUsers ? (
-          <div className="p-6 text-center text-gray-600">Cargando usuarios...</div>
-        ) : usuariosFiltrados.length === 0 ? (
-          <div className="p-6 text-center text-gray-600">No hay usuarios registrados</div>
-        ) : (
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Nombre</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Rol</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Estado</th>
-                <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {usuariosFiltrados.map(usuario => (
-                <tr key={usuario.user_id} className="border-b hover:bg-gray-50 transition">
-                  <td className="px-6 py-3 text-sm text-gray-900">{usuario.full_name}</td>
-                  <td className="px-6 py-3 text-sm text-gray-600">{usuario.email}</td>
-                  <td className="px-6 py-3 text-sm">
-                    <span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-semibold">
-                      {roles.find(r => r.role_id === usuario.role_id)?.name || 'N/A'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3 text-sm">
-                    <button
-                      onClick={() => handleToggleActivo(usuario.user_id, !usuario.active)}
-                      className={`px-2 py-1 rounded text-xs font-semibold transition cursor-pointer ${
-                        usuario.active
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {usuario.active ? 'Activo' : 'Inactivo'}
-                    </button>
-                  </td>
-                  <td className="px-6 py-3 text-center">
-                    <button
-                      onClick={() => abrirFormulario(usuario)}
-                      className="text-blue-600 hover:text-blue-800 font-semibold text-sm mr-3 cursor-pointer"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => handleEliminarUsuario(usuario.user_id)}
-                      className="text-red-600 hover:text-red-800 font-semibold text-sm cursor-pointer"
-                    >
-                      Eliminar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* SECCIÓN ROLES */}
-      <h2 className="text-3xl font-bold text-gray-800 mb-6 mt-12">Gestión de Roles</h2>
-
-      {/* Mensajes de error */}
-      {errorRoles && (
-        <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
-          Error: {errorRoles}
-        </div>
-      )}
-
-      {/* Búsqueda y botón agregar roles */}
-      <div className="mb-6 flex gap-4">
-        <input
-          type="text"
-          placeholder="Buscar rol..."
-          value={busquedaRol}
-          onChange={(e) => setBusquedaRol(e.target.value)}
-          className="flex-1 px-4 py-2 border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-gray-900"
-        />
-        <button
-          onClick={() => abrirFormularioRol()}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-semibold transition cursor-pointer disabled:opacity-50"
-          disabled={loadingRoles}
-        >
-          + Nuevo Rol
-        </button>
-      </div>
-
-      {/* Modal Formulario Rol */}
-      {mostrarFormRol && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-96">
-            <h3 className="text-xl font-bold mb-4 text-gray-800">
-              {editandoRol ? 'Editar Rol' : 'Nuevo Rol'}
-            </h3>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+              <label className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
                 <input
-                  type="text"
-                  value={formDataRol.name}
-                  onChange={(e) => setFormDataRol({ ...formDataRol, name: e.target.value })}
-                  className="w-full px-3 py-2 border text-gray-900 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Nombre del rol"
+                  type="checkbox"
+                  checked={userForm.active}
+                  onChange={(event) =>
+                    setUserForm((current) => ({ ...current, active: event.target.checked }))
+                  }
+                  className="h-4 w-4 rounded border-slate-300"
                 />
+                <span className="text-sm text-slate-700">Usuario activo</span>
+              </label>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={closeUserForm}
+                  disabled={savingUser}
+                  className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingUser}
+                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {savingUser ? "Guardando..." : "Guardar usuario"}
+                </button>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showRoleForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+            <h3 className="text-xl font-semibold text-slate-900">
+              {editingRoleId ? "Editar rol" : "Nuevo rol"}
+            </h3>
+
+            <form className="mt-6 space-y-4" onSubmit={submitRoleForm}>
+              <label className="block space-y-1">
+                <span className="text-sm font-medium text-slate-700">Nombre</span>
+                <input
+                  required
+                  value={roleForm.name}
+                  onChange={(event) =>
+                    setRoleForm((current) => ({ ...current, name: event.target.value }))
+                  }
+                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
+                />
+              </label>
+
+              <label className="block space-y-1">
+                <span className="text-sm font-medium text-slate-700">Descripcion</span>
                 <textarea
-                  value={formDataRol.description}
-                  onChange={(e) => setFormDataRol({ ...formDataRol, description: e.target.value })}
-                  className="w-full px-3 py-2 border text-gray-900 border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Descripción del rol"
-                  rows={3}
+                  value={roleForm.description}
+                  onChange={(event) =>
+                    setRoleForm((current) => ({ ...current, description: event.target.value }))
+                  }
+                  rows={4}
+                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
                 />
+              </label>
+
+              <label className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={roleForm.active}
+                  onChange={(event) =>
+                    setRoleForm((current) => ({ ...current, active: event.target.checked }))
+                  }
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+                <span className="text-sm text-slate-700">Rol activo</span>
+              </label>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={closeRoleForm}
+                  disabled={savingRole}
+                  className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingRole}
+                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {savingRole ? "Guardando..." : "Guardar rol"}
+                </button>
               </div>
-            </div>
-            <div className="flex gap-2 mt-6">
+            </form>
+          </div>
+        </div>
+      )}
+
+      {locationsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-semibold text-slate-900">Sedes por usuario</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  {locationsUser
+                    ? `Asignaciones operativas para ${locationsUser.full_name}.`
+                    : "Configura las sedes del usuario."}
+                </p>
+              </div>
               <button
-                onClick={guardarRol}
-                disabled={loadingFormRol}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-semibold transition cursor-pointer disabled:opacity-50"
+                type="button"
+                onClick={closeLocationsModal}
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-50"
               >
-                {loadingFormRol ? 'Guardando...' : 'Guardar'}
+                Cerrar
               </button>
+            </div>
+
+            {userLocationsError && (
+              <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {userLocationsError}
+              </div>
+            )}
+
+            <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+              {loadingUserLocations || loadingLocations ? (
+                <div className="px-4 py-6 text-sm text-slate-500">Cargando sedes...</div>
+              ) : availableLocations.length === 0 ? (
+                <div className="px-4 py-6 text-sm text-slate-500">
+                  No hay sedes activas disponibles.
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-200">
+                  {availableLocations.map((location) => {
+                    const checked = selectedLocationIds.includes(location.location_id);
+                    const isDefault = defaultLocationId === location.location_id;
+
+                    return (
+                      <div
+                        key={location.location_id}
+                        className="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between"
+                      >
+                        <label className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleLocation(location.location_id)}
+                            className="mt-1 h-4 w-4 rounded border-slate-300"
+                          />
+                          <span>
+                            <span className="block font-medium text-slate-900">
+                              {location.name} ({location.code})
+                            </span>
+                            <span className="block text-sm text-slate-500">
+                              {location.type}
+                              {location.address ? ` - ${location.address}` : ""}
+                            </span>
+                          </span>
+                        </label>
+
+                        <label
+                          className={`inline-flex items-center gap-2 text-sm ${checked ? "text-slate-700" : "text-slate-400"}`}
+                        >
+                          <input
+                            type="radio"
+                            name="default-location"
+                            checked={isDefault}
+                            disabled={!checked}
+                            onChange={() => setDefaultLocationId(location.location_id)}
+                            className="h-4 w-4 border-slate-300"
+                          />
+                          Sede default
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
               <button
-                onClick={cerrarFormularioRol}
-                disabled={loadingFormRol}
-                className="flex-1 bg-gray-400 hover:bg-gray-500 text-white py-2 rounded-lg font-semibold transition cursor-pointer disabled:opacity-50"
+                type="button"
+                onClick={closeLocationsModal}
+                disabled={savingUserLocations}
+                className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveUserLocations()}
+                disabled={savingUserLocations || loadingUserLocations}
+                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {savingUserLocations ? "Guardando..." : "Guardar sedes"}
               </button>
             </div>
           </div>
         </div>
       )}
-
-      {/* Tabla de Roles */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        {loadingRoles ? (
-          <div className="p-6 text-center text-gray-600">Cargando roles...</div>
-        ) : rolesFiltrados.length === 0 ? (
-          <div className="p-6 text-center text-gray-600">No hay roles registrados</div>
-        ) : (
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Nombre</th>
-                <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Descripción</th>
-                <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rolesFiltrados.map(rol => (
-                <tr key={rol.role_id} className="border-b hover:bg-gray-50 transition">
-                  <td className="px-6 py-3 text-sm text-gray-900">
-                    <span className="bg-indigo-100 text-indigo-800 px-2 py-1 rounded text-xs font-semibold">
-                      {rol.name}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3 text-sm text-gray-600">{rol.description}</td>
-                  <td className="px-6 py-3 text-center">
-                    <button
-                      onClick={() => abrirFormularioRol(rol)}
-                      className="text-blue-600 hover:text-blue-800 font-semibold text-sm mr-3 cursor-pointer"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => handleEliminarRol(rol.role_id)}
-                      className="text-red-600 hover:text-red-800 font-semibold text-sm cursor-pointer"
-                    >
-                      Eliminar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* Estadísticas */}
-      <div className="grid grid-cols-3 gap-4 mt-6">
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="text-2xl font-bold text-blue-600">{usuarios.length}</div>
-          <div className="text-gray-600 text-sm">Total de Usuarios</div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="text-2xl font-bold text-green-600">{usuarios.filter(u => u.active).length}</div>
-          <div className="text-gray-600 text-sm">Usuarios Activos</div>
-        </div>
-        <div className="bg-white p-4 rounded-lg shadow">
-          <div className="text-2xl font-bold text-purple-600">{roles.length}</div>
-          <div className="text-gray-600 text-sm">Roles Disponibles</div>
-        </div>
-      </div>
     </div>
   );
 }
