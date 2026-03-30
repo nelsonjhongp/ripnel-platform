@@ -10,6 +10,7 @@ const {
   updateTransferLineReceipt,
   markTransferShipped,
   markTransferReceived,
+  markTransferCancelled,
 } = require('./transfers.repo');
 const {
   findLocationById,
@@ -417,6 +418,30 @@ async function receiveTransferById(transferId, input = {}) {
   return getTransferById(normalizedTransferId);
 }
 
+async function cancelTransferById(transferId, input = {}) {
+  const normalizedTransferId = normalizeUuid(transferId);
+
+  if (!normalizedTransferId) {
+    throw new AppError('Transfer id is required', 400);
+  }
+
+  const transfer = await findTransferHeaderById(normalizedTransferId);
+
+  if (!transfer) {
+    throw new AppError('Transfer not found', 404);
+  }
+
+  if (transfer.status !== 'draft') {
+    throw new AppError('Only draft transfers can be cancelled', 400);
+  }
+
+  const cancelledBy = await resolveActorUserId(input.cancelled_by, 'Cancelled by');
+
+  await markTransferCancelled(normalizedTransferId, cancelledBy);
+
+  return getTransferById(normalizedTransferId);
+}
+
 module.exports = {
   listTransfers,
   listPendingReceipts,
@@ -424,4 +449,5 @@ module.exports = {
   createTransfer,
   shipTransferById,
   receiveTransferById,
+  cancelTransferById,
 };

@@ -1,9 +1,11 @@
 const { AppError } = require('../../shared/errors');
 const { pool } = require('../../shared/db');
+const { findUserByEmail } = require('../users/users.repo');
 const {
   findAllInventory,
   findAllKardex,
   findAllAdjustments,
+  findAdjustmentVariants,
   findAdjustmentHeaderById,
   findAdjustmentLinesByAdjustmentId,
   findLocationById,
@@ -13,11 +15,13 @@ const {
   insertAdjustment,
   insertAdjustmentLine,
   confirmAdjustment,
+  cancelAdjustment,
   upsertInventoryQty,
   insertStockMovement,
 } = require('./inventory.repo');
 
 const ALLOWED_MOVEMENT_TYPES = ['IN', 'OUT', 'ADJUST'];
+const DEVELOPMENT_ACTOR_EMAIL = 'nelson@ripnel.com';
 
 function normalizeUuid(value) {
   const normalized = String(value || '').trim();
@@ -75,6 +79,28 @@ function ensureUniqueVariantIds(lines) {
   return true;
 }
 
+async function resolveAdjustmentActorUserId(value, fieldLabel) {
+  const normalizedUserId = normalizeUuid(value);
+
+  if (normalizedUserId) {
+    const user = await findUserById(normalizedUserId);
+
+    if (!user) {
+      throw new AppError(`${fieldLabel} user is invalid`, 400);
+    }
+
+    return user.user_id;
+  }
+
+  const fallbackUser = await findUserByEmail(DEVELOPMENT_ACTOR_EMAIL);
+
+  if (!fallbackUser) {
+    throw new AppError('Development adjustment actor is not available', 500);
+  }
+
+  return fallbackUser.user_id;
+}
+
 async function listInventory(input = {}) {
   const filters = {
     locationId: normalizeUuid(input.location_id),
@@ -117,6 +143,27 @@ async function listAdjustments() {
   return findAllAdjustments();
 }
 
+async function searchVariantsForAdjustment(input = {}) {
+  const locationId = normalizeUuid(input.location_id);
+  const query = normalizeText(input.query);
+
+  if (!locationId) {
+    throw new AppError('Location id is required', 400);
+  }
+
+  const location = await findLocationById(locationId);
+
+  if (!location) {
+    throw new AppError('Location is invalid', 400);
+  }
+
+  if (!query || query.length < 2) {
+    return [];
+  }
+
+  return findAdjustmentVariants(locationId, query);
+}
+
 async function getAdjustmentById(adjustmentId) {
   const normalizedAdjustmentId = normalizeUuid(adjustmentId);
 
@@ -140,7 +187,10 @@ async function getAdjustmentById(adjustmentId) {
 
 async function createAdjustment(input) {
   const locationId = normalizeUuid(input.location_id);
-  const createdBy = normalizeUuid(input.created_by);
+  const createdBy = await resolveAdjustmentActorUserId(
+    input.created_by,
+    'Created by'
+  );
   const reason = normalizeText(input.reason);
   const notes = normalizeText(input.notes);
   const lines = Array.isArray(input.lines) ? input.lines : [];
@@ -173,7 +223,7 @@ async function createAdjustment(input) {
 
   const [location, createdByUser, variants] = await Promise.all([
     findLocationById(locationId),
-    createdBy ? findUserById(createdBy) : Promise.resolve(null),
+    findUserById(createdBy),
     findVariantsByIds(normalizedLines.map((line) => line.variant_id)),
   ]);
 
@@ -181,7 +231,7 @@ async function createAdjustment(input) {
     throw new AppError('Location is invalid', 400);
   }
 
-  if (createdBy && !createdByUser) {
+  if (!createdByUser) {
     throw new AppError('Created by user is invalid', 400);
   }
 
@@ -246,7 +296,10 @@ async function createAdjustment(input) {
 
 async function confirmAdjustmentById(adjustmentId, input = {}) {
   const normalizedAdjustmentId = normalizeUuid(adjustmentId);
-  const confirmedBy = normalizeUuid(input.confirmed_by);
+  const confirmedBy = await resolveAdjustmentActorUserId(
+    input.confirmed_by,
+    'Confirmed by'
+  );
 
   if (!normalizedAdjustmentId) {
     throw new AppError('Adjustment id is required', 400);
@@ -262,9 +315,9 @@ async function confirmAdjustmentById(adjustmentId, input = {}) {
     throw new AppError('Only draft adjustments can be confirmed', 400);
   }
 
-  const confirmedByUser = confirmedBy ? await findUserById(confirmedBy) : null;
+  const confirmedByUser = await findUserById(confirmedBy);
 
-  if (confirmedBy && !confirmedByUser) {
+  if (!confirmedByUser) {
     throw new AppError('Confirmed by user is invalid', 400);
   }
 
@@ -325,11 +378,45 @@ async function confirmAdjustmentById(adjustmentId, input = {}) {
   return getAdjustmentById(normalizedAdjustmentId);
 }
 
+async function cancelAdjustmentById(adjustmentId, input = {}) {
+  const normalizedAdjustmentId = normalizeUuid(adjustmentId);
+  const cancelledBy = await resolveAdjustmentActorUserId(
+    input.cancelled_by,
+    'Cancelled by'
+  );
+
+  if (!normalizedAdjustmentId) {
+    throw new AppError('Adjustment id is required', 400);
+  }
+
+  const existingAdjustment = await findAdjustmentHeaderById(normalizedAdjustmentId);
+
+  if (!existingAdjustment) {
+    throw new AppError('Adjustment not found', 404);
+  }
+
+  if (existingAdjustment.status !== 'draft') {
+    throw new AppError('Only draft adjustments can be cancelled', 400);
+  }
+
+  const cancelledByUser = await findUserById(cancelledBy);
+
+  if (!cancelledByUser) {
+    throw new AppError('Cancelled by user is invalid', 400);
+  }
+
+  await cancelAdjustment(normalizedAdjustmentId, cancelledBy);
+
+  return getAdjustmentById(normalizedAdjustmentId);
+}
+
 module.exports = {
   listInventory,
   listKardex,
   listAdjustments,
+  searchVariantsForAdjustment,
   getAdjustmentById,
   createAdjustment,
   confirmAdjustmentById,
+  cancelAdjustmentById,
 };

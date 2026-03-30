@@ -2,6 +2,7 @@ const { AppError } = require('../../shared/errors');
 const { pool } = require('../../shared/db');
 const {
   findAllPrices,
+  findStylesMissingCommercialPrices,
   findPriceById,
   findStyleById,
   findSizeById,
@@ -158,6 +159,10 @@ async function createPrice(input) {
   }
 }
 
+async function listPriceCoverageGaps() {
+  return findStylesMissingCommercialPrices();
+}
+
 async function patchPrice(priceId, input) {
   const normalizedPriceId = String(priceId || '').trim();
 
@@ -231,6 +236,7 @@ async function patchPrice(priceId, input) {
 
 module.exports = {
   listPrices,
+  listPriceCoverageGaps,
   createPrice,
   patchPrice,
   ALLOWED_PRICE_TYPES,

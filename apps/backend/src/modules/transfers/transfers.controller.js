@@ -5,6 +5,7 @@ const {
   createTransfer,
   shipTransferById,
   receiveTransferById,
+  cancelTransferById,
 } = require('./transfers.service');
 
 async function getTransfers(req, res, next) {
@@ -61,6 +62,15 @@ async function postReceiveTransfer(req, res, next) {
   }
 }
 
+async function postCancelTransfer(req, res, next) {
+  try {
+    const transfer = await cancelTransferById(req.params.transferId, req.body);
+    res.json({ ok: true, data: transfer });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getTransfers,
   getPendingReceipts,
@@ -68,4 +78,5 @@ module.exports = {
   postTransfer,
   postShipTransfer,
   postReceiveTransfer,
+  postCancelTransfer,
 };

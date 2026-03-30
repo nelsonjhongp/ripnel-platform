@@ -6,6 +6,7 @@ const {
   postTransfer,
   postShipTransfer,
   postReceiveTransfer,
+  postCancelTransfer,
 } = require('./transfers.controller');
 
 const router = express.Router();
@@ -16,5 +17,6 @@ router.get('/:transferId', getTransfer);
 router.post('/', postTransfer);
 router.post('/:transferId/ship', postShipTransfer);
 router.post('/:transferId/receive', postReceiveTransfer);
+router.post('/:transferId/cancel', postCancelTransfer);
 
 module.exports = router;

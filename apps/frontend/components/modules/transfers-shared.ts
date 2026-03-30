@@ -17,6 +17,8 @@ export type TransferSummary = {
   shipped_by_name: string | null;
   received_by: string | null;
   received_by_name: string | null;
+  cancelled_by: string | null;
+  cancelled_by_name: string | null;
   created_at: string;
   shipped_at: string | null;
   received_at: string | null;
