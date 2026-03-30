@@ -44,8 +44,7 @@ const sidebarGroups = [
     title: "Administracion",
     icon: Settings,
     items: [
-      { title: "Usuarios", url: "/administracion/usuarios" },
-      { title: "Roles", url: "/administracion/roles" },
+      { title: "Roles y usuarios", url: "/administracion/roles&usuarios" },
       { title: "Ubicaciones", url: "/administracion/ubicaciones" },
     ],
   },

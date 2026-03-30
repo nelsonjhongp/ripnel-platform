@@ -11,6 +11,6 @@
     "lint:frontend": "npm run lint --workspace @ripnel/frontend"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.100.0"
+    "@supabase/supabase-js": "^2.100.1"
   }
 }
