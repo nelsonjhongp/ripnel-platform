@@ -15,18 +15,37 @@ const {
   notFoundHandler,
 } = require('./middlewares/error-handler');
 
+function normalizeOrigin(value) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return new URL(value).origin;
+  } catch (error) {
+    return String(value).replace(/\/+$/, '');
+  }
+}
+
 const app = express();
-const allowedOrigins = new Set([env.frontendUrl]);
+const allowedOrigins = new Set();
+const configuredFrontendOrigin = normalizeOrigin(env.frontendUrl);
+
+if (configuredFrontendOrigin) {
+  allowedOrigins.add(configuredFrontendOrigin);
+}
 
 try {
-  const frontendUrl = new URL(env.frontendUrl);
+  const frontendUrl = new URL(configuredFrontendOrigin || env.frontendUrl);
 
   if (frontendUrl.hostname === 'localhost') {
-    allowedOrigins.add(env.frontendUrl.replace('localhost', '127.0.0.1'));
+    frontendUrl.hostname = '127.0.0.1';
+    allowedOrigins.add(frontendUrl.origin);
   }
 
   if (frontendUrl.hostname === '127.0.0.1') {
-    allowedOrigins.add(env.frontendUrl.replace('127.0.0.1', 'localhost'));
+    frontendUrl.hostname = 'localhost';
+    allowedOrigins.add(frontendUrl.origin);
   }
 } catch (error) {
   console.warn('Invalid FRONTEND_URL value for CORS allowlist.');
@@ -35,7 +54,9 @@ try {
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.has(origin)) {
+      const normalizedOrigin = normalizeOrigin(origin);
+
+      if (!origin || (normalizedOrigin && allowedOrigins.has(normalizedOrigin))) {
         return callback(null, true);
       }
 
