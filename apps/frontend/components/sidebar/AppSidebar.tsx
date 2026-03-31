@@ -107,6 +107,7 @@ const sidebarGroups = [
     icon: Boxes,
     items: [
       { title: "Stock actual", url: "/inventory" },
+      { title: "Apertura y ajustes", url: "/inventory/ajustes" },
       { title: "Kardex", url: "/kardex" },
       { title: "Historial de transacciones", url: "/transaction-history" },
     ],
@@ -123,6 +124,7 @@ const catalogIcons = {
 
 const inventoryIcons = {
   "Stock actual": Warehouse,
+  "Apertura y ajustes": ClipboardList,
   Kardex: ClipboardList,
   "Historial de transacciones": ReceiptText,
 }

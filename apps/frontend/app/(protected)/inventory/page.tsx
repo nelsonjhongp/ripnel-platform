@@ -1,95 +1,185 @@
-"use client"
+"use client";
 
-import { useMemo, useState } from "react"
-import { AlertTriangle, Boxes, Package, Search } from "lucide-react"
+import { useEffect, useMemo, useState } from "react";
+import { Boxes, LoaderCircle, MapPin, Package, Search } from "lucide-react";
+import { buildApiUrl } from "@/lib/api";
 
 type InventoryItem = {
-  id: number
-  sku: string
-  name: string
-  category: string
-  location: string
-  stock: number
-  minStock: number
-  unitCost: number
-}
+  location_id: string;
+  location_code: string;
+  location_name: string;
+  variant_id: string;
+  sku: string;
+  style_id: string;
+  style_code: string;
+  style_name: string;
+  garment_type_name: string | null;
+  size_id: string;
+  size_code: string;
+  color_id: string;
+  color_name: string;
+  qty: number;
+};
 
-const INVENTORY_ITEMS: InventoryItem[] = [
-  { id: 1, sku: "RIP-001", name: "Polo Essentials", category: "Ropa", location: "Almacen A1", stock: 25, minStock: 10, unitCost: 45 },
-  { id: 2, sku: "RIP-013", name: "Jean Urban Flex", category: "Ropa", location: "Almacen A2", stock: 14, minStock: 8, unitCost: 82 },
-  { id: 3, sku: "RIP-222", name: "Zapatilla Runner Pro", category: "Calzado", location: "Almacen B1", stock: 8, minStock: 12, unitCost: 130 },
-  { id: 4, sku: "RIP-330", name: "Casaca Softshell", category: "Ropa", location: "Almacen A3", stock: 6, minStock: 6, unitCost: 120 },
-  { id: 5, sku: "RIP-411", name: "Mochila City Light", category: "Accesorios", location: "Almacen C1", stock: 16, minStock: 7, unitCost: 64 },
-  { id: 6, sku: "RIP-501", name: "Gorra Street Cap", category: "Accesorios", location: "Tienda 1", stock: 4, minStock: 6, unitCost: 22 },
-]
-
-const CATEGORIES = ["Todos", "Ropa", "Calzado", "Accesorios"]
-
-function stockStatus(stock: number, minStock: number) {
-  if (stock <= minStock) return "Critico"
-  if (stock <= minStock + 4) return "Bajo"
-  return "Normal"
-}
+type PriceCoverageGap = {
+  style_id: string;
+  style_code: string;
+  style_name: string;
+  variant_count: number;
+  inventory_row_count: number;
+  price_row_count: number;
+};
 
 export default function InventoryPage() {
-  const [query, setQuery] = useState("")
-  const [category, setCategory] = useState("Todos")
+  const [items, setItems] = useState<InventoryItem[]>([]);
+  const [coverageGaps, setCoverageGaps] = useState<PriceCoverageGap[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [locationFilter, setLocationFilter] = useState("all");
+
+  async function loadInventory() {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(buildApiUrl("/api/inventory"), {
+        cache: "no-store",
+      });
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(payload.message || "No se pudo cargar inventario");
+      }
+
+      setItems(payload.data || []);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo cargar inventario"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadInventory();
+
+    fetch(buildApiUrl("/api/prices/coverage-gaps"), { cache: "no-store" })
+      .then((res) => res.json())
+      .then((payload) => {
+        setCoverageGaps(payload.data || []);
+      })
+      .catch(console.error);
+  }, []);
+
+  const locationOptions = useMemo(() => {
+    const map = new Map<string, string>();
+
+    for (const item of items) {
+      map.set(item.location_code, item.location_name);
+    }
+
+    return Array.from(map.entries()).map(([code, name]) => ({
+      code,
+      name,
+    }));
+  }, [items]);
 
   const filteredItems = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase()
+    const normalizedQuery = query.trim().toLowerCase();
 
-    return INVENTORY_ITEMS.filter((item) => {
-      const byCategory = category === "Todos" || item.category === category
-      const byQuery =
+    return items.filter((item) => {
+      const matchesLocation =
+        locationFilter === "all" || item.location_code === locationFilter;
+      const matchesQuery =
         !normalizedQuery ||
-        item.name.toLowerCase().includes(normalizedQuery) ||
         item.sku.toLowerCase().includes(normalizedQuery) ||
-        item.location.toLowerCase().includes(normalizedQuery)
+        item.style_code.toLowerCase().includes(normalizedQuery) ||
+        item.style_name.toLowerCase().includes(normalizedQuery) ||
+        item.location_name.toLowerCase().includes(normalizedQuery) ||
+        (item.garment_type_name || "").toLowerCase().includes(normalizedQuery);
 
-      return byCategory && byQuery
-    })
-  }, [query, category])
+      return matchesLocation && matchesQuery;
+    });
+  }, [items, query, locationFilter]);
 
   const totals = useMemo(() => {
-    const totalSku = filteredItems.length
-    const totalUnits = filteredItems.reduce((acc, item) => acc + item.stock, 0)
-    const lowStock = filteredItems.filter((item) => item.stock <= item.minStock).length
-    const inventoryValue = filteredItems.reduce((acc, item) => acc + item.stock * item.unitCost, 0)
+    const uniqueSkus = new Set(filteredItems.map((item) => item.sku)).size;
+    const totalUnits = filteredItems.reduce((acc, item) => acc + item.qty, 0);
+    const uniqueLocations = new Set(
+      filteredItems.map((item) => item.location_id)
+    ).size;
 
-    return { totalSku, totalUnits, lowStock, inventoryValue }
-  }, [filteredItems])
+    return {
+      uniqueSkus,
+      totalUnits,
+      uniqueLocations,
+    };
+  }, [filteredItems]);
+
+  const stylesWithoutCommercialPrice = useMemo(
+    () => new Set(coverageGaps.map((gap) => gap.style_code)),
+    [coverageGaps]
+  );
 
   return (
     <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
       <div className="mx-auto max-w-7xl space-y-5">
         <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
-          <p className="text-xs uppercase tracking-wide text-violet-600">Control de stock</p>
-          <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">Inventario</h1>
+          <p className="text-xs uppercase tracking-wide text-violet-600">
+            Control de stock
+          </p>
+          <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">
+            Inventario
+          </h1>
           <p className="mt-1 text-sm text-slate-600">
-            Visualiza existencias por producto, alertas de minimo y valor valorizado del inventario.
+            Visualiza existencias reales por variante y sede usando el stock
+            actual consolidado de la base de datos.
           </p>
         </header>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-3">
           <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-wide text-slate-500">SKUs activos</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">{totals.totalSku}</p>
+            <p className="text-xs uppercase tracking-wide text-slate-500">
+              SKUs con stock
+            </p>
+            <p className="mt-2 text-2xl font-bold text-slate-900">
+              {totals.uniqueSkus}
+            </p>
           </article>
           <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Unidades disponibles</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">{totals.totalUnits}</p>
+            <p className="text-xs uppercase tracking-wide text-slate-500">
+              Unidades disponibles
+            </p>
+            <p className="mt-2 text-2xl font-bold text-slate-900">
+              {totals.totalUnits}
+            </p>
           </article>
-          <article className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-wide text-amber-700">Alertas de stock</p>
-            <p className="mt-2 text-2xl font-bold text-amber-800">{totals.lowStock}</p>
-          </article>
-          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-wide text-slate-500">Valor inventario</p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">S/. {totals.inventoryValue.toFixed(2)}</p>
+          <article className="rounded-2xl border border-violet-200 bg-violet-50 p-4 shadow-sm">
+            <p className="text-xs uppercase tracking-wide text-violet-700">
+              Sedes con stock
+            </p>
+            <p className="mt-2 text-2xl font-bold text-violet-800">
+              {totals.uniqueLocations}
+            </p>
           </article>
         </div>
 
         <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
+          {coverageGaps.length > 0 ? (
+            <div className="mb-5 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Hay styles con stock sin precio comercial. Inventario puede operar, pero
+              ventas y precios siguen incompletos para:{" "}
+              <span className="font-semibold">
+                {coverageGaps.map((gap) => gap.style_code).join(", ")}
+              </span>
+              .
+            </div>
+          ) : null}
+
           <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -97,115 +187,155 @@ export default function InventoryPage() {
                 type="text"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar por nombre, SKU o ubicacion"
+                placeholder="Buscar por SKU, style, producto o ubicacion"
                 className="w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
               />
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {CATEGORIES.map((currentCategory) => (
+              <button
+                type="button"
+                onClick={() => setLocationFilter("all")}
+                className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+                  locationFilter === "all"
+                    ? "border-violet-400 bg-violet-100 text-violet-700"
+                    : "border-slate-300 bg-white text-slate-700 hover:border-slate-400"
+                }`}
+              >
+                Todas
+              </button>
+              {locationOptions.map((location) => (
                 <button
-                  key={currentCategory}
+                  key={location.code}
                   type="button"
-                  onClick={() => setCategory(currentCategory)}
+                  onClick={() => setLocationFilter(location.code)}
                   className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
-                    category === currentCategory
+                    locationFilter === location.code
                       ? "border-violet-400 bg-violet-100 text-violet-700"
                       : "border-slate-300 bg-white text-slate-700 hover:border-slate-400"
                   }`}
                 >
-                  {currentCategory}
+                  {location.code}
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="mt-5 overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">SKU</th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Producto</th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Categoria</th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Ubicacion</th>
-                  <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Stock</th>
-                  <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Minimo</th>
-                  <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Costo unit.</th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
-                {filteredItems.map((item) => {
-                  const status = stockStatus(item.stock, item.minStock)
+          {error ? (
+            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          ) : null}
 
-                  return (
-                    <tr key={item.id} className="hover:bg-slate-50">
-                      <td className="whitespace-nowrap px-3 py-3 text-sm font-medium text-slate-700">{item.sku}</td>
-                      <td className="px-3 py-3 text-sm font-semibold text-slate-900">{item.name}</td>
-                      <td className="px-3 py-3 text-sm text-slate-600">{item.category}</td>
-                      <td className="px-3 py-3 text-sm text-slate-600">{item.location}</td>
-                      <td className="px-3 py-3 text-right text-sm font-semibold text-slate-800">{item.stock}</td>
-                      <td className="px-3 py-3 text-right text-sm text-slate-600">{item.minStock}</td>
-                      <td className="px-3 py-3 text-right text-sm text-slate-600">S/. {item.unitCost.toFixed(2)}</td>
-                      <td className="px-3 py-3 text-sm">
-                        <span
-                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            status === "Critico"
-                              ? "bg-red-100 text-red-700"
-                              : status === "Bajo"
-                              ? "bg-amber-100 text-amber-700"
-                              : "bg-emerald-100 text-emerald-700"
-                          }`}
-                        >
-                          {status}
+          {loading ? (
+            <div className="mt-5 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-sm text-slate-500">
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+              Cargando inventario...
+            </div>
+          ) : (
+            <div className="mt-5 overflow-x-auto">
+              <table className="min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      SKU
+                    </th>
+                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Producto
+                    </th>
+                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Tipo prenda
+                    </th>
+                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Style
+                    </th>
+                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Variante
+                    </th>
+                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Ubicacion
+                    </th>
+                    <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Stock
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {filteredItems.map((item) => (
+                    <tr
+                      key={`${item.location_id}-${item.variant_id}`}
+                      className="hover:bg-slate-50"
+                    >
+                      <td className="whitespace-nowrap px-3 py-3 text-sm font-medium text-slate-700">
+                        {item.sku}
+                      </td>
+                      <td className="px-3 py-3 text-sm font-semibold text-slate-900">
+                        <div className="space-y-1">
+                          <p>{item.style_name}</p>
+                          {stylesWithoutCommercialPrice.has(item.style_code) ? (
+                            <span className="inline-flex rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                              Sin precio comercial
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-sm text-slate-600">
+                        {item.garment_type_name || "Sin tipo"}
+                      </td>
+                      <td className="px-3 py-3 text-sm text-slate-600">
+                        {item.style_code}
+                      </td>
+                      <td className="px-3 py-3 text-sm text-slate-600">
+                        {item.size_code} / {item.color_name}
+                      </td>
+                      <td className="px-3 py-3 text-sm text-slate-600">
+                        <span className="inline-flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-violet-500" />
+                          {item.location_name}
                         </span>
                       </td>
+                      <td className="px-3 py-3 text-right text-sm font-semibold text-slate-800">
+                        {item.qty}
+                      </td>
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {!filteredItems.length && (
-            <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-              No se encontraron productos con los filtros actuales.
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
+
+          {!loading && !filteredItems.length ? (
+            <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+              No se encontraron registros de inventario con los filtros actuales.
+            </div>
+          ) : null}
         </article>
 
-        <div className="grid gap-4 xl:grid-cols-3">
+        <div className="grid gap-4 xl:grid-cols-2">
           <article className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
             <p className="flex items-center gap-2 text-sm font-semibold text-violet-700">
               <Boxes className="h-4 w-4" />
-              Reabastecimiento sugerido
+              Lectura real de stock
             </p>
             <p className="mt-2 text-sm text-violet-800">
-              Prioriza la reposicion de productos con estado Critico para evitar quiebres de stock en tienda.
+              Este listado ya sale del backend y refleja el estado actual de la
+              tabla <code>inventory</code> por sede y variante.
             </p>
           </article>
 
           <article className="rounded-2xl border border-slate-200 bg-white p-4">
             <p className="flex items-center gap-2 text-sm font-semibold text-slate-700">
               <Package className="h-4 w-4" />
-              Cobertura general
+              Regla operativa
             </p>
             <p className="mt-2 text-sm text-slate-600">
-              La cobertura actual es de {totals.totalUnits} unidades distribuidas en {totals.totalSku} productos.
-            </p>
-          </article>
-
-          <article className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-            <p className="flex items-center gap-2 text-sm font-semibold text-amber-700">
-              <AlertTriangle className="h-4 w-4" />
-              Alertas activas
-            </p>
-            <p className="mt-2 text-sm text-amber-800">
-              Hay {totals.lowStock} productos por debajo o en su stock minimo.
+              El stock no debe editarse directo. La apertura inicial y los
+              ajustes pasan por documentos confirmados; luego el movimiento
+              normal sigue por ventas y transferencias.
             </p>
           </article>
         </div>
       </div>
     </section>
-  )
+  );
 }

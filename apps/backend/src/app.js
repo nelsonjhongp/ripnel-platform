@@ -9,6 +9,9 @@ const stylesRoutes = require('./modules/styles/styles.routes');
 const variantsRoutes = require('./modules/variants/variants.routes');
 const pricesRoutes = require('./modules/prices/prices.routes');
 const pricingRulesRoutes = require('./modules/prices/pricing-rules.routes');
+const inventoryRoutes = require('./modules/inventory/inventory.routes');
+const transfersRoutes = require('./modules/transfers/transfers.routes');
+const usersRoutes = require('./modules/users/users.routes');
 const customersRoutes = require('./modules/customers/customers.routes');
 const {
   errorHandler,
@@ -74,6 +77,9 @@ app.use('/api/styles', stylesRoutes);
 app.use('/api/variants', variantsRoutes);
 app.use('/api/prices', pricesRoutes);
 app.use('/api/pricing-rules', pricingRulesRoutes);
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/transfers', transfersRoutes);
+app.use('/api/users', usersRoutes);
 app.use('/api/customers', customersRoutes);
 
 app.use(notFoundHandler);

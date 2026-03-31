@@ -8,6 +8,7 @@ type PriceMode = "list" | "editor" | "rules";
 
 type PriceRow = {
   style_size_price_id: string;
+  style_id: string;
   style_code: string;
   style_name: string;
   size_code: string;
@@ -29,8 +30,20 @@ type PricingRuleRow = {
   valid_to: string | null;
 };
 
+type PriceCoverageGap = {
+  style_id: string;
+  style_code: string;
+  style_name: string;
+  variant_count: number;
+  inventory_row_count: number;
+  price_row_count: number;
+};
+
 function formatDate(dateStr: string | null) {
-  if (!dateStr) return "—";
+  if (!dateStr) {
+    return "-";
+  }
+
   return new Intl.DateTimeFormat("es-PE", {
     day: "2-digit",
     month: "short",
@@ -52,8 +65,8 @@ function StatusBadge({ status }: { status: PriceRow["validity_status"] | string 
     status === "active"
       ? "bg-emerald-100 text-emerald-700"
       : status === "scheduled"
-      ? "bg-amber-100 text-amber-700"
-      : "bg-slate-200 text-slate-600";
+        ? "bg-amber-100 text-amber-700"
+        : "bg-slate-200 text-slate-600";
 
   return (
     <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${styles}`}>
@@ -62,9 +75,63 @@ function StatusBadge({ status }: { status: PriceRow["validity_status"] | string 
   );
 }
 
+function usePriceCoverageGaps() {
+  const [coverageGaps, setCoverageGaps] = useState<PriceCoverageGap[]>([]);
+  const [coverageLoading, setCoverageLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(buildApiUrl("/api/prices/coverage-gaps"), { cache: "no-store" })
+      .then((res) => res.json())
+      .then((payload) => {
+        setCoverageGaps(payload.data || []);
+      })
+      .catch(console.error)
+      .finally(() => setCoverageLoading(false));
+  }, []);
+
+  return {
+    coverageGaps,
+    coverageLoading,
+  };
+}
+
+function PriceCoverageBanner({
+  coverageGaps,
+  coverageLoading,
+}: {
+  coverageGaps: PriceCoverageGap[];
+  coverageLoading: boolean;
+}) {
+  if (coverageLoading || coverageGaps.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
+      <p className="text-sm font-semibold text-amber-800">
+        Styles con stock o variantes sin precio comercial
+      </p>
+      <p className="mt-1 text-sm text-amber-700">
+        Completa esos precios para evitar huecos operativos antes de venta.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {coverageGaps.map((gap) => (
+          <span
+            key={gap.style_id}
+            className="rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-semibold text-amber-800"
+          >
+            {gap.style_code} · {gap.variant_count} variantes · {gap.inventory_row_count} stocks
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PriceListView() {
   const [priceRows, setPriceRows] = useState<PriceRow[]>([]);
   const [search, setSearch] = useState("");
+  const { coverageGaps, coverageLoading } = usePriceCoverageGaps();
 
   useEffect(() => {
     fetch(buildApiUrl("/api/prices"), { cache: "no-store" })
@@ -89,6 +156,11 @@ function PriceListView() {
     );
   }, [priceRows, search]);
 
+  const uniqueStylesWithPrice = useMemo(
+    () => new Set(priceRows.map((row) => row.style_id)).size,
+    [priceRows]
+  );
+
   return (
     <div className="space-y-5">
       <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)] md:p-6">
@@ -97,7 +169,9 @@ function PriceListView() {
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-violet-500">
               Precios
             </p>
-            <h1 className="mt-2 text-2xl font-semibold text-slate-950">Listado de precios</h1>
+            <h1 className="mt-2 text-2xl font-semibold text-slate-950">
+              Listado de precios
+            </h1>
           </div>
 
           <div className="relative w-full max-w-sm">
@@ -105,7 +179,7 @@ function PriceListView() {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar por código o nombre"
+              placeholder="Buscar por codigo o nombre"
               className="w-full rounded-2xl border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-violet-400"
             />
           </div>
@@ -116,7 +190,9 @@ function PriceListView() {
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Styles con precio
             </p>
-            <p className="mt-2 text-2xl font-semibold text-slate-900">{priceRows.length}</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-900">
+              {uniqueStylesWithPrice}
+            </p>
           </article>
           <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -135,13 +211,20 @@ function PriceListView() {
             </p>
           </article>
         </div>
+
+        <div className="mt-5">
+          <PriceCoverageBanner
+            coverageGaps={coverageGaps}
+            coverageLoading={coverageLoading}
+          />
+        </div>
       </div>
 
       <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)] md:p-6">
         <div className="flex items-center justify-between border-b border-slate-200 pb-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-              Vista mockup
+              Vista operativa
             </p>
             <h2 className="mt-1 text-xl font-semibold text-slate-950">Resumen por style</h2>
           </div>
@@ -196,6 +279,7 @@ function PriceEditorView() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const { coverageGaps, coverageLoading } = usePriceCoverageGaps();
 
   useEffect(() => {
     fetch(buildApiUrl("/api/prices"), { cache: "no-store" })
@@ -204,8 +288,7 @@ function PriceEditorView() {
         setPriceRows(payload.data || []);
         setSelectedPriceId((payload.data || [])[0]?.style_size_price_id || "");
       })
-      .catch(console.error)
-      .finally(() => undefined);
+      .catch(console.error);
   }, []);
 
   const selectedRow =
@@ -296,9 +379,16 @@ function PriceEditorView() {
         </p>
         <h1 className="mt-2 text-2xl font-semibold text-slate-950">Crear y editar precio</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-          Mockup de formulario para mantenimiento de precio retail por style y talla.
-          La persistencia real se conectara despues a `style_size_prices`.
+          Formulario operativo para mantenimiento puntual de precio por style y talla
+          sobre <code>style_size_prices</code>.
         </p>
+
+        <div className="mt-5">
+          <PriceCoverageBanner
+            coverageGaps={coverageGaps}
+            coverageLoading={coverageLoading}
+          />
+        </div>
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[0.75fr_1.25fr]">
@@ -386,9 +476,11 @@ function PriceEditorView() {
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                 Detalle por talla
               </p>
-              <h2 className="mt-1 text-xl font-semibold text-slate-950">{selectedRow?.style_name}</h2>
+              <h2 className="mt-1 text-xl font-semibold text-slate-950">
+                {selectedRow?.style_name}
+              </h2>
             </div>
-            {selectedRow && <StatusBadge status={selectedRow.validity_status} />}
+            {selectedRow ? <StatusBadge status={selectedRow.validity_status} /> : null}
           </div>
 
           <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -402,16 +494,22 @@ function PriceEditorView() {
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Inicio vigencia
               </p>
-              <p className="mt-2 text-lg font-semibold text-slate-900">{formatDate(selectedRow?.start_date ?? null)}</p>
+              <p className="mt-2 text-lg font-semibold text-slate-900">
+                {formatDate(selectedRow?.start_date ?? null)}
+              </p>
             </article>
           </div>
 
-          {selectedRow && (
+          {selectedRow ? (
             <div className="mt-4 space-y-3">
               <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">Talla {selectedRow.size_code}</p>
-                  <p className="text-xs text-slate-500">Precio {selectedRow.price_type} vigente</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    Talla {selectedRow.size_code}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Precio {selectedRow.price_type} vigente
+                  </p>
                 </div>
                 <input
                   type="text"
@@ -421,7 +519,7 @@ function PriceEditorView() {
                 />
               </div>
             </div>
-          )}
+          ) : null}
         </article>
       </div>
     </div>
@@ -625,15 +723,26 @@ function WholesaleRulesView() {
               </p>
               <h2 className="mt-1 text-xl font-semibold text-slate-950">pricing_rules</h2>
             </div>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{rules.length}</span>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+              {rules.length}
+            </span>
           </div>
 
           <div className="mt-4 space-y-3">
             {rules.map((rule) => (
-              <article key={rule.rule_id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <article
+                key={rule.rule_id}
+                className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+              >
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-slate-900">{rule.rule_type}</p>
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${rule.active ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      rule.active
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-slate-200 text-slate-600"
+                    }`}
+                  >
                     {rule.active ? "Activa" : "Inactiva"}
                   </span>
                 </div>
@@ -663,7 +772,6 @@ export function ListPrices({ mode }: { mode: PriceMode }) {
         {mode === "list" ? <PriceListView /> : null}
         {mode === "editor" ? <PriceEditorView /> : null}
         {mode === "rules" ? <WholesaleRulesView /> : null}
-
       </div>
     </section>
   );
