@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowDownUp,
   ArrowUp,
   ArrowDown,
   PencilLine,
+  Plus,
   RefreshCw,
   Check,
   X,
+  Trash2,
 } from "lucide-react";
 import { buildApiUrl } from "@/lib/api";
 
@@ -30,6 +32,21 @@ type Customer = {
 };
 
 type EditState = {
+  document_type: string;
+  document_number: string;
+  full_name: string;
+  business_name: string;
+  commercial_name: string;
+  email: string;
+  phone: string;
+  customer_type: string;
+  active: boolean;
+  notes: string;
+};
+
+type CreateState = {
+  document_type: string;
+  document_number: string;
   full_name: string;
   business_name: string;
   commercial_name: string;
@@ -53,6 +70,26 @@ const CUSTOMER_TYPE_LABELS: Record<string, string> = {
   wholesale: "Mayorista",
 };
 
+const DOC_RULES: Record<string, { label: string; regex: RegExp }> = {
+  dni: { label: "DNI", regex: /^\d{8}$/ },
+  ruc: { label: "RUC", regex: /^\d{11}$/ },
+  ce: { label: "CE", regex: /^[A-Za-z0-9]{9,12}$/ },
+  passport: { label: "Pasaporte", regex: /^[A-Za-z0-9]{6,15}$/ },
+};
+
+const EMPTY_FORM: CreateState = {
+  document_type: "none",
+  document_number: "",
+  full_name: "",
+  business_name: "",
+  commercial_name: "",
+  email: "",
+  phone: "",
+  customer_type: "retail",
+  active: true,
+  notes: "",
+};
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("es-PE", {
     day: "2-digit",
@@ -65,6 +102,71 @@ function buildDisplayName(c: Customer) {
   return c.full_name || c.business_name || c.commercial_name || "—";
 }
 
+function trimOrNull(value: string) {
+  const normalized = value.trim();
+  return normalized.length ? normalized : null;
+}
+
+function validateCustomerInput(input: Pick<CreateState, "document_type" | "document_number" | "full_name" | "business_name" | "commercial_name">) {
+  const nameIsMissing =
+    !input.full_name.trim() &&
+    !input.business_name.trim() &&
+    !input.commercial_name.trim();
+
+  if (nameIsMissing) {
+    return "Ingresa al menos un nombre: nombre completo, razón social o nombre comercial.";
+  }
+
+  if (input.document_type === "none") {
+    if (input.document_number.trim()) {
+      return "Si el tipo de documento es sin documento, el número debe ir vacío.";
+    }
+    return null;
+  }
+
+  const rule = DOC_RULES[input.document_type];
+  if (!rule) {
+    return "Tipo de documento inválido.";
+  }
+
+  const normalizedNumber =
+    input.document_type === "passport"
+      ? input.document_number.trim().toUpperCase()
+      : input.document_number.trim();
+
+  if (!normalizedNumber) {
+    return "Número de documento obligatorio para el tipo seleccionado.";
+  }
+
+  if (!rule.regex.test(normalizedNumber)) {
+    return `Formato inválido para ${rule.label}.`;
+  }
+
+  return null;
+}
+
+function buildCustomerPayload(input: CreateState) {
+  const normalizedDocumentNumber =
+    input.document_type === "none"
+      ? null
+      : input.document_type === "passport"
+      ? input.document_number.trim().toUpperCase()
+      : input.document_number.trim();
+
+  return {
+    document_type: input.document_type,
+    document_number: normalizedDocumentNumber,
+    full_name: trimOrNull(input.full_name),
+    business_name: trimOrNull(input.business_name),
+    commercial_name: trimOrNull(input.commercial_name),
+    email: trimOrNull(input.email),
+    phone: trimOrNull(input.phone),
+    customer_type: input.customer_type,
+    active: input.active,
+    notes: trimOrNull(input.notes),
+  };
+}
+
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,6 +177,10 @@ export default function CustomersPage() {
   const [editState, setEditState] = useState<EditState | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [createState, setCreateState] = useState<CreateState>(EMPTY_FORM);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   async function fetchCustomers(docType: string, sortOrder: string) {
@@ -119,6 +225,8 @@ export default function CustomersPage() {
     setEditingId(c.customer_id);
     setSaveError(null);
     setEditState({
+      document_type: c.document_type,
+      document_number: c.document_number || "",
       full_name: c.full_name || "",
       business_name: c.business_name || "",
       commercial_name: c.commercial_name || "",
@@ -136,8 +244,85 @@ export default function CustomersPage() {
     setSaveError(null);
   }
 
+  async function createCustomer() {
+    setCreateError(null);
+
+    const validationError = validateCustomerInput(createState);
+    if (validationError) {
+      setCreateError(validationError);
+      return;
+    }
+
+    setCreating(true);
+
+    try {
+      const res = await fetch(buildApiUrl("/api/customers"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildCustomerPayload(createState)),
+      });
+
+      const payload = await res.json();
+
+      if (!res.ok) {
+        throw new Error(payload.message || "Error al crear cliente");
+      }
+
+      setCustomers((prev) =>
+        sort === "desc" ? [payload.data, ...prev] : [...prev, payload.data]
+      );
+      setCreateState(EMPTY_FORM);
+    } catch (err: unknown) {
+      setCreateError(err instanceof Error ? err.message : "Error al crear cliente");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function deleteCustomer(customerId: string) {
+    const customer = customers.find((c) => c.customer_id === customerId);
+    const customerLabel = customer ? buildDisplayName(customer) : "este cliente";
+
+    if (!window.confirm(`¿Eliminar ${customerLabel}? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    setDeletingId(customerId);
+    setSaveError(null);
+    setCreateError(null);
+
+    try {
+      const res = await fetch(buildApiUrl(`/api/customers/${customerId}`), {
+        method: "DELETE",
+      });
+
+      const payload = await res.json();
+
+      if (!res.ok) {
+        throw new Error(payload.message || "Error al eliminar cliente");
+      }
+
+      setCustomers((prev) => prev.filter((c) => c.customer_id !== customerId));
+
+      if (editingId === customerId) {
+        cancelEdit();
+      }
+    } catch (err: unknown) {
+      setSaveError(err instanceof Error ? err.message : "Error al eliminar cliente");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   async function saveEdit(customerId: string) {
     if (!editState) return;
+
+    const validationError = validateCustomerInput(editState);
+    if (validationError) {
+      setSaveError(validationError);
+      return;
+    }
+
     setSaving(true);
     setSaveError(null);
 
@@ -147,16 +332,7 @@ export default function CustomersPage() {
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            full_name: editState.full_name || null,
-            business_name: editState.business_name || null,
-            commercial_name: editState.commercial_name || null,
-            email: editState.email || null,
-            phone: editState.phone || null,
-            customer_type: editState.customer_type,
-            active: editState.active,
-            notes: editState.notes || null,
-          }),
+          body: JSON.stringify(buildCustomerPayload(editState)),
         }
       );
 
@@ -183,6 +359,8 @@ export default function CustomersPage() {
     { value: "dni", label: "DNI" },
     { value: "ruc", label: "RUC" },
     { value: "ce", label: "CE" },
+    { value: "passport", label: "Pasaporte" },
+    { value: "none", label: "Sin doc." },
   ];
 
   const isEmpty = !loading && !error && customers.length === 0;
@@ -256,6 +434,148 @@ export default function CustomersPage() {
         </div>
       )}
 
+      {/* Create error */}
+      {createError && (
+        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {createError}
+        </div>
+      )}
+
+      {/* Create form */}
+      <div className="rounded-lg border border-gray-200 bg-white p-4">
+        <h2 className="text-sm font-semibold text-gray-900">Nuevo cliente</h2>
+        <p className="mt-1 text-xs text-gray-500">Alta directa en ERP, sin vincular a ventas por ahora.</p>
+
+        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+          <select
+            className="rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            value={createState.document_type}
+            onChange={(e) =>
+              setCreateState((s) => ({
+                ...s,
+                document_type: e.target.value,
+                document_number: e.target.value === "none" ? "" : s.document_number,
+              }))
+            }
+          >
+            <option value="none">Sin documento</option>
+            <option value="dni">DNI</option>
+            <option value="ruc">RUC</option>
+            <option value="ce">CE</option>
+            <option value="passport">Pasaporte</option>
+          </select>
+
+          <input
+            className="rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none disabled:bg-gray-100"
+            placeholder="Número de documento"
+            value={createState.document_number}
+            disabled={createState.document_type === "none"}
+            onChange={(e) =>
+              setCreateState((s) => ({ ...s, document_number: e.target.value }))
+            }
+          />
+
+          <select
+            className="rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            value={createState.customer_type}
+            onChange={(e) =>
+              setCreateState((s) => ({ ...s, customer_type: e.target.value }))
+            }
+          >
+            <option value="retail">Retail</option>
+            <option value="wholesale">Mayorista</option>
+          </select>
+
+          <input
+            className="rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            placeholder="Nombre completo"
+            value={createState.full_name}
+            onChange={(e) =>
+              setCreateState((s) => ({ ...s, full_name: e.target.value }))
+            }
+          />
+
+          <input
+            className="rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            placeholder="Razón social"
+            value={createState.business_name}
+            onChange={(e) =>
+              setCreateState((s) => ({ ...s, business_name: e.target.value }))
+            }
+          />
+
+          <input
+            className="rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            placeholder="Nombre comercial"
+            value={createState.commercial_name}
+            onChange={(e) =>
+              setCreateState((s) => ({ ...s, commercial_name: e.target.value }))
+            }
+          />
+
+          <input
+            type="email"
+            className="rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            placeholder="email@ejemplo.com"
+            value={createState.email}
+            onChange={(e) =>
+              setCreateState((s) => ({ ...s, email: e.target.value }))
+            }
+          />
+
+          <input
+            className="rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            placeholder="999 000 000"
+            value={createState.phone}
+            onChange={(e) =>
+              setCreateState((s) => ({ ...s, phone: e.target.value }))
+            }
+          />
+
+          <input
+            className="rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            placeholder="Notas internas"
+            value={createState.notes}
+            onChange={(e) =>
+              setCreateState((s) => ({ ...s, notes: e.target.value }))
+            }
+          />
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            onClick={() =>
+              setCreateState((s) => ({ ...s, active: !s.active }))
+            }
+            className={`inline-flex items-center rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+              createState.active
+                ? "bg-green-100 text-green-700 hover:bg-green-200"
+                : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+            }`}
+          >
+            {createState.active ? "Activo" : "Inactivo"}
+          </button>
+
+          <button
+            onClick={() => setCreateState(EMPTY_FORM)}
+            disabled={creating}
+            className="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+          >
+            <X size={12} />
+            Limpiar
+          </button>
+
+          <button
+            onClick={createCustomer}
+            disabled={creating}
+            className="inline-flex items-center gap-1 rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            <Plus size={12} />
+            {creating ? "Creando..." : "Crear cliente"}
+          </button>
+        </div>
+      </div>
+
       {/* Table */}
       <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
         <table className="w-full text-sm">
@@ -315,7 +635,43 @@ export default function CustomersPage() {
 
                     {/* N° documento */}
                     <td className="px-3 py-2 text-gray-700 font-mono text-xs whitespace-nowrap">
-                      {c.document_number || "—"}
+                      {isEditing ? (
+                        <div className="flex items-center gap-1">
+                          <select
+                            className="rounded border border-gray-300 px-1.5 py-1 text-xs focus:border-blue-500 focus:outline-none"
+                            value={editState!.document_type}
+                            onChange={(e) =>
+                              setEditState((s) =>
+                                s
+                                  ? {
+                                      ...s,
+                                      document_type: e.target.value,
+                                      document_number: e.target.value === "none" ? "" : s.document_number,
+                                    }
+                                  : s
+                              )
+                            }
+                          >
+                            <option value="none">Sin doc.</option>
+                            <option value="dni">DNI</option>
+                            <option value="ruc">RUC</option>
+                            <option value="ce">CE</option>
+                            <option value="passport">Pasaporte</option>
+                          </select>
+
+                          <input
+                            className="w-28 rounded border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none disabled:bg-gray-100"
+                            placeholder="N°"
+                            disabled={editState!.document_type === "none"}
+                            value={editState!.document_number}
+                            onChange={(e) =>
+                              setEditState((s) => s && { ...s, document_number: e.target.value })
+                            }
+                          />
+                        </div>
+                      ) : (
+                        c.document_number || "—"
+                      )}
                     </td>
 
                     {/* Nombre */}
@@ -464,6 +820,17 @@ export default function CustomersPage() {
                         >
                           <PencilLine size={12} />
                           Editar
+                        </button>
+                      )}
+
+                      {!isEditing && (
+                        <button
+                          onClick={() => deleteCustomer(c.customer_id)}
+                          disabled={deletingId === c.customer_id}
+                          className="ml-1 inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                        >
+                          <Trash2 size={12} />
+                          {deletingId === c.customer_id ? "Eliminando..." : "Eliminar"}
                         </button>
                       )}
                     </td>

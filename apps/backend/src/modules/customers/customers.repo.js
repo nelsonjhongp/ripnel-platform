@@ -51,25 +51,63 @@ async function findCustomerById(customerId) {
   return result.rows[0] || null;
 }
 
-async function updateCustomer({ customerId, full_name, business_name, commercial_name, email, phone, customer_type, active, notes }) {
+async function updateCustomer({ customerId, document_type, document_number, full_name, business_name, commercial_name, email, phone, customer_type, active, notes }) {
   const result = await query(
     `UPDATE customers
      SET
-       full_name = $2,
-       business_name = $3,
-       commercial_name = $4,
-       email = $5,
-       phone = $6,
-       customer_type = $7,
-       active = $8,
-       notes = $9,
+       document_type = $2,
+       document_number = $3,
+       full_name = $4,
+       business_name = $5,
+       commercial_name = $6,
+       email = $7,
+       phone = $8,
+       customer_type = $9,
+       active = $10,
+       notes = $11,
        updated_at = CURRENT_TIMESTAMP
      WHERE customer_id = $1
      RETURNING
        customer_id, internal_code, document_type, document_number,
        full_name, business_name, commercial_name, email, phone,
        customer_type, active, notes, created_at, updated_at`,
-    [customerId, full_name, business_name, commercial_name, email, phone, customer_type, active, notes]
+    [customerId, document_type, document_number, full_name, business_name, commercial_name, email, phone, customer_type, active, notes]
+  );
+
+  return result.rows[0] || null;
+}
+
+async function createCustomer({ document_type, document_number, full_name, business_name, commercial_name, email, phone, customer_type, active, notes }) {
+  const result = await query(
+    `INSERT INTO customers (
+       document_type,
+       document_number,
+       full_name,
+       business_name,
+       commercial_name,
+       email,
+       phone,
+       customer_type,
+       active,
+       notes
+     )
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+     RETURNING
+       customer_id, internal_code, document_type, document_number,
+       full_name, business_name, commercial_name, email, phone,
+       customer_type, active, notes, created_at, updated_at`,
+    [document_type, document_number, full_name, business_name, commercial_name, email, phone, customer_type, active, notes]
+  );
+
+  return result.rows[0] || null;
+}
+
+async function deleteCustomerById(customerId) {
+  const result = await query(
+    `DELETE FROM customers
+     WHERE customer_id = $1
+     RETURNING customer_id`,
+    [customerId]
   );
 
   return result.rows[0] || null;
@@ -78,5 +116,7 @@ async function updateCustomer({ customerId, full_name, business_name, commercial
 module.exports = {
   findAllCustomers,
   findCustomerById,
+  createCustomer,
   updateCustomer,
+  deleteCustomerById,
 };
