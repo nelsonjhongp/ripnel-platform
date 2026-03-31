@@ -49,7 +49,19 @@ FROM (
     ('LEG-SUP', 'L', 'retail', 89.90, '2026-03-26', NULL, true),
     ('LEG-SUP', 'L', 'wholesale', 65.00, '2026-03-26', NULL, true),
     ('LEG-SUP', 'XL', 'retail', 99.90, '2026-03-26', NULL, true),
-    ('LEG-SUP', 'XL', 'wholesale', 72.00, '2026-03-26', NULL, true)
+    ('LEG-SUP', 'XL', 'wholesale', 72.00, '2026-03-26', NULL, true),
+
+    -- POL-FLIC (Polo Manga Corta - Full Licra) - Sizes: ST, L, XL
+    ('POL-FLIC', 'ST', 'retail', 39.90, '2026-03-26', NULL, true),
+    ('POL-FLIC', 'ST', 'wholesale', 28.50, '2026-03-26', NULL, true),
+    ('POL-FLIC', 'L', 'retail', 39.90, '2026-03-26', NULL, true),
+    ('POL-FLIC', 'L', 'wholesale', 28.50, '2026-03-26', NULL, true),
+    ('POL-FLIC', 'XL', 'retail', 44.90, '2026-03-26', NULL, true),
+    ('POL-FLIC', 'XL', 'wholesale', 31.90, '2026-03-26', NULL, true),
+
+    -- SHO-CHA (Short - Chaliz) - Sizes: ST
+    ('SHO-CHA', 'ST', 'retail', 59.90, '2026-03-26', NULL, true),
+    ('SHO-CHA', 'ST', 'wholesale', 42.50, '2026-03-26', NULL, true)
 ) AS seeded(style_code, size_code, price_type, price, start_date, end_date, active)
 INNER JOIN product_styles ps ON ps.style_code = seeded.style_code
 INNER JOIN sizes s ON s.code = seeded.size_code
@@ -60,7 +72,7 @@ ON CONFLICT (style_id, size_id, price_type, start_date) DO NOTHING;
 -- SUMMARY
 -- ============================================================
 -- This script inserts:
--- - 20 retail/wholesale prices for 3 styles
+-- - 28 retail/wholesale prices for 5 styles
 -- - one current validity window per style+size+type
 -- - enough data to list, filter and validate the prices module
 --

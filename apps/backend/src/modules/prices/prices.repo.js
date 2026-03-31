@@ -54,6 +54,38 @@ async function findAllPrices(filters = {}) {
   return result.rows;
 }
 
+async function findStylesMissingCommercialPrices() {
+  const result = await query(
+    `with style_coverage as (
+       select
+         ps.style_id,
+         ps.style_code,
+         ps.name as style_name,
+         count(distinct pv.variant_id)::int as variant_count,
+         count(distinct i.location_id::text || ':' || i.variant_id::text)::int as inventory_row_count,
+         count(distinct ssp.style_size_price_id)::int as price_row_count
+       from product_styles ps
+       left join product_variants pv on pv.style_id = ps.style_id
+       left join inventory i on i.variant_id = pv.variant_id
+       left join style_size_prices ssp on ssp.style_id = ps.style_id
+       group by ps.style_id, ps.style_code, ps.name
+     )
+     select
+       style_id,
+       style_code,
+       style_name,
+       variant_count,
+       inventory_row_count,
+       price_row_count
+     from style_coverage
+     where price_row_count = 0
+       and (variant_count > 0 or inventory_row_count > 0)
+     order by inventory_row_count desc, variant_count desc, style_name asc`
+  );
+
+  return result.rows;
+}
+
 async function findPriceById(priceId) {
   const result = await query(
     `select
@@ -182,6 +214,7 @@ async function updatePrice(priceId, payload) {
 
 module.exports = {
   findAllPrices,
+  findStylesMissingCommercialPrices,
   findPriceById,
   findStyleById,
   findSizeById,
