@@ -65,9 +65,11 @@ export function useSupabaseUsers() {
       const newUser = data[0] as Usuario;
       setUsuarios([newUser, ...usuarios]);
       return newUser;
+
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error al crear usuario';
       setError(message);
+      console.error('Error en crearUsuario:', message, err);
       throw err;
     }
   }, [usuarios]);
