@@ -4,6 +4,7 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider } from "@/components/auth/AuthProvider";
 
 const geist = Geist({
   subsets: ["latin"],
@@ -37,9 +38,11 @@ export default function RootLayout({
       className={cn(poppins.className, "font-sans", geist.variable)}
     >
       <body>
-        <SidebarProvider>
-          <TooltipProvider>{children}</TooltipProvider>
-        </SidebarProvider>
+        <AuthProvider>
+          <SidebarProvider>
+            <TooltipProvider>{children}</TooltipProvider>
+          </SidebarProvider>
+        </AuthProvider>
       </body>
     </html>
   );

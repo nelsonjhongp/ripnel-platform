@@ -1,4 +1,4 @@
-const { listRoles, createRole, patchRole } = require('./roles.service');
+const { listRoles, listPermissions, createRole, patchRole } = require('./roles.service');
 
 async function getRoles(req, res, next) {
   try {
@@ -26,6 +26,19 @@ async function postRole(req, res, next) {
   }
 }
 
+async function getPermissions(req, res, next) {
+  try {
+    const permissions = await listPermissions();
+
+    res.json({
+      ok: true,
+      data: permissions,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function patchRoleById(req, res, next) {
   try {
     const role = await patchRole(req.params.roleId, req.body);
@@ -41,6 +54,7 @@ async function patchRoleById(req, res, next) {
 
 module.exports = {
   getRoles,
+  getPermissions,
   postRole,
   patchRoleById,
 };
