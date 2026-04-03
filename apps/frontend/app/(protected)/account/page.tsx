@@ -1,162 +1,412 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Building2, CheckCircle2, MapPin, Store, Warehouse } from "lucide-react";
+import { type AuthLocation, useAuth } from "@/components/auth/AuthProvider";
+import { apiFetch, type ApiEnvelope, unwrapApiData } from "@/lib/api";
 
-const colaborador = {
-    nombre: "Juan Pérez",
-    iniciales: "JP",
-    correo: "juan.perez@ripnel.com",
-    telefono: "+1 (234) 567-890",
-    direccion: "Calle Falsa 123, Ciudad",
-    rol: "Cajero",
-    turno: "Matutino  07:00 – 15:00",
-    sucursal: "Sucursal Centro",
-    diasLaborados: 22,
-    estado: "Activo",
-    ingreso: "15 ene 2025",
-};
-
-function ReadonlyField({ label, value, type = "text" }: { label: string; value: string; type?: string }) {
-    return (
-        <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">{label}</label>
-            <input
-                type={type}
-                value={value}
-                readOnly
-                className="block w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 text-sm focus:outline-none"
-            />
-        </div>
-    );
+function getInitials(value: string) {
+  return value
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((token) => token.charAt(0).toUpperCase())
+    .join("");
 }
 
-function SectionToggle({
-    label,
-    open,
-    onToggle,
+function locationTypeLabel(type: string) {
+  if (type === "store") return "Tienda";
+  if (type === "warehouse") return "Almacen";
+  if (type === "workshop") return "Taller";
+  if (type === "third_party") return "Tercero";
+  return "Ubicacion";
+}
+
+function LocationIcon({ type }: { type: string }) {
+  if (type === "store") return <Store className="h-4 w-4 text-indigo-600" />;
+  if (type === "warehouse") return <Warehouse className="h-4 w-4 text-indigo-600" />;
+  return <Building2 className="h-4 w-4 text-indigo-600" />;
+}
+
+function ReadonlyField({
+  label,
+  value,
 }: {
-    label: string;
-    open: boolean;
-    onToggle: () => void;
+  label: string;
+  value: string;
 }) {
-    return (
-        <button
-            onClick={onToggle}
-            className="flex items-center gap-2 text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
-        >
-            <span className={`inline-block transition-transform duration-200 ${open ? "rotate-90" : "rotate-0"}`}>▶</span>
-            {open ? `Ocultar ${label}` : `Mostrar ${label}`}
-        </button>
-    );
+  return (
+    <div className="space-y-1">
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800">
+        {value}
+      </div>
+    </div>
+  );
 }
 
-export default function Cuenta() {
-    const [showPersonal, setShowPersonal] = useState(false);
-    const [showSeguridad, setShowSeguridad] = useState(false);
-    const [showPassword, setShowPassword] = useState(false);
+export default function AccountPage() {
+  const {
+    user,
+    loading,
+    locationAssignments,
+    defaultLocation,
+    locationsLoading,
+    locationsError,
+    refreshLocations,
+    setDefaultLocation,
+  } = useAuth();
+  const [selectedLocationId, setSelectedLocationId] = useState("");
+  const [savingLocation, setSavingLocation] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [availableLocations, setAvailableLocations] = useState<AuthLocation[]>([]);
+  const [loadingAvailableLocations, setLoadingAvailableLocations] = useState(false);
 
+  useEffect(() => {
+    if (!user?.user_id || locationAssignments.length > 0) {
+      setAvailableLocations([]);
+      setLoadingAvailableLocations(false);
+      return;
+    }
+
+    let active = true;
+
+    async function loadAvailableLocations() {
+      setLoadingAvailableLocations(true);
+
+      try {
+        const response = await apiFetch<ApiEnvelope<AuthLocation[]> | AuthLocation[]>("/api/locations");
+        const locations = unwrapApiData(response);
+        if (active) {
+          setAvailableLocations(locations.filter((location) => location.active));
+        }
+      } catch {
+        if (active) {
+          setAvailableLocations([]);
+        }
+      } finally {
+        if (active) {
+          setLoadingAvailableLocations(false);
+        }
+      }
+    }
+
+    void loadAvailableLocations();
+
+    return () => {
+      active = false;
+    };
+  }, [locationAssignments.length, user?.user_id]);
+
+  useEffect(() => {
+    const nextSelected =
+      defaultLocation?.location_id ||
+      locationAssignments[0]?.location_id ||
+      availableLocations[0]?.location_id ||
+      "";
+    setSelectedLocationId(nextSelected);
+  }, [availableLocations, defaultLocation?.location_id, locationAssignments]);
+
+  const assignedLocationsCount = locationAssignments.length;
+  const currentLocationLabel = defaultLocation?.name || "Sin sede default";
+  const initials = useMemo(
+    () => getInitials(user?.full_name || "Usuario Ripnel"),
+    [user?.full_name]
+  );
+
+  async function handleSaveDefaultLocation() {
+    if (!selectedLocationId) {
+      setSaveError("Elige una sede para guardarla como default.");
+      return;
+    }
+
+    setSavingLocation(true);
+    setSaveMessage(null);
+    setSaveError(null);
+
+    try {
+      if (locationAssignments.length > 0) {
+        await setDefaultLocation(selectedLocationId);
+        setSaveMessage("La sede default del usuario se actualizo correctamente.");
+      } else {
+        await apiFetch(`/api/users/${user.user_id}/locations`, {
+          method: "PUT",
+          body: JSON.stringify({
+            assignments: [{ location_id: selectedLocationId, is_default: true }],
+          }),
+        });
+        await refreshLocations();
+        setSaveMessage("La sede inicial del usuario se configuro correctamente.");
+      }
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "No se pudo actualizar la sede.");
+    } finally {
+      setSavingLocation(false);
+    }
+  }
+
+  if (loading) {
     return (
-        <section className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-slate-50 p-6">
-            <div className="max-w-2xl mx-auto space-y-6">
-
-                {/* Header de perfil */}
-                <div className="rounded-3xl border border-indigo-100 bg-white p-6 shadow-sm flex items-center gap-5">
-                    <div className="flex-shrink-0 w-16 h-16 rounded-full bg-indigo-600 flex items-center justify-center text-white text-2xl font-bold select-none">
-                        {colaborador.iniciales}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <h1 className="text-2xl font-bold text-slate-900 truncate">{colaborador.nombre}</h1>
-                        <p className="text-sm text-slate-500">{colaborador.rol} · {colaborador.sucursal}</p>
-                    </div>
-                    <span className="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        {colaborador.estado}
-                    </span>
-                </div>
-
-                {/* Tarjetas de resumen */}
-                <div className="grid grid-cols-3 gap-4">
-                    <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm text-center">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">Rol</p>
-                        <p className="text-base font-bold text-slate-800">{colaborador.rol}</p>
-                    </div>
-                    <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm text-center">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">Días laborados</p>
-                        <p className="text-base font-bold text-indigo-600">{colaborador.diasLaborados}</p>
-                    </div>
-                    <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm text-center">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">Ingreso</p>
-                        <p className="text-base font-bold text-slate-800">{colaborador.ingreso}</p>
-                    </div>
-                </div>
-
-                {/* Turno actual */}
-                <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600 text-lg">
-                        🕐
-                    </div>
-                    <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-indigo-400">Turno actual</p>
-                        <p className="text-sm font-semibold text-indigo-800">{colaborador.turno}</p>
-                    </div>
-                </div>
-
-                {/* Datos personales (togglable) */}
-                <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-base font-bold text-slate-800">Datos personales</h2>
-                        <SectionToggle label="datos" open={showPersonal} onToggle={() => setShowPersonal(!showPersonal)} />
-                    </div>
-
-                    {showPersonal ? (
-                        <div className="space-y-4 pt-2">
-                            <ReadonlyField label="Nombre completo" value={colaborador.nombre} />
-                            <ReadonlyField label="Correo electrónico" value={colaborador.correo} type="email" />
-                            <ReadonlyField label="Teléfono" value={colaborador.telefono} type="tel" />
-                            <ReadonlyField label="Dirección" value={colaborador.direccion} />
-                        </div>
-                    ) : (
-                        <p className="text-sm text-slate-400 italic">Información personal oculta.</p>
-                    )}
-                </div>
-
-                {/* Seguridad (togglable) */}
-                <div className="rounded-3xl border border-slate-100 bg-white p-6 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-base font-bold text-slate-800">Seguridad</h2>
-                        <SectionToggle label="contraseña" open={showSeguridad} onToggle={() => setShowSeguridad(!showSeguridad)} />
-                    </div>
-
-                    {showSeguridad ? (
-                        <div className="space-y-3 pt-2">
-                            <div>
-                                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Contraseña actual</label>
-                                <div className="relative">
-                                    <input
-                                        type={showPassword ? "text" : "password"}
-                                        value="contraseña123"
-                                        readOnly
-                                        className="block w-full px-4 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 text-sm focus:outline-none pr-20"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-indigo-500 hover:text-indigo-700 font-semibold"
-                                    >
-                                        {showPassword ? "Ocultar" : "Ver"}
-                                    </button>
-                                </div>
-                            </div>
-                            <button className="w-full py-2.5 px-4 rounded-xl border border-indigo-200 text-indigo-600 text-sm font-semibold hover:bg-indigo-50 transition-colors">
-                                Solicitar cambio de contraseña
-                            </button>
-                        </div>
-                    ) : (
-                        <p className="text-sm text-slate-400 italic">Credenciales ocultas.</p>
-                    )}
-                </div>
-
-            </div>
-        </section>
+      <section className="min-h-screen bg-slate-50 p-8">
+        <div className="mx-auto max-w-5xl rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="text-sm font-medium text-slate-500">Cargando cuenta...</div>
+        </div>
+      </section>
     );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  return (
+    <section className="min-h-screen bg-slate-50 p-6 md:p-8">
+      <div className="mx-auto max-w-5xl space-y-6">
+        <header className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-indigo-600 text-xl font-bold text-white">
+                {initials}
+              </div>
+              <div className="space-y-1">
+                <h1 className="text-2xl font-bold text-slate-900">{user.full_name}</h1>
+                <div className="text-sm text-slate-500">
+                  @{user.username} · {user.role_name || "Sin rol"}
+                </div>
+                <div className="text-sm text-slate-500">
+                  {user.email || "Sin correo registrado"}
+                </div>
+              </div>
+            </div>
+
+            <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
+              <CheckCircle2 className="h-4 w-4" />
+              Sesion activa
+            </div>
+          </div>
+        </header>
+
+        <section className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Rol actual
+            </div>
+            <div className="mt-2 text-xl font-semibold text-slate-900">
+              {user.role_name || "Sin rol"}
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Sede default
+            </div>
+            <div className="mt-2 text-xl font-semibold text-slate-900">{currentLocationLabel}</div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Sedes asignadas
+            </div>
+            <div className="mt-2 text-xl font-semibold text-slate-900">
+              {assignedLocationsCount}
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-5">
+              <h2 className="text-lg font-semibold text-slate-900">Datos del usuario</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Informacion actual de la cuenta autenticada.
+              </p>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <ReadonlyField label="Nombre completo" value={user.full_name} />
+              <ReadonlyField label="Usuario" value={user.username} />
+              <ReadonlyField
+                label="Correo"
+                value={user.email || "Sin correo registrado"}
+              />
+              <ReadonlyField label="Rol" value={user.role_name || "Sin rol"} />
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-5">
+              <h2 className="text-lg font-semibold text-slate-900">Sede operativa</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Esta sede default puede reutilizarse luego en ventas, inventario y otros flujos.
+              </p>
+            </div>
+
+            {locationsLoading || loadingAvailableLocations ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                Cargando sedes asignadas...
+              </div>
+            ) : locationsError ? (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {locationsError}
+              </div>
+            ) : locationAssignments.length === 0 ? (
+              availableLocations.length === 0 ? (
+                <div className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-800">
+                  <div className="font-medium">Este usuario todavia no tiene sedes configuradas.</div>
+                  <div>
+                    No se encontraron ubicaciones activas para elegir una sede default inicial.
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-4 text-sm text-indigo-700">
+                    Aun no tienes asignaciones en <code>user_locations</code>. Puedes elegir una sede
+                    activa para dejarla como configuracion inicial desde tu cuenta.
+                  </div>
+
+                  {availableLocations.map((location) => {
+                    const isSelected = selectedLocationId === location.location_id;
+
+                    return (
+                      <label
+                        key={location.location_id}
+                        className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-4 transition ${
+                          isSelected
+                            ? "border-indigo-300 bg-indigo-50"
+                            : "border-slate-200 bg-white hover:bg-slate-50"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="default-location"
+                          value={location.location_id}
+                          checked={isSelected}
+                          onChange={() => setSelectedLocationId(location.location_id)}
+                          className="mt-1 h-4 w-4 border-slate-300 text-indigo-600"
+                        />
+
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <LocationIcon type={location.type} />
+                            <span className="font-medium text-slate-900">{location.name}</span>
+                          </div>
+
+                          <div className="text-sm text-slate-500">
+                            {locationTypeLabel(location.type)}
+                            {location.code ? ` · ${location.code}` : ""}
+                          </div>
+
+                          <div className="flex items-center gap-2 text-sm text-slate-500">
+                            <MapPin className="h-4 w-4" />
+                            <span>{location.address || "Sin direccion registrada"}</span>
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+
+                  {saveError && (
+                    <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                      {saveError}
+                    </div>
+                  )}
+
+                  {saveMessage && (
+                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                      {saveMessage}
+                    </div>
+                  )}
+
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="button"
+                      onClick={handleSaveDefaultLocation}
+                      disabled={savingLocation || !selectedLocationId}
+                      className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {savingLocation ? "Guardando..." : "Guardar sede inicial"}
+                    </button>
+                  </div>
+                </div>
+              )
+            ) : (
+              <div className="space-y-3">
+                {locationAssignments.map((assignment) => {
+                  const isSelected = selectedLocationId === assignment.location_id;
+
+                  return (
+                    <label
+                      key={assignment.location_id}
+                      className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-4 transition ${
+                        isSelected
+                          ? "border-indigo-300 bg-indigo-50"
+                          : "border-slate-200 bg-white hover:bg-slate-50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="default-location"
+                        value={assignment.location_id}
+                        checked={isSelected}
+                        onChange={() => setSelectedLocationId(assignment.location_id)}
+                        className="mt-1 h-4 w-4 border-slate-300 text-indigo-600"
+                      />
+
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <LocationIcon type={assignment.location.type} />
+                          <span className="font-medium text-slate-900">
+                            {assignment.location.name}
+                          </span>
+                          {assignment.is_default && (
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                              Actual
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="text-sm text-slate-500">
+                          {locationTypeLabel(assignment.location.type)}
+                          {assignment.location.code ? ` · ${assignment.location.code}` : ""}
+                        </div>
+
+                        <div className="flex items-center gap-2 text-sm text-slate-500">
+                          <MapPin className="h-4 w-4" />
+                          <span>{assignment.location.address || "Sin direccion registrada"}</span>
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+
+                {saveError && (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    {saveError}
+                  </div>
+                )}
+
+                {saveMessage && (
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                    {saveMessage}
+                  </div>
+                )}
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={handleSaveDefaultLocation}
+                    disabled={savingLocation || !selectedLocationId}
+                    className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {savingLocation ? "Guardando..." : "Guardar sede default"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+    </section>
+  );
 }

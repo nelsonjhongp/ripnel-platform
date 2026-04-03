@@ -35,6 +35,36 @@ function normalizeEmail(value) {
   return normalized.toLowerCase();
 }
 
+function normalizeUsername(value) {
+  const normalized = normalizeText(value);
+
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized.toLowerCase();
+}
+
+function buildTemporaryPassword(username) {
+  return `${username}123`;
+}
+
+function buildUserConflictError(error) {
+  if (error.code !== '23505') {
+    return null;
+  }
+
+  if (error.constraint === 'uq_users_username' || String(error.detail || '').includes('(username)')) {
+    return new AppError('User username already exists', 409);
+  }
+
+  if (String(error.detail || '').includes('(email)')) {
+    return new AppError('User email already exists', 409);
+  }
+
+  return new AppError('User data already exists', 409);
+}
+
 function normalizeAssignments(input) {
   if (!Array.isArray(input)) {
     return null;
@@ -52,6 +82,7 @@ async function listUsers() {
 
 async function createUser(input = {}) {
   const fullName = normalizeText(input.full_name);
+  const username = normalizeUsername(input.username);
   const email = normalizeEmail(input.email);
   const roleId =
     input.role_id === null || input.role_id === undefined
@@ -63,8 +94,8 @@ async function createUser(input = {}) {
     throw new AppError('User full_name is required', 400);
   }
 
-  if (!email) {
-    throw new AppError('User email is required', 400);
+  if (!username) {
+    throw new AppError('User username is required', 400);
   }
 
   if (input.role_id !== null && input.role_id !== undefined && !roleId) {
@@ -84,16 +115,23 @@ async function createUser(input = {}) {
   }
 
   try {
-    return await insertUser({
+    const createdUser = await insertUser({
       full_name: fullName,
+      username,
       email,
-      password_hash: 'temp_hash',
+      temporary_password: buildTemporaryPassword(username),
       role_id: roleId,
       active,
     });
+
+    return {
+      ...createdUser,
+      temporary_password: buildTemporaryPassword(username),
+    };
   } catch (error) {
-    if (error.code === '23505') {
-      throw new AppError('User email already exists', 409);
+    const conflictError = buildUserConflictError(error);
+    if (conflictError) {
+      throw conflictError;
     }
 
     throw error;
@@ -113,11 +151,18 @@ async function patchUser(userId, input = {}) {
     throw new AppError('User not found', 404);
   }
 
-  if (!('full_name' in input) && !('email' in input) && !('role_id' in input) && !('active' in input)) {
+  if (
+    !('full_name' in input) &&
+    !('username' in input) &&
+    !('email' in input) &&
+    !('role_id' in input) &&
+    !('active' in input)
+  ) {
     throw new AppError('No editable fields were provided for user', 400);
   }
 
   const fullName = 'full_name' in input ? normalizeText(input.full_name) : existingUser.full_name;
+  const username = 'username' in input ? normalizeUsername(input.username) : existingUser.username;
   const email = 'email' in input ? normalizeEmail(input.email) : existingUser.email;
   const roleId =
     'role_id' in input
@@ -131,8 +176,8 @@ async function patchUser(userId, input = {}) {
     throw new AppError('User full_name is required', 400);
   }
 
-  if (!email) {
-    throw new AppError('User email is required', 400);
+  if (!username) {
+    throw new AppError('User username is required', 400);
   }
 
   if ('role_id' in input && input.role_id !== null && !roleId) {
@@ -156,14 +201,16 @@ async function patchUser(userId, input = {}) {
       {
         userId: normalizedUserId,
         full_name: fullName,
+        username,
         email,
         role_id: roleId,
         active,
       }
     );
   } catch (error) {
-    if (error.code === '23505') {
-      throw new AppError('User email already exists', 409);
+    const conflictError = buildUserConflictError(error);
+    if (conflictError) {
+      throw conflictError;
     }
 
     throw error;
@@ -177,6 +224,7 @@ function buildUserLocationsPayload(user, assignments) {
     user: {
       user_id: user.user_id,
       full_name: user.full_name,
+      username: user.username,
       email: user.email,
       role_id: user.role_id,
       active: user.active,

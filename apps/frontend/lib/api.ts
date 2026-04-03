@@ -1,5 +1,10 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:3001";
 
+export type ApiEnvelope<T> = {
+  ok: boolean;
+  data: T;
+};
+
 export async function apiFetch<T>(
   path: string,
   init: RequestInit = {}
@@ -28,6 +33,19 @@ export async function apiFetch<T>(
 
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
+}
+
+export function unwrapApiData<T>(payload: T | ApiEnvelope<T>): T {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "ok" in payload &&
+    "data" in payload
+  ) {
+    return (payload as ApiEnvelope<T>).data;
+  }
+
+  return payload as T;
 }
 
 const apiBaseUrl =

@@ -40,7 +40,21 @@ import { cn } from "@/lib/utils"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { useRouter } from "next/navigation"
 
-const sidebarGroups = [
+type SidebarItem = {
+  title: string
+  url: string
+}
+
+type SidebarGroup = {
+  title: string
+  icon: React.ComponentType<{ className?: string }>
+  permission?: string
+  onlyForRoles?: string[]
+  excludeRoles?: string[]
+  items: SidebarItem[]
+}
+
+const sidebarGroups: SidebarGroup[] = [
   {
     title: "Administracion",
     icon: Settings,
@@ -228,7 +242,7 @@ export function AppSidebar({
 }: React.PropsWithChildren<React.ComponentProps<typeof Sidebar>>) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, loading, has, logout } = useAuth()
+  const { user, loading, locationsLoading, locationAssignments, defaultLocation, has, logout } = useAuth()
 
   const visibleGroups = React.useMemo(() => {
     if (loading) return []
@@ -237,14 +251,13 @@ export function AppSidebar({
       if (g.permission && !has(g.permission)) return false
 
       // Si hay restricción de roles específicos (onlyForRoles)
-      const group = g as any
-      if (group.onlyForRoles && user?.role_name) {
-        if (!group.onlyForRoles.includes(user.role_name)) return false
+      if (g.onlyForRoles && user?.role_name) {
+        if (!g.onlyForRoles.includes(user.role_name)) return false
       }
 
       // Si hay exclusión de roles específicos (excludeRoles)
-      if (group.excludeRoles && user?.role_name) {
-        if (group.excludeRoles.includes(user.role_name)) return false
+      if (g.excludeRoles && user?.role_name) {
+        if (g.excludeRoles.includes(user.role_name)) return false
       }
 
       return true
@@ -299,12 +312,26 @@ export function AppSidebar({
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
                 <Store className="h-4 w-4 shrink-0 text-slate-500" />
-                <p className="truncate text-sm font-semibold text-slate-800">Tienda ripnel</p>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-800">
+                    {locationsLoading
+                      ? "Cargando sede..."
+                      : defaultLocation?.name || "Sin sede asignada"}
+                  </p>
+                  <p className="truncate text-[11px] text-slate-500">
+                    {locationsLoading
+                      ? "Buscando configuracion..."
+                      : locationAssignments.length > 0
+                      ? `${defaultLocation?.code || "Sin codigo"} · ${locationAssignments.length} sedes`
+                      : "Configurar en cuenta"}
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
+                onClick={() => router.push("/account")}
                 className="inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-500 transition hover:bg-white hover:text-slate-700"
-                aria-label="Cambiar sede"
+                aria-label="Configurar sede"
               >
                 <ChevronsUpDown className="h-4 w-4" />
               </button>
