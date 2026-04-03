@@ -11,7 +11,6 @@ import {
   ChevronsUpDown,
   CircleUserRound,
   House,
-  LogOut,
   Palette,
   ReceiptText,
   Ruler,
@@ -38,11 +37,28 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
+import { useAuth } from "@/components/auth/AuthProvider"
+import { useRouter } from "next/navigation"
 
-const sidebarGroups = [
+type SidebarItem = {
+  title: string
+  url: string
+}
+
+type SidebarGroup = {
+  title: string
+  icon: React.ComponentType<{ className?: string }>
+  permission?: string
+  onlyForRoles?: string[]
+  excludeRoles?: string[]
+  items: SidebarItem[]
+}
+
+const sidebarGroups: SidebarGroup[] = [
   {
     title: "Administracion",
     icon: Settings,
+    permission: "admin.manage",
     items: [
       { title: "Roles y usuarios", url: "/administracion/roles&usuarios" },
       { title: "Ubicaciones", url: "/administracion/ubicaciones" },
@@ -58,6 +74,7 @@ const sidebarGroups = [
   {
     title: "Catalogos",
     icon: Warehouse,
+    permission: "catalogs.manage",
     items: [
       { title: "Tallas", url: "/catalogos/tallas" },
       { title: "Colores", url: "/catalogos/colores" },
@@ -70,6 +87,7 @@ const sidebarGroups = [
   {
     title: "Productos",
     icon: ShoppingBag,
+    permission: "products.manage",
     items: [
       { title: "Estilos", url: "/productos/estilos" },
       { title: "Variantes", url: "/productos/variantes" },
@@ -78,6 +96,7 @@ const sidebarGroups = [
   {
     title: "Precios",
     icon: ReceiptText,
+    permission: "prices.manage",
     items: [
       { title: "Listado de precios", url: "/precios/listado-de-precios" },
       { title: "Crear y editar precio", url: "/precios/crear-y-editar-precio" },
@@ -87,6 +106,7 @@ const sidebarGroups = [
   {
     title: "Transferencias",
     icon: ArrowRightLeft,
+    permission: "transfers.manage",
     items: [
       { title: "Listado de transferencias", url: "/transferencias/listado-de-transferencias" },
       { title: "Crear transferencia", url: "/transferencias/crear-transferencia" },
@@ -94,8 +114,21 @@ const sidebarGroups = [
     ],
   },
   {
+    title: "Venta Rápida",
+    icon: ShoppingCart,
+    permission: "sales.pos",
+    onlyForRoles: ["CAJA"],
+    items: [
+      { title: "Nueva compra", url: "/purchase-system" },
+      { title: "Checkout", url: "/purchase-system/checkout" },
+      { title: "Pago", url: "/purchase-system/checkout-payment" },
+    ],
+  },
+  {
     title: "Compra",
     icon: ShoppingCart,
+    permission: "sales.pos",
+    excludeRoles: ["CAJA"],
     items: [
       { title: "Nueva compra", url: "/purchase-system" },
       { title: "Checkout", url: "/purchase-system/checkout" },
@@ -105,6 +138,7 @@ const sidebarGroups = [
   {
     title: "Inventario",
     icon: Boxes,
+    permission: "inventory.view",
     items: [
       { title: "Stock actual", url: "/inventory" },
       { title: "Apertura y ajustes", url: "/inventory/ajustes" },
@@ -207,6 +241,36 @@ export function AppSidebar({
   ...props
 }: React.PropsWithChildren<React.ComponentProps<typeof Sidebar>>) {
   const pathname = usePathname()
+  const router = useRouter()
+  const { user, loading, locationsLoading, locationAssignments, defaultLocation, has, logout } = useAuth()
+
+  const visibleGroups = React.useMemo(() => {
+    if (loading) return []
+    return sidebarGroups.filter((g) => {
+      // Verificar permiso base
+      if (g.permission && !has(g.permission)) return false
+
+      // Si hay restricción de roles específicos (onlyForRoles)
+      if (g.onlyForRoles && user?.role_name) {
+        if (!g.onlyForRoles.includes(user.role_name)) return false
+      }
+
+      // Si hay exclusión de roles específicos (excludeRoles)
+      if (g.excludeRoles && user?.role_name) {
+        if (g.excludeRoles.includes(user.role_name)) return false
+      }
+
+      return true
+    })
+  }, [loading, has, user?.role_name])
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+    } finally {
+      router.push("/")
+    }
+  }
 
   return (
     <div className="min-h-screen flex flex-1 w-full bg-[#f8fafc]">
@@ -248,12 +312,26 @@ export function AppSidebar({
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
                 <Store className="h-4 w-4 shrink-0 text-slate-500" />
-                <p className="truncate text-sm font-semibold text-slate-800">Tienda ripnel</p>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-800">
+                    {locationsLoading
+                      ? "Cargando sede..."
+                      : defaultLocation?.name || "Sin sede asignada"}
+                  </p>
+                  <p className="truncate text-[11px] text-slate-500">
+                    {locationsLoading
+                      ? "Buscando configuracion..."
+                      : locationAssignments.length > 0
+                      ? `${defaultLocation?.code || "Sin codigo"} · ${locationAssignments.length} sedes`
+                      : "Configurar en cuenta"}
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
+                onClick={() => router.push("/account")}
                 className="inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-500 transition hover:bg-white hover:text-slate-700"
-                aria-label="Cambiar sede"
+                aria-label="Configurar sede"
               >
                 <ChevronsUpDown className="h-4 w-4" />
               </button>
@@ -265,7 +343,7 @@ export function AppSidebar({
           <nav className="space-y-2">
             <SidebarLink href="/inicio" label="Inicio" icon={House} active={pathname === "/inicio"} />
 
-            {sidebarGroups.map((group) => (
+            {visibleGroups.map((group) => (
               <SidebarGroupSection
                 key={group.title}
                 title={group.title}
@@ -286,18 +364,18 @@ export function AppSidebar({
               <CircleUserRound className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-slate-900">Usuario ripnel</p>
-              <p className="truncate text-xs text-slate-500">Rol de usuario</p>
+              <p className="truncate text-sm font-semibold text-slate-900">{user?.full_name || "Usuario"}</p>
+              <p className="truncate text-xs text-slate-500">{user?.role_name || "Rol"}</p>
             </div>
           </Link>
 
-          <Link
-            href="/"
-            className="mt-1.5 flex items-center gap-2.5 rounded-2xl px-2.5 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="mt-1.5 flex w-full items-center gap-2.5 rounded-2xl px-2.5 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
           >
-            <LogOut className="h-4 w-4" />
             <span>Cerrar sesion</span>
-          </Link>
+          </button>
         </SidebarFooter>
       </Sidebar>
 

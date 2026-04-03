@@ -1,7 +1,7 @@
 const { query } = require('../../shared/db');
 
-async function findAllRoles() {
-  const result = await query(
+async function findAllRoles(executor = query) {
+  const result = await executor(
     `select role_id, name, description, active, created_at, updated_at
      from roles
      order by active desc, name asc`
@@ -19,6 +19,53 @@ async function findRoleById(roleId, executor = query) {
   );
 
   return result.rows[0] || null;
+}
+
+async function findAllPermissions(executor = query) {
+  const result = await executor(
+    `select permission_id, key, description
+     from permissions
+     order by key asc`
+  );
+
+  return result.rows;
+}
+
+async function findPermissionsByKeys(permissionKeys, executor = query) {
+  if (!permissionKeys.length) {
+    return [];
+  }
+
+  const result = await executor(
+    `select permission_id, key, description
+     from permissions
+     where key = any($1::text[])
+     order by key asc`,
+    [permissionKeys]
+  );
+
+  return result.rows;
+}
+
+async function findRolePermissionsByRoleIds(roleIds, executor = query) {
+  if (!roleIds.length) {
+    return [];
+  }
+
+  const result = await executor(
+    `select
+       rp.role_id,
+       p.permission_id,
+       p.key,
+       p.description
+     from role_permissions rp
+     inner join permissions p on p.permission_id = rp.permission_id
+     where rp.role_id = any($1::uuid[])
+     order by rp.role_id asc, p.key asc`,
+    [roleIds]
+  );
+
+  return result.rows;
 }
 
 async function insertRole({ name, description, active }, executor = query) {
@@ -48,9 +95,27 @@ async function updateRole({ roleId, name, description, active }, executor = quer
   return result.rows[0] || null;
 }
 
+async function replaceRolePermissions(roleId, permissionIds, executor = query) {
+  await executor('delete from role_permissions where role_id = $1', [roleId]);
+
+  if (!permissionIds.length) {
+    return;
+  }
+
+  await executor(
+    `insert into role_permissions (role_id, permission_id)
+     select $1, unnest($2::uuid[])`,
+    [roleId, permissionIds]
+  );
+}
+
 module.exports = {
   findAllRoles,
   findRoleById,
+  findAllPermissions,
+  findPermissionsByKeys,
+  findRolePermissionsByRoleIds,
   insertRole,
   updateRole,
+  replaceRolePermissions,
 };
