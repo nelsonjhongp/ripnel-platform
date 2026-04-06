@@ -72,22 +72,43 @@ Do not invent tables or fields if the migration already defines them.
 ## Current API baseline
 
 - `GET /health`
-- `GET /api/roles`
-- `GET /api/locations`
-- `POST /api/locations`
+
+Current mounted route groups in backend:
+
+- `GET /health`
+- `POST /api/auth/*`
+- `GET|POST|PATCH /api/users/*`
+- `GET|POST|PATCH /api/roles/*`
+- `GET|POST|PATCH /api/locations/*`
+- `GET|POST /api/catalogs/*`
+- `GET|POST|PATCH /api/styles/*`
+- `GET|POST|PATCH /api/variants/*`
+- `GET|POST|PATCH /api/prices/*`
+- `GET|POST /api/inventory/*`
+- `GET|POST /api/transfers/*`
+- `GET|POST|PATCH /api/customers/*`
+
+Do not assume a sales API exists yet just because the schema already contains sales tables.
 
 ## Current business modules visible in UI
 
 - Inicio
+- Dashboard
 - Administracion
   - Usuarios
   - Roles
   - Ubicaciones
 - Catalogos
+- Clientes
 - Productos
 - Precios
+- Inventory
+- Kardex
 - Transferencias
-- Venta rapida
+- `purchase-system`: existing sales UI flow, still mock/ecommerce-like in language
+- `transaction-history`: existing sales history UI, currently mock
+
+Treat `purchase-system` and `transaction-history` as transitional sales screens, not as fully integrated ERP flows.
 
 ## Domain notes
 
@@ -101,6 +122,15 @@ For products, the current schema already suggests this flow:
 - `pricing_rules`
 
 So product creation should be built around styles first, then sizes/colors, then variants, then prices.
+
+For sales, the current MVP direction is:
+
+- the operator works from the user's default location;
+- the frontend should use backend APIs, not direct table access;
+- customer can be existing or generic storefront customer;
+- stock and current price must be resolved in backend;
+- a confirmed sale should impact `sales`, `sales_details`, `sales_payments` and `stock_movements`;
+- history and sale detail are follow-up work after the base registration flow is stable.
 
 ## Environment
 
@@ -124,14 +154,20 @@ Frontend:
 - If a module is not ready, use an intentional placeholder instead of a dead link.
 - When changing layout, adjust sidebar, topbar and content together so proportions stay coherent.
 
+## Execution boundaries
+
+- Jira is the source of truth for sprint tracking, ownership and status.
+- Docs inside `docs/` should be used for active sprint scope, shared flows, testing, readiness checks or stable technical references.
+- Do not use repo docs as a substitute for retrospective Jira history unless explicitly requested.
+- Keep `AGENTS.md` focused on stable project context, not temporary sprint management decisions.
+
 ## Next priorities
 
-Recommended order for the next modules:
+Current recommended order:
 
-1. `Ubicaciones`
-2. `Usuarios`
-3. `Roles`
-4. `Estilos`
-5. `Variantes`
-6. `Precios`
-
+1. `Ventas MVP`: registro de venta end-to-end con backend real
+2. `Historial y detalle de ventas` despues del flujo base
+3. `Clientes` y su integracion operativa con ventas
+4. `Hardening` de auth, roles, permisos y user-locations
+5. `Precios`, `Inventory` y `Transferencias` como soporte del flujo comercial
+6. Ajustar placeholders o mocks restantes para que reflejen estado real del sistema
