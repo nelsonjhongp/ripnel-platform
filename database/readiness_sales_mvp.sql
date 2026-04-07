@@ -1,7 +1,7 @@
 -- ============================================================
 -- RIPNEL sales MVP readiness check
 -- Purpose: verify the minimum context required to test the
--- Week 9 "Nueva venta" flow.
+-- Week 9 "Nueva venta" flow and the parallel cash closing base.
 -- Read only.
 -- ============================================================
 
@@ -35,11 +35,18 @@ from customers
 where internal_code like 'SALE-CLI-%'
 order by internal_code;
 
--- Sales tables should remain empty until backend transactions are ready
+-- Demo confirmed sales ready for history/detail/cash closing base
 select
-  (select count(*) from sales) as sales_count,
-  (select count(*) from sales_details) as sales_details_count,
-  (select count(*) from sales_payments) as sales_payments_count;
+  s.sale_number,
+  s.document_type,
+  s.status,
+  l.code as location_code,
+  timezone('America/Lima', s.confirmed_at)::date as business_date_lima,
+  s.total_amount
+from sales s
+inner join locations l on l.location_id = s.location_id
+where s.sale_number in ('N-900001', 'B-900001', 'F-900001')
+order by s.confirmed_at desc, s.sale_number asc;
 
 -- Variants with stock and current retail price in store locations
 select
@@ -66,3 +73,33 @@ left join style_size_prices ssp
 where l.type = 'store'
   and i.qty > 0
 order by l.code, ps.style_code, s.sort_order, pv.sku;
+
+-- Cash closing aggregate based on confirmed sales and Lima business date
+select
+  l.code as location_code,
+  timezone('America/Lima', s.confirmed_at)::date as business_date_lima,
+  count(distinct s.sale_id) as confirmed_sales_count,
+  coalesce(sum(case when sp.method = 'cash' then sp.amount else 0 end), 0)::numeric(12,2) as total_cash,
+  coalesce(sum(case when sp.method = 'yape' then sp.amount else 0 end), 0)::numeric(12,2) as total_yape,
+  coalesce(sum(case when sp.method = 'plin' then sp.amount else 0 end), 0)::numeric(12,2) as total_plin,
+  coalesce(sum(case when sp.method = 'transfer' then sp.amount else 0 end), 0)::numeric(12,2) as total_transfer,
+  coalesce(sum(sp.amount), 0)::numeric(12,2) as total_all
+from sales s
+inner join sales_payments sp on sp.sale_id = s.sale_id
+inner join locations l on l.location_id = s.location_id
+where s.status = 'confirmed'
+  and s.sale_number in ('N-900001', 'B-900001', 'F-900001')
+group by l.code, timezone('America/Lima', s.confirmed_at)::date
+order by business_date_lima desc, location_code asc;
+
+-- Header total vs payment total consistency for the demo sales
+select
+  s.sale_number,
+  s.total_amount,
+  coalesce(sum(sp.amount), 0)::numeric(12,2) as payment_total,
+  (s.total_amount - coalesce(sum(sp.amount), 0))::numeric(12,2) as difference
+from sales s
+left join sales_payments sp on sp.sale_id = s.sale_id
+where s.sale_number in ('N-900001', 'B-900001', 'F-900001')
+group by s.sale_number, s.total_amount
+order by s.sale_number asc;

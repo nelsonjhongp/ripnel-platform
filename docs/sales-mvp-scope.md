@@ -46,6 +46,17 @@ Al cierre de la semana el equipo debe poder:
 - anulacion completa de ventas;
 - automatizacion de demo final.
 
+## Caja y cierre diario en paralelo
+
+Aunque el modulo de caja no entra como entregable cerrado de Semana 9, si queda habilitado para backend base con:
+
+- dataset confiable de ventas confirmadas;
+- reglas cerradas para calcular totales por metodo;
+- fecha de negocio basada en `confirmed_at` en `America/Lima`;
+- consultas SQL de referencia para `cash_closings`.
+
+Esto habilita trabajo paralelo de caja sin vender aun una UI final ni un flujo operativo completo.
+
 ## Defaults elegidos para reducir alcance
 
 - `POST /api/sales` registra y confirma la venta en una sola operacion.

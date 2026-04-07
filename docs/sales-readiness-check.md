@@ -4,7 +4,7 @@ Semana 9 del proyecto: `2026-04-06` a `2026-04-12` en `America/Lima`.
 
 ## Objetivo
 
-Confirmar antes de ejecutar el sprint que el equipo tiene contexto, datos y accesos minimos para probar "Nueva venta" sin bloqueos evitables.
+Confirmar antes de ejecutar el sprint que el equipo tiene contexto, datos y accesos minimos para probar "Nueva venta" sin bloqueos evitables y para dejar lista la base tecnica de caja en paralelo.
 
 ## Cuando usarlo
 
@@ -19,6 +19,8 @@ Confirmar antes de ejecutar el sprint que el equipo tiene contexto, datos y acce
 - salida de consulta que demuestre stock vendible;
 - salida de consulta que demuestre precio vigente;
 - confirmacion de que existen clientes de prueba, incluido cliente generico de mostrador;
+- confirmacion de que existen 3 ventas demo confirmadas para historial, detalle y caja;
+- salida de consulta con agregado por metodo de pago y fecha Lima;
 - nota breve del owner si hay bloqueos.
 
 ## Checklist operativo
@@ -38,6 +40,7 @@ Confirmar antes de ejecutar el sprint que el equipo tiene contexto, datos y acce
 - existen variantes activas con stock en esa sede;
 - existe precio vigente retail para esas variantes;
 - existen clientes de prueba para mostrador, retail y factura con `customer_id` utilizable;
+- existe dataset demo con 3 ventas `confirmed` en `TD-CENT`;
 - no hay datos base faltantes para confirmar una venta simple.
 
 ### 3. Dependencias tecnicas
@@ -46,7 +49,8 @@ Confirmar antes de ejecutar el sprint que el equipo tiene contexto, datos y acce
 - backend confirma contrato minimo para `POST /api/sales`;
 - frontend conoce errores esperados por stock o precio;
 - frontend usa la sede default del usuario y no deja elegir ubicacion manual;
-- QA tiene claro que historial y detalle quedan fuera del compromiso de esta semana.
+- existe una base tecnica documentada para `cash_closings`;
+- QA sabe que caja queda habilitada en paralelo solo a nivel dataset, reglas y queries.
 
 ## SQL recomendado
 
@@ -57,11 +61,13 @@ Ejecutar despues de:
 3. `database/seed_variants_inventory.sql`
 4. `database/seed_style_size_prices.sql`
 5. `database/seed_sales_mvp.sql`
-6. `database/readiness_sales_mvp.sql`
+6. `database/seed_sales_confirmed_demo.sql`
+7. `database/readiness_sales_mvp.sql`
 
 ## Criterio para marcar RP-121 como listo
 
 - el checklist esta revisado;
-- no hay bloqueos criticos abiertos por permisos, sede default, stock o precios;
+- no hay bloqueos criticos abiertos por permisos, sede default, stock, precios o ventas demo;
 - si existe bloqueo, queda anotado en Jira con responsable y siguiente accion;
-- el equipo puede arrancar QA del flujo comprometido sin inventar datos.
+- el equipo puede arrancar QA del flujo comprometido sin inventar datos;
+- un integrante distinto puede usar las consultas base para arrancar backend de caja sin inspeccion manual extra del repo.

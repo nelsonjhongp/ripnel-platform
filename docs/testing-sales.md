@@ -15,7 +15,8 @@ Ejecutar o verificar estos datos antes de probar:
 3. `database/seed_variants_inventory.sql`
 4. `database/seed_style_size_prices.sql`
 5. `database/seed_sales_mvp.sql`
-6. `database/readiness_sales_mvp.sql`
+6. `database/seed_sales_confirmed_demo.sql`
+7. `database/readiness_sales_mvp.sql`
 
 ## Readiness check
 
@@ -27,6 +28,7 @@ Antes de iniciar el testing, confirmar:
 - existe cliente generico de mostrador con `customer_id` real;
 - existen variantes con stock en la sede;
 - existen precios vigentes para esas variantes;
+- existen 3 ventas demo confirmadas para historial, detalle y caja;
 - login y sesion funcionan;
 - la pantalla de nueva venta carga sin mocks.
 
@@ -111,6 +113,16 @@ Luego de una venta exitosa, revisar:
 - `stock_movements`
 - `inventory`
 
+## Base para caja en paralelo
+
+Ademas del flujo de venta, validar que la base diaria para caja ya sea reutilizable:
+
+- existe una venta `cash` de hoy;
+- existe una venta `yape` de hoy;
+- existe una venta `transfer` de ayer;
+- el agregado por metodo y fecha Lima coincide con lo sembrado;
+- la venta de ayer no contamina el cierre del dia actual.
+
 ## Nota minima que debe quedar en Jira al cerrar una tarea
 
 Usar siempre una nota corta de prueba, por ejemplo:
@@ -126,10 +138,12 @@ Ventas MVP se considera validado manualmente cuando:
 - hay al menos un caso de rechazo por stock;
 - hay al menos un caso de rechazo por precio faltante;
 - existe trazabilidad del movimiento de salida;
-- el readiness check no deja bloqueos criticos abiertos.
+- el readiness check no deja bloqueos criticos abiertos;
+- la base de pagos ya permite calcular caja diaria sin ambiguedad de tablas o fechas.
 
 ## Casos fuera del compromiso semanal
 
 - historial de ventas conectado;
 - detalle de venta confirmado;
+- UI final de caja y cierre diario;
 - reportes o exportaciones.
