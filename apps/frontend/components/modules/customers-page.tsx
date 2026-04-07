@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowDownUp,
@@ -368,21 +369,29 @@ export default function CustomersPage() {
   return (
     <div className="flex flex-col gap-4 p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Clientes</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             Listado de clientes registrados
           </p>
         </div>
-        <button
-          onClick={() => fetchCustomers(docFilter, sort)}
-          disabled={loading}
-          className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-        >
-          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-          Actualizar
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/clientes/dashboards"
+            className="flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm text-blue-700 transition-colors hover:bg-blue-100"
+          >
+            Dashboards BI
+          </Link>
+          <button
+            onClick={() => fetchCustomers(docFilter, sort)}
+            disabled={loading}
+            className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+            Actualizar
+          </button>
+        </div>
       </div>
 
       {/* Filters */}

@@ -1,12 +1,25 @@
 const { query } = require('../../shared/db');
 
-async function findAllCustomers({ documentType, sort }) {
+async function findAllCustomers({ documentType, sort, q }) {
   const params = [];
   const conditions = [];
 
   if (documentType && documentType !== 'all') {
     params.push(documentType);
     conditions.push(`c.document_type = $${params.length}`);
+  }
+
+  if (q) {
+    params.push(`%${q}%`);
+    const index = params.length;
+    conditions.push(
+      `(
+        c.full_name ILIKE $${index}
+        OR COALESCE(c.business_name, '') ILIKE $${index}
+        OR COALESCE(c.commercial_name, '') ILIKE $${index}
+        OR COALESCE(c.document_number, '') ILIKE $${index}
+      )`
+    );
   }
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
