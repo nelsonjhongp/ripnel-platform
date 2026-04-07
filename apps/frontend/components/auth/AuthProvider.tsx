@@ -79,6 +79,16 @@ function buildLocationState(payload: UserLocationsPayload | null) {
   };
 }
 
+function formatLocationsError(error: unknown) {
+  const message = error instanceof Error ? error.message : "No se pudo cargar sedes";
+
+  if (message === "Not authenticated") {
+    return "No se pudo validar la sesion para cargar sedes. Reingresa y usa el mismo host en frontend y backend (localhost o 127.0.0.1).";
+  }
+
+  return message;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<AuthState>({
     user: null,
@@ -107,10 +117,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         locationsError: null,
       }));
     } catch (error) {
+      console.warn("Failed to load user locations", error);
       setState((current) => ({
         ...current,
         locationsLoading: false,
-        locationsError: error instanceof Error ? error.message : "No se pudo cargar sedes",
+        locationsError: formatLocationsError(error),
         locationAssignments: [],
         defaultLocation: null,
       }));

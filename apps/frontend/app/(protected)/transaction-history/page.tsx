@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { Filter, ReceiptText, Search } from "lucide-react"
 
-import { buildApiUrl } from "@/lib/api"
+import { apiFetch } from "@/lib/api"
 
 type SaleStatus = "confirmed" | "draft" | "cancelled"
 
@@ -49,21 +49,50 @@ export default function TransactionHistoryPage() {
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState("all")
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let active = true
     const controller = new AbortController()
-    const params = new URLSearchParams()
-    if (status !== "all") params.set("status", status)
-    if (search.trim()) params.set("q", search.trim())
 
-    setLoading(true)
-    fetch(buildApiUrl(`/api/sales?${params.toString()}`), { signal: controller.signal })
-      .then((res) => res.json())
-      .then((data) => setSales(Array.isArray(data) ? data : []))
-      .catch(() => setSales([]))
-      .finally(() => setLoading(false))
+    async function loadSales() {
+      setLoading(true)
+      setError(null)
 
-    return () => controller.abort()
+      try {
+        const params = new URLSearchParams()
+        if (status !== "all") params.set("status", status)
+        if (search.trim()) params.set("q", search.trim())
+
+        const path = params.toString() ? `/api/sales?${params.toString()}` : "/api/sales"
+        const data = await apiFetch<SaleItem[]>(path, {
+          signal: controller.signal,
+          cache: "no-store",
+        })
+
+        if (active) {
+          setSales(Array.isArray(data) ? data : [])
+        }
+      } catch (loadError) {
+        if (!active || controller.signal.aborted) {
+          return
+        }
+
+        setSales([])
+        setError(loadError instanceof Error ? loadError.message : "No se pudieron cargar las ventas")
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadSales()
+
+    return () => {
+      active = false
+      controller.abort()
+    }
   }, [search, status])
 
   const totals = useMemo(() => {
@@ -79,7 +108,9 @@ export default function TransactionHistoryPage() {
         <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
           <p className="text-xs uppercase tracking-wide text-violet-600">Operaciones de venta</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">Historial de ventas</h1>
-          <p className="mt-1 text-sm text-slate-600">Revisa ventas confirmadas, borradores y comprobantes emitidos.</p>
+          <p className="mt-1 text-sm text-slate-600">
+            Consulta las ventas confirmadas de la sede operativa actual.
+          </p>
         </header>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -136,7 +167,9 @@ export default function TransactionHistoryPage() {
 
             <div className="divide-y divide-slate-200 bg-white">
               {loading ? (
-                <div className="px-4 py-10 text-center text-sm text-slate-500">Cargando ventas…</div>
+                <div className="px-4 py-10 text-center text-sm text-slate-500">Cargando ventas...</div>
+              ) : error ? (
+                <div className="px-4 py-10 text-center text-sm text-red-600">{error}</div>
               ) : sales.length === 0 ? (
                 <div className="px-4 py-10 text-center text-sm text-slate-500">
                   No se encontraron ventas con los filtros aplicados.
@@ -153,19 +186,29 @@ export default function TransactionHistoryPage() {
                       <p className="text-xs text-slate-500">
                         {new Date(sale.confirmed_at || sale.created_at).toLocaleString("es-PE")}
                       </p>
-                      <p className="mt-1 text-xs uppercase tracking-wide text-violet-600">{sale.document_type}</p>
+                      <p className="mt-1 text-xs uppercase tracking-wide text-violet-600">
+                        {sale.document_type}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-slate-800">{sale.customer_name_text || "Cliente general"}</p>
+                      <p className="text-sm font-medium text-slate-800">
+                        {sale.customer_name_text || "Cliente general"}
+                      </p>
                       <p className="text-xs text-slate-500">{sale.location_name}</p>
                     </div>
                     <div className="text-sm text-slate-700">{sale.seller_name}</div>
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">S/. {Number(sale.total_amount).toFixed(2)}</p>
+                      <p className="text-sm font-semibold text-slate-900">
+                        S/. {Number(sale.total_amount).toFixed(2)}
+                      </p>
                       <p className="text-xs text-slate-500">{sale.currency}</p>
                     </div>
                     <div>
-                      <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[sale.status] || "border-slate-200 bg-slate-100 text-slate-700"}`}>
+                      <span
+                        className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                          STATUS_STYLES[sale.status] || "border-slate-200 bg-slate-100 text-slate-700"
+                        }`}
+                      >
                         {STATUS_LABELS[sale.status] || sale.status}
                       </span>
                     </div>
@@ -179,7 +222,7 @@ export default function TransactionHistoryPage() {
         <div className="rounded-3xl border border-violet-200 bg-violet-50/80 p-4 text-sm text-violet-800 shadow-sm">
           <div className="flex items-center gap-2">
             <ReceiptText className="h-4 w-4" />
-            <p>Selecciona una venta para ver su detalle completo.</p>
+            <p>Selecciona una venta para ver su detalle dentro de la misma sede operativa.</p>
           </div>
         </div>
       </div>
