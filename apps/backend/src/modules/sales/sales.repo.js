@@ -18,27 +18,25 @@ async function findSellableVariants(locationId, searchQuery) {
 
   const result = await query(
     `SELECT
+       pv.style_id,
        pv.variant_id,
        pv.sku,
        ps.name AS style_name,
        ps.style_code,
+       pv.size_id,
        s.code AS size_code,
        s.name AS size_name,
+       s.sort_order AS size_sort_order,
+       pv.color_id,
        c.code AS color_code,
        c.name AS color_name,
        i.qty AS stock,
-       COALESCE(ssp.price, 0) AS retail_price
+       get_current_style_size_price(pv.style_id, pv.size_id, 'retail', CURRENT_DATE) AS retail_price
      FROM product_variants pv
      INNER JOIN product_styles ps ON ps.style_id = pv.style_id
      INNER JOIN sizes s ON s.size_id = pv.size_id
      INNER JOIN colors c ON c.color_id = pv.color_id
      INNER JOIN inventory i ON i.variant_id = pv.variant_id AND i.location_id = $1
-     LEFT JOIN style_size_prices ssp
-       ON ssp.style_id = pv.style_id
-       AND ssp.size_id = pv.size_id
-       AND ssp.price_type = 'retail'
-       AND ssp.active = true
-       AND (ssp.end_date IS NULL OR ssp.end_date >= CURRENT_DATE)
      WHERE COALESCE(pv.active, true) = true
        AND i.qty > 0
        ${searchCondition}
@@ -103,10 +101,19 @@ async function findAllSales(filters = {}) {
   return result.rows;
 }
 
-async function findSaleById(saleId) {
+async function findSaleById(saleId, locationId = null) {
+  const values = [saleId];
+  let locationCondition = '';
+
+  if (locationId) {
+    values.push(locationId);
+    locationCondition = ` AND s.location_id = $${values.length}`;
+  }
+
   const result = await query(
     `SELECT
        s.sale_id,
+       s.location_id,
        s.sale_number,
        s.status,
        s.document_type,
@@ -130,8 +137,9 @@ async function findSaleById(saleId) {
      FROM sales s
      INNER JOIN locations l ON l.location_id = s.location_id
      INNER JOIN users u ON u.user_id = s.seller_user_id
-     WHERE s.sale_id = $1`,
-    [saleId]
+     WHERE s.sale_id = $1
+       ${locationCondition}`,
+    values
   );
 
   return result.rows[0] || null;
@@ -190,6 +198,47 @@ async function findLocationById(locationId) {
   return result.rows[0] || null;
 }
 
+async function findCustomerById(customerId) {
+  const result = await query(
+    `SELECT
+       customer_id,
+       internal_code,
+       document_type,
+       document_number,
+       full_name,
+       business_name,
+       commercial_name,
+       address,
+       active
+     FROM customers
+     WHERE customer_id = $1`,
+    [customerId]
+  );
+
+  return result.rows[0] || null;
+}
+
+async function findCustomerByInternalCode(internalCode) {
+  const result = await query(
+    `SELECT
+       customer_id,
+       internal_code,
+       document_type,
+       document_number,
+       full_name,
+       business_name,
+       commercial_name,
+       address,
+       active
+     FROM customers
+     WHERE internal_code = $1
+     LIMIT 1`,
+    [internalCode]
+  );
+
+  return result.rows[0] || null;
+}
+
 async function findVariantById(variantId) {
   const result = await query(
     `SELECT
@@ -208,6 +257,15 @@ async function findVariantById(variantId) {
   );
 
   return result.rows[0] || null;
+}
+
+async function getCurrentRetailPriceInTx(clientQuery, styleId, sizeId) {
+  const result = await clientQuery(
+    `SELECT get_current_style_size_price($1, $2, 'retail', CURRENT_DATE) AS price`,
+    [styleId, sizeId]
+  );
+
+  return result.rows[0] ? result.rows[0].price : null;
 }
 
 async function getInventoryQtyInTx(clientQuery, locationId, variantId) {
@@ -341,7 +399,10 @@ module.exports = {
   findSaleDetailsBySaleId,
   findSalePaymentsBySaleId,
   findLocationById,
+  findCustomerById,
+  findCustomerByInternalCode,
   findVariantById,
+  getCurrentRetailPriceInTx,
   getInventoryQtyInTx,
   nextSaleNumberInTx,
   insertSale,

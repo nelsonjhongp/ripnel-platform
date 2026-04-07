@@ -35,8 +35,44 @@ function requirePermission(permissionKey) {
   };
 }
 
+function requireAnyPermission(permissionKeys) {
+  return function requireAnyPermissionMiddleware(req, _res, next) {
+    const permissions = req.auth?.permissions;
+
+    if (
+      Array.isArray(permissions) &&
+      Array.isArray(permissionKeys) &&
+      permissionKeys.some((permissionKey) => permissions.includes(permissionKey))
+    ) {
+      return next();
+    }
+
+    return next(new AppError('Forbidden', 403));
+  };
+}
+
+function requireSelfOrPermission(permissionKey, paramName = 'userId') {
+  return function requireSelfOrPermissionMiddleware(req, _res, next) {
+    const authenticatedUserId = req.auth?.sub;
+    const targetUserId = req.params?.[paramName];
+    const permissions = req.auth?.permissions;
+
+    if (authenticatedUserId && targetUserId && authenticatedUserId === targetUserId) {
+      return next();
+    }
+
+    if (Array.isArray(permissions) && permissions.includes(permissionKey)) {
+      return next();
+    }
+
+    return next(new AppError('Forbidden', 403));
+  };
+}
+
 module.exports = {
   requireAuth,
   requirePermission,
+  requireAnyPermission,
+  requireSelfOrPermission,
 };
 
