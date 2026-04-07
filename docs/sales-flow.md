@@ -81,7 +81,7 @@ Para Semana 9 el comportamiento esperado es:
 - reserva sin confirmacion;
 - anulacion posterior;
 - cambio o devolucion;
-- caja y cierre diario;
+- modulo de caja y cierre diario end-to-end;
 - historial de ventas dentro del alcance de Semana 9;
 - detalle de venta confirmada dentro del alcance de Semana 9.
 
@@ -94,6 +94,8 @@ Para Semana 9 el comportamiento esperado es:
 ## Nota de sprint
 
 Historial y detalle pueden quedar preparados como backlog tecnico, pero no forman parte del criterio de cierre de esta semana.
+
+La base tecnica de caja si puede avanzar en paralelo a partir de ventas confirmadas, pagos y fecha de negocio Lima, sin comprometer aun una UI final de cierre diario.
 
 ## Contrato tecnico minimo
 
