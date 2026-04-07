@@ -65,7 +65,7 @@ function mapDatabaseError(error) {
   throw error;
 }
 
-async function listCustomers({ documentType, sort }) {
+async function listCustomers({ documentType, sort, q }) {
   const docType = documentType && documentType !== 'all' ? documentType : null;
 
   if (docType && !ALLOWED_DOCUMENT_TYPES.includes(docType)) {
@@ -74,7 +74,7 @@ async function listCustomers({ documentType, sort }) {
 
   const sortOrder = sort === 'asc' ? 'asc' : 'desc';
 
-  return findAllCustomers({ documentType: docType, sort: sortOrder });
+  return findAllCustomers({ documentType: docType, sort: sortOrder, q: cleanText(q) });
 }
 
 async function patchCustomer(customerId, input) {

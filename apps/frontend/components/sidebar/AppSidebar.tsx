@@ -53,6 +53,7 @@ const sidebarGroups = [
     icon: Users,
     items: [
       { title: "Clientes", url: "/clientes" },
+      { title: "Dashboards BI", url: "/clientes/dashboards" },
     ],
   },
   {
@@ -94,12 +95,11 @@ const sidebarGroups = [
     ],
   },
   {
-    title: "Compra",
+    title: "Venta rápida",
     icon: ShoppingCart,
     items: [
-      { title: "Nueva compra", url: "/purchase-system" },
-      { title: "Checkout", url: "/purchase-system/checkout" },
-      { title: "Pago", url: "/purchase-system/checkout-payment" },
+      { title: "Nueva venta", url: "/purchase-system" },
+      { title: "Historial de ventas", url: "/transaction-history" },
     ],
   },
   {
@@ -109,7 +109,6 @@ const sidebarGroups = [
       { title: "Stock actual", url: "/inventory" },
       { title: "Apertura y ajustes", url: "/inventory/ajustes" },
       { title: "Kardex", url: "/kardex" },
-      { title: "Historial de transacciones", url: "/transaction-history" },
     ],
   },
 ]
