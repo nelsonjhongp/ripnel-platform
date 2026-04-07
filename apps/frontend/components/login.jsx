@@ -4,13 +4,31 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import FormField from "./ui/FormField";
 import CustomButton from "./ui/CustomButton";
+import { useAuth } from "./auth/AuthProvider";
+import { useState } from "react";
 
 export default function LoginRipnel() {
   const router = useRouter();
+  const { login } = useAuth();
+  const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    router.push("/account");
+    const form = new FormData(event.currentTarget);
+    const username = String(form.get("username") || "").trim();
+    const password = String(form.get("password") || "");
+
+    setError(null);
+    setSubmitting(true);
+    try {
+      await login({ username, password });
+      router.push("/inicio");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo iniciar sesión");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
     return (
@@ -26,11 +44,16 @@ export default function LoginRipnel() {
       <h2 className="text-4xl text-center font-bold mt-4">Inicio de sesión</h2>
 
       <form className="mt-4" onSubmit={handleSubmit}>
+        {error && (
+          <div className="mb-3 w-full rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </div>
+        )}
         <FormField
-          label="Correo electrónico"
-          type="email"
-          id="email"
-          placeholder="Ingrese su correo electrónico"
+          label="Usuario"
+          type="text"
+          id="username"
+          placeholder="Ingrese su usuario"
           required
         />
 
@@ -42,8 +65,8 @@ export default function LoginRipnel() {
           required
         />
 
-        <CustomButton type="submit">
-          Iniciar sesión
+        <CustomButton type="submit" disabled={submitting}>
+          {submitting ? "Ingresando..." : "Iniciar sesión"}
         </CustomButton>
 
       </form>

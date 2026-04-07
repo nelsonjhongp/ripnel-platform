@@ -66,12 +66,17 @@ FROM (
 INNER JOIN product_styles ps ON ps.style_code = seeded.style_code
 INNER JOIN sizes s ON s.code = seeded.size_code
 INNER JOIN style_sizes ss ON ss.style_id = ps.style_id AND ss.size_id = s.size_id
-ON CONFLICT (style_id, size_id, price_type, start_date) DO NOTHING;
+ON CONFLICT (style_id, size_id, price_type, start_date) DO UPDATE
+SET
+  price = EXCLUDED.price,
+  end_date = EXCLUDED.end_date,
+  active = EXCLUDED.active,
+  updated_at = CURRENT_TIMESTAMP;
 
 -- ============================================================
 -- SUMMARY
 -- ============================================================
--- This script inserts:
+-- This script inserts or normalizes:
 -- - 28 retail/wholesale prices for 5 styles
 -- - one current validity window per style+size+type
 -- - enough data to list, filter and validate the prices module

@@ -34,6 +34,8 @@ yarn-error.log*
 .DS_Store
 .vercel/
 *.pem
+.codex
+.local/
 
 # Supabase local state
 supabase/.branches/

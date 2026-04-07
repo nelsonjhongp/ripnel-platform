@@ -5,6 +5,7 @@ async function findAllUsers(executor = query) {
     `select
        u.user_id,
        u.full_name,
+       u.username,
        u.email,
        u.role_id,
        r.name as role_name,
@@ -24,6 +25,7 @@ async function findUserById(userId, executor = query) {
     `select
        u.user_id,
        u.full_name,
+       u.username,
        u.email,
        u.role_id,
        r.name as role_name,
@@ -44,6 +46,7 @@ async function findUserByEmail(email, executor = query) {
     `select
        u.user_id,
        u.full_name,
+       u.username,
        u.email,
        u.role_id,
        r.name as role_name,
@@ -60,34 +63,35 @@ async function findUserByEmail(email, executor = query) {
 }
 
 async function insertUser(
-  { full_name, email, password_hash, role_id, active },
+  { full_name, username, email, temporary_password, role_id, active },
   executor = query
 ) {
   const result = await executor(
-    `insert into users (full_name, email, password_hash, role_id, active)
-     values ($1, $2, $3, $4, $5)
-     returning user_id, full_name, email, role_id, active, created_at, updated_at`,
-    [full_name, email, password_hash, role_id, active]
+    `insert into users (full_name, username, email, password_hash, role_id, active)
+     values ($1, $2, $3, crypt($4, gen_salt('bf')), $5, $6)
+     returning user_id, full_name, username, email, role_id, active, created_at, updated_at`,
+    [full_name, username, email, temporary_password, role_id, active]
   );
 
   return result.rows[0] || null;
 }
 
 async function updateUser(
-  { userId, full_name, email, role_id, active },
+  { userId, full_name, username, email, role_id, active },
   executor = query
 ) {
   const result = await executor(
     `update users
      set
        full_name = $2,
-       email = $3,
-       role_id = $4,
-       active = $5,
+       username = $3,
+       email = $4,
+       role_id = $5,
+       active = $6,
        updated_at = current_timestamp
      where user_id = $1
-     returning user_id, full_name, email, role_id, active, created_at, updated_at`,
-    [userId, full_name, email, role_id, active]
+     returning user_id, full_name, username, email, role_id, active, created_at, updated_at`,
+    [userId, full_name, username, email, role_id, active]
   );
 
   return result.rows[0] || null;

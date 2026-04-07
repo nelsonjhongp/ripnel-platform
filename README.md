@@ -118,3 +118,7 @@ Muestra listado real de reglas
 - [Workflow Backend + Supabase](./docs/backend-supabase-workflow.md)
 - [Acceso del equipo a Supabase](./docs/supabase-team-access.md)
 - [Flujo de producto](./docs/product-flow.md)
+- [Scope de Ventas MVP Semana 9](./docs/sales-mvp-scope.md)
+- [Flujo funcional de ventas](./docs/sales-flow.md)
+- [Testing manual de ventas](./docs/testing-sales.md)
+- [Readiness check de ventas](./docs/sales-readiness-check.md)
