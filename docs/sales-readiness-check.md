@@ -18,7 +18,7 @@ Confirmar antes de ejecutar el sprint que el equipo tiene contexto, datos y acce
 - captura o nota de que existe usuario operativo con sede default;
 - salida de consulta que demuestre stock vendible;
 - salida de consulta que demuestre precio vigente;
-- confirmacion de que existen clientes de prueba;
+- confirmacion de que existen clientes de prueba, incluido cliente generico de mostrador;
 - nota breve del owner si hay bloqueos.
 
 ## Checklist operativo
@@ -29,6 +29,7 @@ Confirmar antes de ejecutar el sprint que el equipo tiene contexto, datos y acce
 - existe usuario activo para ventas o caja;
 - el usuario tiene sede default asignada;
 - login y sesion funcionan en frontend;
+- las rutas de ventas requieren auth y permiso operativo;
 - el flujo visible en UI se identifica como "Nueva venta".
 
 ### 2. Datos minimos
@@ -36,7 +37,7 @@ Confirmar antes de ejecutar el sprint que el equipo tiene contexto, datos y acce
 - existe al menos una sede `store` activa;
 - existen variantes activas con stock en esa sede;
 - existe precio vigente retail para esas variantes;
-- existen clientes de prueba para mostrador, retail y factura;
+- existen clientes de prueba para mostrador, retail y factura con `customer_id` utilizable;
 - no hay datos base faltantes para confirmar una venta simple.
 
 ### 3. Dependencias tecnicas
@@ -44,6 +45,7 @@ Confirmar antes de ejecutar el sprint que el equipo tiene contexto, datos y acce
 - backend confirma contrato minimo para busqueda de items vendibles;
 - backend confirma contrato minimo para `POST /api/sales`;
 - frontend conoce errores esperados por stock o precio;
+- frontend usa la sede default del usuario y no deja elegir ubicacion manual;
 - QA tiene claro que historial y detalle quedan fuera del compromiso de esta semana.
 
 ## SQL recomendado
