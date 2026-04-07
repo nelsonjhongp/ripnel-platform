@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import { ShoppingCart } from "lucide-react"
 import { AppSidebar } from "./AppSidebar"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { useAuth } from "@/components/auth/AuthProvider"
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -27,6 +28,7 @@ export function SidebarShell({
   homeUrl?: string
 }) {
   const pathname = usePathname()
+  const { has } = useAuth()
 
   const resolvedTitle = React.useMemo(() => {
     if (title) return title
@@ -39,7 +41,7 @@ export function SidebarShell({
       "/admin-crud": "Gestion de usuarios",
       "/inventory": "Inventario",
       "/kardex": "Kardex",
-      "/transaction-history": "Historial de transacciones",
+      "/transaction-history": "Historial de ventas",
     }
 
     if (routeTitles[pathname]) {
@@ -73,13 +75,15 @@ export function SidebarShell({
           </Breadcrumb>
         </div>
 
-        <Link
-          href="/purchase-system"
-          className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
-        >
-          <ShoppingCart className="h-4 w-4" />
-          Venta rapida
-        </Link>
+        {has("sales.pos") && (
+          <Link
+            href="/purchase-system"
+            className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+          >
+            <ShoppingCart className="h-4 w-4" />
+            Venta rapida
+          </Link>
+        )}
       </header>
 
       <main className="flex-1 overflow-auto w-full min-h-screen">{children}</main>

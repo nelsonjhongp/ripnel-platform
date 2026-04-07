@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { ArrowLeft, CreditCard, ReceiptText, User } from "lucide-react"
 
-import { buildApiUrl } from "@/lib/api"
+import { apiFetch } from "@/lib/api"
 
 type SaleDetail = {
   sale_id: string
@@ -56,35 +56,50 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
   useEffect(() => {
     let active = true
 
-    async function load() {
+    async function loadSale() {
+      setLoading(true)
+      setError(null)
+
       try {
         const { saleId } = await params
-        const res = await fetch(buildApiUrl(`/api/sales/${saleId}`))
-        const data = await res.json()
-        if (!res.ok) {
-          throw new Error(data.message || "No se pudo cargar la venta")
+        const data = await apiFetch<SaleDetail>(`/api/sales/${saleId}`, {
+          cache: "no-store",
+        })
+
+        if (active) {
+          setSale(data)
         }
-        if (active) setSale(data)
-      } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : "Error al cargar la venta")
+      } catch (loadError) {
+        if (active) {
+          setSale(null)
+          setError(loadError instanceof Error ? loadError.message : "No se pudo cargar la venta")
+        }
       } finally {
-        if (active) setLoading(false)
+        if (active) {
+          setLoading(false)
+        }
       }
     }
 
-    load()
-    return () => { active = false }
+    loadSale()
+
+    return () => {
+      active = false
+    }
   }, [params])
 
   if (loading) {
-    return <div className="p-8 text-sm text-slate-500">Cargando detalle de venta…</div>
+    return <div className="p-8 text-sm text-slate-500">Cargando detalle de venta...</div>
   }
 
   if (error || !sale) {
     return (
       <div className="p-8">
         <p className="text-sm text-red-600">{error || "Venta no encontrada"}</p>
-        <Link href="/transaction-history" className="mt-4 inline-block text-sm text-violet-700 hover:underline">
+        <Link
+          href="/transaction-history"
+          className="mt-4 inline-block text-sm text-violet-700 hover:underline"
+        >
           Volver al historial
         </Link>
       </div>
@@ -106,9 +121,12 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
 
         <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
           <p className="text-xs uppercase tracking-wide text-violet-600">Detalle de venta</p>
-          <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">{sale.sale_number || "Sin correlativo"}</h1>
+          <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">
+            {sale.sale_number || "Sin correlativo"}
+          </h1>
           <p className="mt-1 text-sm text-slate-600">
-            {sale.document_type} • {sale.status} • {new Date(sale.confirmed_at || sale.created_at).toLocaleString("es-PE")}
+            {sale.document_type} • {sale.status} •{" "}
+            {new Date(sale.confirmed_at || sale.created_at).toLocaleString("es-PE")}
           </p>
         </header>
 
@@ -121,7 +139,10 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
               </h2>
               <div className="space-y-2">
                 {sale.details.map((line) => (
-                  <div key={line.sale_detail_id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div
+                    key={line.sale_detail_id}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+                  >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <p className="font-semibold text-slate-900">{line.style_name}</p>
@@ -129,7 +150,9 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
                           {line.sku} • {line.size_code} / {line.color_code}
                         </p>
                       </div>
-                      <p className="text-sm font-semibold text-slate-900">S/. {Number(line.line_total).toFixed(2)}</p>
+                      <p className="text-sm font-semibold text-slate-900">
+                        S/. {Number(line.line_total).toFixed(2)}
+                      </p>
                     </div>
                     <div className="mt-2 grid gap-2 text-sm text-slate-600 md:grid-cols-4">
                       <span>Cantidad: {line.quantity}</span>
@@ -157,11 +180,22 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
                 Cliente
               </h2>
               <div className="space-y-2 text-sm text-slate-700">
-                <p><span className="font-medium">Nombre:</span> {sale.customer_name_text || "Cliente general"}</p>
-                <p><span className="font-medium">Documento:</span> {sale.customer_doc_type || "-"} {sale.customer_doc_number || ""}</p>
-                <p><span className="font-medium">Dirección:</span> {sale.customer_address_text || "-"}</p>
-                <p><span className="font-medium">Ubicación:</span> {sale.location_name}</p>
-                <p><span className="font-medium">Vendedor:</span> {sale.seller_name}</p>
+                <p>
+                  <span className="font-medium">Nombre:</span> {sale.customer_name_text || "Cliente general"}
+                </p>
+                <p>
+                  <span className="font-medium">Documento:</span> {sale.customer_doc_type || "-"}{" "}
+                  {sale.customer_doc_number || ""}
+                </p>
+                <p>
+                  <span className="font-medium">Direccion:</span> {sale.customer_address_text || "-"}
+                </p>
+                <p>
+                  <span className="font-medium">Ubicacion:</span> {sale.location_name}
+                </p>
+                <p>
+                  <span className="font-medium">Vendedor:</span> {sale.seller_name}
+                </p>
               </div>
             </article>
 
@@ -175,10 +209,15 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
                   <p>No hay pagos registrados.</p>
                 ) : (
                   sale.payments.map((payment) => (
-                    <div key={payment.payment_id} className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-                      <p className="font-medium text-slate-800">{payment.method}</p>
+                    <div
+                      key={payment.payment_id}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2"
+                    >
+                      <p className="font-medium capitalize text-slate-800">{payment.method}</p>
                       <p>Monto: S/. {Number(payment.amount).toFixed(2)}</p>
-                      <p className="text-xs text-slate-500">{new Date(payment.paid_at).toLocaleString("es-PE")}</p>
+                      <p className="text-xs text-slate-500">
+                        {new Date(payment.paid_at).toLocaleString("es-PE")}
+                      </p>
                     </div>
                   ))
                 )}

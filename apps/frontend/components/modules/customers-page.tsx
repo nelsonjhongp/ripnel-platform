@@ -13,7 +13,7 @@ import {
   X,
   Trash2,
 } from "lucide-react";
-import { buildApiUrl } from "@/lib/api";
+import { apiFetch, buildApiUrl, unwrapApiData } from "@/lib/api";
 
 type Customer = {
   customer_id: string;
@@ -197,18 +197,16 @@ export default function CustomersPage() {
       if (docType !== "all") params.set("document_type", docType);
       params.set("sort", sortOrder);
 
-      const res = await fetch(
-        buildApiUrl(`/api/customers?${params.toString()}`),
-        { signal: ctrl.signal, cache: "no-store" }
+      const payload = await apiFetch<{ ok: boolean; data: Customer[] } | Customer[]>(
+        `/api/customers?${params.toString()}`,
+        {
+        signal: ctrl.signal,
+        cache: "no-store",
+        }
       );
 
-      const payload = await res.json();
-
-      if (!res.ok) {
-        throw new Error(payload.message || "Error al cargar clientes");
-      }
-
-      setCustomers(payload.data || []);
+      const nextCustomers = unwrapApiData<Customer[]>(payload);
+      setCustomers(Array.isArray(nextCustomers) ? nextCustomers : []);
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Error desconocido");
@@ -219,7 +217,6 @@ export default function CustomersPage() {
 
   useEffect(() => {
     fetchCustomers(docFilter, sort);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docFilter, sort]);
 
   function startEdit(c: Customer) {
