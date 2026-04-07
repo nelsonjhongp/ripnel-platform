@@ -4,21 +4,30 @@
 
 begin;
 
+insert into roles (name, description, active)
+values
+  ('ADMIN', 'Acceso general al sistema y configuracion base.', true),
+  ('TIENDA', 'Operacion de ventas y consultas.', true),
+  ('CAJA', 'Cobros y registro de ventas.', true),
+  ('VENTAS', 'Operacion comercial y venta rapida.', true),
+  ('ALMACEN', 'Operacion de stock y movimientos internos.', true)
+on conflict (name) do update
+set
+  description = excluded.description,
+  active = excluded.active,
+  updated_at = current_timestamp;
+
 with seeded_permissions(permission_key, description) as (
   values
-    ('dashboard.view', 'Ver inicio y panel general.'),
-    ('users.manage', 'Gestionar usuarios.'),
-    ('roles.manage', 'Gestionar roles.'),
-    ('locations.manage', 'Gestionar ubicaciones.'),
+    ('admin.manage', 'Administracion de roles, usuarios y ubicaciones.'),
     ('catalogs.manage', 'Gestionar catalogos maestros.'),
-    ('styles.manage', 'Gestionar estilos.'),
-    ('variants.manage', 'Gestionar variantes.'),
+    ('products.manage', 'Gestionar estilos y variantes.'),
     ('prices.manage', 'Gestionar precios y reglas comerciales.'),
     ('customers.manage', 'Gestionar clientes.'),
     ('inventory.view', 'Consultar inventario y kardex.'),
     ('inventory.adjust', 'Registrar ajustes de inventario.'),
     ('transfers.manage', 'Gestionar transferencias internas.'),
-    ('sales.use', 'Operar venta rapida y checkout.')
+    ('sales.pos', 'Operar venta rapida y checkout.')
 )
 insert into permissions (
   key,
@@ -32,44 +41,70 @@ on conflict (key) do update
 set
   description = excluded.description;
 
-delete from role_permissions;
+with base_roles(role_name) as (
+  values
+    ('ADMIN'),
+    ('TIENDA'),
+    ('CAJA'),
+    ('VENTAS'),
+    ('ALMACEN')
+),
+permission_keys(permission_key) as (
+  values
+    ('admin.manage'),
+    ('catalogs.manage'),
+    ('products.manage'),
+    ('prices.manage'),
+    ('customers.manage'),
+    ('inventory.view'),
+    ('inventory.adjust'),
+    ('transfers.manage'),
+    ('sales.pos'),
+    ('dashboard.view'),
+    ('users.manage'),
+    ('roles.manage'),
+    ('locations.manage'),
+    ('styles.manage'),
+    ('variants.manage'),
+    ('sales.use')
+)
+delete from role_permissions rp
+using roles r, permissions p, base_roles br, permission_keys pk
+where rp.role_id = r.role_id
+  and rp.permission_id = p.permission_id
+  and r.name = br.role_name
+  and p.key = pk.permission_key;
 
 with seeded_role_permissions(role_name, permission_key) as (
   values
-    ('ADMIN', 'dashboard.view'),
-    ('ADMIN', 'users.manage'),
-    ('ADMIN', 'roles.manage'),
-    ('ADMIN', 'locations.manage'),
+    ('ADMIN', 'admin.manage'),
     ('ADMIN', 'catalogs.manage'),
-    ('ADMIN', 'styles.manage'),
-    ('ADMIN', 'variants.manage'),
+    ('ADMIN', 'products.manage'),
     ('ADMIN', 'prices.manage'),
     ('ADMIN', 'customers.manage'),
     ('ADMIN', 'inventory.view'),
     ('ADMIN', 'inventory.adjust'),
     ('ADMIN', 'transfers.manage'),
-    ('ADMIN', 'sales.use'),
+    ('ADMIN', 'sales.pos'),
 
-    ('ALMACEN', 'dashboard.view'),
-    ('ALMACEN', 'variants.manage'),
     ('ALMACEN', 'inventory.view'),
     ('ALMACEN', 'inventory.adjust'),
     ('ALMACEN', 'transfers.manage'),
 
-    ('TIENDA', 'dashboard.view'),
-    ('TIENDA', 'customers.manage'),
+    ('TIENDA', 'catalogs.manage'),
+    ('TIENDA', 'products.manage'),
     ('TIENDA', 'prices.manage'),
+    ('TIENDA', 'customers.manage'),
     ('TIENDA', 'inventory.view'),
-    ('TIENDA', 'sales.use'),
+    ('TIENDA', 'sales.pos'),
 
-    ('CAJA', 'dashboard.view'),
     ('CAJA', 'customers.manage'),
-    ('CAJA', 'sales.use'),
+    ('CAJA', 'sales.pos'),
 
-    ('VENTAS', 'dashboard.view'),
+    ('VENTAS', 'products.manage'),
     ('VENTAS', 'customers.manage'),
     ('VENTAS', 'prices.manage'),
-    ('VENTAS', 'sales.use')
+    ('VENTAS', 'sales.pos')
 )
 insert into role_permissions (
   role_id,

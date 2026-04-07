@@ -8,7 +8,6 @@ const catalogsRoutes = require('./modules/catalogs/catalogs.routes');
 const stylesRoutes = require('./modules/styles/styles.routes');
 const variantsRoutes = require('./modules/variants/variants.routes');
 const pricesRoutes = require('./modules/prices/prices.routes');
-const pricingRulesRoutes = require('./modules/prices/pricing-rules.routes');
 const inventoryRoutes = require('./modules/inventory/inventory.routes');
 const transfersRoutes = require('./modules/transfers/transfers.routes');
 const usersRoutes = require('./modules/users/users.routes');
@@ -57,6 +56,7 @@ try {
 
 app.use(
   cors({
+    credentials: true,
     origin(origin, callback) {
       const normalizedOrigin = normalizeOrigin(origin);
 
@@ -71,13 +71,14 @@ app.use(
 app.use(express.json());
 
 app.use('/health', healthRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/users', usersRoutes);
 app.use('/api/roles', rolesRoutes);
 app.use('/api/locations', locationsRoutes);
 app.use('/api', catalogsRoutes);
 app.use('/api/styles', stylesRoutes);
 app.use('/api/variants', variantsRoutes);
 app.use('/api/prices', pricesRoutes);
-app.use('/api/pricing-rules', pricingRulesRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/transfers', transfersRoutes);
 app.use('/api/users', usersRoutes);

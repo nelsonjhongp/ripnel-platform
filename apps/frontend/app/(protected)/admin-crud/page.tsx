@@ -9,6 +9,12 @@ type ApiResponse<T> = {
   message?: string;
 };
 
+type Permission = {
+  permission_id: string;
+  key: string;
+  description: string | null;
+};
+
 type Role = {
   role_id: string;
   name: string;
@@ -16,17 +22,20 @@ type Role = {
   active: boolean;
   created_at: string;
   updated_at: string;
+  permissions: Permission[];
 };
 
 type User = {
   user_id: string;
   full_name: string;
-  email: string;
+  username: string;
+  email: string | null;
   role_id: string | null;
   role_name?: string | null;
   active: boolean;
   created_at: string;
   updated_at: string;
+  temporary_password?: string;
 };
 
 type Location = {
@@ -52,6 +61,7 @@ type UserLocationsPayload = {
 
 type UserFormState = {
   full_name: string;
+  username: string;
   email: string;
   role_id: string;
   active: boolean;
@@ -61,6 +71,18 @@ type RoleFormState = {
   name: string;
   description: string;
   active: boolean;
+  permission_keys: string[];
+};
+
+type PermissionGroup = {
+  group: string;
+  permissions: Permission[];
+};
+
+type PermissionModuleOption = {
+  key: string;
+  label: string;
+  count: number;
 };
 
 async function requestJson<T>(path: string, init?: RequestInit) {
@@ -70,6 +92,7 @@ async function requestJson<T>(path: string, init?: RequestInit) {
       ...(init?.headers || {}),
     },
     cache: "no-store",
+    credentials: "include",
     ...init,
   });
 
@@ -84,6 +107,7 @@ async function requestJson<T>(path: string, init?: RequestInit) {
 
 const emptyUserForm: UserFormState = {
   full_name: "",
+  username: "",
   email: "",
   role_id: "",
   active: true,
@@ -93,17 +117,236 @@ const emptyRoleForm: RoleFormState = {
   name: "",
   description: "",
   active: true,
+  permission_keys: [],
 };
+
+function formatPermissionGroupLabel(group: string) {
+  return group
+    .split(/[_-]/g)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function PermissionSelector({
+  selectedPermissions,
+  selectedKeys,
+  permissionModules,
+  activeModule,
+  query,
+  onQueryChange,
+  onModuleChange,
+  onTogglePermission,
+  onClearAll,
+  groups,
+  loading,
+  error,
+  totalPermissions,
+}: {
+  selectedPermissions: Permission[];
+  selectedKeys: string[];
+  permissionModules: PermissionModuleOption[];
+  activeModule: string;
+  query: string;
+  onQueryChange: (value: string) => void;
+  onModuleChange: (value: string) => void;
+  onTogglePermission: (permissionKey: string) => void;
+  onClearAll: () => void;
+  groups: PermissionGroup[];
+  loading: boolean;
+  error: string | null;
+  totalPermissions: number;
+}) {
+  return (
+    <div className="flex h-full min-h-0 flex-col rounded-2xl border border-slate-200 bg-slate-50/50">
+      <div className="border-b border-slate-200 px-4 py-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <div className="text-sm font-medium text-slate-700">Permisos del rol</div>
+            <div className="mt-1 text-xs text-slate-500">
+              Busca, filtra por modulo y marca solo lo necesario.
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-right">
+            <div className="text-[11px] uppercase tracking-wide text-slate-500">
+              Seleccionados
+            </div>
+            <div className="text-base font-semibold text-slate-900">
+              {selectedKeys.length}
+            </div>
+          </div>
+        </div>
+
+        {selectedPermissions.length > 0 ? (
+          <div className="mt-3 rounded-2xl border border-violet-200 bg-violet-50/70 p-3">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="text-xs font-medium uppercase tracking-wide text-violet-700">
+                Seleccionados: {selectedPermissions.length}
+              </div>
+              <button
+                type="button"
+                onClick={onClearAll}
+                className="text-xs font-medium text-violet-700 transition hover:text-violet-900"
+              >
+                Limpiar todo
+              </button>
+            </div>
+            <div className="flex max-h-20 flex-wrap gap-2 overflow-y-auto pr-1">
+              {selectedPermissions.map((permission) => (
+                <button
+                  key={`selected-${permission.permission_id}`}
+                  type="button"
+                  onClick={() => onTogglePermission(permission.key)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-violet-300 bg-white px-2.5 py-1 text-xs font-medium text-violet-800 transition hover:border-violet-400 hover:bg-violet-100"
+                  title={permission.description || permission.key}
+                >
+                  <span className="max-w-[14rem] truncate">{permission.key}</span>
+                  <span className="text-sm leading-none text-violet-500">x</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 rounded-2xl border border-dashed border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-500">
+            Todavia no has seleccionado permisos para este rol.
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3">
+        <label className="block space-y-1">
+          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Buscar permiso
+          </span>
+          <input
+            type="text"
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            placeholder="Buscar por clave o descripcion"
+            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-violet-500"
+          />
+        </label>
+
+        <div className="space-y-2">
+          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Modulo
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {permissionModules.map((module) => {
+              const isActive = activeModule === module.key;
+
+              return (
+                <button
+                  key={module.key}
+                  type="button"
+                  onClick={() => onModuleChange(module.key)}
+                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                    isActive
+                      ? "border-violet-300 bg-violet-100 text-violet-800"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  {module.label} ({module.count})
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        {loading ? (
+          <div className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-500">
+            Cargando permisos...
+          </div>
+        ) : error ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {error}
+          </div>
+        ) : totalPermissions === 0 ? (
+          <div className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-500">
+            No hay permisos registrados todavia.
+          </div>
+        ) : groups.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
+            No hay permisos que coincidan con la busqueda o el modulo seleccionado.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {groups.map((group) => {
+              const selectedCount = group.permissions.filter((permission) =>
+                selectedKeys.includes(permission.key)
+              ).length;
+
+              return (
+                <div key={group.group} className="space-y-2">
+                  <div className="sticky top-0 z-10 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-100/95 px-3 py-2 backdrop-blur">
+                    <div className="text-sm font-semibold text-slate-900">
+                      {formatPermissionGroupLabel(group.group)}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {selectedCount}/{group.permissions.length}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {group.permissions.map((permission) => {
+                      const checked = selectedKeys.includes(permission.key);
+
+                      return (
+                        <label
+                          key={permission.permission_id}
+                          className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2 transition ${
+                            checked
+                              ? "border-violet-300 bg-violet-50"
+                              : "border-slate-200 bg-white hover:bg-slate-50"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => onTogglePermission(permission.key)}
+                            className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-center gap-2">
+                              <span className="truncate text-sm font-medium text-slate-900">
+                                {permission.key}
+                              </span>
+                              <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                                {group.group}
+                              </span>
+                            </span>
+                            <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                              {permission.description || "Sin descripcion"}
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function AdminCrudPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [availablePermissions, setAvailablePermissions] = useState<Permission[]>([]);
   const [availableLocations, setAvailableLocations] = useState<Location[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [loadingRoles, setLoadingRoles] = useState(true);
+  const [loadingPermissions, setLoadingPermissions] = useState(true);
   const [loadingLocations, setLoadingLocations] = useState(true);
   const [usersError, setUsersError] = useState<string | null>(null);
   const [rolesError, setRolesError] = useState<string | null>(null);
+  const [permissionsError, setPermissionsError] = useState<string | null>(null);
   const [locationsError, setLocationsError] = useState<string | null>(null);
 
   const [userQuery, setUserQuery] = useState("");
@@ -117,6 +360,8 @@ export default function AdminCrudPage() {
   const [showRoleForm, setShowRoleForm] = useState(false);
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
   const [roleForm, setRoleForm] = useState<RoleFormState>(emptyRoleForm);
+  const [rolePermissionQuery, setRolePermissionQuery] = useState("");
+  const [rolePermissionModule, setRolePermissionModule] = useState("all");
   const [savingRole, setSavingRole] = useState(false);
 
   const [locationsOpen, setLocationsOpen] = useState(false);
@@ -147,11 +392,27 @@ export default function AdminCrudPage() {
 
     try {
       const data = await requestJson<Role[]>("/api/roles");
-      setRoles(data);
+      setRoles(data.map((role) => ({ ...role, permissions: role.permissions || [] })));
     } catch (error) {
       setRolesError(error instanceof Error ? error.message : "No se pudo cargar roles");
     } finally {
       setLoadingRoles(false);
+    }
+  }, []);
+
+  const loadPermissions = useCallback(async () => {
+    setLoadingPermissions(true);
+    setPermissionsError(null);
+
+    try {
+      const data = await requestJson<Permission[]>("/api/roles/permissions");
+      setAvailablePermissions(data);
+    } catch (error) {
+      setPermissionsError(
+        error instanceof Error ? error.message : "No se pudo cargar permisos"
+      );
+    } finally {
+      setLoadingPermissions(false);
     }
   }, []);
 
@@ -172,8 +433,9 @@ export default function AdminCrudPage() {
   useEffect(() => {
     void loadUsers();
     void loadRoles();
+    void loadPermissions();
     void loadLocations();
-  }, [loadUsers, loadRoles, loadLocations]);
+  }, [loadUsers, loadRoles, loadPermissions, loadLocations]);
 
   const filteredUsers = useMemo(() => {
     const query = userQuery.trim().toLowerCase();
@@ -185,7 +447,7 @@ export default function AdminCrudPage() {
     return users.filter((user) => {
       const roleName = user.role_name || roles.find((role) => role.role_id === user.role_id)?.name || "";
 
-      return [user.full_name, user.email, roleName].some((value) =>
+      return [user.full_name, user.username, user.email || "", roleName].some((value) =>
         value.toLowerCase().includes(query),
       );
     });
@@ -198,17 +460,94 @@ export default function AdminCrudPage() {
       return roles;
     }
 
-    return roles.filter((role) =>
-      [role.name, role.description || ""].some((value) => value.toLowerCase().includes(query)),
-    );
+    return roles.filter((role) => {
+      const permissionSummary = role.permissions
+        .flatMap((permission) => [permission.key, permission.description || ""])
+        .join(" ");
+
+      return [role.name, role.description || "", permissionSummary].some((value) =>
+        value.toLowerCase().includes(query)
+      );
+    });
   }, [roleQuery, roles]);
+
+  const filteredPermissionGroups = useMemo<PermissionGroup[]>(() => {
+    const query = rolePermissionQuery.trim().toLowerCase();
+    const filteredPermissions = availablePermissions.filter((permission) => {
+      const [groupKey] = permission.key.split(".");
+      const group = groupKey || "general";
+
+      if (rolePermissionModule !== "all" && group !== rolePermissionModule) {
+        return false;
+      }
+
+      if (!query) {
+        return true;
+      }
+
+      return [permission.key, permission.description || ""].some((value) =>
+        value.toLowerCase().includes(query)
+      );
+    });
+
+    const groups = new Map<string, Permission[]>();
+
+    for (const permission of filteredPermissions) {
+      const [groupKey] = permission.key.split(".");
+      const group = groupKey || "general";
+      const current = groups.get(group) || [];
+      current.push(permission);
+      groups.set(group, current);
+    }
+
+    return Array.from(groups.entries())
+      .map(([group, permissions]) => ({
+        group,
+        permissions: [...permissions].sort((left, right) => left.key.localeCompare(right.key)),
+      }))
+      .sort((left, right) => left.group.localeCompare(right.group));
+  }, [availablePermissions, rolePermissionModule, rolePermissionQuery]);
+
+  const permissionModules = useMemo<PermissionModuleOption[]>(() => {
+    const groups = new Map<string, number>();
+
+    for (const permission of availablePermissions) {
+      const [groupKey] = permission.key.split(".");
+      const group = groupKey || "general";
+      groups.set(group, (groups.get(group) || 0) + 1);
+    }
+
+    return [
+      {
+        key: "all",
+        label: "Todos",
+        count: availablePermissions.length,
+      },
+      ...Array.from(groups.entries())
+        .sort((left, right) => left[0].localeCompare(right[0]))
+        .map(([key, count]) => ({
+          key,
+          label: formatPermissionGroupLabel(key),
+          count,
+        })),
+    ];
+  }, [availablePermissions]);
+
+  const selectedPermissions = useMemo(() => {
+    const selectedKeys = new Set(roleForm.permission_keys);
+
+    return availablePermissions
+      .filter((permission) => selectedKeys.has(permission.key))
+      .sort((left, right) => left.key.localeCompare(right.key));
+  }, [availablePermissions, roleForm.permission_keys]);
 
   function openUserForm(user?: User) {
     if (user) {
       setEditingUserId(user.user_id);
       setUserForm({
         full_name: user.full_name,
-        email: user.email,
+        username: user.username,
+        email: user.email || "",
         role_id: user.role_id || "",
         active: user.active,
       });
@@ -233,7 +572,8 @@ export default function AdminCrudPage() {
     try {
       const payload = {
         full_name: userForm.full_name,
-        email: userForm.email,
+        username: userForm.username,
+        email: userForm.email.trim() || null,
         role_id: userForm.role_id || null,
         active: userForm.active,
       };
@@ -244,10 +584,16 @@ export default function AdminCrudPage() {
           body: JSON.stringify(payload),
         });
       } else {
-        await requestJson<User>("/api/users", {
+        const createdUser = await requestJson<User>("/api/users", {
           method: "POST",
           body: JSON.stringify(payload),
         });
+
+        if (createdUser.temporary_password) {
+          window.alert(
+            `Usuario creado. Clave temporal para ${createdUser.username}: ${createdUser.temporary_password}`
+          );
+        }
       }
 
       closeUserForm();
@@ -279,12 +625,16 @@ export default function AdminCrudPage() {
   }
 
   function openRoleForm(role?: Role) {
+    setRolePermissionQuery("");
+    setRolePermissionModule("all");
+
     if (role) {
       setEditingRoleId(role.role_id);
       setRoleForm({
         name: role.name,
         description: role.description || "",
         active: role.active,
+        permission_keys: role.permissions.map((permission) => permission.key),
       });
     } else {
       setEditingRoleId(null);
@@ -298,6 +648,8 @@ export default function AdminCrudPage() {
     setShowRoleForm(false);
     setEditingRoleId(null);
     setRoleForm(emptyRoleForm);
+    setRolePermissionQuery("");
+    setRolePermissionModule("all");
   }
 
   async function submitRoleForm(event: FormEvent<HTMLFormElement>) {
@@ -309,6 +661,7 @@ export default function AdminCrudPage() {
         name: roleForm.name,
         description: roleForm.description,
         active: roleForm.active,
+        permission_keys: roleForm.permission_keys,
       };
 
       if (editingRoleId) {
@@ -429,6 +782,23 @@ export default function AdminCrudPage() {
     }
   }
 
+  function toggleRolePermission(permissionKey: string) {
+    setRoleForm((current) => {
+      const alreadySelected = current.permission_keys.includes(permissionKey);
+
+      return {
+        ...current,
+        permission_keys: alreadySelected
+          ? current.permission_keys.filter((currentKey) => currentKey !== permissionKey)
+          : [...current.permission_keys, permissionKey],
+      };
+    });
+  }
+
+  function clearAllRolePermissions() {
+    setRoleForm((current) => ({ ...current, permission_keys: [] }));
+  }
+
   function roleBadgeClass(active: boolean) {
     return active ? "bg-indigo-100 text-indigo-800" : "bg-slate-200 text-slate-700";
   }
@@ -448,7 +818,7 @@ export default function AdminCrudPage() {
         </p>
       </header>
 
-      <section className="grid gap-4 md:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="text-sm text-slate-500">Usuarios</div>
           <div className="mt-2 text-3xl font-semibold text-slate-900">{users.length}</div>
@@ -469,6 +839,12 @@ export default function AdminCrudPage() {
             {availableLocations.length}
           </div>
         </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="text-sm text-slate-500">Permisos base</div>
+          <div className="mt-2 text-3xl font-semibold text-violet-700">
+            {availablePermissions.length}
+          </div>
+        </div>
       </section>
 
       <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -482,7 +858,7 @@ export default function AdminCrudPage() {
               type="text"
               value={userQuery}
               onChange={(event) => setUserQuery(event.target.value)}
-              placeholder="Buscar por nombre, email o rol"
+              placeholder="Buscar por nombre, usuario, email o rol"
               className="min-w-72 rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
             />
             <button
@@ -531,7 +907,8 @@ export default function AdminCrudPage() {
                       <tr key={user.user_id}>
                         <td className="px-4 py-3 align-top">
                           <div className="font-medium text-slate-900">{user.full_name}</div>
-                          <div className="text-slate-500">{user.email}</div>
+                          <div className="text-slate-500">@{user.username}</div>
+                          {user.email && <div className="text-slate-400">{user.email}</div>}
                         </td>
                         <td className="px-4 py-3 align-top">
                           <span className="inline-flex rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-medium text-indigo-800">
@@ -588,7 +965,7 @@ export default function AdminCrudPage() {
           <div>
             <h2 className="text-xl font-semibold text-slate-900">Roles</h2>
             <p className="text-sm text-slate-500">
-              Mantenimiento base para el bloque de auth y administracion.
+              Los permisos se administran por rol y luego se heredan al usuario durante la sesion.
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -615,6 +992,12 @@ export default function AdminCrudPage() {
           </div>
         )}
 
+        {permissionsError && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {permissionsError}
+          </div>
+        )}
+
         <div className="overflow-hidden rounded-2xl border border-slate-200">
           {loadingRoles ? (
             <div className="px-4 py-6 text-sm text-slate-500">Cargando roles...</div>
@@ -629,6 +1012,7 @@ export default function AdminCrudPage() {
                   <tr>
                     <th className="px-4 py-3 text-left font-medium text-slate-600">Rol</th>
                     <th className="px-4 py-3 text-left font-medium text-slate-600">Descripcion</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-600">Permisos</th>
                     <th className="px-4 py-3 text-left font-medium text-slate-600">Estado</th>
                     <th className="px-4 py-3 text-left font-medium text-slate-600">Actualizado</th>
                     <th className="px-4 py-3 text-right font-medium text-slate-600">Acciones</th>
@@ -643,6 +1027,23 @@ export default function AdminCrudPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 align-top text-slate-600">{role.description || "-"}</td>
+                      <td className="px-4 py-3 align-top">
+                        {role.permissions.length === 0 ? (
+                          <span className="text-slate-400">Sin permisos</span>
+                        ) : (
+                          <div className="flex max-w-xl flex-wrap gap-2">
+                            {role.permissions.map((permission) => (
+                              <span
+                                key={`${role.role_id}-${permission.permission_id}`}
+                                className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700"
+                                title={permission.description || permission.key}
+                              >
+                                {permission.key}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
                       <td className="px-4 py-3 align-top">
                         <span
                           className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusBadgeClass(role.active)}`}
@@ -693,7 +1094,9 @@ export default function AdminCrudPage() {
               {editingUserId ? "Editar usuario" : "Nuevo usuario"}
             </h3>
             <p className="mt-1 text-sm text-slate-500">
-              El password se guarda temporalmente como <code>temp_hash</code> hasta que entre auth.
+              {editingUserId
+                ? "Actualiza nombre, usuario, correo opcional y rol del usuario."
+                : "La clave temporal se genera como usuario + 123 mientras se define el flujo de cambio de contraseña."}
             </p>
 
             <form className="mt-6 space-y-4" onSubmit={submitUserForm}>
@@ -710,9 +1113,22 @@ export default function AdminCrudPage() {
               </label>
 
               <label className="block space-y-1">
-                <span className="text-sm font-medium text-slate-700">Email</span>
+                <span className="text-sm font-medium text-slate-700">Usuario</span>
                 <input
                   required
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  value={userForm.username}
+                  onChange={(event) =>
+                    setUserForm((current) => ({ ...current, username: event.target.value }))
+                  }
+                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
+                />
+              </label>
+
+              <label className="block space-y-1">
+                <span className="text-sm font-medium text-slate-700">Email opcional</span>
+                <input
                   type="email"
                   value={userForm.email}
                   onChange={(event) =>
@@ -776,49 +1192,78 @@ export default function AdminCrudPage() {
 
       {showRoleForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+          <div className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+            <div className="border-b border-slate-200 px-6 py-5">
             <h3 className="text-xl font-semibold text-slate-900">
               {editingRoleId ? "Editar rol" : "Nuevo rol"}
             </h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Los permisos se asignan al rol, no al usuario individual.
+            </p>
+            </div>
 
-            <form className="mt-6 space-y-4" onSubmit={submitRoleForm}>
-              <label className="block space-y-1">
-                <span className="text-sm font-medium text-slate-700">Nombre</span>
-                <input
-                  required
-                  value={roleForm.name}
-                  onChange={(event) =>
-                    setRoleForm((current) => ({ ...current, name: event.target.value }))
-                  }
-                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
-                />
-              </label>
+            <form className="flex min-h-0 flex-1 flex-col" onSubmit={submitRoleForm}>
+              <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
+                <div className="grid gap-4 xl:grid-cols-[0.78fr_1.22fr]">
+                  <div className="space-y-4">
+                    <label className="block space-y-1">
+                      <span className="text-sm font-medium text-slate-700">Nombre</span>
+                      <input
+                        required
+                        value={roleForm.name}
+                        onChange={(event) =>
+                          setRoleForm((current) => ({ ...current, name: event.target.value }))
+                        }
+                        className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
+                      />
+                    </label>
 
-              <label className="block space-y-1">
-                <span className="text-sm font-medium text-slate-700">Descripcion</span>
-                <textarea
-                  value={roleForm.description}
-                  onChange={(event) =>
-                    setRoleForm((current) => ({ ...current, description: event.target.value }))
-                  }
-                  rows={4}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
-                />
-              </label>
+                    <label className="block space-y-1">
+                      <span className="text-sm font-medium text-slate-700">Descripcion</span>
+                      <textarea
+                        value={roleForm.description}
+                        onChange={(event) =>
+                          setRoleForm((current) => ({ ...current, description: event.target.value }))
+                        }
+                        rows={6}
+                        className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
+                      />
+                    </label>
 
-              <label className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
-                <input
-                  type="checkbox"
-                  checked={roleForm.active}
-                  onChange={(event) =>
-                    setRoleForm((current) => ({ ...current, active: event.target.checked }))
-                  }
-                  className="h-4 w-4 rounded border-slate-300"
-                />
-                <span className="text-sm text-slate-700">Rol activo</span>
-              </label>
+                    <label className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={roleForm.active}
+                        onChange={(event) =>
+                          setRoleForm((current) => ({ ...current, active: event.target.checked }))
+                        }
+                        className="h-4 w-4 rounded border-slate-300"
+                      />
+                      <span className="text-sm text-slate-700">Rol activo</span>
+                    </label>
+                  </div>
 
-              <div className="flex justify-end gap-3 pt-2">
+                  <div className="min-h-0 xl:h-[calc(85vh-16rem)]">
+                    <PermissionSelector
+                      selectedPermissions={selectedPermissions}
+                      selectedKeys={roleForm.permission_keys}
+                      permissionModules={permissionModules}
+                      activeModule={rolePermissionModule}
+                      query={rolePermissionQuery}
+                      onQueryChange={setRolePermissionQuery}
+                      onModuleChange={setRolePermissionModule}
+                      onTogglePermission={toggleRolePermission}
+                      onClearAll={clearAllRolePermissions}
+                      groups={filteredPermissionGroups}
+                      loading={loadingPermissions}
+                      error={permissionsError}
+                      totalPermissions={availablePermissions.length}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
                 <button
                   type="button"
                   onClick={closeRoleForm}

@@ -13,6 +13,8 @@ begin;
 insert into roles (name, description, active)
 values
   ('ADMIN', 'Acceso general al sistema y configuracion base.', true),
+  ('TIENDA', 'Operacion de ventas y consultas', true),
+  ('CAJA', 'Cobros y cierre diario', true),
   ('VENTAS', 'Operacion comercial y venta rapida.', true),
   ('ALMACEN', 'Operacion de stock y movimientos internos.', true)
 on conflict (name) do update
@@ -20,6 +22,23 @@ set
   description = excluded.description,
   active = excluded.active,
   updated_at = current_timestamp;
+
+-- ============================================================
+-- 1.1) USUARIO DEMO (para login username/password)
+-- ============================================================
+
+-- Requiere extension pgcrypto (ya activada en migracion base)
+insert into users (full_name, username, email, password_hash, role_id, active)
+select
+  'Admin Ripnel',
+  'admin',
+  null,
+  crypt('admin123', gen_salt('bf')),
+  r.role_id,
+  true
+from roles r
+where r.name = 'ADMIN'
+on conflict (username) do nothing;
 
 -- ============================================================
 -- 2) MASTER CATALOGS - PRIORITY 1

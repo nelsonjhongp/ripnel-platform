@@ -1,6 +1,8 @@
 -- RIPNEL operational demo seed
 -- Purpose: leave a coherent minimum dataset for team development on
 -- users, user_locations, customers, inventory and stock movements.
+-- Legacy/demo seed: do not use on the current shared Supabase base.
+-- Prefer database/seed_operational_mvp.sql for the current MVP flow.
 -- Safe to re-run: uses upserts and replaces only stock movements marked
 -- with the SEED reason prefix.
 
