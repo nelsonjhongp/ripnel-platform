@@ -24,6 +24,7 @@ Antes de iniciar el testing, confirmar:
 - existe usuario operativo con sede default;
 - existe al menos una sede tienda activa;
 - existen clientes de prueba retail y factura;
+- existe cliente generico de mostrador con `customer_id` real;
 - existen variantes con stock en la sede;
 - existen precios vigentes para esas variantes;
 - login y sesion funcionan;
@@ -35,7 +36,8 @@ Antes de iniciar el testing, confirmar:
 
 - iniciar sesion con usuario de ventas;
 - abrir nueva venta;
-- seleccionar variante con stock;
+- confirmar que la sede visible es la sede default del usuario;
+- seleccionar estilo y luego combinacion talla/color con stock;
 - agregar cantidad valida;
 - seleccionar cliente retail o cliente generico;
 - elegir metodo de pago;
@@ -71,7 +73,16 @@ Esperado:
 - la UI muestra error claro;
 - no se registra la venta.
 
-### 4. Cliente invalido
+### 4. Venta fuera de sede permitida
+
+- intentar consultar ventas de otra sede usando session activa.
+
+Esperado:
+
+- backend no devuelve ventas fuera de la sede default;
+- el detalle de una venta ajena responde `404`.
+
+### 5. Cliente invalido
 
 - enviar cliente inexistente o datos inconsistentes.
 
@@ -80,7 +91,7 @@ Esperado:
 - backend rechaza la operacion;
 - no se registra la venta.
 
-### 5. Pago invalido
+### 6. Pago invalido
 
 - enviar metodo no permitido o monto insuficiente.
 
