@@ -15,8 +15,10 @@ import {
   User,
 } from "lucide-react"
 
+import { PermissionGuard } from "@/components/auth/PermissionGuard"
+import { InlineStatusCard } from "@/components/feedback/status-page"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { apiFetch, unwrapApiData } from "@/lib/api"
+import { ApiError, apiFetch, unwrapApiData } from "@/lib/api"
 
 const DOC_TYPES = [
   { value: "none", label: "Sin comprobante" },
@@ -98,6 +100,26 @@ function groupVariantsByStyle(variants) {
   }
 
   return Array.from(grouped.values())
+}
+
+function explainApiError(error, fallback) {
+  if (!(error instanceof ApiError)) {
+    return fallback
+  }
+
+  if (error.status === 403) {
+    return "Tu usuario no tiene permisos para operar ventas en este módulo."
+  }
+
+  if (error.status === 409) {
+    return error.message
+  }
+
+  if (error.status === 401) {
+    return "La sesión ya no es válida. Inicia sesión otra vez para continuar."
+  }
+
+  return error.message || fallback
 }
 
 export default function NuevaVentaPage() {
@@ -185,7 +207,7 @@ export default function NuevaVentaPage() {
       } catch (fetchError) {
         if (!active) return
         setVariants([])
-        setError(fetchError instanceof Error ? fetchError.message : "No se pudieron cargar productos")
+        setError(explainApiError(fetchError, "No se pudieron cargar productos"))
       } finally {
         if (active) {
           setLoadingVariants(false)
@@ -362,15 +384,16 @@ export default function NuevaVentaPage() {
       setSelectedCustomer(genericCustomer)
       setCustomerQuery("")
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "No se pudo confirmar la venta")
+      setError(explainApiError(submitError, "No se pudo confirmar la venta"))
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
-      <div className="mx-auto max-w-7xl space-y-5">
+    <PermissionGuard permission="sales.pos">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
+        <div className="mx-auto max-w-7xl space-y-5">
         <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
           <p className="text-xs uppercase tracking-wide text-violet-600">Punto de venta</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">Nueva venta</h1>
@@ -378,6 +401,15 @@ export default function NuevaVentaPage() {
             Registra una venta usando la sede operativa del usuario y precio resuelto por backend.
           </p>
         </header>
+
+        {!defaultLocation?.location_id && !locationsLoading && (
+          <InlineStatusCard
+            title="No hay sede operativa activa"
+            description="Debes tener una sede default asignada para registrar ventas. Configúrala desde tu cuenta o solicita apoyo al administrador."
+            tone="warning"
+            icon={<MapPin className="h-5 w-5" />}
+          />
+        )}
 
         {confirmedSale && (
           <div className="rounded-3xl border border-emerald-300 bg-emerald-50 p-5 shadow-md">
@@ -790,6 +822,7 @@ export default function NuevaVentaPage() {
           </div>
         </section>
       </div>
-    </div>
+      </div>
+    </PermissionGuard>
   )
 }

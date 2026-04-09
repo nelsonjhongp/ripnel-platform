@@ -3,24 +3,26 @@
 import React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "./AuthProvider";
+import { LoadingPage } from "@/components/feedback/status-page";
 
 export function ProtectedGuard({ children }: { children: React.ReactNode }) {
-  const { loading, user } = useAuth();
+  const { loading, user, sessionExpired } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   React.useEffect(() => {
     if (!loading && !user) {
-      router.replace(`/?next=${encodeURIComponent(pathname || "/")}`);
+      const params = new URLSearchParams({
+        next: pathname || "/",
+      });
+
+      params.set("reason", sessionExpired ? "session-expired" : "auth-required");
+      router.replace(`/?${params.toString()}`);
     }
-  }, [loading, user, router, pathname]);
+  }, [loading, user, router, pathname, sessionExpired]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-[#f8fafc]">
-        <div className="text-sm font-semibold text-slate-600">Cargando sesión…</div>
-      </div>
-    );
+    return <LoadingPage title="Validando sesión" description="Estamos confirmando tu acceso antes de abrir el módulo." />;
   }
 
   if (!user) return null;
