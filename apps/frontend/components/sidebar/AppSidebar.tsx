@@ -49,6 +49,7 @@ type SidebarGroup = {
   title: string
   icon: React.ComponentType<{ className?: string }>
   permission?: string
+  directLink?: boolean
   onlyForRoles?: string[]
   excludeRoles?: string[]
   items: SidebarItem[]
@@ -56,33 +57,30 @@ type SidebarGroup = {
 
 const sidebarGroups: SidebarGroup[] = [
   {
-    title: "Administracion",
-    icon: Settings,
-    permission: "admin.manage",
+    title: "Venta",
+    icon: ShoppingCart,
+    permission: "sales.pos",
+    excludeRoles: ["CAJA"],
     items: [
-      { title: "Roles y usuarios", url: "/administracion/roles&usuarios" },
-      { title: "Ubicaciones", url: "/administracion/ubicaciones" },
+      { title: "Nueva venta", url: "/purchase-system" },
+      { title: "Historial de ventas", url: "/transaction-history" },
     ],
   },
   {
-    title: "Clientes",
-    icon: Users,
-    items: [
-      { title: "Clientes", url: "/clientes" },
-      { title: "Dashboards BI", url: "/clientes/dashboards" },
-    ],
+    title: "Caja",
+    icon: Banknote,
+    permission: "sales.pos",
+    directLink: true,
+    items: [{ title: "Caja del día", url: "/caja" }],
   },
   {
-    title: "Catalogos",
-    icon: Warehouse,
-    permission: "catalogs.manage",
+    title: "Inventario",
+    icon: Boxes,
+    permission: "inventory.view",
     items: [
-      { title: "Tallas", url: "/catalogos/tallas" },
-      { title: "Colores", url: "/catalogos/colores" },
-      { title: "Tipo de prenda", url: "/catalogos/tipo-prenda" },
-      { title: "Telas", url: "/catalogos/telas" },
-      { title: "Detalle de tela", url: "/catalogos/detalle-de-tela" },
-      { title: "Targets", url: "/catalogos/targets" },
+      { title: "Stock actual", url: "/inventory" },
+      { title: "Apertura y ajustes", url: "/inventory/ajustes" },
+      { title: "Kardex", url: "/kardex" },
     ],
   },
   {
@@ -115,31 +113,33 @@ const sidebarGroups: SidebarGroup[] = [
     ],
   },
   {
-    title: "Venta rápida",
-    icon: ShoppingCart,
-    permission: "sales.pos",
-    excludeRoles: ["CAJA"],
+    title: "Administracion",
+    icon: Settings,
+    permission: "admin.manage",
     items: [
-      { title: "Nueva venta", url: "/purchase-system" },
-      { title: "Historial de ventas", url: "/transaction-history" },
+      { title: "Roles y usuarios", url: "/administracion/roles&usuarios" },
+      { title: "Ubicaciones", url: "/administracion/ubicaciones" },
     ],
   },
   {
-    title: "Inventario",
-    icon: Boxes,
-    permission: "inventory.view",
+    title: "Clientes",
+    icon: Users,
     items: [
-      { title: "Stock actual", url: "/inventory" },
-      { title: "Apertura y ajustes", url: "/inventory/ajustes" },
-      { title: "Kardex", url: "/kardex" },
+      { title: "Clientes", url: "/clientes" },
+      { title: "Dashboards BI", url: "/clientes/dashboards" },
     ],
   },
   {
-    title: "Caja",
-    icon: Banknote,
-    permission: "sales.pos",
+    title: "Catalogos",
+    icon: Warehouse,
+    permission: "catalogs.manage",
     items: [
-      { title: "Caja del día", url: "/caja" },
+      { title: "Tallas", url: "/catalogos/tallas" },
+      { title: "Colores", url: "/catalogos/colores" },
+      { title: "Tipo de prenda", url: "/catalogos/tipo-prenda" },
+      { title: "Telas", url: "/catalogos/telas" },
+      { title: "Detalle de tela", url: "/catalogos/detalle-de-tela" },
+      { title: "Targets", url: "/catalogos/targets" },
     ],
   },
 ]
@@ -188,13 +188,26 @@ function SidebarGroupSection({
   title,
   icon: Icon,
   items,
+  directLink,
   pathname,
 }: {
   title: string
   icon: React.ComponentType<{ className?: string }>
   items: SidebarItem[]
+  directLink?: boolean
   pathname: string
 }) {
+  if (directLink && items.length === 1) {
+    const item = items[0]
+    const isActive = pathname === item.url || pathname.startsWith(`${item.url}/`)
+
+    return (
+      <div className="border-t border-slate-200 pt-2.5">
+        <SidebarLink href={item.url} label={title} icon={Icon} active={isActive} />
+      </div>
+    )
+  }
+
   const isActive = items.some((item) => pathname === item.url || pathname.startsWith(`${item.url}/`))
 
   return (
@@ -352,12 +365,22 @@ export function AppSidebar({
           <nav className="space-y-2">
             <SidebarLink href="/inicio" label="Inicio" icon={House} active={pathname === "/inicio"} />
 
+            <div className="border-t border-slate-200 pt-2.5">
+              <SidebarLink
+                href="/dashboard"
+                label="Dashboard"
+                icon={ArrowRightLeft}
+                active={pathname === "/dashboard"}
+              />
+            </div>
+
             {visibleGroups.map((group) => (
               <SidebarGroupSection
                 key={group.title}
                 title={group.title}
                 icon={group.icon}
                 items={group.items}
+                directLink={group.directLink}
                 pathname={pathname}
               />
             ))}
