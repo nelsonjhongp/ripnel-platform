@@ -6,6 +6,7 @@ import Image from "next/image"
 import { usePathname } from "next/navigation"
 import {
   ArrowRightLeft,
+  Banknote,
   ClipboardList,
   ChevronDown,
   ChevronsUpDown,
@@ -117,15 +118,6 @@ const sidebarGroups: SidebarGroup[] = [
   {
     title: "Venta rápida",
     icon: ShoppingCart,
-    items: [
-      { title: "Nueva venta", url: "/purchase-system" },
-      { title: "Historial de ventas", url: "/transaction-history" },
-    ],
-  },
-  {
-    title: "Venta rápida",
-    icon: ShoppingCart,
-    permission: "sales.pos",
     excludeRoles: ["CAJA"],
     items: [
       { title: "Nueva venta", url: "/purchase-system" },
@@ -140,6 +132,13 @@ const sidebarGroups: SidebarGroup[] = [
       { title: "Stock actual", url: "/inventory" },
       { title: "Apertura y ajustes", url: "/inventory/ajustes" },
       { title: "Kardex", url: "/kardex" },
+    ],
+  },
+  {
+    title: "Caja",
+    icon: Banknote,
+    items: [
+      { title: "Caja del día", url: "/caja" },
     ],
   },
 ]

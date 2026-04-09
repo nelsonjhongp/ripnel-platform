@@ -19,7 +19,7 @@ export function SidebarShell({
   children,
   title,
   homeLabel = "Inicio",
-  homeUrl = "/account",
+  homeUrl = "/inicio",
 }: {
   children: React.ReactNode
   title?: string

@@ -1,0 +1,404 @@
+"use client"
+
+import { useEffect, useState, useCallback } from "react"
+import { Banknote, CreditCard, Smartphone, ArrowRightLeft, X, CheckCircle2, Clock, RefreshCw, ChevronRight } from "lucide-react"
+import { useAuth } from "@/components/auth/AuthProvider"
+import { buildApiUrl } from "@/lib/api"
+
+type PaymentTotals = {
+  cash: number
+  yape: number
+  plin: number
+  transfer: number
+  all: number
+}
+
+type CashClosing = {
+  cash_closing_id: string
+  location_id: string
+  location_name: string
+  business_date: string
+  status: "open" | "closed"
+  opened_by: string | null
+  opened_by_name: string | null
+  closed_by: string | null
+  closed_by_name: string | null
+  total_cash: number
+  total_yape: number
+  total_plin: number
+  total_transfer: number
+  total_all: number
+  notes: string | null
+  created_at: string
+  closed_at: string | null
+}
+
+type SalesSummary = {
+  sale_count: number
+  grand_total: number
+  by_method: PaymentTotals
+}
+
+type CurrentCashResponse = {
+  closing: CashClosing | null
+  business_date: string
+  sales_summary: SalesSummary
+}
+
+const METHOD_CONFIG = [
+  { key: "cash" as const, label: "Efectivo", icon: Banknote, color: "emerald" },
+  { key: "yape" as const, label: "Yape", icon: Smartphone, color: "violet" },
+  { key: "plin" as const, label: "Plin", icon: Smartphone, color: "sky" },
+  { key: "transfer" as const, label: "Transferencia", icon: ArrowRightLeft, color: "amber" },
+]
+
+const COLOR_MAP: Record<string, { card: string; label: string; value: string; icon: string }> = {
+  emerald: { card: "border-emerald-200 bg-emerald-50", label: "text-emerald-700", value: "text-emerald-900", icon: "text-emerald-600" },
+  violet: { card: "border-violet-200 bg-violet-50", label: "text-violet-700", value: "text-violet-900", icon: "text-violet-600" },
+  sky: { card: "border-sky-200 bg-sky-50", label: "text-sky-700", value: "text-sky-900", icon: "text-sky-600" },
+  amber: { card: "border-amber-200 bg-amber-50", label: "text-amber-700", value: "text-amber-900", icon: "text-amber-600" },
+}
+
+function formatDate(dateStr: string) {
+  const [year, month, day] = dateStr.split("-")
+  return `${day}/${month}/${year}`
+}
+
+function formatAmount(value: number | string | undefined) {
+  return `S/. ${Number(value || 0).toFixed(2)}`
+}
+
+export default function CajaPage() {
+  const { user, defaultLocation } = useAuth()
+  const [current, setCurrent] = useState<CurrentCashResponse | null>(null)
+  const [history, setHistory] = useState<CashClosing[]>([])
+  const [loading, setLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [closeNotes, setCloseNotes] = useState("")
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false)
+
+  const locationId = defaultLocation?.location_id
+
+  const fetchCurrent = useCallback(async () => {
+    if (!locationId) return
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(buildApiUrl(`/api/cash/current?location_id=${locationId}`))
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body?.message || `HTTP ${res.status}`)
+      }
+      const data: CurrentCashResponse = await res.json()
+      setCurrent(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error de conexión")
+    } finally {
+      setLoading(false)
+    }
+  }, [locationId])
+
+  const fetchHistory = useCallback(async () => {
+    if (!locationId) return
+    try {
+      const res = await fetch(buildApiUrl(`/api/cash?location_id=${locationId}`))
+      const data = await res.json()
+      setHistory(Array.isArray(data) ? data : [])
+    } catch {
+      setHistory([])
+    }
+  }, [locationId])
+
+  useEffect(() => {
+    fetchCurrent()
+    fetchHistory()
+  }, [fetchCurrent, fetchHistory])
+
+  async function handleOpen() {
+    if (!locationId) return
+    setActionLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(buildApiUrl("/api/cash/open"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ location_id: locationId, user_id: user?.user_id }),
+      })
+      const body = await res.json()
+      if (!res.ok) throw new Error(body?.message || `HTTP ${res.status}`)
+      await fetchCurrent()
+      await fetchHistory()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al abrir caja")
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  async function handleClose() {
+    if (!current?.closing) return
+    setActionLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(
+        buildApiUrl(`/api/cash/${current.closing.cash_closing_id}/close`),
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ notes: closeNotes || undefined, user_id: user?.user_id }),
+        }
+      )
+      const body = await res.json()
+      if (!res.ok) throw new Error(body?.message || `HTTP ${res.status}`)
+      setShowCloseConfirm(false)
+      setCloseNotes("")
+      await fetchCurrent()
+      await fetchHistory()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al cerrar caja")
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  if (!locationId) {
+    return (
+      <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
+        <div className="mx-auto max-w-4xl">
+          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-6">
+            <p className="font-semibold text-amber-800">Sin sede asignada</p>
+            <p className="mt-1 text-sm text-amber-700">
+              Tu usuario no tiene una sede default configurada. Contacta a un administrador.
+            </p>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  const isClosed = current?.closing?.status === "closed"
+  const isOpen = current?.closing?.status === "open"
+  const hasNoClosing = current !== null && current.closing === null
+  const summary = current?.sales_summary
+  const businessDate = current?.business_date
+
+  return (
+    <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
+      <div className="mx-auto max-w-4xl space-y-5">
+
+        {/* Header */}
+        <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
+          <p className="text-xs uppercase tracking-wide text-violet-600">Operaciones de caja</p>
+          <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">Caja y Cierre Diario</h1>
+          <p className="mt-1 text-sm text-slate-600">
+            {defaultLocation.name}
+            {businessDate && (
+              <span className="ml-2 font-medium text-slate-800">&bull; {formatDate(businessDate)}</span>
+            )}
+          </p>
+        </header>
+
+        {/* Error banner */}
+        {error && (
+          <div className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+            <X className="h-4 w-4 shrink-0" />
+            {error}
+            <button onClick={() => setError(null)} className="ml-auto text-rose-600 hover:text-rose-800">
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex items-center justify-center py-16 text-slate-500">
+            <RefreshCw className="h-5 w-5 animate-spin" />
+            <span className="ml-2 text-sm">Cargando caja...</span>
+          </div>
+        ) : (
+          <>
+            {/* Status card */}
+            <article className={`rounded-3xl border p-5 shadow-md md:p-6 ${isOpen ? "border-emerald-200 bg-emerald-50/80" : isClosed ? "border-slate-200 bg-slate-50" : "border-amber-200 bg-amber-50/80"}`}>
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-3">
+                  {isOpen ? (
+                    <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+                  ) : isClosed ? (
+                    <X className="h-6 w-6 text-slate-500" />
+                  ) : (
+                    <Clock className="h-6 w-6 text-amber-600" />
+                  )}
+                  <div>
+                    <p className={`font-semibold text-lg ${isOpen ? "text-emerald-800" : isClosed ? "text-slate-700" : "text-amber-800"}`}>
+                      {isOpen ? "Caja abierta" : isClosed ? "Caja cerrada" : "Sin apertura"}
+                    </p>
+                    {isOpen && current.closing?.opened_by_name && (
+                      <p className="text-xs text-emerald-700">
+                        Aperturada por {current.closing.opened_by_name}
+                      </p>
+                    )}
+                    {isClosed && current.closing?.closed_by_name && (
+                      <p className="text-xs text-slate-600">
+                        Cerrada por {current.closing.closed_by_name}
+                        {current.closing.closed_at && (
+                          <> &bull; {new Date(current.closing.closed_at).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}</>
+                        )}
+                      </p>
+                    )}
+                    {hasNoClosing && (
+                      <p className="text-xs text-amber-700">No se ha aperturado la caja para hoy</p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  {hasNoClosing && (
+                    <button
+                      onClick={handleOpen}
+                      disabled={actionLoading}
+                      className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-emerald-700 disabled:opacity-60"
+                    >
+                      {actionLoading ? "Abriendo..." : "Abrir caja"}
+                    </button>
+                  )}
+                  {isOpen && (
+                    <button
+                      onClick={() => setShowCloseConfirm(true)}
+                      disabled={actionLoading}
+                      className="rounded-2xl bg-slate-700 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-slate-800 disabled:opacity-60"
+                    >
+                      Cerrar caja
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { fetchCurrent(); fetchHistory() }}
+                    disabled={loading || actionLoading}
+                    className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+                    title="Actualizar"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </article>
+
+            {/* Sales summary */}
+            {summary && (
+              <div className="space-y-3">
+                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+                  {METHOD_CONFIG.map((method) => {
+                    const cc = COLOR_MAP[method.color]
+                    const Icon = method.icon
+                    const value = summary.by_method[method.key]
+                    return (
+                      <article key={method.key} className={`rounded-2xl border p-4 shadow-sm ${cc.card}`}>
+                        <div className="flex items-center gap-2">
+                          <Icon className={`h-4 w-4 ${cc.icon}`} />
+                          <p className={`text-xs uppercase tracking-wide ${cc.label}`}>{method.label}</p>
+                        </div>
+                        <p className={`mt-2 text-xl font-bold ${cc.value}`}>{formatAmount(value)}</p>
+                      </article>
+                    )
+                  })}
+                </div>
+
+                <article className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Total del día</p>
+                    <p className="mt-1 text-3xl font-bold text-slate-900">
+                      {formatAmount(summary.grand_total)}
+                    </p>
+                  </div>
+                  <div className="flex flex-col justify-center sm:items-end">
+                    <p className="text-xs uppercase tracking-wide text-slate-500">Ventas confirmadas</p>
+                    <p className="mt-1 text-2xl font-bold text-violet-700">{summary.sale_count}</p>
+                  </div>
+                </article>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Historial */}
+        {history.length > 0 && (
+          <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
+            <p className="mb-3 text-sm font-semibold text-slate-800">Historial de cierres</p>
+            <div className="divide-y divide-slate-100">
+              {history.map((closing) => (
+                <div key={closing.cash_closing_id} className="flex items-center justify-between py-3">
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">{formatDate(closing.business_date)}</p>
+                    <p className="text-xs text-slate-500">{closing.location_name}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <p className="text-sm font-semibold text-slate-900">{formatAmount(closing.total_all)}</p>
+                    <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${closing.status === "open" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-100 text-slate-600"}`}>
+                      {closing.status === "open" ? "Abierta" : "Cerrada"}
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-slate-400" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </article>
+        )}
+      </div>
+
+      {/* Close confirmation modal */}
+      {showCloseConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-bold text-slate-900">Confirmar cierre de caja</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Se calcularán los totales de ventas confirmadas del día y se cerrará la caja.
+            </p>
+
+            {summary && (
+              <div className="mt-4 rounded-2xl bg-slate-50 p-4 space-y-1">
+                {METHOD_CONFIG.map((m) => (
+                  <div key={m.key} className="flex justify-between text-sm">
+                    <span className="text-slate-600">{m.label}</span>
+                    <span className="font-medium text-slate-900">{formatAmount(summary.by_method[m.key])}</span>
+                  </div>
+                ))}
+                <div className="mt-2 flex justify-between border-t border-slate-200 pt-2 text-sm font-semibold">
+                  <span className="text-slate-800">Total</span>
+                  <span className="text-slate-900">{formatAmount(summary.grand_total)}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-4">
+              <label className="mb-1 block text-xs font-medium text-slate-700">
+                Observaciones (opcional)
+              </label>
+              <textarea
+                value={closeNotes}
+                onChange={(e) => setCloseNotes(e.target.value)}
+                rows={2}
+                placeholder="Ej: Sin novedades"
+                className="w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+              />
+            </div>
+
+            <div className="mt-5 flex gap-3">
+              <button
+                onClick={() => setShowCloseConfirm(false)}
+                disabled={actionLoading}
+                className="flex-1 rounded-2xl border border-slate-200 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleClose}
+                disabled={actionLoading}
+                className="flex-1 rounded-2xl bg-slate-800 py-2 text-sm font-semibold text-white shadow transition hover:bg-slate-900 disabled:opacity-60"
+              >
+                {actionLoading ? "Cerrando..." : "Cerrar caja"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
