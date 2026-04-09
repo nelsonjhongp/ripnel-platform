@@ -9,6 +9,8 @@ const {
   countSalesByLocationAndDate,
 } = require('./cash.repo');
 const { query } = require('../../shared/db');
+const { findActiveUserById } = require('../auth/auth.repo');
+const { findDefaultLocationByUserId } = require('../users/users.repo');
 
 function todayPeruDate() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
@@ -16,7 +18,13 @@ function todayPeruDate() {
 
 function normalizeUuid(value) {
   const normalized = String(value || '').trim();
-  return normalized || null;
+  if (!normalized) return null;
+
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    normalized
+  )
+    ? normalized
+    : null;
 }
 
 function normalizeDate(value) {
@@ -46,17 +54,50 @@ async function validateLocationExists(locationId) {
   return result.rows.length > 0;
 }
 
+async function resolveCashContext(userId, requestedLocationId = null) {
+  const normalizedUserId = normalizeUuid(userId);
+
+  if (!normalizedUserId) {
+    throw new AppError('Not authenticated', 401, { code: 'AUTH_REQUIRED' });
+  }
+
+  const user = await findActiveUserById(normalizedUserId);
+  if (!user) {
+    throw new AppError('Not authenticated', 401, { code: 'AUTH_REQUIRED' });
+  }
+
+  const defaultLocation = await findDefaultLocationByUserId(normalizedUserId);
+  if (!defaultLocation) {
+    throw new AppError('Authenticated user has no default location assigned', 409, {
+      code: 'DEFAULT_LOCATION_REQUIRED',
+    });
+  }
+
+  if (!defaultLocation.active) {
+    throw new AppError('Default location is inactive', 409, {
+      code: 'DEFAULT_LOCATION_INACTIVE',
+    });
+  }
+
+  if (requestedLocationId && requestedLocationId !== defaultLocation.location_id) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN_LOCATION' });
+  }
+
+  return {
+    user,
+    locationId: requestedLocationId || defaultLocation.location_id,
+  };
+}
+
 async function openCash(input) {
-  const locationId = normalizeUuid(input.location_id);
+  const requestedLocationId = normalizeUuid(input.location_id);
   const businessDate = normalizeDate(input.business_date) || todayPeruDate();
-  const userId = normalizeUuid(input.user_id);
   const notes = input.notes ? String(input.notes).trim() : null;
 
-  if (!locationId) throw new AppError('location_id is required', 400);
-  if (!userId) throw new AppError('user_id is required', 400);
+  const { user, locationId } = await resolveCashContext(input.user_id, requestedLocationId);
 
   const locationExists = await validateLocationExists(locationId);
-  if (!locationExists) throw new AppError('Location not found', 404);
+  if (!locationExists) throw new AppError('Location not found', 404, { code: 'LOCATION_NOT_FOUND' });
 
   const existing = await findCashClosingByLocationAndDate(locationId, businessDate);
 
@@ -68,23 +109,25 @@ async function openCash(input) {
   const record = await insertCashClosing({
     location_id: locationId,
     business_date: businessDate,
-    opened_by: userId,
+    opened_by: user.user_id,
     notes,
   });
 
   return findCashClosingById(record.cash_closing_id);
 }
 
-async function closeCash(cashClosingId, input) {
-  const normalizedId = normalizeUuid(cashClosingId);
-  if (!normalizedId) throw new AppError('cash_closing_id is required', 400);
+async function closeCash(input) {
+  const normalizedId = normalizeUuid(input.cash_closing_id);
+  if (!normalizedId) throw new AppError('cash_closing_id is required', 400, { code: 'INVALID_CASH_CLOSING_ID' });
 
-  const userId = normalizeUuid(input.user_id);
-  if (!userId) throw new AppError('user_id is required', 400);
+  const { user, locationId } = await resolveCashContext(input.user_id, normalizeUuid(input.location_id));
 
   const closing = await findCashClosingById(normalizedId);
-  if (!closing) throw new AppError('Caja no encontrada', 404);
-  if (closing.status === 'closed') throw new AppError('La caja ya fue cerrada', 409);
+  if (!closing) throw new AppError('Caja no encontrada', 404, { code: 'CASH_CLOSING_NOT_FOUND' });
+  if (closing.location_id !== locationId) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN_LOCATION' });
+  }
+  if (closing.status === 'closed') throw new AppError('La caja ya fue cerrada', 409, { code: 'CASH_ALREADY_CLOSED' });
 
   const paymentRows = await sumSalesPaymentsByLocationAndDate(
     closing.location_id,
@@ -93,7 +136,7 @@ async function closeCash(cashClosingId, input) {
   const totals = buildPaymentTotals(paymentRows);
 
   await updateCashClosingClose(normalizedId, {
-    closed_by: userId,
+    closed_by: user.user_id,
     total_cash: totals.cash,
     total_yape: totals.yape,
     total_plin: totals.plin,
@@ -106,13 +149,13 @@ async function closeCash(cashClosingId, input) {
 }
 
 async function getCurrentCash(input) {
-  const locationId = normalizeUuid(input.location_id);
+  const requestedLocationId = normalizeUuid(input.location_id);
   const businessDate = normalizeDate(input.business_date) || todayPeruDate();
 
-  if (!locationId) throw new AppError('location_id is required', 400);
+  const { locationId } = await resolveCashContext(input.user_id, requestedLocationId);
 
   const locationExists = await validateLocationExists(locationId);
-  if (!locationExists) throw new AppError('Location not found', 404);
+  if (!locationExists) throw new AppError('Location not found', 404, { code: 'LOCATION_NOT_FOUND' });
 
   const closing = await findCashClosingByLocationAndDate(locationId, businessDate);
 
@@ -131,22 +174,30 @@ async function getCurrentCash(input) {
 }
 
 async function listCashClosings(input = {}) {
-  const locationId = normalizeUuid(input.location_id);
+  const requestedLocationId = normalizeUuid(input.location_id);
   const status = input.status ? String(input.status).trim() : null;
+  const { locationId } = await resolveCashContext(input.user_id, requestedLocationId);
 
   if (status && !['open', 'closed'].includes(status)) {
-    throw new AppError('Invalid status value', 400);
+    throw new AppError('Invalid status value', 400, { code: 'INVALID_STATUS' });
   }
 
   return findAllCashClosings({ locationId, status });
 }
 
-async function getCashClosing(cashClosingId) {
-  const normalizedId = normalizeUuid(cashClosingId);
-  if (!normalizedId) throw new AppError('cash_closing_id is required', 400);
+async function getCashClosing(input = {}) {
+  const normalizedId = normalizeUuid(input.cash_closing_id);
+  if (!normalizedId) {
+    throw new AppError('cash_closing_id is required', 400, { code: 'INVALID_CASH_CLOSING_ID' });
+  }
 
   const closing = await findCashClosingById(normalizedId);
-  if (!closing) throw new AppError('Caja no encontrada', 404);
+  if (!closing) throw new AppError('Caja no encontrada', 404, { code: 'CASH_CLOSING_NOT_FOUND' });
+
+  const { locationId } = await resolveCashContext(input.user_id, closing.location_id);
+  if (closing.location_id !== locationId) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN_LOCATION' });
+  }
 
   const [paymentRows, salesRow] = await Promise.all([
     sumSalesPaymentsByLocationAndDate(closing.location_id, closing.business_date),

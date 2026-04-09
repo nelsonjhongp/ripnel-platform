@@ -9,6 +9,7 @@ const {
 async function getCashClosings(req, res, next) {
   try {
     const closings = await listCashClosings({
+      user_id: req.auth?.sub,
       location_id: req.query.location_id,
       status: req.query.status,
     });
@@ -21,6 +22,7 @@ async function getCashClosings(req, res, next) {
 async function getCashCurrent(req, res, next) {
   try {
     const result = await getCurrentCash({
+      user_id: req.auth?.sub,
       location_id: req.query.location_id,
       business_date: req.query.business_date,
     });
@@ -32,7 +34,10 @@ async function getCashCurrent(req, res, next) {
 
 async function getCashClosingById(req, res, next) {
   try {
-    const closing = await getCashClosing(req.params.id);
+    const closing = await getCashClosing({
+      cash_closing_id: req.params.id,
+      user_id: req.auth?.sub,
+    });
     return res.json(closing);
   } catch (error) {
     return next(error);
@@ -41,7 +46,10 @@ async function getCashClosingById(req, res, next) {
 
 async function postOpenCash(req, res, next) {
   try {
-    const closing = await openCash(req.body);
+    const closing = await openCash({
+      ...(req.body || {}),
+      user_id: req.auth?.sub,
+    });
     return res.status(201).json(closing);
   } catch (error) {
     return next(error);
@@ -50,7 +58,11 @@ async function postOpenCash(req, res, next) {
 
 async function patchCloseCash(req, res, next) {
   try {
-    const closing = await closeCash(req.params.id, req.body);
+    const closing = await closeCash({
+      cash_closing_id: req.params.id,
+      ...(req.body || {}),
+      user_id: req.auth?.sub,
+    });
     return res.json(closing);
   } catch (error) {
     return next(error);

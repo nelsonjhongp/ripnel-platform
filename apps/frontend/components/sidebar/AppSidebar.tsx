@@ -117,14 +117,6 @@ const sidebarGroups: SidebarGroup[] = [
   {
     title: "Venta rápida",
     icon: ShoppingCart,
-    items: [
-      { title: "Nueva venta", url: "/purchase-system" },
-      { title: "Historial de ventas", url: "/transaction-history" },
-    ],
-  },
-  {
-    title: "Venta rápida",
-    icon: ShoppingCart,
     permission: "sales.pos",
     excludeRoles: ["CAJA"],
     items: [
@@ -145,6 +137,7 @@ const sidebarGroups: SidebarGroup[] = [
   {
     title: "Caja",
     icon: Banknote,
+    permission: "sales.pos",
     items: [
       { title: "Caja del día", url: "/caja" },
     ],

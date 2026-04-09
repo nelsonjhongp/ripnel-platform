@@ -4,7 +4,9 @@ import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { Filter, ReceiptText, Search } from "lucide-react"
 
-import { apiFetch } from "@/lib/api"
+import { PermissionGuard } from "@/components/auth/PermissionGuard"
+import { InlineStatusCard } from "@/components/feedback/status-page"
+import { ApiError, apiFetch } from "@/lib/api"
 
 type SaleStatus = "confirmed" | "draft" | "cancelled"
 
@@ -44,6 +46,22 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: "Anulada",
 }
 
+function explainSalesError(error: unknown) {
+  if (!(error instanceof ApiError)) {
+    return "No se pudieron cargar las ventas"
+  }
+
+  if (error.status === 403) {
+    return "Tu rol no tiene acceso al historial de ventas."
+  }
+
+  if (error.status === 409) {
+    return "Necesitas una sede default activa para consultar el historial operativo."
+  }
+
+  return error.message || "No se pudieron cargar las ventas"
+}
+
 export default function TransactionHistoryPage() {
   const [sales, setSales] = useState<SaleItem[]>([])
   const [search, setSearch] = useState("")
@@ -79,7 +97,7 @@ export default function TransactionHistoryPage() {
         }
 
         setSales([])
-        setError(loadError instanceof Error ? loadError.message : "No se pudieron cargar las ventas")
+        setError(explainSalesError(loadError))
       } finally {
         if (active) {
           setLoading(false)
@@ -103,8 +121,9 @@ export default function TransactionHistoryPage() {
   }, [sales])
 
   return (
-    <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
-      <div className="mx-auto max-w-7xl space-y-5">
+    <PermissionGuard permission="sales.pos">
+      <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
+        <div className="mx-auto max-w-7xl space-y-5">
         <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
           <p className="text-xs uppercase tracking-wide text-violet-600">Operaciones de venta</p>
           <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">Historial de ventas</h1>
@@ -169,7 +188,13 @@ export default function TransactionHistoryPage() {
               {loading ? (
                 <div className="px-4 py-10 text-center text-sm text-slate-500">Cargando ventas...</div>
               ) : error ? (
-                <div className="px-4 py-10 text-center text-sm text-red-600">{error}</div>
+                <div className="px-4 py-6">
+                  <InlineStatusCard
+                    title="No pudimos cargar el historial"
+                    description={error}
+                    tone="danger"
+                  />
+                </div>
               ) : sales.length === 0 ? (
                 <div className="px-4 py-10 text-center text-sm text-slate-500">
                   No se encontraron ventas con los filtros aplicados.
@@ -225,7 +250,8 @@ export default function TransactionHistoryPage() {
             <p>Selecciona una venta para ver su detalle dentro de la misma sede operativa.</p>
           </div>
         </div>
-      </div>
-    </section>
+        </div>
+      </section>
+    </PermissionGuard>
   )
 }

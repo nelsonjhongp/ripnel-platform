@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { apiFetch, unwrapApiData } from "@/lib/api";
+import { AUTH_ERROR_EVENT, ApiError, apiFetch, unwrapApiData } from "@/lib/api";
 
 export type AuthUser = {
   user_id: string;
@@ -49,6 +49,8 @@ type AuthState = {
   user: AuthUser | null;
   permissions: string[];
   loading: boolean;
+  authMessage: string | null;
+  sessionExpired: boolean;
   locationsLoading: boolean;
   locationsError: string | null;
   locationAssignments: AuthLocationAssignment[];
@@ -61,6 +63,7 @@ type AuthContextValue = AuthState & {
   login: (input: { username: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
   setDefaultLocation: (locationId: string) => Promise<void>;
+  clearAuthNotice: () => void;
   has: (permissionKey: string) => boolean;
 };
 
@@ -89,16 +92,51 @@ function formatLocationsError(error: unknown) {
   return message;
 }
 
+function buildSignedOutState(overrides: Partial<AuthState> = {}): AuthState {
+  return {
+    user: null,
+    permissions: [],
+    loading: false,
+    authMessage: null,
+    sessionExpired: false,
+    locationsLoading: false,
+    locationsError: null,
+    locationAssignments: [],
+    defaultLocation: null,
+    ...overrides,
+  };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = React.useState<AuthState>({
     user: null,
     permissions: [],
     loading: true,
+    authMessage: null,
+    sessionExpired: false,
     locationsLoading: false,
     locationsError: null,
     locationAssignments: [],
     defaultLocation: null,
   });
+
+  React.useEffect(() => {
+    function handleAuthError() {
+      setState((current) =>
+        buildSignedOutState({
+          authMessage: current.user
+            ? "Tu sesión expiró. Vuelve a iniciar sesión para continuar."
+            : null,
+          sessionExpired: Boolean(current.user),
+        })
+      );
+    }
+
+    window.addEventListener(AUTH_ERROR_EVENT, handleAuthError);
+    return () => {
+      window.removeEventListener(AUTH_ERROR_EVENT, handleAuthError);
+    };
+  }, []);
 
   const fetchLocations = React.useCallback(async (userId: string) => {
     setState((current) => ({ ...current, locationsLoading: true, locationsError: null }));
@@ -131,24 +169,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refresh = React.useCallback(async () => {
     setState((s) => ({ ...s, loading: true }));
     try {
-      const data = await apiFetch<{ user: AuthUser; permissions: string[] }>("/api/auth/me");
+      const data = await apiFetch<{ user: AuthUser; permissions: string[] }>("/api/auth/me", {
+        suppressAuthEvent: true,
+      });
       setState((current) => ({
         ...current,
         user: data.user,
         permissions: data.permissions || [],
         loading: false,
+        authMessage: null,
+        sessionExpired: false,
       }));
       await fetchLocations(data.user.user_id);
-    } catch {
-      setState({
-        user: null,
-        permissions: [],
-        loading: false,
-        locationsLoading: false,
-        locationsError: null,
-        locationAssignments: [],
-        defaultLocation: null,
-      });
+    } catch (error) {
+      const isUnauthorized = error instanceof ApiError && error.status === 401;
+      setState(
+        buildSignedOutState({
+          loading: false,
+          authMessage: isUnauthorized ? null : "No se pudo validar la sesión actual.",
+          sessionExpired: false,
+        })
+      );
     }
   }, [fetchLocations]);
 
@@ -169,6 +210,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           user: data.user,
           permissions: data.permissions || [],
           loading: false,
+          authMessage: null,
+          sessionExpired: false,
         }));
         await fetchLocations(data.user.user_id);
       } catch (error) {
@@ -180,16 +223,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logout = React.useCallback(async () => {
-    await apiFetch<void>("/api/auth/logout", { method: "POST" });
-    setState({
-      user: null,
-      permissions: [],
-      loading: false,
-      locationsLoading: false,
-      locationsError: null,
-      locationAssignments: [],
-      defaultLocation: null,
-    });
+    try {
+      await apiFetch<void>("/api/auth/logout", {
+        method: "POST",
+        suppressAuthEvent: true,
+      });
+    } finally {
+      setState(buildSignedOutState());
+    }
+  }, []);
+
+  const clearAuthNotice = React.useCallback(() => {
+    setState((current) => ({
+      ...current,
+      authMessage: null,
+      sessionExpired: false,
+    }));
   }, []);
 
   const refreshLocations = React.useCallback(async () => {
@@ -259,9 +308,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login,
       logout,
       setDefaultLocation,
+      clearAuthNotice,
       has,
     }),
-    [state, refresh, refreshLocations, login, logout, setDefaultLocation, has]
+    [state, refresh, refreshLocations, login, logout, setDefaultLocation, clearAuthNotice, has]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

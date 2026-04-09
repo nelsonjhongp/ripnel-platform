@@ -2,8 +2,10 @@
 
 import { useEffect, useState, useCallback } from "react"
 import { Banknote, CreditCard, Smartphone, ArrowRightLeft, X, CheckCircle2, Clock, RefreshCw, ChevronRight } from "lucide-react"
+import { PermissionGuard } from "@/components/auth/PermissionGuard"
+import { InlineStatusCard } from "@/components/feedback/status-page"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { buildApiUrl } from "@/lib/api"
+import { ApiError, apiFetch } from "@/lib/api"
 
 type PaymentTotals = {
   cash: number
@@ -68,6 +70,22 @@ function formatAmount(value: number | string | undefined) {
   return `S/. ${Number(value || 0).toFixed(2)}`
 }
 
+function explainCashError(error: unknown, fallback: string) {
+  if (!(error instanceof ApiError)) {
+    return error instanceof Error ? error.message : fallback
+  }
+
+  if (error.status === 409) {
+    return error.message
+  }
+
+  if (error.status === 403) {
+    return "No tienes permisos para operar caja con la sesión actual."
+  }
+
+  return error.message || fallback
+}
+
 export default function CajaPage() {
   const { user, defaultLocation } = useAuth()
   const [current, setCurrent] = useState<CurrentCashResponse | null>(null)
@@ -85,15 +103,12 @@ export default function CajaPage() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(buildApiUrl(`/api/cash/current?location_id=${locationId}`))
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body?.message || `HTTP ${res.status}`)
-      }
-      const data: CurrentCashResponse = await res.json()
+      const data = await apiFetch<CurrentCashResponse>("/api/cash/current", {
+        cache: "no-store",
+      })
       setCurrent(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error de conexión")
+      setError(explainCashError(err, "Error al cargar caja"))
     } finally {
       setLoading(false)
     }
@@ -102,8 +117,9 @@ export default function CajaPage() {
   const fetchHistory = useCallback(async () => {
     if (!locationId) return
     try {
-      const res = await fetch(buildApiUrl(`/api/cash?location_id=${locationId}`))
-      const data = await res.json()
+      const data = await apiFetch<CashClosing[]>("/api/cash", {
+        cache: "no-store",
+      })
       setHistory(Array.isArray(data) ? data : [])
     } catch {
       setHistory([])
@@ -120,17 +136,14 @@ export default function CajaPage() {
     setActionLoading(true)
     setError(null)
     try {
-      const res = await fetch(buildApiUrl("/api/cash/open"), {
+      await apiFetch("/api/cash/open", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ location_id: locationId, user_id: user?.user_id }),
+        body: JSON.stringify({ location_id: locationId }),
       })
-      const body = await res.json()
-      if (!res.ok) throw new Error(body?.message || `HTTP ${res.status}`)
       await fetchCurrent()
       await fetchHistory()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al abrir caja")
+      setError(explainCashError(err, "Error al abrir caja"))
     } finally {
       setActionLoading(false)
     }
@@ -141,22 +154,16 @@ export default function CajaPage() {
     setActionLoading(true)
     setError(null)
     try {
-      const res = await fetch(
-        buildApiUrl(`/api/cash/${current.closing.cash_closing_id}/close`),
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ notes: closeNotes || undefined, user_id: user?.user_id }),
-        }
-      )
-      const body = await res.json()
-      if (!res.ok) throw new Error(body?.message || `HTTP ${res.status}`)
+      await apiFetch(`/api/cash/${current.closing.cash_closing_id}/close`, {
+        method: "PATCH",
+        body: JSON.stringify({ notes: closeNotes || undefined }),
+      })
       setShowCloseConfirm(false)
       setCloseNotes("")
       await fetchCurrent()
       await fetchHistory()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al cerrar caja")
+      setError(explainCashError(err, "Error al cerrar caja"))
     } finally {
       setActionLoading(false)
     }
@@ -164,16 +171,17 @@ export default function CajaPage() {
 
   if (!locationId) {
     return (
-      <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
-        <div className="mx-auto max-w-4xl">
-          <div className="rounded-3xl border border-amber-200 bg-amber-50 p-6">
-            <p className="font-semibold text-amber-800">Sin sede asignada</p>
-            <p className="mt-1 text-sm text-amber-700">
-              Tu usuario no tiene una sede default configurada. Contacta a un administrador.
-            </p>
+      <PermissionGuard permission="sales.pos">
+        <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
+          <div className="mx-auto max-w-4xl">
+            <InlineStatusCard
+              title="Sin sede asignada"
+              description="Tu usuario no tiene una sede default configurada. Contacta a un administrador antes de aperturar caja."
+              tone="warning"
+            />
           </div>
-        </div>
-      </section>
+        </section>
+      </PermissionGuard>
     )
   }
 
@@ -184,8 +192,9 @@ export default function CajaPage() {
   const businessDate = current?.business_date
 
   return (
-    <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
-      <div className="mx-auto max-w-4xl space-y-5">
+    <PermissionGuard permission="sales.pos">
+      <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
+        <div className="mx-auto max-w-4xl space-y-5">
 
         {/* Header */}
         <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
@@ -341,7 +350,7 @@ export default function CajaPage() {
             </div>
           </article>
         )}
-      </div>
+        </div>
 
       {/* Close confirmation modal */}
       {showCloseConfirm && (
@@ -399,6 +408,7 @@ export default function CajaPage() {
           </div>
         </div>
       )}
-    </section>
+      </section>
+    </PermissionGuard>
   )
 }

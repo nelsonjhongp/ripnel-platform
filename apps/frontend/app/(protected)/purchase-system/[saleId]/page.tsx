@@ -4,7 +4,9 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { ArrowLeft, CreditCard, ReceiptText, User } from "lucide-react"
 
-import { apiFetch } from "@/lib/api"
+import { PermissionGuard } from "@/components/auth/PermissionGuard"
+import { ErrorPage, ForbiddenPage, LoadingPage, NotFoundPage } from "@/components/feedback/status-page"
+import { ApiError, apiFetch } from "@/lib/api"
 
 type SaleDetail = {
   sale_id: string
@@ -51,7 +53,7 @@ type SaleDetail = {
 export default function SaleDetailPage({ params }: { params: Promise<{ saleId: string }> }) {
   const [sale, setSale] = useState<SaleDetail | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
     let active = true
@@ -72,7 +74,7 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
       } catch (loadError) {
         if (active) {
           setSale(null)
-          setError(loadError instanceof Error ? loadError.message : "No se pudo cargar la venta")
+          setError(loadError instanceof Error ? loadError : new Error("No se pudo cargar la venta"))
         }
       } finally {
         if (active) {
@@ -89,26 +91,30 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
   }, [params])
 
   if (loading) {
-    return <div className="p-8 text-sm text-slate-500">Cargando detalle de venta...</div>
+    return <LoadingPage title="Cargando detalle de venta" description="Estamos recuperando la venta confirmada y sus movimientos asociados." />
+  }
+
+  if (error instanceof ApiError && error.status === 404) {
+    return <NotFoundPage />
+  }
+
+  if (error instanceof ApiError && error.status === 403) {
+    return <ForbiddenPage />
   }
 
   if (error || !sale) {
     return (
-      <div className="p-8">
-        <p className="text-sm text-red-600">{error || "Venta no encontrada"}</p>
-        <Link
-          href="/transaction-history"
-          className="mt-4 inline-block text-sm text-violet-700 hover:underline"
-        >
-          Volver al historial
-        </Link>
-      </div>
+      <ErrorPage
+        title="No pudimos abrir el detalle de venta"
+        description={error?.message || "La venta solicitada no está disponible para esta sede operativa."}
+      />
     )
   }
 
   return (
-    <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
-      <div className="mx-auto max-w-6xl space-y-5">
+    <PermissionGuard permission="sales.pos">
+      <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
+        <div className="mx-auto max-w-6xl space-y-5">
         <div className="flex items-center justify-between gap-3">
           <Link
             href="/transaction-history"
@@ -242,7 +248,8 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
             </article>
           </div>
         </div>
-      </div>
-    </section>
+        </div>
+      </section>
+    </PermissionGuard>
   )
 }

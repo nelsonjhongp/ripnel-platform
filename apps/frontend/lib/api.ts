@@ -2,6 +2,32 @@ function isLocalDevHost(hostname: string) {
   return hostname === "localhost" || hostname === "127.0.0.1";
 }
 
+export const AUTH_ERROR_EVENT = "ripnel:auth-error";
+
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  details?: unknown;
+
+  constructor(message: string, status: number, options: { code?: string; details?: unknown } = {}) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = options.code;
+    this.details = options.details;
+  }
+}
+
+type ApiErrorPayload = {
+  message?: string;
+  code?: string;
+  details?: unknown;
+};
+
+type ApiFetchInit = RequestInit & {
+  suppressAuthEvent?: boolean;
+};
+
 function resolveConfiguredApiBaseUrl() {
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
     return process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -45,28 +71,53 @@ export type ApiEnvelope<T> = {
 
 export async function apiFetch<T>(
   path: string,
-  init: RequestInit = {}
+  init: ApiFetchInit = {}
 ): Promise<T> {
   const url = path.startsWith("http") ? path : `${getApiBaseUrl()}${path}`;
+  const { suppressAuthEvent, ...requestInit } = init;
 
   const res = await fetch(url, {
-    ...init,
+    ...requestInit,
     headers: {
       "Content-Type": "application/json",
-      ...(init.headers || {}),
+      ...(requestInit.headers || {}),
     },
     credentials: "include",
   });
 
   if (!res.ok) {
+    let payload: ApiErrorPayload | null = null;
     let message = `HTTP ${res.status}`;
+
     try {
-      const body = await res.json();
-      if (body?.message) message = body.message;
+      payload = (await res.json()) as ApiErrorPayload;
+      if (payload?.message) {
+        message = payload.message;
+      }
     } catch {
       // ignore
     }
-    throw new Error(message);
+
+    if (
+      typeof window !== "undefined" &&
+      res.status === 401 &&
+      !suppressAuthEvent
+    ) {
+      window.dispatchEvent(
+        new CustomEvent(AUTH_ERROR_EVENT, {
+          detail: {
+            status: res.status,
+            code: payload?.code,
+            message,
+          },
+        })
+      );
+    }
+
+    throw new ApiError(message, res.status, {
+      code: payload?.code,
+      details: payload?.details,
+    });
   }
 
   if (res.status === 204) return undefined as T;
