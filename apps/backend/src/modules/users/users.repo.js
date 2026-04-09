@@ -134,6 +134,26 @@ async function findUserLocationsByUserId(userId, executor = query) {
   return result.rows;
 }
 
+async function findDefaultLocationByUserId(userId, executor = query) {
+  const result = await executor(
+    `select
+       l.location_id,
+       l.name,
+       l.code,
+       l.type,
+       l.address,
+       l.active
+     from user_locations ul
+     inner join locations l on l.location_id = ul.location_id
+     where ul.user_id = $1
+       and ul.is_default = true
+     limit 1`,
+    [userId]
+  );
+
+  return result.rows[0] || null;
+}
+
 async function replaceUserLocations(userId, assignments, executor = query) {
   await executor('delete from user_locations where user_id = $1', [userId]);
 
@@ -154,5 +174,6 @@ module.exports = {
   updateUser,
   findLocationsByIds,
   findUserLocationsByUserId,
+  findDefaultLocationByUserId,
   replaceUserLocations,
 };

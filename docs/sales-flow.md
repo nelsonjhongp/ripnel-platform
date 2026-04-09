@@ -27,7 +27,7 @@ Antes de iniciar una venta debe existir:
 3. El vendedor busca productos o variantes disponibles para esa sede.
 4. El vendedor agrega uno o mas items a la venta.
 5. El sistema valida stock por item antes de confirmar.
-6. El vendedor selecciona un cliente existente o usa cliente generico.
+6. El vendedor selecciona un cliente existente o usa cliente generico real de mostrador.
 7. El sistema calcula precio vigente por item desde backend.
 8. El vendedor define el metodo de pago.
 9. El sistema registra la venta en una sola operacion.
@@ -61,6 +61,7 @@ Para Semana 9 el comportamiento esperado es:
 - la cantidad debe ser mayor a cero;
 - debe existir stock suficiente en la sede;
 - debe existir precio vigente aplicable;
+- toda venta confirmada debe persistir `customer_id`;
 - el total calculado por backend debe ser consistente con los items;
 - el monto de pago debe cubrir el total de la venta;
 - el metodo de pago debe estar en el set permitido.
@@ -80,7 +81,7 @@ Para Semana 9 el comportamiento esperado es:
 - reserva sin confirmacion;
 - anulacion posterior;
 - cambio o devolucion;
-- caja y cierre diario;
+- modulo de caja y cierre diario end-to-end;
 - historial de ventas dentro del alcance de Semana 9;
 - detalle de venta confirmada dentro del alcance de Semana 9.
 
@@ -93,3 +94,11 @@ Para Semana 9 el comportamiento esperado es:
 ## Nota de sprint
 
 Historial y detalle pueden quedar preparados como backlog tecnico, pero no forman parte del criterio de cierre de esta semana.
+
+La base tecnica de caja si puede avanzar en paralelo a partir de ventas confirmadas, pagos y fecha de negocio Lima, sin comprometer aun una UI final de cierre diario.
+
+## Contrato tecnico minimo
+
+- `POST /api/sales` toma `customer_id`, `document_type`, `payment_method`, `notes?` e `items[{variant_id, quantity}]`.
+- La sede, el vendedor, los snapshots de cliente y el precio final los resuelve backend.
+- Las lecturas de ventas y variantes vendibles quedan limitadas a la sede default del usuario autenticado.

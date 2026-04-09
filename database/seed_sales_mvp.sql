@@ -13,6 +13,8 @@
 -- Safe to re-run:
 -- - customer inserts use upsert by internal_code
 -- - does not insert into sales tables yet
+-- - confirmed demo sales are seeded separately in
+--   database/seed_sales_confirmed_demo.sql
 -- ============================================================
 
 begin;
