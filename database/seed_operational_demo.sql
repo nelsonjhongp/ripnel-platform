@@ -38,14 +38,15 @@ set
 -- 1) OPERATIONAL USERS
 -- ============================================================
 
-with seeded_users(full_name, email, role_name) as (
+with seeded_users(username, full_name, email, role_name) as (
   values
-    ('Ventas Centro', 'ventas.centro@ripnel.com', 'VENTAS'),
-    ('Almacen Central', 'almacen.central@ripnel.com', 'ALMACEN'),
-    ('Tienda Centro', 'tienda.centro@ripnel.com', 'TIENDA'),
-    ('Caja Centro', 'caja.centro@ripnel.com', 'CAJA')
+    ('ventascentro', 'Ventas Centro', 'ventas.centro@ripnel.com', 'VENTAS'),
+    ('almacencentral', 'Almacen Central', 'almacen.central@ripnel.com', 'ALMACEN'),
+    ('tiendacentro', 'Tienda Centro', 'tienda.centro@ripnel.com', 'TIENDA'),
+    ('cajacentro', 'Caja Centro', 'caja.centro@ripnel.com', 'CAJA')
 )
 insert into users (
+  username,
   full_name,
   email,
   password_hash,
@@ -53,6 +54,7 @@ insert into users (
   active
 )
 select
+  seeded_users.username,
   seeded_users.full_name,
   seeded_users.email,
   'temp_hash',
@@ -62,6 +64,7 @@ from seeded_users
 inner join roles on roles.name = seeded_users.role_name
 on conflict (email) do update
 set
+  username = excluded.username,
   full_name = excluded.full_name,
   password_hash = excluded.password_hash,
   role_id = excluded.role_id,

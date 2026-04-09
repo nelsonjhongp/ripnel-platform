@@ -11,9 +11,9 @@ Dejar el flujo de registro de venta operable de punta a punta con backend real, 
 Al cierre de la semana el equipo debe poder:
 
 - iniciar una nueva venta desde una pantalla interna operada por vendedor;
-- asociar un cliente existente o usar cliente generico;
+- asociar un cliente existente o usar cliente generico real persistido por `customer_id`;
 - agregar items reales con stock disponible por sede;
-- calcular precios vigentes desde backend;
+- calcular precios vigentes desde backend sin confiar en precios enviados por frontend;
 - registrar un pago simple;
 - confirmar la venta;
 - descontar stock y dejar trazabilidad de inventario.
@@ -22,7 +22,7 @@ Al cierre de la semana el equipo debe poder:
 
 - flujo interno de venta asistida por vendedor;
 - uso de sede default del usuario como contexto operativo;
-- cliente existente o cliente generico de mostrador;
+- cliente existente o cliente generico de mostrador con `customer_id` real;
 - seleccion de variantes con stock disponible;
 - precio automatico vigente por item;
 - una sola forma de pago por venta;
@@ -46,13 +46,25 @@ Al cierre de la semana el equipo debe poder:
 - anulacion completa de ventas;
 - automatizacion de demo final.
 
+## Caja y cierre diario en paralelo
+
+Aunque el modulo de caja no entra como entregable cerrado de Semana 9, si queda habilitado para backend base con:
+
+- dataset confiable de ventas confirmadas;
+- reglas cerradas para calcular totales por metodo;
+- fecha de negocio basada en `confirmed_at` en `America/Lima`;
+- consultas SQL de referencia para `cash_closings`.
+
+Esto habilita trabajo paralelo de caja sin vender aun una UI final ni un flujo operativo completo.
+
 ## Defaults elegidos para reducir alcance
 
 - `POST /api/sales` registra y confirma la venta en una sola operacion.
 - El flujo de UI se modela como "registro de venta", no como carrito ecommerce.
 - La sede de venta sale de la sede default del usuario autenticado.
 - El pago MVP usa un solo metodo por venta: `cash`, `yape`, `plin` o `transfer`.
-- El precio final se resuelve automaticamente desde backend.
+- El precio final se resuelve automaticamente desde backend usando precio vigente retail.
+- `GET /api/sales`, `GET /api/sales/:saleId` y `GET /api/sales/sellable-variants` se limitan a la sede default del usuario.
 - Si falta precio o stock, la venta no se confirma.
 - `GET /api/sales` y `GET /api/sales/:saleId` quedan como backlog listo para el siguiente sprint.
 

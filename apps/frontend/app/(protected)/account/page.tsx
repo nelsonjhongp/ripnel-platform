@@ -121,6 +121,11 @@ export default function AccountPage() {
       return;
     }
 
+    if (!user?.user_id) {
+      setSaveError("No hay una sesion activa para actualizar la sede.");
+      return;
+    }
+
     setSavingLocation(true);
     setSaveMessage(null);
     setSaveError(null);

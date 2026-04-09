@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const { env } = require('./config/env');
+const authRoutes = require('./modules/auth/auth.routes');
 const healthRoutes = require('./modules/health/health.routes');
 const authRoutes = require('./modules/auth/auth.routes');
 const rolesRoutes = require('./modules/roles/roles.routes');

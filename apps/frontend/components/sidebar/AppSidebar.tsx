@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import {
   ArrowRightLeft,
   Banknote,
@@ -39,7 +39,6 @@ import {
 } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { useRouter } from "next/navigation"
 
 type SidebarItem = {
   title: string
@@ -118,6 +117,15 @@ const sidebarGroups: SidebarGroup[] = [
   {
     title: "Venta rápida",
     icon: ShoppingCart,
+    items: [
+      { title: "Nueva venta", url: "/purchase-system" },
+      { title: "Historial de ventas", url: "/transaction-history" },
+    ],
+  },
+  {
+    title: "Venta rápida",
+    icon: ShoppingCart,
+    permission: "sales.pos",
     excludeRoles: ["CAJA"],
     items: [
       { title: "Nueva venta", url: "/purchase-system" },
@@ -191,7 +199,7 @@ function SidebarGroupSection({
 }: {
   title: string
   icon: React.ComponentType<{ className?: string }>
-  items: { title: string; url: string }[]
+  items: SidebarItem[]
   pathname: string
 }) {
   const isActive = items.some((item) => pathname === item.url || pathname.startsWith(`${item.url}/`))
@@ -211,8 +219,8 @@ function SidebarGroupSection({
                 title === "Catalogos"
                   ? catalogIcons[item.title as keyof typeof catalogIcons]
                   : title === "Inventario"
-                  ? inventoryIcons[item.title as keyof typeof inventoryIcons]
-                  : undefined
+                    ? inventoryIcons[item.title as keyof typeof inventoryIcons]
+                    : undefined
 
               return (
                 <SidebarLink
@@ -237,22 +245,29 @@ export function AppSidebar({
 }: React.PropsWithChildren<React.ComponentProps<typeof Sidebar>>) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user, loading, locationsLoading, locationAssignments, defaultLocation, has, logout } = useAuth()
+  const {
+    user,
+    loading,
+    locationsLoading,
+    locationsError,
+    locationAssignments,
+    defaultLocation,
+    has,
+    logout,
+  } = useAuth()
 
   const visibleGroups = React.useMemo(() => {
     if (loading) return []
-    return sidebarGroups.filter((g) => {
-      // Verificar permiso base
-      if (g.permission && !has(g.permission)) return false
 
-      // Si hay restricción de roles específicos (onlyForRoles)
-      if (g.onlyForRoles && user?.role_name) {
-        if (!g.onlyForRoles.includes(user.role_name)) return false
+    return sidebarGroups.filter((group) => {
+      if (group.permission && !has(group.permission)) return false
+
+      if (group.onlyForRoles && user?.role_name && !group.onlyForRoles.includes(user.role_name)) {
+        return false
       }
 
-      // Si hay exclusión de roles específicos (excludeRoles)
-      if (g.excludeRoles && user?.role_name) {
-        if (g.excludeRoles.includes(user.role_name)) return false
+      if (group.excludeRoles && user?.role_name && group.excludeRoles.includes(user.role_name)) {
+        return false
       }
 
       return true
@@ -268,7 +283,7 @@ export function AppSidebar({
   }
 
   return (
-    <div className="min-h-screen flex flex-1 w-full bg-[#f8fafc]">
+    <div className="flex min-h-screen w-full flex-1 bg-[#f8fafc]">
       <Sidebar
         variant="sidebar"
         className="border-slate-200 bg-white"
@@ -298,7 +313,9 @@ export function AppSidebar({
               />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-base font-semibold leading-5 text-slate-950">Creaciones Ripnel</p>
+              <p className="truncate text-base font-semibold leading-5 text-slate-950">
+                Creaciones Ripnel
+              </p>
               <p className="text-xs text-slate-500">Sistema ERP</p>
             </div>
           </div>
@@ -311,14 +328,18 @@ export function AppSidebar({
                   <p className="truncate text-sm font-semibold text-slate-800">
                     {locationsLoading
                       ? "Cargando sede..."
-                      : defaultLocation?.name || "Sin sede asignada"}
+                      : locationsError
+                        ? "Sede no disponible"
+                        : defaultLocation?.name || "Sin sede asignada"}
                   </p>
                   <p className="truncate text-[11px] text-slate-500">
                     {locationsLoading
                       ? "Buscando configuracion..."
-                      : locationAssignments.length > 0
-                      ? `${defaultLocation?.code || "Sin codigo"} · ${locationAssignments.length} sedes`
-                      : "Configurar en cuenta"}
+                      : locationsError
+                        ? "Revisar cuenta o volver a iniciar sesion"
+                        : locationAssignments.length > 0
+                        ? `${defaultLocation?.code || "Sin codigo"} · ${locationAssignments.length} sedes`
+                        : "Configurar en cuenta"}
                   </p>
                 </div>
               </div>
@@ -359,7 +380,9 @@ export function AppSidebar({
               <CircleUserRound className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-slate-900">{user?.full_name || "Usuario"}</p>
+              <p className="truncate text-sm font-semibold text-slate-900">
+                {user?.full_name || "Usuario"}
+              </p>
               <p className="truncate text-xs text-slate-500">{user?.role_name || "Rol"}</p>
             </div>
           </Link>

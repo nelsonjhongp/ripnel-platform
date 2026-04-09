@@ -15,7 +15,8 @@ Ejecutar o verificar estos datos antes de probar:
 3. `database/seed_variants_inventory.sql`
 4. `database/seed_style_size_prices.sql`
 5. `database/seed_sales_mvp.sql`
-6. `database/readiness_sales_mvp.sql`
+6. `database/seed_sales_confirmed_demo.sql`
+7. `database/readiness_sales_mvp.sql`
 
 ## Readiness check
 
@@ -24,8 +25,10 @@ Antes de iniciar el testing, confirmar:
 - existe usuario operativo con sede default;
 - existe al menos una sede tienda activa;
 - existen clientes de prueba retail y factura;
+- existe cliente generico de mostrador con `customer_id` real;
 - existen variantes con stock en la sede;
 - existen precios vigentes para esas variantes;
+- existen 3 ventas demo confirmadas para historial, detalle y caja;
 - login y sesion funcionan;
 - la pantalla de nueva venta carga sin mocks.
 
@@ -35,7 +38,8 @@ Antes de iniciar el testing, confirmar:
 
 - iniciar sesion con usuario de ventas;
 - abrir nueva venta;
-- seleccionar variante con stock;
+- confirmar que la sede visible es la sede default del usuario;
+- seleccionar estilo y luego combinacion talla/color con stock;
 - agregar cantidad valida;
 - seleccionar cliente retail o cliente generico;
 - elegir metodo de pago;
@@ -71,7 +75,16 @@ Esperado:
 - la UI muestra error claro;
 - no se registra la venta.
 
-### 4. Cliente invalido
+### 4. Venta fuera de sede permitida
+
+- intentar consultar ventas de otra sede usando session activa.
+
+Esperado:
+
+- backend no devuelve ventas fuera de la sede default;
+- el detalle de una venta ajena responde `404`.
+
+### 5. Cliente invalido
 
 - enviar cliente inexistente o datos inconsistentes.
 
@@ -80,7 +93,7 @@ Esperado:
 - backend rechaza la operacion;
 - no se registra la venta.
 
-### 5. Pago invalido
+### 6. Pago invalido
 
 - enviar metodo no permitido o monto insuficiente.
 
@@ -100,6 +113,16 @@ Luego de una venta exitosa, revisar:
 - `stock_movements`
 - `inventory`
 
+## Base para caja en paralelo
+
+Ademas del flujo de venta, validar que la base diaria para caja ya sea reutilizable:
+
+- existe una venta `cash` de hoy;
+- existe una venta `yape` de hoy;
+- existe una venta `transfer` de ayer;
+- el agregado por metodo y fecha Lima coincide con lo sembrado;
+- la venta de ayer no contamina el cierre del dia actual.
+
 ## Nota minima que debe quedar en Jira al cerrar una tarea
 
 Usar siempre una nota corta de prueba, por ejemplo:
@@ -115,10 +138,12 @@ Ventas MVP se considera validado manualmente cuando:
 - hay al menos un caso de rechazo por stock;
 - hay al menos un caso de rechazo por precio faltante;
 - existe trazabilidad del movimiento de salida;
-- el readiness check no deja bloqueos criticos abiertos.
+- el readiness check no deja bloqueos criticos abiertos;
+- la base de pagos ya permite calcular caja diaria sin ambiguedad de tablas o fechas.
 
 ## Casos fuera del compromiso semanal
 
 - historial de ventas conectado;
 - detalle de venta confirmado;
+- UI final de caja y cierre diario;
 - reportes o exportaciones.

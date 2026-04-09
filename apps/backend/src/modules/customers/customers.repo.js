@@ -14,6 +14,8 @@ async function findAllCustomers({ documentType, sort, q }) {
     const index = params.length;
     conditions.push(
       `(
+        COALESCE(c.internal_code, '') ILIKE $${index}
+        OR
         c.full_name ILIKE $${index}
         OR COALESCE(c.business_name, '') ILIKE $${index}
         OR COALESCE(c.commercial_name, '') ILIKE $${index}
@@ -34,8 +36,11 @@ async function findAllCustomers({ documentType, sort, q }) {
        c.full_name,
        c.business_name,
        c.commercial_name,
+       COALESCE(NULLIF(c.full_name, ''), NULLIF(c.business_name, ''), NULLIF(c.commercial_name, '')) AS display_name,
        c.email,
        c.phone,
+       c.district,
+       c.address,
        c.customer_type,
        c.active,
        c.notes,
@@ -54,7 +59,9 @@ async function findCustomerById(customerId) {
   const result = await query(
     `SELECT
        customer_id, internal_code, document_type, document_number,
-       full_name, business_name, commercial_name, email, phone,
+       full_name, business_name, commercial_name,
+       COALESCE(NULLIF(full_name, ''), NULLIF(business_name, ''), NULLIF(commercial_name, '')) AS display_name,
+       email, phone, district, address,
        customer_type, active, notes, created_at, updated_at
      FROM customers
      WHERE customer_id = $1`,
