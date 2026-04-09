@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { env } = require('./config/env');
 const healthRoutes = require('./modules/health/health.routes');
+const authRoutes = require('./modules/auth/auth.routes');
 const rolesRoutes = require('./modules/roles/roles.routes');
 const locationsRoutes = require('./modules/locations/locations.routes');
 const catalogsRoutes = require('./modules/catalogs/catalogs.routes');
@@ -13,6 +14,7 @@ const transfersRoutes = require('./modules/transfers/transfers.routes');
 const usersRoutes = require('./modules/users/users.routes');
 const customersRoutes = require('./modules/customers/customers.routes');
 const salesRoutes = require('./modules/sales/sales.routes');
+const cashRoutes = require('./modules/cash/cash.routes');
 const {
   errorHandler,
   notFoundHandler,
@@ -84,6 +86,7 @@ app.use('/api/transfers', transfersRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/customers', customersRoutes);
 app.use('/api/sales', salesRoutes);
+app.use('/api/cash', cashRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
