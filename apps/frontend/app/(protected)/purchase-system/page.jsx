@@ -394,13 +394,24 @@ export default function NuevaVentaPage() {
     <PermissionGuard permission="sales.pos">
       <div className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
         <div className="mx-auto max-w-7xl space-y-5">
-        <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
-          <p className="text-xs uppercase tracking-wide text-violet-600">Punto de venta</p>
-          <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">Nueva venta</h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Registra una venta usando la sede operativa del usuario y precio resuelto por backend.
-          </p>
-        </header>
+          <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-violet-600">Punto de venta</p>
+                <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">Nueva venta</h1>
+                <p className="mt-1 text-sm text-slate-600">
+                  Registra una venta usando la sede operativa del usuario y precio resuelto por backend.
+                </p>
+              </div>
+
+              <Link
+                href="/transaction-history"
+                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                Ir al historial
+              </Link>
+            </div>
+          </header>
 
         {!defaultLocation?.location_id && !locationsLoading && (
           <InlineStatusCard
@@ -429,6 +440,12 @@ export default function NuevaVentaPage() {
                   className="rounded-xl border border-emerald-300 bg-white px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50"
                 >
                   Ver detalle
+                </Link>
+                <Link
+                  href="/transaction-history"
+                  className="rounded-xl border border-emerald-300 bg-white px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50"
+                >
+                  Ver historial
                 </Link>
                 <button
                   type="button"
