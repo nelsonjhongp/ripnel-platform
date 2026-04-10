@@ -59,6 +59,22 @@ function requireAnyPermission(permissionKeys) {
   };
 }
 
+function requireAnyRole(roleNames) {
+  return function requireAnyRoleMiddleware(req, _res, next) {
+    const roleName = req.auth?.role_name;
+
+    if (
+      roleName &&
+      Array.isArray(roleNames) &&
+      roleNames.includes(roleName)
+    ) {
+      return next();
+    }
+
+    return next(new AppError('Forbidden', 403, { code: 'FORBIDDEN_ROLE' }));
+  };
+}
+
 function requireSelfOrPermission(permissionKey, paramName = 'userId') {
   return function requireSelfOrPermissionMiddleware(req, _res, next) {
     const authenticatedUserId = req.auth?.sub;
@@ -84,6 +100,7 @@ module.exports = {
   requireAuth,
   requirePermission,
   requireAnyPermission,
+  requireAnyRole,
   requireSelfOrPermission,
 };
 

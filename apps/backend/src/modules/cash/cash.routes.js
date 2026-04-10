@@ -1,5 +1,5 @@
 const express = require('express');
-const { requireAuth, requireAnyPermission } = require('../../middlewares/auth');
+const { requireAuth, requireAnyRole } = require('../../middlewares/auth');
 const {
   getCashClosings,
   getCashCurrent,
@@ -10,7 +10,7 @@ const {
 
 const router = express.Router();
 
-router.use(requireAuth, requireAnyPermission(['sales.pos']));
+router.use(requireAuth, requireAnyRole(['ADMIN', 'CAJA']));
 
 router.get('/', getCashClosings);
 router.get('/current', getCashCurrent);

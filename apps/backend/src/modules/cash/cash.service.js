@@ -12,8 +12,14 @@ const { query } = require('../../shared/db');
 const { findActiveUserById } = require('../auth/auth.repo');
 const { findDefaultLocationByUserId } = require('../users/users.repo');
 
+const ALLOWED_CASH_ROLES = new Set(['ADMIN', 'CAJA']);
+
 function todayPeruDate() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+}
+
+function round2(value) {
+  return Math.round(Number(value || 0) * 100) / 100;
 }
 
 function normalizeUuid(value) {
@@ -39,11 +45,28 @@ function buildPaymentTotals(rows) {
   for (const row of rows) {
     const method = row.method;
     if (method in totals) {
-      totals[method] = Math.round(Number(row.total) * 100) / 100;
+      totals[method] = round2(row.total);
     }
   }
-  const all = Math.round((totals.cash + totals.yape + totals.plin + totals.transfer) * 100) / 100;
+  const all = round2(totals.cash + totals.yape + totals.plin + totals.transfer);
   return { ...totals, all };
+}
+
+function buildSalesSummary(paymentRows, salesRow) {
+  const byMethod = buildPaymentTotals(paymentRows);
+  const grandTotal = round2(salesRow.grand_total || 0);
+  const difference = round2(grandTotal - byMethod.all);
+
+  return {
+    sale_count: Number(salesRow.sale_count || 0),
+    grand_total: grandTotal,
+    by_method: byMethod,
+    consistency: {
+      payment_total: byMethod.all,
+      difference,
+      is_consistent: Math.abs(difference) < 0.01,
+    },
+  };
 }
 
 async function validateLocationExists(locationId) {
@@ -64,6 +87,10 @@ async function resolveCashContext(userId, requestedLocationId = null) {
   const user = await findActiveUserById(normalizedUserId);
   if (!user) {
     throw new AppError('Not authenticated', 401, { code: 'AUTH_REQUIRED' });
+  }
+
+  if (!ALLOWED_CASH_ROLES.has(String(user.role_name || ''))) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN_ROLE' });
   }
 
   const defaultLocation = await findDefaultLocationByUserId(normalizedUserId);
@@ -164,13 +191,11 @@ async function getCurrentCash(input) {
     countSalesByLocationAndDate(locationId, businessDate),
   ]);
 
-  const salesSummary = {
-    sale_count: Number(salesRow.sale_count || 0),
-    grand_total: Math.round(Number(salesRow.grand_total || 0) * 100) / 100,
-    by_method: buildPaymentTotals(paymentRows),
+  return {
+    closing: closing || null,
+    business_date: businessDate,
+    sales_summary: buildSalesSummary(paymentRows, salesRow),
   };
-
-  return { closing: closing || null, business_date: businessDate, sales_summary: salesSummary };
 }
 
 async function listCashClosings(input = {}) {
@@ -204,13 +229,10 @@ async function getCashClosing(input = {}) {
     countSalesByLocationAndDate(closing.location_id, closing.business_date),
   ]);
 
-  const salesSummary = {
-    sale_count: Number(salesRow.sale_count || 0),
-    grand_total: Math.round(Number(salesRow.grand_total || 0) * 100) / 100,
-    by_method: buildPaymentTotals(paymentRows),
+  return {
+    ...closing,
+    sales_summary: buildSalesSummary(paymentRows, salesRow),
   };
-
-  return { ...closing, sales_summary: salesSummary };
 }
 
 module.exports = {
