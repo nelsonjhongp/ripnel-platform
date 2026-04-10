@@ -69,7 +69,7 @@ const sidebarGroups: SidebarGroup[] = [
   {
     title: "Caja",
     icon: Banknote,
-    permission: "sales.pos",
+    onlyForRoles: ["ADMIN", "CAJA"],
     directLink: true,
     items: [{ title: "Caja del día", url: "/caja" }],
   },
