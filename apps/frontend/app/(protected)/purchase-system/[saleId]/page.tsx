@@ -1,11 +1,17 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ArrowLeft, CreditCard, ReceiptText, User } from "lucide-react"
 
 import { PermissionGuard } from "@/components/auth/PermissionGuard"
-import { ErrorPage, ForbiddenPage, LoadingPage, NotFoundPage } from "@/components/feedback/status-page"
+import {
+  ErrorPage,
+  ForbiddenPage,
+  InlineStatusCard,
+  LoadingPage,
+  NotFoundPage,
+} from "@/components/feedback/status-page"
 import { ApiError, apiFetch } from "@/lib/api"
 
 type SaleDetail = {
@@ -50,6 +56,14 @@ type SaleDetail = {
   }>
 }
 
+function round2(value: number) {
+  return Math.round(value * 100) / 100
+}
+
+function isCloseEnough(left: number, right: number) {
+  return Math.abs(left - right) < 0.01
+}
+
 export default function SaleDetailPage({ params }: { params: Promise<{ saleId: string }> }) {
   const [sale, setSale] = useState<SaleDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -90,8 +104,47 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
     }
   }, [params])
 
+  const consistency = useMemo(() => {
+    if (!sale) {
+      return null
+    }
+
+    const lineSubtotal = round2(
+      sale.details.reduce((accumulator, line) => accumulator + Number(line.line_subtotal || 0), 0)
+    )
+    const lineTax = round2(
+      sale.details.reduce((accumulator, line) => accumulator + Number(line.line_tax || 0), 0)
+    )
+    const lineTotal = round2(
+      sale.details.reduce((accumulator, line) => accumulator + Number(line.line_total || 0), 0)
+    )
+    const paymentTotal = round2(
+      sale.payments.reduce((accumulator, payment) => accumulator + Number(payment.amount || 0), 0)
+    )
+
+    const headerMatches =
+      isCloseEnough(lineSubtotal, Number(sale.subtotal_amount || 0)) &&
+      isCloseEnough(lineTax, Number(sale.tax_amount || 0)) &&
+      isCloseEnough(lineTotal, Number(sale.total_amount || 0))
+    const paymentMatches = isCloseEnough(paymentTotal, Number(sale.total_amount || 0))
+
+    return {
+      lineSubtotal,
+      lineTax,
+      lineTotal,
+      paymentTotal,
+      headerMatches,
+      paymentMatches,
+    }
+  }, [sale])
+
   if (loading) {
-    return <LoadingPage title="Cargando detalle de venta" description="Estamos recuperando la venta confirmada y sus movimientos asociados." />
+    return (
+      <LoadingPage
+        title="Cargando detalle de venta"
+        description="Estamos recuperando la venta confirmada y sus movimientos asociados."
+      />
+    )
   }
 
   if (error instanceof ApiError && error.status === 404) {
@@ -106,7 +159,7 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
     return (
       <ErrorPage
         title="No pudimos abrir el detalle de venta"
-        description={error?.message || "La venta solicitada no está disponible para esta sede operativa."}
+        description={error?.message || "La venta solicitada no esta disponible para esta sede operativa."}
       />
     )
   }
@@ -115,139 +168,202 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
     <PermissionGuard permission="sales.pos">
       <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
         <div className="mx-auto max-w-6xl space-y-5">
-        <div className="flex items-center justify-between gap-3">
-          <Link
-            href="/transaction-history"
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Volver al historial
-          </Link>
-        </div>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Link
+              href="/transaction-history"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Volver al historial
+            </Link>
 
-        <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
-          <p className="text-xs uppercase tracking-wide text-violet-600">Detalle de venta</p>
-          <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">
-            {sale.sale_number || "Sin correlativo"}
-          </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            {sale.document_type} • {sale.status} •{" "}
-            {new Date(sale.confirmed_at || sale.created_at).toLocaleString("es-PE")}
-          </p>
-        </header>
+            <Link
+              href="/purchase-system"
+              className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-800"
+            >
+              Registrar nueva venta
+            </Link>
+          </div>
 
-        <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
-          <div className="space-y-5">
-            <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
-              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
-                <ReceiptText className="h-4 w-4 text-violet-600" />
-                Productos vendidos
-              </h2>
-              <div className="space-y-2">
-                {sale.details.map((line) => (
-                  <div
-                    key={line.sale_detail_id}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-slate-900">{line.style_name}</p>
-                        <p className="text-xs text-slate-500">
-                          {line.sku} • {line.size_code} / {line.color_code}
+          <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
+            <p className="text-xs uppercase tracking-wide text-violet-600">Detalle de venta</p>
+            <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">
+              {sale.sale_number || "Sin correlativo"}
+            </h1>
+            <p className="mt-1 text-sm text-slate-600">
+              {sale.document_type} • {sale.status} •{" "}
+              {new Date(sale.confirmed_at || sale.created_at).toLocaleString("es-PE")}
+            </p>
+          </header>
+
+          {consistency && !consistency.headerMatches && (
+            <InlineStatusCard
+              title="La venta necesita revision"
+              description="Los totales de cabecera no coinciden con la suma de las lineas persistidas. Conviene contrastar la venta antes de tomarla como referencia operativa."
+              tone="warning"
+            />
+          )}
+
+          {consistency && consistency.headerMatches && !consistency.paymentMatches && (
+            <InlineStatusCard
+              title="Pago inconsistente con el total"
+              description="Las lineas coinciden con la cabecera, pero la suma de pagos registrados no cubre el total de la venta."
+              tone="warning"
+            />
+          )}
+
+          <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+            <div className="space-y-5">
+              <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
+                <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
+                  <ReceiptText className="h-4 w-4 text-violet-600" />
+                  Productos vendidos
+                </h2>
+                <div className="space-y-2">
+                  {sale.details.map((line) => (
+                    <div
+                      key={line.sale_detail_id}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-slate-900">{line.style_name}</p>
+                          <p className="text-xs text-slate-500">
+                            {line.sku} • {line.size_code} / {line.color_code}
+                          </p>
+                        </div>
+                        <p className="text-sm font-semibold text-slate-900">
+                          S/. {Number(line.line_total).toFixed(2)}
                         </p>
                       </div>
-                      <p className="text-sm font-semibold text-slate-900">
-                        S/. {Number(line.line_total).toFixed(2)}
-                      </p>
+                      <div className="mt-2 grid gap-2 text-sm text-slate-600 md:grid-cols-4">
+                        <span>Cantidad: {line.quantity}</span>
+                        <span>Lista: S/. {Number(line.unit_price_list).toFixed(2)}</span>
+                        <span>Final: S/. {Number(line.unit_price_final).toFixed(2)}</span>
+                        <span>Subtotal: S/. {Number(line.line_subtotal).toFixed(2)}</span>
+                      </div>
                     </div>
-                    <div className="mt-2 grid gap-2 text-sm text-slate-600 md:grid-cols-4">
-                      <span>Cantidad: {line.quantity}</span>
-                      <span>Lista: S/. {Number(line.unit_price_list).toFixed(2)}</span>
-                      <span>Final: S/. {Number(line.unit_price_final).toFixed(2)}</span>
-                      <span>Subtotal: S/. {Number(line.line_subtotal).toFixed(2)}</span>
+                  ))}
+                </div>
+              </article>
+
+              {sale.notes && (
+                <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur">
+                  <h2 className="mb-2 text-lg font-semibold text-slate-800">Notas</h2>
+                  <p className="text-sm text-slate-600">{sale.notes}</p>
+                </article>
+              )}
+            </div>
+
+            <div className="space-y-5">
+              <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur">
+                <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
+                  <User className="h-4 w-4 text-violet-600" />
+                  Cliente
+                </h2>
+                <div className="space-y-2 text-sm text-slate-700">
+                  <p>
+                    <span className="font-medium">Nombre:</span> {sale.customer_name_text || "Cliente general"}
+                  </p>
+                  <p>
+                    <span className="font-medium">Documento:</span> {sale.customer_doc_type || "-"}{" "}
+                    {sale.customer_doc_number || ""}
+                  </p>
+                  <p>
+                    <span className="font-medium">Direccion:</span> {sale.customer_address_text || "-"}
+                  </p>
+                  <p>
+                    <span className="font-medium">Ubicacion:</span> {sale.location_name}
+                  </p>
+                  <p>
+                    <span className="font-medium">Vendedor:</span> {sale.seller_name}
+                  </p>
+                </div>
+              </article>
+
+              <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur">
+                <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
+                  <CreditCard className="h-4 w-4 text-violet-600" />
+                  Pagos
+                </h2>
+                <div className="space-y-2 text-sm text-slate-700">
+                  {sale.payments.length === 0 ? (
+                    <p>No hay pagos registrados.</p>
+                  ) : (
+                    sale.payments.map((payment) => (
+                      <div
+                        key={payment.payment_id}
+                        className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2"
+                      >
+                        <p className="font-medium capitalize text-slate-800">{payment.method}</p>
+                        <p>Monto: S/. {Number(payment.amount).toFixed(2)}</p>
+                        <p className="text-xs text-slate-500">
+                          {new Date(payment.paid_at).toLocaleString("es-PE")}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </article>
+
+              <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur">
+                <h2 className="mb-4 text-lg font-semibold text-slate-800">Resumen y consistencia</h2>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Subtotal cabecera</span>
+                    <span>S/. {Number(sale.subtotal_amount).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>IGV cabecera</span>
+                    <span>S/. {Number(sale.tax_amount).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Subtotal lineas</span>
+                    <span>S/. {Number(consistency?.lineSubtotal || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>IGV lineas</span>
+                    <span>S/. {Number(consistency?.lineTax || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Total pagos</span>
+                    <span>S/. {Number(consistency?.paymentTotal || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-bold text-slate-900">
+                    <span>Total venta</span>
+                    <span>S/. {Number(sale.total_amount).toFixed(2)}</span>
+                  </div>
+                </div>
+
+                {consistency && (
+                  <div className="mt-4 space-y-2 text-sm">
+                    <div
+                      className={`rounded-2xl border px-3 py-2 ${
+                        consistency.headerMatches
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : "border-amber-200 bg-amber-50 text-amber-800"
+                      }`}
+                    >
+                      {consistency.headerMatches
+                        ? "Cabecera y lineas coinciden."
+                        : "Cabecera y lineas no coinciden."}
+                    </div>
+                    <div
+                      className={`rounded-2xl border px-3 py-2 ${
+                        consistency.paymentMatches
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : "border-amber-200 bg-amber-50 text-amber-800"
+                      }`}
+                    >
+                      {consistency.paymentMatches
+                        ? "Los pagos cubren exactamente el total de la venta."
+                        : "La suma de pagos no cubre el total de la venta."}
                     </div>
                   </div>
-                ))}
-              </div>
-            </article>
-
-            {sale.notes && (
-              <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur">
-                <h2 className="mb-2 text-lg font-semibold text-slate-800">Notas</h2>
-                <p className="text-sm text-slate-600">{sale.notes}</p>
-              </article>
-            )}
-          </div>
-
-          <div className="space-y-5">
-            <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur">
-              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
-                <User className="h-4 w-4 text-violet-600" />
-                Cliente
-              </h2>
-              <div className="space-y-2 text-sm text-slate-700">
-                <p>
-                  <span className="font-medium">Nombre:</span> {sale.customer_name_text || "Cliente general"}
-                </p>
-                <p>
-                  <span className="font-medium">Documento:</span> {sale.customer_doc_type || "-"}{" "}
-                  {sale.customer_doc_number || ""}
-                </p>
-                <p>
-                  <span className="font-medium">Direccion:</span> {sale.customer_address_text || "-"}
-                </p>
-                <p>
-                  <span className="font-medium">Ubicacion:</span> {sale.location_name}
-                </p>
-                <p>
-                  <span className="font-medium">Vendedor:</span> {sale.seller_name}
-                </p>
-              </div>
-            </article>
-
-            <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur">
-              <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
-                <CreditCard className="h-4 w-4 text-violet-600" />
-                Pagos
-              </h2>
-              <div className="space-y-2 text-sm text-slate-700">
-                {sale.payments.length === 0 ? (
-                  <p>No hay pagos registrados.</p>
-                ) : (
-                  sale.payments.map((payment) => (
-                    <div
-                      key={payment.payment_id}
-                      className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2"
-                    >
-                      <p className="font-medium capitalize text-slate-800">{payment.method}</p>
-                      <p>Monto: S/. {Number(payment.amount).toFixed(2)}</p>
-                      <p className="text-xs text-slate-500">
-                        {new Date(payment.paid_at).toLocaleString("es-PE")}
-                      </p>
-                    </div>
-                  ))
                 )}
-              </div>
-            </article>
-
-            <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur">
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between text-slate-600">
-                  <span>Subtotal</span>
-                  <span>S/. {Number(sale.subtotal_amount).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-slate-600">
-                  <span>IGV</span>
-                  <span>S/. {Number(sale.tax_amount).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-bold text-slate-900">
-                  <span>Total</span>
-                  <span>S/. {Number(sale.total_amount).toFixed(2)}</span>
-                </div>
-              </div>
-            </article>
+              </article>
+            </div>
           </div>
-        </div>
         </div>
       </section>
     </PermissionGuard>

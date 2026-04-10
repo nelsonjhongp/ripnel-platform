@@ -49,6 +49,12 @@ function normalizeText(value) {
   return normalized || null;
 }
 
+function normalizeDate(value) {
+  if (value === undefined || value === null) return null;
+  const normalized = String(value).trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : null;
+}
+
 function normalizePositiveInteger(value) {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) return null;
@@ -189,13 +195,33 @@ async function listSellableVariants(input = {}) {
 async function listSales(input = {}) {
   const status = normalizeText(input.status);
   const q = normalizeText(input.q);
+  const dateFrom = normalizeDate(input.date_from);
+  const dateTo = normalizeDate(input.date_to);
   const { location } = await resolveOperatingContext(input.user_id);
 
   if (status && !['draft', 'confirmed', 'cancelled'].includes(status)) {
     throw new AppError('Invalid status value', 400);
   }
 
-  return findAllSales({ status, q, locationId: location.location_id });
+  if (input.date_from !== undefined && input.date_from !== null && !dateFrom) {
+    throw new AppError('Invalid date_from value', 400);
+  }
+
+  if (input.date_to !== undefined && input.date_to !== null && !dateTo) {
+    throw new AppError('Invalid date_to value', 400);
+  }
+
+  if (dateFrom && dateTo && dateFrom > dateTo) {
+    throw new AppError('date_from cannot be greater than date_to', 400);
+  }
+
+  return findAllSales({
+    status,
+    q,
+    dateFrom,
+    dateTo,
+    locationId: location.location_id,
+  });
 }
 
 async function getSale(input = {}) {

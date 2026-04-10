@@ -51,6 +51,7 @@ async function findSellableVariants(locationId, searchQuery) {
 async function findAllSales(filters = {}) {
   const conditions = [];
   const values = [];
+  const businessDateExpr = `DATE(COALESCE(s.confirmed_at, s.created_at) AT TIME ZONE 'America/Lima')`;
 
   if (filters.status) {
     values.push(filters.status);
@@ -66,6 +67,16 @@ async function findAllSales(filters = {}) {
     values.push(`%${filters.q}%`);
     const idx = values.length;
     conditions.push(`(s.sale_number ILIKE $${idx} OR s.customer_name_text ILIKE $${idx})`);
+  }
+
+  if (filters.dateFrom) {
+    values.push(filters.dateFrom);
+    conditions.push(`${businessDateExpr} >= $${values.length}::date`);
+  }
+
+  if (filters.dateTo) {
+    values.push(filters.dateTo);
+    conditions.push(`${businessDateExpr} <= $${values.length}::date`);
   }
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -93,7 +104,7 @@ async function findAllSales(filters = {}) {
      INNER JOIN locations l ON l.location_id = s.location_id
      INNER JOIN users u ON u.user_id = s.seller_user_id
      ${whereClause}
-     ORDER BY s.created_at DESC
+     ORDER BY COALESCE(s.confirmed_at, s.created_at) DESC, s.created_at DESC
      LIMIT 200`,
     values
   );

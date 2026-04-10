@@ -18,6 +18,8 @@ async function getSales(req, res, next) {
       user_id: req.auth?.sub,
       status: req.query.status,
       q: req.query.q,
+      date_from: req.query.date_from,
+      date_to: req.query.date_to,
     });
     return res.json(sales);
   } catch (error) {
