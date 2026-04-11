@@ -78,7 +78,7 @@ export function SidebarShell({
         {has("sales.pos") && (
           <Link
             href="/purchase-system"
-            className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700"
+            className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-3.5 py-1 text-sm font-semibold text-white transition hover:bg-indigo-700"
           >
             <ShoppingCart className="h-4 w-4" />
             Venta rapida

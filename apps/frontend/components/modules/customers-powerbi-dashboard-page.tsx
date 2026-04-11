@@ -73,7 +73,9 @@ export default function CustomersPowerBiDashboardPage() {
           />
         ) : (
           <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Configura NEXT_PUBLIC_CUSTOMERS_POWERBI_EMBED_URL en apps/frontend/.env.local para incrustar el dashboard real.
+            Configura NEXT_PUBLIC_CUSTOMERS_POWERBI_
+            EMBED_URL en apps/frontend/.env.local 
+            para incrustar el dashboard real.
           </div>
         )}
       </div>
