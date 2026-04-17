@@ -1,7 +1,10 @@
+import { Suspense } from "react";
 import LoginRipnel from "@/components/login";
 
 export default function Home() {
   return (
-    <LoginRipnel/>
+    <Suspense>
+      <LoginRipnel />
+    </Suspense>
   );
 }
