@@ -1,3 +1,4 @@
+const os = require('os');
 const express = require('express');
 const cors = require('cors');
 const { env } = require('./config/env');
@@ -32,28 +33,68 @@ function normalizeOrigin(value) {
   }
 }
 
+function collectLocalFrontendOrigins(baseOrigin) {
+  const origins = new Set();
+
+  if (!baseOrigin) {
+    return origins;
+  }
+
+  try {
+    const frontendUrl = new URL(baseOrigin);
+    const localHosts = new Set(['localhost', '127.0.0.1']);
+
+    for (const networkInterface of Object.values(os.networkInterfaces())) {
+      for (const address of networkInterface || []) {
+        if (address.family === 'IPv4' && !address.internal) {
+          localHosts.add(address.address);
+        }
+      }
+    }
+
+    for (const hostname of localHosts) {
+      frontendUrl.hostname = hostname;
+      origins.add(frontendUrl.origin);
+    }
+  } catch (error) {
+    console.warn('Invalid FRONTEND_URL value for CORS allowlist.');
+  }
+
+  return origins;
+}
+
+function isPrivateIpv4(hostname) {
+  if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname || '')) {
+    return false;
+  }
+
+  const [a, b] = hostname.split('.').map(Number);
+
+  return (
+    a === 10 ||
+    a === 127 ||
+    (a === 192 && b === 168) ||
+    (a === 172 && b >= 16 && b <= 31)
+  );
+}
+
+function isAllowedDevOrigin(origin) {
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === 'localhost' || hostname === '127.0.0.1' || isPrivateIpv4(hostname);
+  } catch (error) {
+    return false;
+  }
+}
+
 const app = express();
 const allowedOrigins = new Set();
 const configuredFrontendOrigin = normalizeOrigin(env.frontendUrl);
 
 if (configuredFrontendOrigin) {
-  allowedOrigins.add(configuredFrontendOrigin);
-}
-
-try {
-  const frontendUrl = new URL(configuredFrontendOrigin || env.frontendUrl);
-
-  if (frontendUrl.hostname === 'localhost') {
-    frontendUrl.hostname = '127.0.0.1';
-    allowedOrigins.add(frontendUrl.origin);
+  for (const origin of collectLocalFrontendOrigins(configuredFrontendOrigin)) {
+    allowedOrigins.add(origin);
   }
-
-  if (frontendUrl.hostname === '127.0.0.1') {
-    frontendUrl.hostname = 'localhost';
-    allowedOrigins.add(frontendUrl.origin);
-  }
-} catch (error) {
-  console.warn('Invalid FRONTEND_URL value for CORS allowlist.');
 }
 
 app.use(
@@ -62,7 +103,11 @@ app.use(
     origin(origin, callback) {
       const normalizedOrigin = normalizeOrigin(origin);
 
-      if (!origin || (normalizedOrigin && allowedOrigins.has(normalizedOrigin))) {
+      if (
+        !origin ||
+        (normalizedOrigin && allowedOrigins.has(normalizedOrigin)) ||
+        (env.nodeEnv !== 'production' && normalizedOrigin && isAllowedDevOrigin(normalizedOrigin))
+      ) {
         return callback(null, true);
       }
 
