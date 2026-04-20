@@ -6,12 +6,14 @@ import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 import {
   ArrowRightLeft,
+  BarChart3,
   Banknote,
   ClipboardList,
   ChevronDown,
   ChevronsUpDown,
   CircleUserRound,
   House,
+  LayoutDashboard,
   Palette,
   ReceiptText,
   RotateCcw,
@@ -132,10 +134,13 @@ const sidebarGroups: SidebarGroup[] = [
   {
     title: "Clientes",
     icon: Users,
-    items: [
-      { title: "Clientes", url: "/clientes" },
-      { title: "Dashboards BI", url: "/clientes/dashboards" },
-    ],
+    items: [{ title: "Clientes", url: "/clientes" }],
+  },
+  {
+    title: "BI",
+    icon: BarChart3,
+    directLink: true,
+    items: [{ title: "BI", url: "/bi" }],
   },
   {
     title: "Catalogos",
@@ -377,7 +382,7 @@ export function AppSidebar({
               <SidebarLink
                 href="/dashboard"
                 label="Dashboard"
-                icon={ArrowRightLeft}
+                icon={LayoutDashboard}
                 active={pathname === "/dashboard"}
               />
             </div>
