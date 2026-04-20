@@ -34,6 +34,8 @@ DROP TABLE IF EXISTS exchange_lines CASCADE;
 DROP TABLE IF EXISTS exchanges CASCADE;
 
 DROP TABLE IF EXISTS sales_receipts CASCADE;
+DROP TABLE IF EXISTS sales_payment_reversals CASCADE;
+DROP TABLE IF EXISTS sale_cancellations CASCADE;
 DROP TABLE IF EXISTS sales_payments CASCADE;
 DROP TABLE IF EXISTS sales_details CASCADE;
 DROP TABLE IF EXISTS sales CASCADE;
@@ -643,6 +645,57 @@ CREATE TABLE IF NOT EXISTS sales_payments (
 
   CHECK (method IN ('cash','yape','plin','transfer'))
 );
+
+CREATE TABLE IF NOT EXISTS sale_cancellations (
+  sale_cancellation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sale_id UUID NOT NULL REFERENCES sales(sale_id) ON DELETE CASCADE,
+  location_id UUID NOT NULL REFERENCES locations(location_id),
+  status VARCHAR(20) NOT NULL DEFAULT 'confirmed',
+  reason VARCHAR(200) NOT NULL,
+  notes TEXT,
+  cancelled_by UUID REFERENCES users(user_id),
+  cancelled_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT uq_sale_cancellations_sale UNIQUE (sale_id),
+  CONSTRAINT chk_sale_cancellations_status
+    CHECK (status IN ('confirmed'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_sale_cancellations_location_date
+  ON sale_cancellations(location_id, cancelled_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_sale_cancellations_cancelled_at
+  ON sale_cancellations(cancelled_at DESC);
+
+CREATE TABLE IF NOT EXISTS sales_payment_reversals (
+  payment_reversal_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  payment_id UUID NOT NULL REFERENCES sales_payments(payment_id) ON DELETE CASCADE,
+  sale_id UUID NOT NULL REFERENCES sales(sale_id) ON DELETE CASCADE,
+  location_id UUID NOT NULL REFERENCES locations(location_id),
+  method VARCHAR(20) NOT NULL,
+  amount NUMERIC(12,2) NOT NULL CHECK (amount > 0),
+  reason VARCHAR(200) NOT NULL,
+  notes TEXT,
+  reversed_by UUID REFERENCES users(user_id),
+  reversed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT uq_sales_payment_reversals_payment UNIQUE (payment_id),
+  CONSTRAINT chk_sales_payment_reversals_method
+    CHECK (method IN ('cash','yape','plin','transfer'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_sales_payment_reversals_sale
+  ON sales_payment_reversals(sale_id);
+
+CREATE INDEX IF NOT EXISTS idx_sales_payment_reversals_location_date
+  ON sales_payment_reversals(location_id, reversed_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_sales_payment_reversals_reversed_at
+  ON sales_payment_reversals(reversed_at DESC);
 
 CREATE TABLE IF NOT EXISTS cash_closings (
   cash_closing_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

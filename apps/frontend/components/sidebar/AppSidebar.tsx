@@ -14,6 +14,7 @@ import {
   House,
   Palette,
   ReceiptText,
+  RotateCcw,
   Ruler,
   Settings,
   Shirt,
@@ -65,6 +66,13 @@ const sidebarGroups: SidebarGroup[] = [
       { title: "Nueva venta", url: "/purchase-system" },
       { title: "Historial de ventas", url: "/transaction-history" },
     ],
+  },
+  {
+    title: "Postventa",
+    icon: RotateCcw,
+    permission: "sales.postsale.view",
+    directLink: true,
+    items: [{ title: "Postventa", url: "/postventa" }],
   },
   {
     title: "Caja",
