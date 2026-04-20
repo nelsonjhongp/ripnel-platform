@@ -15,6 +15,7 @@ const transfersRoutes = require('./modules/transfers/transfers.routes');
 const usersRoutes = require('./modules/users/users.routes');
 const customersRoutes = require('./modules/customers/customers.routes');
 const salesRoutes = require('./modules/sales/sales.routes');
+const postsalesRoutes = require('./modules/postsales/postsales.routes');
 const cashRoutes = require('./modules/cash/cash.routes');
 const {
   errorHandler,
@@ -130,6 +131,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/transfers', transfersRoutes);
 app.use('/api/customers', customersRoutes);
 app.use('/api/sales', salesRoutes);
+app.use('/api/postsales', postsalesRoutes);
 app.use('/api/cash', cashRoutes);
 
 app.use(notFoundHandler);

@@ -42,6 +42,7 @@ export function SidebarShell({
       "/inventory": "Inventario",
       "/kardex": "Kardex",
       "/transaction-history": "Historial de ventas",
+      "/postventa": "Postventa",
     }
 
     if (routeTitles[pathname]) {

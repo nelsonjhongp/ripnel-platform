@@ -27,7 +27,10 @@ with seeded_permissions(permission_key, description) as (
     ('inventory.view', 'Consultar inventario y kardex.'),
     ('inventory.adjust', 'Registrar ajustes de inventario.'),
     ('transfers.manage', 'Gestionar transferencias internas.'),
-    ('sales.pos', 'Operar venta rapida y checkout.')
+    ('sales.pos', 'Operar venta rapida y checkout.'),
+    ('sales.postsale.view', 'Consultar postventa operativa y ventas elegibles.'),
+    ('sales.postsale.exchange', 'Registrar cambios simples de postventa.'),
+    ('sales.postsale.cancel', 'Registrar anulaciones controladas de postventa.')
 )
 insert into permissions (
   key,
@@ -60,6 +63,9 @@ permission_keys(permission_key) as (
     ('inventory.adjust'),
     ('transfers.manage'),
     ('sales.pos'),
+    ('sales.postsale.view'),
+    ('sales.postsale.exchange'),
+    ('sales.postsale.cancel'),
     ('dashboard.view'),
     ('users.manage'),
     ('roles.manage'),
@@ -86,6 +92,9 @@ with seeded_role_permissions(role_name, permission_key) as (
     ('ADMIN', 'inventory.adjust'),
     ('ADMIN', 'transfers.manage'),
     ('ADMIN', 'sales.pos'),
+    ('ADMIN', 'sales.postsale.view'),
+    ('ADMIN', 'sales.postsale.exchange'),
+    ('ADMIN', 'sales.postsale.cancel'),
 
     ('ALMACEN', 'inventory.view'),
     ('ALMACEN', 'inventory.adjust'),
@@ -97,14 +106,20 @@ with seeded_role_permissions(role_name, permission_key) as (
     ('TIENDA', 'customers.manage'),
     ('TIENDA', 'inventory.view'),
     ('TIENDA', 'sales.pos'),
+    ('TIENDA', 'sales.postsale.view'),
+    ('TIENDA', 'sales.postsale.exchange'),
 
     ('CAJA', 'customers.manage'),
     ('CAJA', 'sales.pos'),
+    ('CAJA', 'sales.postsale.view'),
+    ('CAJA', 'sales.postsale.cancel'),
 
     ('VENTAS', 'products.manage'),
     ('VENTAS', 'customers.manage'),
     ('VENTAS', 'prices.manage'),
-    ('VENTAS', 'sales.pos')
+    ('VENTAS', 'sales.pos'),
+    ('VENTAS', 'sales.postsale.view'),
+    ('VENTAS', 'sales.postsale.exchange')
 )
 insert into role_permissions (
   role_id,

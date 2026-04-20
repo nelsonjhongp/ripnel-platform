@@ -148,15 +148,29 @@ async function updateCashClosingClose(cashClosingId, data) {
 
 async function sumSalesPaymentsByLocationAndDate(locationId, businessDate) {
   const result = await query(
-    `SELECT
-       sp.method,
-       SUM(sp.amount) AS total
-     FROM sales_payments sp
-     INNER JOIN sales s ON s.sale_id = sp.sale_id
-     WHERE s.location_id = $1
-       AND s.status = 'confirmed'
-       AND DATE(s.confirmed_at AT TIME ZONE 'America/Lima') = $2::date
-     GROUP BY sp.method`,
+    `WITH payment_movements AS (
+       SELECT
+         sp.method,
+         sp.amount AS signed_amount
+       FROM sales_payments sp
+       INNER JOIN sales s ON s.sale_id = sp.sale_id
+       WHERE s.location_id = $1
+         AND DATE(COALESCE(s.confirmed_at, s.created_at) AT TIME ZONE 'America/Lima') = $2::date
+
+       UNION ALL
+
+       SELECT
+         spr.method,
+         -spr.amount AS signed_amount
+       FROM sales_payment_reversals spr
+       WHERE spr.location_id = $1
+         AND DATE(spr.reversed_at AT TIME ZONE 'America/Lima') = $2::date
+     )
+     SELECT
+       method,
+       COALESCE(SUM(signed_amount), 0) AS total
+     FROM payment_movements
+     GROUP BY method`,
     [locationId, businessDate]
   );
   return result.rows;
