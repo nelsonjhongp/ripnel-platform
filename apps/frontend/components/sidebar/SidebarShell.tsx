@@ -37,6 +37,8 @@ export function SidebarShell({
       "/sidebar": "Panel del usuario",
       "/account": "Cuenta",
       "/inicio": "Inicio",
+      "/dashboard": "Dashboard operativo",
+      "/bi": "BI y analitica",
       "/account-mockup": "Cuenta mockup",
       "/admin-crud": "Gestion de usuarios",
       "/inventory": "Inventario",

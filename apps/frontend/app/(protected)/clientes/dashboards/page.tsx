@@ -1,5 +1,5 @@
-import CustomersPowerBiDashboardPage from "@/components/modules/customers-powerbi-dashboard-page";
+import { redirect } from "next/navigation"
 
 export default function Page() {
-  return <CustomersPowerBiDashboardPage />;
+  redirect("/bi?view=clientes")
 }
