@@ -33,6 +33,7 @@ DROP TABLE IF EXISTS cash_closings CASCADE;
 DROP TABLE IF EXISTS exchange_lines CASCADE;
 DROP TABLE IF EXISTS exchanges CASCADE;
 
+DROP TABLE IF EXISTS sales_receipts CASCADE;
 DROP TABLE IF EXISTS sales_payments CASCADE;
 DROP TABLE IF EXISTS sales_details CASCADE;
 DROP TABLE IF EXISTS sales CASCADE;
@@ -668,6 +669,38 @@ CREATE TABLE IF NOT EXISTS cash_closings (
   UNIQUE (location_id, business_date)
 );
 
+
+CREATE TABLE IF NOT EXISTS sales_receipts (
+  sales_receipt_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sale_id UUID NOT NULL UNIQUE REFERENCES sales(sale_id) ON DELETE CASCADE,
+
+  document_type VARCHAR(20) NOT NULL CHECK (document_type IN ('boleta','factura')),
+  series VARCHAR(4) NOT NULL,          -- B001 / F001
+  correlative VARCHAR(8) NOT NULL,     -- 00000001
+  issued_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  provider VARCHAR(30),                -- greenter, nubefact, etc.
+  external_id VARCHAR(100),            -- ticket o id externo
+  sunat_status VARCHAR(20),            -- sent/accepted/rejected/voided
+  sunat_code VARCHAR(20),
+  sunat_message TEXT,
+
+  xml_url TEXT,
+  cdr_url TEXT,
+  pdf_url TEXT,
+  qr_payload TEXT,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  CHECK (
+    sunat_status IS NULL
+    OR sunat_status IN ('pending','sent','accepted','rejected','voided','error')
+  ),
+
+  UNIQUE (series, correlative)
+);
+
 -- ============================================================
 -- 10) CAMBIOS / REPOSICIONES
 -- ============================================================
@@ -772,6 +805,9 @@ CREATE INDEX IF NOT EXISTS idx_sales_payments_sale
 
 CREATE INDEX IF NOT EXISTS idx_sales_payments_method_paid
   ON sales_payments(method, paid_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_sales_receipts_sunat_status
+  ON sales_receipts(sunat_status, issued_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_adjustments_location_created
   ON inventory_adjustments(location_id, created_at DESC);
@@ -895,6 +931,11 @@ CREATE TRIGGER trg_cash_closings_updated_at
 BEFORE UPDATE ON cash_closings
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+DROP TRIGGER IF EXISTS trg_sales_receipts_updated_at ON sales_receipts;
+CREATE TRIGGER trg_sales_receipts_updated_at
+BEFORE UPDATE ON sales_receipts
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
 DROP TRIGGER IF EXISTS trg_exchanges_updated_at ON exchanges;
 CREATE TRIGGER trg_exchanges_updated_at
 BEFORE UPDATE ON exchanges
@@ -945,6 +986,9 @@ COMMENT ON TABLE sales IS
 
 COMMENT ON TABLE sales_details IS
 'Líneas de venta por variante. pricing_rule_applied ayuda a analítica comercial futura.';
+
+COMMENT ON TABLE sales_receipts IS
+'Comprobante electrónico asociado a una venta confirmada y su estado de integración SUNAT.';
 
 COMMENT ON TABLE exchanges IS
 'Cabecera de cambios/reposiciones. Puede asociarse o no a una venta previa.';
