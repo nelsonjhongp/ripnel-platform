@@ -1,4 +1,14 @@
-const { listSellableVariants, listSales, getSale, createSale } = require('./sales.service');
+const {
+  listSellableVariants,
+  listSales,
+  listReceiptQueue,
+  getSale,
+  createSale,
+  retrySaleReceipt,
+  processPendingReceiptQueue,
+  getSalePdfLink,
+  getSaleProformaPdf,
+} = require('./sales.service');
 
 async function getSellableVariants(req, res, next) {
   try {
@@ -22,6 +32,19 @@ async function getSales(req, res, next) {
       date_to: req.query.date_to,
     });
     return res.json(sales);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function getReceiptQueue(req, res, next) {
+  try {
+    const receipts = await listReceiptQueue({
+      user_id: req.auth?.sub,
+      queue_status: req.query.queue_status,
+      limit: req.query.limit,
+    });
+    return res.json(receipts);
   } catch (error) {
     return next(error);
   }
@@ -51,9 +74,66 @@ async function postSale(req, res, next) {
   }
 }
 
+async function postRetrySaleReceipt(req, res, next) {
+  try {
+    const sale = await retrySaleReceipt({
+      sale_id: req.params.saleId,
+      user_id: req.auth?.sub,
+    });
+    return res.status(200).json(sale);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function postRetryPendingReceipts(req, res, next) {
+  try {
+    const result = await processPendingReceiptQueue({
+      limit: req.body && req.body.limit,
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function getSalePdfFile(req, res, next) {
+  try {
+    const result = await getSalePdfLink({
+      sale_id: req.params.saleId,
+      user_id: req.auth?.sub,
+      format: req.query.format,
+    });
+
+    return res.redirect(302, result.pdfUrl);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function getSaleProformaPdfFile(req, res, next) {
+  try {
+    const result = await getSaleProformaPdf({
+      sale_id: req.params.saleId,
+      user_id: req.auth?.sub,
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${result.fileName}"`);
+    return res.send(result.pdfBuffer);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   getSellableVariants,
   getSales,
+  getReceiptQueue,
   getSaleById,
   postSale,
+  postRetrySaleReceipt,
+  postRetryPendingReceipts,
+  getSalePdfFile,
+  getSaleProformaPdfFile,
 };

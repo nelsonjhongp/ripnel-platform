@@ -64,6 +64,18 @@ function isCloseEnough(left: number, right: number) {
   return Math.abs(left - right) < 0.01
 }
 
+function resolveSaleDocumentPath(sale: SaleDetail) {
+  if (sale.document_type === "proforma") {
+    return `/api/sales/${sale.sale_id}/proforma-pdf`
+  }
+
+  if (sale.document_type === "boleta" || sale.document_type === "factura") {
+    return `/api/sales/${sale.sale_id}/pdf`
+  }
+
+  return null
+}
+
 export default function SaleDetailPage({ params }: { params: Promise<{ saleId: string }> }) {
   const [sale, setSale] = useState<SaleDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -164,6 +176,15 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
     )
   }
 
+  const documentPath = resolveSaleDocumentPath(sale)
+  const canDownloadDocument = Boolean(documentPath)
+  const downloadLabel =
+    sale.document_type === "proforma"
+      ? "Abrir proforma PDF"
+      : sale.document_type === "boleta" || sale.document_type === "factura"
+        ? "Abrir comprobante PDF"
+        : "Sin documento PDF"
+
   return (
     <PermissionGuard permission="sales.pos">
       <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
@@ -186,14 +207,35 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
           </div>
 
           <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
-            <p className="text-xs uppercase tracking-wide text-violet-600">Detalle de venta</p>
-            <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">
-              {sale.sale_number || "Sin correlativo"}
-            </h1>
-            <p className="mt-1 text-sm text-slate-600">
-              {sale.document_type} • {sale.status} •{" "}
-              {new Date(sale.confirmed_at || sale.created_at).toLocaleString("es-PE")}
-            </p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-violet-600">Detalle de venta</p>
+                <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">
+                  {sale.sale_number || "Sin correlativo"}
+                </h1>
+                <p className="mt-1 text-sm text-slate-600">
+                  {sale.document_type} • {sale.status} •{" "}
+                  {new Date(sale.confirmed_at || sale.created_at).toLocaleString("es-PE")}
+                </p>
+              </div>
+
+              {canDownloadDocument ? (
+                <a
+                  href={documentPath || "#"}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-800 shadow-sm transition hover:bg-violet-100"
+                >
+                  <ReceiptText className="h-4 w-4" />
+                  {downloadLabel}
+                </a>
+              ) : (
+                <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-medium text-slate-500">
+                  <ReceiptText className="h-4 w-4" />
+                  {downloadLabel}
+                </span>
+              )}
+            </div>
           </header>
 
           {consistency && !consistency.headerMatches && (

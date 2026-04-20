@@ -69,6 +69,18 @@ Variables minimas:
 - `JWT_SECRET`
 - `FRONTEND_URL`
 
+Variables de emision SUNAT/APISUNAT:
+
+- `APISUNAT_ENABLED` (`true|false`): en `false` la venta se confirma sin intentar emision.
+- `APISUNAT_RETRY_JOB_ENABLED` (`true|false`): activa el worker de reintentos en background.
+- `APISUNAT_RETRY_INTERVAL_MS`: intervalo del worker en milisegundos.
+- `APISUNAT_RETRY_BATCH_SIZE`: maximo de comprobantes a reintentar por ciclo.
+
+Notas operativas:
+
+- Si APISUNAT presenta caidas o errores internos, usar `APISUNAT_ENABLED=false` para mantener operacion de caja/inventario.
+- Cuando el proveedor se recupere, volver a `APISUNAT_ENABLED=true` y ejecutar reintentos pendientes.
+
 ### Frontend
 
 Crear `apps/frontend/.env.local` a partir de `apps/frontend/.env.example`.
@@ -112,6 +124,24 @@ Carga reglas reales
 Crea regla si no existe
 Edita regla existente
 Muestra listado real de reglas
+
+## Contingencia SUNAT
+
+Para desacoplar la operacion comercial de la emision electronica, el backend incluye cola de comprobantes y reintentos.
+
+Endpoints disponibles (requieren auth y permiso `sales.pos`):
+
+- `GET /api/sales/receipts/queue?queue_status=open&limit=50`
+- `POST /api/sales/:saleId/retry-receipt`
+- `POST /api/sales/receipts/retry-pending` con body opcional `{ "limit": 20 }`
+
+Valores de `queue_status`:
+
+- `open`: incluye `missing`, `pending` y `error`.
+- `missing`: venta confirmada sin registro en `sales_receipts`.
+- `pending`: enviado pero aun no confirmado.
+- `error`: emision fallida.
+- `all`: sin filtro de estado de cola.
 
 ## Documentacion tecnica
 

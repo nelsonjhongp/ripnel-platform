@@ -22,7 +22,7 @@ import { ApiError, apiFetch, unwrapApiData } from "@/lib/api"
 
 const DOC_TYPES = [
   { value: "none", label: "Sin comprobante" },
-  { value: "boleta", label: "Boleta (DNI)" },
+  { value: "boleta", label: "Boleta (DNI/CE)" },
   { value: "factura", label: "Factura (RUC)" },
   { value: "proforma", label: "Proforma" },
 ]
@@ -67,14 +67,25 @@ function buildCustomerDocument(customer) {
 
 function isCustomerValidForDocumentType(customer, documentType) {
   if (!customer) return false
+  const customerDocType = String(customer.document_type || "").toLowerCase()
 
   if (documentType === "boleta") {
-    return customer.document_type === "dni" && Boolean(customer.document_number)
+    const documentNumber = String(customer.document_number || "").trim()
+
+    if (customerDocType === "dni") {
+      return /^\d{8}$/.test(documentNumber)
+    }
+
+    if (customerDocType === "ce") {
+      return /^\d{9}$/.test(documentNumber)
+    }
+
+    return false
   }
 
   if (documentType === "factura") {
     return (
-      customer.document_type === "ruc" &&
+      customerDocType === "ruc" &&
       Boolean(customer.document_number) &&
       Boolean(customer.address)
     )
@@ -740,7 +751,7 @@ export default function NuevaVentaPage() {
                 {!customerIsValid && (
                   <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
                     {documentType === "boleta"
-                      ? "Para boleta debes seleccionar un cliente con DNI."
+                      ? "Para boleta debes seleccionar un cliente con DNI o CE valido (DNI 8 digitos, CE 9 digitos)."
                       : "Para factura debes seleccionar un cliente con RUC y direccion."}
                   </p>
                 )}
