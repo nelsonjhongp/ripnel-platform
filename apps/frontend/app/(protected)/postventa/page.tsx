@@ -66,9 +66,9 @@ const CASH_STYLES: Record<string, string> = {
 }
 
 const CASH_LABELS: Record<string, string> = {
-  open: "Caja abierta",
-  closed: "Caja cerrada",
-  missing: "Sin caja abierta",
+  open: "Caja operativa abierta",
+  closed: "Caja operativa cerrada",
+  missing: "Sin caja operativa abierta",
 }
 
 function explainPostsaleError(error: unknown) {
@@ -434,8 +434,9 @@ export default function PostsalePage() {
             <div className="flex items-start gap-2">
               <CircleAlert className="mt-0.5 h-4 w-4" />
               <p>
-                Este MVP de postventa no usa SUNAT como criterio. La elegibilidad se resuelve solo
-                con estado de venta, caja abierta, stock disponible y trazabilidad interna.
+                Este MVP de postventa no usa SUNAT como criterio. La elegibilidad se resuelve con
+                estado de venta, caja operativa de la sede para el día de la venta, stock
+                disponible y trazabilidad interna.
               </p>
             </div>
           </div>

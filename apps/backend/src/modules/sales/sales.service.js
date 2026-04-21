@@ -23,6 +23,7 @@ const {
   decrementInventoryInTx,
   insertStockMovementInTx,
 } = require('./sales.repo');
+const { findCashClosingByLocationAndDate } = require('../cash/cash.repo');
 const { findActiveUserById } = require('../auth/auth.repo');
 const { findDefaultLocationByUserId } = require('../users/users.repo');
 
@@ -42,6 +43,10 @@ const RECEIPT_PROVIDER_APISUNAT = 'apisunat';
 const RECEIPT_QUEUE_STATUS_FILTERS = ['open', 'pending', 'error', 'missing', 'all'];
 
 let receiptRetryJobRunning = false;
+
+function todayPeruDate() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+}
 
 function normalizeUuid(value) {
   const normalized = String(value || '').trim();
@@ -967,6 +972,33 @@ async function resolveOperatingContext(userId) {
   };
 }
 
+async function assertOpenCashForLocation(location, executor = null) {
+  const businessDate = todayPeruDate();
+  const cashClosing = await findCashClosingByLocationAndDate(
+    location.location_id,
+    businessDate,
+    executor || undefined
+  );
+
+  if (!cashClosing) {
+    throw new AppError(
+      `No hay una caja abierta para ${location.name} en la fecha operativa de hoy. Abre caja antes de registrar ventas.`,
+      409,
+      { code: 'CASH_OPEN_REQUIRED' }
+    );
+  }
+
+  if (cashClosing.status !== 'open') {
+    throw new AppError(
+      `La caja operativa de ${location.name} ya fue cerrada para hoy. No se pueden registrar más ventas en esa fecha operativa.`,
+      409,
+      { code: 'CASH_ALREADY_CLOSED_FOR_DATE' }
+    );
+  }
+
+  return cashClosing;
+}
+
 async function resolveCustomerForSale(customerId) {
   if (customerId) {
     const customer = await findCustomerById(customerId);
@@ -1190,6 +1222,7 @@ async function createSale(input = {}) {
   try {
     await client.query('begin');
     const clientQuery = client.query.bind(client);
+    await assertOpenCashForLocation(location, clientQuery);
 
     const computedItems = [];
     let subtotalAmount = 0;

@@ -46,6 +46,8 @@ import { useAuth } from "@/components/auth/AuthProvider"
 type SidebarItem = {
   title: string
   url: string
+  onlyForRoles?: string[]
+  excludeRoles?: string[]
 }
 
 type SidebarGroup = {
@@ -80,8 +82,11 @@ const sidebarGroups: SidebarGroup[] = [
     title: "Caja",
     icon: Banknote,
     onlyForRoles: ["ADMIN", "CAJA"],
-    directLink: true,
-    items: [{ title: "Caja del día", url: "/caja" }],
+    items: [
+      { title: "Caja del día", url: "/caja" },
+      { title: "Historial de caja", url: "/caja/historial" },
+      { title: "Control de cajas", url: "/caja/control", onlyForRoles: ["ADMIN"] },
+    ],
   },
   {
     title: "Inventario",
@@ -203,15 +208,33 @@ function SidebarGroupSection({
   items,
   directLink,
   pathname,
+  roleName,
 }: {
   title: string
   icon: React.ComponentType<{ className?: string }>
   items: SidebarItem[]
   directLink?: boolean
   pathname: string
+  roleName?: string
 }) {
-  if (directLink && items.length === 1) {
-    const item = items[0]
+  const visibleItems = items.filter((item) => {
+    if (item.onlyForRoles && roleName && !item.onlyForRoles.includes(roleName)) {
+      return false
+    }
+
+    if (item.excludeRoles && roleName && item.excludeRoles.includes(roleName)) {
+      return false
+    }
+
+    return true
+  })
+
+  if (visibleItems.length === 0) {
+    return null
+  }
+
+  if (directLink && visibleItems.length === 1) {
+    const item = visibleItems[0]
     const isActive = pathname === item.url || pathname.startsWith(`${item.url}/`)
 
     return (
@@ -221,7 +244,9 @@ function SidebarGroupSection({
     )
   }
 
-  const isActive = items.some((item) => pathname === item.url || pathname.startsWith(`${item.url}/`))
+  const isActive = visibleItems.some(
+    (item) => pathname === item.url || pathname.startsWith(`${item.url}/`)
+  )
 
   return (
     <Collapsible defaultOpen={isActive} className="group border-t border-slate-200 pt-2.5">
@@ -233,7 +258,7 @@ function SidebarGroupSection({
         </CollapsibleTrigger>
         <CollapsibleContent className="pt-1">
           <div className="space-y-0.5 pl-2">
-            {items.map((item) => {
+            {visibleItems.map((item) => {
               const IconComponent =
                 title === "Catalogos"
                   ? catalogIcons[item.title as keyof typeof catalogIcons]
@@ -247,7 +272,7 @@ function SidebarGroupSection({
                   href={item.url}
                   label={item.title}
                   icon={IconComponent}
-                  active={pathname === item.url}
+                  active={pathname === item.url || pathname.startsWith(`${item.url}/`)}
                 />
               )
             })}
@@ -278,7 +303,26 @@ export function AppSidebar({
   const visibleGroups = React.useMemo(() => {
     if (loading) return []
 
-    return sidebarGroups.filter((group) => {
+    return sidebarGroups
+      .map((group) => {
+        const items = group.items.filter((item) => {
+          if (item.onlyForRoles && user?.role_name && !item.onlyForRoles.includes(user.role_name)) {
+            return false
+          }
+
+          if (item.excludeRoles && user?.role_name && item.excludeRoles.includes(user.role_name)) {
+            return false
+          }
+
+          return true
+        })
+
+        return {
+          ...group,
+          items,
+        }
+      })
+      .filter((group) => {
       if (group.permission && !has(group.permission)) return false
 
       if (group.onlyForRoles && user?.role_name && !group.onlyForRoles.includes(user.role_name)) {
@@ -289,8 +333,8 @@ export function AppSidebar({
         return false
       }
 
-      return true
-    })
+      return group.items.length > 0
+      })
   }, [loading, has, user?.role_name])
 
   const handleLogout = async () => {
@@ -395,6 +439,7 @@ export function AppSidebar({
                 items={group.items}
                 directLink={group.directLink}
                 pathname={pathname}
+                roleName={user?.role_name}
               />
             ))}
           </nav>

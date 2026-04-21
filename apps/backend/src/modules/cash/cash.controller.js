@@ -4,6 +4,8 @@ const {
   getCurrentCash,
   listCashClosings,
   getCashClosing,
+  getCashAdminSummary,
+  listCashAdminSessions,
 } = require('./cash.service');
 
 async function getCashClosings(req, res, next) {
@@ -44,6 +46,36 @@ async function getCashClosingById(req, res, next) {
   }
 }
 
+async function getCashAdminSummaryController(req, res, next) {
+  try {
+    const summary = await getCashAdminSummary({
+      user_id: req.auth?.sub,
+      location_id: req.query.locationId || req.query.location_id,
+      status: req.query.status,
+      range: req.query.range,
+    });
+    return res.json(summary);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function getCashAdminSessionsController(req, res, next) {
+  try {
+    const sessions = await listCashAdminSessions({
+      user_id: req.auth?.sub,
+      location_id: req.query.locationId || req.query.location_id,
+      status: req.query.status,
+      range: req.query.range,
+      page: req.query.page,
+      page_size: req.query.pageSize || req.query.page_size,
+    });
+    return res.json(sessions);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 async function postOpenCash(req, res, next) {
   try {
     const closing = await openCash({
@@ -73,6 +105,8 @@ module.exports = {
   getCashClosings,
   getCashCurrent,
   getCashClosingById,
+  getCashAdminSummaryController,
+  getCashAdminSessionsController,
   postOpenCash,
   patchCloseCash,
 };

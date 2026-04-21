@@ -214,9 +214,9 @@ function resolveDocumentPath(context: PostsaleContext) {
 }
 
 function cashStatusLabel(status: PostsaleContext["sale"]["cash_status"]) {
-  if (status === "open") return "Caja abierta"
-  if (status === "closed") return "Caja cerrada"
-  return "Sin caja abierta"
+  if (status === "open") return "Caja operativa abierta"
+  if (status === "closed") return "Caja operativa cerrada"
+  return "Sin caja operativa abierta"
 }
 
 function cashStatusClasses(status: PostsaleContext["sale"]["cash_status"]) {
