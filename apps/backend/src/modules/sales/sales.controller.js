@@ -1,4 +1,5 @@
 const {
+  getPosContext,
   listSellableVariants,
   listSales,
   listReceiptQueue,
@@ -9,6 +10,17 @@ const {
   getSalePdfLink,
   getSaleProformaPdf,
 } = require('./sales.service');
+
+async function getSalesPosContext(req, res, next) {
+  try {
+    const context = await getPosContext({
+      user_id: req.auth?.sub,
+    });
+    return res.json(context);
+  } catch (error) {
+    return next(error);
+  }
+}
 
 async function getSellableVariants(req, res, next) {
   try {
@@ -127,6 +139,7 @@ async function getSaleProformaPdfFile(req, res, next) {
 }
 
 module.exports = {
+  getSalesPosContext,
   getSellableVariants,
   getSales,
   getReceiptQueue,

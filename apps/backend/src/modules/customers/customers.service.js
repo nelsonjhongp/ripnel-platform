@@ -113,6 +113,7 @@ async function patchCustomer(customerId, input) {
   const commercial_name = 'commercial_name' in input ? cleanText(input.commercial_name) : existing.commercial_name;
   const email = 'email' in input ? cleanText(input.email) : existing.email;
   const phone = 'phone' in input ? cleanText(input.phone) : existing.phone;
+  const address = 'address' in input ? cleanText(input.address) : existing.address;
   const notes = 'notes' in input ? cleanText(input.notes) : existing.notes;
   const active = normalizeActive(input.active, existing.active);
 
@@ -145,6 +146,7 @@ async function patchCustomer(customerId, input) {
       commercial_name,
       email,
       phone,
+      address,
       customer_type,
       active,
       notes,
@@ -165,6 +167,7 @@ async function createNewCustomer(input) {
   const commercial_name = cleanText(input.commercial_name);
   const email = cleanText(input.email);
   const phone = cleanText(input.phone);
+  const address = cleanText(input.address);
   const notes = cleanText(input.notes);
   const active = normalizeActive(input.active, true);
   const customer_type = cleanText(input.customer_type) || 'retail';
@@ -186,6 +189,7 @@ async function createNewCustomer(input) {
       commercial_name,
       email,
       phone,
+      address,
       customer_type,
       active,
       notes,
