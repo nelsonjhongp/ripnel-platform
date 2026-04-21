@@ -10,7 +10,6 @@ import {
   Banknote,
   ClipboardList,
   ChevronDown,
-  ChevronsUpDown,
   CircleUserRound,
   House,
   LayoutDashboard,
@@ -60,6 +59,8 @@ type SidebarGroup = {
   items: SidebarItem[]
 }
 
+const SELLER_FOCUSED_ROLES = ["TIENDA", "VENTAS"]
+
 const sidebarGroups: SidebarGroup[] = [
   {
     title: "Venta",
@@ -92,6 +93,7 @@ const sidebarGroups: SidebarGroup[] = [
     title: "Inventario",
     icon: Boxes,
     permission: "inventory.view",
+    excludeRoles: SELLER_FOCUSED_ROLES,
     items: [
       { title: "Stock actual", url: "/inventory" },
       { title: "Apertura y ajustes", url: "/inventory/ajustes" },
@@ -102,6 +104,7 @@ const sidebarGroups: SidebarGroup[] = [
     title: "Productos",
     icon: ShoppingBag,
     permission: "products.manage",
+    excludeRoles: SELLER_FOCUSED_ROLES,
     items: [
       { title: "Estilos", url: "/productos/estilos" },
       { title: "Variantes", url: "/productos/variantes" },
@@ -111,6 +114,7 @@ const sidebarGroups: SidebarGroup[] = [
     title: "Precios",
     icon: ReceiptText,
     permission: "prices.manage",
+    excludeRoles: SELLER_FOCUSED_ROLES,
     items: [
       { title: "Listado de precios", url: "/precios/listado-de-precios" },
       { title: "Crear y editar precio", url: "/precios/crear-y-editar-precio" },
@@ -121,6 +125,7 @@ const sidebarGroups: SidebarGroup[] = [
     title: "Transferencias",
     icon: ArrowRightLeft,
     permission: "transfers.manage",
+    excludeRoles: SELLER_FOCUSED_ROLES,
     items: [
       { title: "Listado de transferencias", url: "/transferencias/listado-de-transferencias" },
       { title: "Crear transferencia", url: "/transferencias/crear-transferencia" },
@@ -139,18 +144,21 @@ const sidebarGroups: SidebarGroup[] = [
   {
     title: "Clientes",
     icon: Users,
+    onlyForRoles: ["ADMIN", "TIENDA", "CAJA", "VENTAS"],
     items: [{ title: "Clientes", url: "/clientes" }],
   },
   {
     title: "BI",
     icon: BarChart3,
     directLink: true,
+    excludeRoles: SELLER_FOCUSED_ROLES,
     items: [{ title: "BI", url: "/bi" }],
   },
   {
     title: "Catalogos",
     icon: Warehouse,
     permission: "catalogs.manage",
+    excludeRoles: SELLER_FOCUSED_ROLES,
     items: [
       { title: "Tallas", url: "/catalogos/tallas" },
       { title: "Colores", url: "/catalogos/colores" },
@@ -215,7 +223,7 @@ function SidebarGroupSection({
   items: SidebarItem[]
   directLink?: boolean
   pathname: string
-  roleName?: string
+  roleName?: string | null
 }) {
   const visibleItems = items.filter((item) => {
     if (item.onlyForRoles && roleName && !item.onlyForRoles.includes(roleName)) {
@@ -294,7 +302,6 @@ export function AppSidebar({
     loading,
     locationsLoading,
     locationsError,
-    locationAssignments,
     defaultLocation,
     has,
     logout,
@@ -395,24 +402,15 @@ export function AppSidebar({
                         ? "Sede no disponible"
                         : defaultLocation?.name || "Sin sede asignada"}
                   </p>
-                  <p className="truncate text-[11px] text-slate-500">
-                    {locationsLoading
-                      ? "Buscando configuracion..."
-                      : locationsError
-                        ? "Revisar cuenta o volver a iniciar sesion"
-                        : locationAssignments.length > 0
-                        ? `${defaultLocation?.code || "Sin codigo"} · ${locationAssignments.length} sedes`
-                        : "Configurar en cuenta"}
-                  </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => router.push("/account")}
                 className="inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-500 transition hover:bg-white hover:text-slate-700"
-                aria-label="Configurar sede"
+                aria-label="Gestionar sede"
               >
-                <ChevronsUpDown className="h-4 w-4" />
+                <Settings className="h-4 w-4" />
               </button>
             </div>
           </div>

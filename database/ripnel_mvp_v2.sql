@@ -573,7 +573,7 @@ CREATE TABLE IF NOT EXISTS sales (
       OR document_type <> 'boleta'
       OR (
         customer_name_text IS NOT NULL
-        AND customer_doc_type = 'dni'
+        AND customer_doc_type IN ('dni','ce')
         AND customer_doc_number IS NOT NULL
       )
     ),

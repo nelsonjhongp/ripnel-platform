@@ -1,6 +1,7 @@
 const express = require('express');
 const { requireAuth, requirePermission } = require('../../middlewares/auth');
 const {
+	getSalesPosContext,
 	getSellableVariants,
 	getSales,
 	getReceiptQueue,
@@ -16,6 +17,7 @@ const router = express.Router();
 
 router.use(requireAuth, requirePermission('sales.pos'));
 
+router.get('/context', getSalesPosContext);
 router.get('/sellable-variants', getSellableVariants);
 router.get('/receipts/queue', getReceiptQueue);
 router.post('/receipts/retry-pending', postRetryPendingReceipts);

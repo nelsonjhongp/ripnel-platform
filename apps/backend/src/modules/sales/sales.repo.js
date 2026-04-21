@@ -94,6 +94,8 @@ async function findAllSales(filters = {}) {
        s.subtotal_amount,
        s.tax_amount,
        s.sale_discount_amount,
+       s.sale_discount_reason,
+       s.discounted_at,
        s.total_amount,
        s.currency,
        s.confirmed_at,
@@ -137,6 +139,9 @@ async function findSaleById(saleId, locationId = null) {
        s.tax_amount,
        s.tax_rate,
        s.sale_discount_amount,
+       s.sale_discount_reason,
+       s.discounted_by,
+       s.discounted_at,
        s.total_amount,
        s.currency,
        s.notes,
@@ -172,6 +177,11 @@ async function findSaleDetailsBySaleId(saleId) {
        sd.unit_price_list,
        sd.unit_price_final,
        sd.price_type_applied,
+       sd.pricing_basis,
+       sd.pricing_rule_applied,
+       sd.override_reason,
+       sd.overridden_by,
+       sd.overridden_at,
        sd.line_subtotal,
        sd.line_tax,
        sd.line_total
@@ -482,9 +492,10 @@ async function insertSale(clientQuery, saleData) {
        customer_name_text, customer_doc_type, customer_doc_number, customer_address_text,
        document_type, status, notes,
        tax_rate, subtotal_amount, sale_discount_amount, tax_amount, total_amount,
+       sale_discount_reason, discounted_by, discounted_at,
        sale_number, confirmed_at, currency
      ) VALUES (
-       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
+       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
      )
      RETURNING sale_id`,
     [
@@ -503,6 +514,9 @@ async function insertSale(clientQuery, saleData) {
       saleData.sale_discount_amount,
       saleData.tax_amount,
       saleData.total_amount,
+      saleData.sale_discount_reason || null,
+      saleData.discounted_by || null,
+      saleData.discounted_at || null,
       saleData.sale_number,
       saleData.confirmed_at,
       saleData.currency,
@@ -517,9 +531,10 @@ async function insertSaleDetail(clientQuery, detailData) {
     `INSERT INTO sales_details (
        sale_id, variant_id, quantity,
        unit_price_list, unit_price_final,
-       price_type_applied, pricing_basis,
+       price_type_applied, pricing_basis, pricing_rule_applied,
+       override_reason, overridden_by, overridden_at,
        line_subtotal, line_tax, line_total
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
      RETURNING sale_detail_id`,
     [
       detailData.sale_id,
@@ -529,6 +544,10 @@ async function insertSaleDetail(clientQuery, detailData) {
       detailData.unit_price_final,
       detailData.price_type_applied,
       detailData.pricing_basis,
+      detailData.pricing_rule_applied || null,
+      detailData.override_reason || null,
+      detailData.overridden_by || null,
+      detailData.overridden_at || null,
       detailData.line_subtotal,
       detailData.line_tax,
       detailData.line_total,
