@@ -77,10 +77,10 @@ function sanitizeCashStatus(value) {
 
 function buildCancellationCashReason(cashStatus) {
   if (cashStatus === 'closed') {
-    return 'La caja del día de la venta ya fue cerrada.';
+    return 'La caja operativa de la sede para el día de la venta ya fue cerrada.';
   }
 
-  return 'La caja del día de la venta no está abierta.';
+  return 'La caja operativa de la sede para el día de la venta no está abierta.';
 }
 
 function buildAvailability({ sale, details, cancellation, confirmedExchangeCount }) {
