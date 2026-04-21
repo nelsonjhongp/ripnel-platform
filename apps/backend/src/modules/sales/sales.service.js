@@ -83,6 +83,212 @@ function normalizeAmount(value) {
   return Math.round(parsed * 100) / 100;
 }
 
+function normalizePositiveAmount(value) {
+  const parsed = normalizeAmount(value);
+  if (parsed === null || parsed <= 0) return null;
+  return parsed;
+}
+
+function normalizeDiscountMode(value) {
+  const normalized = normalizeText(value);
+  if (!normalized) return null;
+
+  const lower = normalized.toLowerCase();
+  return ['amount', 'percent'].includes(lower) ? lower : null;
+}
+
+function normalizePriceOverride(input) {
+  if (input === undefined || input === null) {
+    return null;
+  }
+
+  if (typeof input !== 'object' || Array.isArray(input)) {
+    throw new AppError('price_override must be an object', 400);
+  }
+
+  const unitPriceFinal = normalizeAmount(input.unit_price_final);
+  const reason = normalizeText(input.reason);
+
+  if (unitPriceFinal === null) {
+    throw new AppError('price_override.unit_price_final must be a valid amount', 400);
+  }
+
+  if (!reason) {
+    throw new AppError('price_override.reason is required', 400);
+  }
+
+  return {
+    unit_price_final: unitPriceFinal,
+    reason,
+  };
+}
+
+function normalizeSaleDiscount(input) {
+  if (input === undefined || input === null) {
+    return null;
+  }
+
+  if (typeof input !== 'object' || Array.isArray(input)) {
+    throw new AppError('sale_discount must be an object', 400);
+  }
+
+  const mode = normalizeDiscountMode(input.mode);
+  const value = normalizePositiveAmount(input.value);
+  const reason = normalizeText(input.reason);
+
+  if (!mode) {
+    throw new AppError('sale_discount.mode must be amount or percent', 400);
+  }
+
+  if (value === null) {
+    throw new AppError('sale_discount.value must be a positive amount', 400);
+  }
+
+  if (!reason) {
+    throw new AppError('sale_discount.reason is required', 400);
+  }
+
+  return {
+    mode,
+    value,
+    reason,
+  };
+}
+
+function computeSaleDiscountAmount(discount, subtotalAmount) {
+  if (!discount) return 0;
+
+  if (subtotalAmount <= 0) {
+    throw new AppError('A discount cannot be applied to an empty subtotal', 400);
+  }
+
+  if (discount.mode === 'percent') {
+    if (discount.value > 100) {
+      throw new AppError('sale_discount.value cannot exceed 100 when mode is percent', 400);
+    }
+
+    return round2((subtotalAmount * discount.value) / 100);
+  }
+
+  if (discount.value > subtotalAmount) {
+    throw new AppError('sale_discount.value cannot exceed subtotal amount', 400);
+  }
+
+  return round2(discount.value);
+}
+
+function allocateSaleDiscountAcrossItems(items, saleDiscountAmount) {
+  if (!Array.isArray(items) || !items.length || saleDiscountAmount <= 0) {
+    return items.map((item) => ({
+      ...item,
+      line_discount_amount: 0,
+      line_subtotal: item.line_subtotal_before_discount,
+    }));
+  }
+
+  const totalBase = round2(
+    items.reduce((accumulator, item) => accumulator + Number(item.line_subtotal_before_discount || 0), 0)
+  );
+
+  let remainingDiscount = saleDiscountAmount;
+
+  return items.map((item, index) => {
+    const baseLineSubtotal = round2(Number(item.line_subtotal_before_discount || 0));
+    const lineDiscount =
+      index === items.length - 1
+        ? remainingDiscount
+        : round2((saleDiscountAmount * baseLineSubtotal) / totalBase);
+    const cappedLineDiscount = Math.min(baseLineSubtotal, Math.max(lineDiscount, 0), remainingDiscount);
+
+    remainingDiscount = round2(remainingDiscount - cappedLineDiscount);
+
+    return {
+      ...item,
+      line_discount_amount: cappedLineDiscount,
+      line_subtotal: round2(baseLineSubtotal - cappedLineDiscount),
+    };
+  });
+}
+
+function applyTaxesToComputedItems(items, taxRate) {
+  const subtotalAmount = round2(
+    items.reduce((accumulator, item) => accumulator + Number(item.line_subtotal || 0), 0)
+  );
+  const taxAmount = round2(subtotalAmount * taxRate);
+  let remainingTax = taxAmount;
+
+  const computedItems = items.map((item, index) => {
+    const lineTax =
+      index === items.length - 1 ? remainingTax : round2(Number(item.line_subtotal || 0) * taxRate);
+
+    remainingTax = round2(remainingTax - lineTax);
+
+    return {
+      ...item,
+      unit_price_final: round2(Number(item.line_subtotal || 0) / item.quantity),
+      line_tax: lineTax,
+      line_total: round2(Number(item.line_subtotal || 0) + lineTax),
+    };
+  });
+
+  return {
+    items: computedItems,
+    subtotalAmount,
+    taxAmount,
+    totalAmount: round2(subtotalAmount + taxAmount),
+  };
+}
+
+function normalizeSalePayments(rawPayments, fallbackPaymentMethod, totalAmount) {
+  if (rawPayments !== undefined && rawPayments !== null) {
+    if (!Array.isArray(rawPayments) || !rawPayments.length) {
+      throw new AppError('payments must be a non-empty array when provided', 400);
+    }
+
+    const normalizedPayments = rawPayments.map((payment, index) => {
+      const method = normalizeText(payment && payment.method);
+      const amount = normalizePositiveAmount(payment && payment.amount);
+      const reference = normalizeText(payment && payment.reference);
+
+      if (!ALLOWED_PAYMENT_METHODS.includes(method)) {
+        throw new AppError(`payments[${index}].method is invalid`, 400);
+      }
+
+      if (amount === null) {
+        throw new AppError(`payments[${index}].amount must be a positive amount`, 400);
+      }
+
+      return {
+        method,
+        amount,
+        reference,
+      };
+    });
+
+    const paymentTotal = round2(
+      normalizedPayments.reduce((accumulator, payment) => accumulator + payment.amount, 0)
+    );
+
+    if (Math.abs(paymentTotal - totalAmount) >= 0.01) {
+      throw new AppError('The sum of payments must match the sale total amount', 400);
+    }
+
+    return normalizedPayments;
+  }
+
+  if (!ALLOWED_PAYMENT_METHODS.includes(fallbackPaymentMethod)) {
+    throw new AppError('Invalid payment_method', 400);
+  }
+
+  return [
+    {
+      method: fallbackPaymentMethod,
+      amount: totalAmount,
+      reference: null,
+    },
+  ];
+}
+
 function normalizeReceiptQueueLimit(value, fallback = 50) {
   const parsed = normalizePositiveInteger(value);
   if (!parsed) return fallback;
@@ -1098,6 +1304,45 @@ async function listSellableVariants(input = {}) {
   return findSellableVariants(location.location_id, q);
 }
 
+async function getPosContext(input = {}) {
+  const { user, location } = await resolveOperatingContext(input.user_id);
+  const businessDate = todayPeruDate();
+  const cashClosing = await findCashClosingByLocationAndDate(location.location_id, businessDate);
+
+  let cashStatus = 'missing';
+  let saleEnabled = false;
+  let message =
+    'No hay una caja abierta para la sede operativa de hoy. Abre caja antes de registrar ventas.';
+
+  if (cashClosing) {
+    if (cashClosing.status === 'open') {
+      cashStatus = 'open';
+      saleEnabled = true;
+      message = 'Caja operativa abierta. La sede ya puede registrar ventas.';
+    } else if (cashClosing.status === 'closed') {
+      cashStatus = 'closed';
+      message =
+        'La caja operativa de hoy ya fue cerrada para esta sede. No se pueden registrar mas ventas en esta fecha.';
+    }
+  }
+
+  return {
+    business_date: businessDate,
+    location,
+    user: {
+      user_id: user.user_id,
+      full_name: user.full_name,
+      role_name: user.role_name,
+    },
+    cash: {
+      status: cashStatus,
+      sale_enabled: saleEnabled,
+      cash_closing_id: cashClosing ? cashClosing.cash_closing_id : null,
+      message,
+    },
+  };
+}
+
 async function listSales(input = {}) {
   const status = normalizeText(input.status);
   const q = normalizeText(input.q);
@@ -1158,6 +1403,7 @@ async function createSale(input = {}) {
   const notes = normalizeText(input.notes);
   const customerId = normalizeUuid(input.customer_id);
   const items = Array.isArray(input.items) ? input.items : [];
+  const saleDiscount = normalizeSaleDiscount(input.sale_discount);
 
   if (input.customer_id !== undefined && input.customer_id !== null && !customerId) {
     throw new AppError('Invalid customer_id', 400);
@@ -1165,10 +1411,6 @@ async function createSale(input = {}) {
 
   if (!ALLOWED_DOCUMENT_TYPES.includes(documentType)) {
     throw new AppError('Invalid document_type', 400);
-  }
-
-  if (!ALLOWED_PAYMENT_METHODS.includes(paymentMethod)) {
-    throw new AppError('Invalid payment_method', 400);
   }
 
   if (!items.length) {
@@ -1214,6 +1456,7 @@ async function createSale(input = {}) {
       style_id: variant.style_id,
       size_id: variant.size_id,
       quantity: qty,
+      price_override: normalizePriceOverride(item && item.price_override),
     });
   }
 
@@ -1224,8 +1467,9 @@ async function createSale(input = {}) {
     const clientQuery = client.query.bind(client);
     await assertOpenCashForLocation(location, clientQuery);
 
+    const confirmedAt = new Date().toISOString();
     const computedItems = [];
-    let subtotalAmount = 0;
+    let baseSubtotalAmount = 0;
 
     for (const item of normalizedItems) {
       const availableQty = await getInventoryQtyInTx(
@@ -1249,27 +1493,42 @@ async function createSale(input = {}) {
         throw new AppError(`No current retail price found for ${item.sku}`, 409);
       }
 
-      const lineSubtotal = round2(resolvedPrice * item.quantity);
-      subtotalAmount += lineSubtotal;
+      const unitPriceBeforeDiscount = item.price_override
+        ? item.price_override.unit_price_final
+        : resolvedPrice;
+      const lineSubtotalBeforeDiscount = round2(unitPriceBeforeDiscount * item.quantity);
+      baseSubtotalAmount += lineSubtotalBeforeDiscount;
 
       computedItems.push({
         ...item,
         unit_price_list: resolvedPrice,
-        unit_price_final: resolvedPrice,
+        unit_price_final: unitPriceBeforeDiscount,
         price_type_applied: 'retail',
-        lineSubtotal,
+        pricing_basis: item.price_override ? 'manual_override' : 'auto',
+        override_reason: item.price_override ? item.price_override.reason : null,
+        overridden_by: item.price_override ? user.user_id : null,
+        overridden_at: item.price_override ? confirmedAt : null,
+        line_subtotal_before_discount: lineSubtotalBeforeDiscount,
       });
     }
 
-    subtotalAmount = round2(subtotalAmount);
+    baseSubtotalAmount = round2(baseSubtotalAmount);
 
     const taxRate = TAX_RATE_BY_DOCUMENT[documentType];
-    const saleDiscountAmount = 0;
-    const taxAmount = round2(subtotalAmount * taxRate);
-    const totalAmount = round2(subtotalAmount + taxAmount - saleDiscountAmount);
+    const saleDiscountAmount = computeSaleDiscountAmount(saleDiscount, baseSubtotalAmount);
+    const discountedItems = allocateSaleDiscountAcrossItems(computedItems, saleDiscountAmount);
+    const pricedSale = applyTaxesToComputedItems(discountedItems, taxRate);
+    const subtotalAmount = pricedSale.subtotalAmount;
+    const taxAmount = pricedSale.taxAmount;
+    const totalAmount = pricedSale.totalAmount;
+
+    if (totalAmount <= 0) {
+      throw new AppError('The final sale total must be greater than zero', 400);
+    }
+
+    const payments = normalizeSalePayments(input.payments, paymentMethod, totalAmount);
 
     const saleNumber = await nextSaleNumberInTx(clientQuery, documentType);
-    const confirmedAt = new Date().toISOString();
 
     const saleRow = await insertSale(clientQuery, {
       location_id: location.location_id,
@@ -1287,6 +1546,9 @@ async function createSale(input = {}) {
       sale_discount_amount: saleDiscountAmount,
       tax_amount: taxAmount,
       total_amount: totalAmount,
+      sale_discount_reason: saleDiscountAmount > 0 && saleDiscount ? saleDiscount.reason : null,
+      discounted_by: saleDiscountAmount > 0 ? user.user_id : null,
+      discounted_at: saleDiscountAmount > 0 ? confirmedAt : null,
       sale_number: saleNumber,
       confirmed_at: confirmedAt,
       currency: 'PEN',
@@ -1294,10 +1556,7 @@ async function createSale(input = {}) {
 
     const saleId = saleRow.sale_id;
 
-    for (const item of computedItems) {
-      const lineTax = round2(item.lineSubtotal * taxRate);
-      const lineTotal = round2(item.lineSubtotal + lineTax);
-
+    for (const item of pricedSale.items) {
       await insertSaleDetail(clientQuery, {
         sale_id: saleId,
         variant_id: item.variant_id,
@@ -1305,10 +1564,14 @@ async function createSale(input = {}) {
         unit_price_list: item.unit_price_list,
         unit_price_final: item.unit_price_final,
         price_type_applied: item.price_type_applied,
-        pricing_basis: 'auto',
-        line_subtotal: item.lineSubtotal,
-        line_tax: lineTax,
-        line_total: lineTotal,
+        pricing_basis: item.pricing_basis,
+        pricing_rule_applied: item.pricing_rule_applied || null,
+        override_reason: item.override_reason,
+        overridden_by: item.overridden_by,
+        overridden_at: item.overridden_at,
+        line_subtotal: item.line_subtotal,
+        line_tax: item.line_tax,
+        line_total: item.line_total,
       });
 
       await decrementInventoryInTx(clientQuery, location.location_id, item.variant_id, item.quantity);
@@ -1325,12 +1588,14 @@ async function createSale(input = {}) {
       });
     }
 
-    await insertSalePayment(clientQuery, {
-      sale_id: saleId,
-      method: paymentMethod,
-      amount: totalAmount,
-      reference: null,
-    });
+    for (const payment of payments) {
+      await insertSalePayment(clientQuery, {
+        sale_id: saleId,
+        method: payment.method,
+        amount: payment.amount,
+        reference: payment.reference,
+      });
+    }
 
     await client.query('commit');
 
@@ -1468,6 +1733,7 @@ async function getSaleProformaPdf(input = {}) {
 }
 
 module.exports = {
+  getPosContext,
   listSellableVariants,
   listSales,
   listReceiptQueue,

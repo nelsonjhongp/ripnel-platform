@@ -71,7 +71,20 @@ async function findCustomerById(customerId) {
   return result.rows[0] || null;
 }
 
-async function updateCustomer({ customerId, document_type, document_number, full_name, business_name, commercial_name, email, phone, customer_type, active, notes }) {
+async function updateCustomer({
+  customerId,
+  document_type,
+  document_number,
+  full_name,
+  business_name,
+  commercial_name,
+  email,
+  phone,
+  address,
+  customer_type,
+  active,
+  notes,
+}) {
   const result = await query(
     `UPDATE customers
      SET
@@ -82,22 +95,48 @@ async function updateCustomer({ customerId, document_type, document_number, full
        commercial_name = $6,
        email = $7,
        phone = $8,
-       customer_type = $9,
-       active = $10,
-       notes = $11,
+       address = $9,
+       customer_type = $10,
+       active = $11,
+       notes = $12,
        updated_at = CURRENT_TIMESTAMP
      WHERE customer_id = $1
      RETURNING
        customer_id, internal_code, document_type, document_number,
-       full_name, business_name, commercial_name, email, phone,
+       full_name, business_name, commercial_name, email, phone, district, address,
        customer_type, active, notes, created_at, updated_at`,
-    [customerId, document_type, document_number, full_name, business_name, commercial_name, email, phone, customer_type, active, notes]
+    [
+      customerId,
+      document_type,
+      document_number,
+      full_name,
+      business_name,
+      commercial_name,
+      email,
+      phone,
+      address,
+      customer_type,
+      active,
+      notes,
+    ]
   );
 
   return result.rows[0] || null;
 }
 
-async function createCustomer({ document_type, document_number, full_name, business_name, commercial_name, email, phone, customer_type, active, notes }) {
+async function createCustomer({
+  document_type,
+  document_number,
+  full_name,
+  business_name,
+  commercial_name,
+  email,
+  phone,
+  address,
+  customer_type,
+  active,
+  notes,
+}) {
   const result = await query(
     `INSERT INTO customers (
        document_type,
@@ -107,16 +146,29 @@ async function createCustomer({ document_type, document_number, full_name, busin
        commercial_name,
        email,
        phone,
+       address,
        customer_type,
        active,
        notes
      )
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
      RETURNING
        customer_id, internal_code, document_type, document_number,
-       full_name, business_name, commercial_name, email, phone,
+       full_name, business_name, commercial_name, email, phone, district, address,
        customer_type, active, notes, created_at, updated_at`,
-    [document_type, document_number, full_name, business_name, commercial_name, email, phone, customer_type, active, notes]
+    [
+      document_type,
+      document_number,
+      full_name,
+      business_name,
+      commercial_name,
+      email,
+      phone,
+      address,
+      customer_type,
+      active,
+      notes,
+    ]
   );
 
   return result.rows[0] || null;
