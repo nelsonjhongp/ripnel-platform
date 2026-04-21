@@ -51,3 +51,22 @@ Guia breve para futuras interfaces operativas de RIPNEL.
 - Lista principal con densidad alta.
 - Detalle expandible solo cuando agregue contexto real.
 - Copy corto, operativo y consistente con el lenguaje ERP del proyecto.
+
+## Patron para modulos de caja
+
+- Separar claramente:
+  - `Caja del dia` como vista operativa;
+  - `Historial` como vista densa de sesiones;
+  - consolas administrativas multi-sede como vistas aparte.
+- Evitar texto redundante en headers o tarjetas cuando la pagina ya se entiende por contexto.
+- Usar tooltips para explicar:
+  - fecha operativa;
+  - total del dia;
+  - pagos del sistema;
+  - diferencia o consistencia.
+- En historiales de caja, preferir:
+  - filas o tablas compactas;
+  - filtros visibles y breves;
+  - paginacion cuando la entidad se repite.
+- Usar el estado `Pendiente de cierre` para sesiones abiertas en listados operativos cuando comunique mejor la accion esperada.
+- Los mini graficos solo deben entrar si resumen una decision real, como tendencia diaria o comparativo por sede.
