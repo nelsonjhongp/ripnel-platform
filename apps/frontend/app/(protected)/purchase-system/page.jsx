@@ -1,12 +1,14 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import {
   Banknote,
   BadgeCheck,
   CircleAlert,
+  ChevronDown,
   CreditCard,
+  History,
   Info,
   Landmark,
   LoaderCircle,
@@ -21,9 +23,10 @@ import {
   ShieldCheck,
   ShoppingBasket,
   Smartphone,
-  Tag,
   Trash2,
+  Users,
   UserPlus,
+  X,
 } from "lucide-react"
 
 import { PermissionGuard } from "@/components/auth/PermissionGuard"
@@ -63,18 +66,6 @@ const SALE_DISCOUNT_OPTIONS = [
   { value: "none", label: "Sin descuento" },
   { value: "percent", label: "Desc. %" },
   { value: "amount", label: "Monto fijo" },
-]
-
-const PRODUCT_STOCK_FILTERS = [
-  { value: "all", label: "Todos" },
-  { value: "in_stock", label: "Con stock" },
-  { value: "out_of_stock", label: "Sin stock" },
-]
-
-const PRODUCT_SEARCH_SCOPES = [
-  { value: "all", label: "Todo" },
-  { value: "code", label: "Codigo" },
-  { value: "name", label: "Nombre" },
 ]
 
 const TAX_RATE = { none: 0, proforma: 0, boleta: 0.18, factura: 0.18 }
@@ -234,23 +225,46 @@ function applyTaxesToPreviewItems(items, taxRate) {
   }
 }
 
-function calculateSalePreview(cart, documentType, saleDiscount) {
+function shouldApplyWholesalePreview(cart, pricingConfig) {
+  const wholesaleMinQty = Number(pricingConfig?.wholesale_min_qty_total || 0)
+  if (!wholesaleMinQty) {
+    return false
+  }
+
+  const totalQuantity = cart.reduce((accumulator, item) => accumulator + Number(item.quantity || 0), 0)
+  return totalQuantity >= wholesaleMinQty
+}
+
+function calculateSalePreview(cart, documentType, saleDiscount, pricingConfig) {
   const taxRate = TAX_RATE[documentType] ?? 0
-  const hasMissingPrice = cart.some(
-    (item) => item.retail_price === null || item.retail_price === undefined
-  )
+  const wholesaleApplies = shouldApplyWholesalePreview(cart, pricingConfig)
 
   const preparedItems = cart.map((item) => {
-    const unitPriceBeforeDiscount =
-      item.price_override?.unit_price_final ?? Number(item.retail_price || 0)
+    const autoUnitPrice =
+      wholesaleApplies && item.wholesale_price !== null && item.wholesale_price !== undefined
+        ? Number(item.wholesale_price || 0)
+        : item.retail_price !== null && item.retail_price !== undefined
+          ? Number(item.retail_price || 0)
+          : null
+    const unitPriceBeforeDiscount = item.price_override?.unit_price_final ?? Number(autoUnitPrice || 0)
     const lineSubtotalBeforeDiscount = round2(unitPriceBeforeDiscount * item.quantity)
+    const priceTypeApplied =
+      wholesaleApplies && item.wholesale_price !== null && item.wholesale_price !== undefined
+        ? "wholesale"
+        : "retail"
 
     return {
       ...item,
+      unit_price_list: autoUnitPrice,
       unit_price_before_discount: unitPriceBeforeDiscount,
+      price_type_applied: priceTypeApplied,
+      pricing_rule_applied: priceTypeApplied === "wholesale" ? pricingConfig?.wholesale_rule_type || null : null,
       line_subtotal_before_discount: lineSubtotalBeforeDiscount,
     }
   })
+  const hasMissingPrice = preparedItems.some(
+    (item) => item.unit_price_list === null || item.unit_price_list === undefined
+  )
 
   const baseSubtotal = round2(
     preparedItems.reduce(
@@ -268,6 +282,8 @@ function calculateSalePreview(cart, documentType, saleDiscount) {
     hasMissingPrice,
     baseSubtotal,
     saleDiscountAmount,
+    priceMode: wholesaleApplies ? "wholesale" : "retail",
+    wholesaleApplied: wholesaleApplies,
   }
 }
 
@@ -325,6 +341,31 @@ function isCustomerValidForDocumentType(customer, documentType) {
   return true
 }
 
+function getCustomerSearchFilter(documentType) {
+  if (documentType === "factura") {
+    return { queryDocumentType: "ruc", localDocumentTypes: ["ruc"] }
+  }
+
+  if (documentType === "boleta") {
+    return { queryDocumentType: null, localDocumentTypes: ["dni", "ce"] }
+  }
+
+  return { queryDocumentType: null, localDocumentTypes: null }
+}
+
+function filterCustomersByDocumentType(customers, documentType) {
+  const { localDocumentTypes } = getCustomerSearchFilter(documentType)
+
+  if (!localDocumentTypes) {
+    return customers
+  }
+
+  return (customers || []).filter((customer) => {
+    const customerDocType = String(customer?.document_type || "").toLowerCase()
+    return localDocumentTypes.includes(customerDocType)
+  })
+}
+
 function groupVariantsByStyle(variants) {
   const grouped = new Map()
 
@@ -378,6 +419,81 @@ function getStyleSearchMeta(style, rawQuery, searchScope) {
   if (nameMatch) return { matches: true, rank: 2 }
 
   return { matches: false, rank: 99 }
+}
+
+function buildProductSearchResults(styles, rawQuery) {
+  return styles
+    .map((style) => {
+      const totalStock = style.variants.reduce(
+        (accumulator, variant) => accumulator + Number(variant.stock || 0),
+        0
+      )
+      const searchMeta = getStyleSearchMeta(style, rawQuery, "all")
+
+      return {
+        ...style,
+        totalStock,
+        searchRank: searchMeta.rank,
+        matchesScope: searchMeta.matches,
+      }
+    })
+    .filter((style) => style.matchesScope)
+    .sort((left, right) => {
+      if (left.searchRank !== right.searchRank) {
+        return left.searchRank - right.searchRank
+      }
+
+      const leftHasStock = left.totalStock > 0 ? 1 : 0
+      const rightHasStock = right.totalStock > 0 ? 1 : 0
+      if (leftHasStock !== rightHasStock) {
+        return rightHasStock - leftHasStock
+      }
+
+      if (left.totalStock !== right.totalStock) {
+        return right.totalStock - left.totalStock
+      }
+
+      return String(left.style_name || "").localeCompare(String(right.style_name || ""))
+    })
+}
+
+function getVariantOptionValues(variants, key, filters = {}) {
+  const values = new Set()
+
+  for (const variant of variants || []) {
+    const matchesFilters = Object.entries(filters).every(([filterKey, filterValue]) => {
+      if (!filterValue) {
+        return true
+      }
+
+      return String(variant?.[filterKey] || "") === String(filterValue)
+    })
+
+    if (!matchesFilters) {
+      continue
+    }
+
+    const optionValue = String(variant?.[key] || "").trim()
+    if (optionValue) {
+      values.add(optionValue)
+    }
+  }
+
+  return Array.from(values).sort((left, right) => left.localeCompare(right))
+}
+
+function findVariantByAttributes(variants, sizeCode, colorCode) {
+  if (!sizeCode || !colorCode) {
+    return null
+  }
+
+  return (
+    (variants || []).find(
+      (variant) =>
+        String(variant.size_code || "") === String(sizeCode) &&
+        String(variant.color_code || "") === String(colorCode)
+    ) || null
+  )
 }
 
 function explainApiError(error, fallback) {
@@ -518,14 +634,20 @@ function replaceCustomerInResults(results, customer) {
 
 export default function NuevaVentaPage() {
   const { user, defaultLocation, locationsLoading, has } = useAuth()
+  const productPickerRef = useRef(null)
+  const productSearchInputRef = useRef(null)
+  const customerPickerRef = useRef(null)
+  const customerSearchInputRef = useRef(null)
+  const documentPickerRef = useRef(null)
 
   const [query, setQuery] = useState("")
   const [variants, setVariants] = useState([])
   const [loadingVariants, setLoadingVariants] = useState(false)
-  const [productStockFilter, setProductStockFilter] = useState("all")
-  const [productSearchScope, setProductSearchScope] = useState("all")
-  const [productStyleFilter, setProductStyleFilter] = useState("all")
-  const [selectedStyleId, setSelectedStyleId] = useState(null)
+  const [productPickerOpen, setProductPickerOpen] = useState(false)
+  const [highlightedProductIndex, setHighlightedProductIndex] = useState(0)
+  const [selectedProductStyle, setSelectedProductStyle] = useState(null)
+  const [selectedSizeCode, setSelectedSizeCode] = useState("")
+  const [selectedColorCode, setSelectedColorCode] = useState("")
 
   const [cart, setCart] = useState([])
 
@@ -542,6 +664,9 @@ export default function NuevaVentaPage() {
   const [customerQuery, setCustomerQuery] = useState("")
   const [customerResults, setCustomerResults] = useState([])
   const [loadingCustomers, setLoadingCustomers] = useState(false)
+  const [customerPickerOpen, setCustomerPickerOpen] = useState(false)
+  const [highlightedCustomerIndex, setHighlightedCustomerIndex] = useState(0)
+  const [documentPickerOpen, setDocumentPickerOpen] = useState(false)
   const [genericCustomer, setGenericCustomer] = useState(null)
   const [selectedCustomer, setSelectedCustomer] = useState(null)
 
@@ -612,7 +737,10 @@ export default function NuevaVentaPage() {
   useEffect(() => {
     if (!defaultLocation?.location_id) {
       setVariants([])
-      setSelectedStyleId(null)
+      setProductPickerOpen(false)
+      setSelectedProductStyle(null)
+      setSelectedSizeCode("")
+      setSelectedColorCode("")
       return
     }
 
@@ -658,7 +786,8 @@ export default function NuevaVentaPage() {
   }, [refreshPosContext])
 
   useEffect(() => {
-    if (!customerQuery.trim()) {
+    const normalizedCustomerQuery = customerQuery.trim()
+    if (!customerPickerOpen && !normalizedCustomerQuery) {
       setCustomerResults([])
       setLoadingCustomers(false)
       return
@@ -669,11 +798,26 @@ export default function NuevaVentaPage() {
       setLoadingCustomers(true)
 
       try {
-        const response = await apiFetch(`/api/customers?q=${encodeURIComponent(customerQuery.trim())}`)
+        const params = new URLSearchParams()
+        if (normalizedCustomerQuery) {
+          params.set("q", normalizedCustomerQuery)
+        }
+
+        const { queryDocumentType } = getCustomerSearchFilter(documentType)
+        if (queryDocumentType) {
+          params.set("document_type", queryDocumentType)
+        }
+
+        const path = params.toString() ? `/api/customers?${params.toString()}` : "/api/customers"
+        const response = await apiFetch(path)
         const customers = unwrapApiData(response)
+        const compatibleCustomers = filterCustomersByDocumentType(
+          Array.isArray(customers) ? customers : [],
+          documentType
+        ).slice(0, normalizedCustomerQuery ? 12 : 24)
 
         if (active) {
-          setCustomerResults(Array.isArray(customers) ? customers.slice(0, 8) : [])
+          setCustomerResults(compatibleCustomers)
         }
       } catch {
         if (active) {
@@ -684,101 +828,181 @@ export default function NuevaVentaPage() {
           setLoadingCustomers(false)
         }
       }
-    }, 250)
+    }, normalizedCustomerQuery ? 250 : 0)
 
     return () => {
       active = false
       window.clearTimeout(timeoutId)
     }
-  }, [customerQuery])
+  }, [customerPickerOpen, customerQuery, documentType])
 
   const styles = useMemo(() => groupVariantsByStyle(variants), [variants])
-
-  const visibleStyles = useMemo(() => {
-    return styles
-      .map((style) => {
-        const totalStock = style.variants.reduce(
-          (accumulator, variant) => accumulator + Number(variant.stock || 0),
-          0
-        )
-        const searchMeta = getStyleSearchMeta(style, query, productSearchScope)
-
-        return {
-          ...style,
-          totalStock,
-          searchRank: searchMeta.rank,
-          matchesScope: searchMeta.matches,
-        }
-      })
-      .filter((style) => {
-        if (!style.matchesScope) {
-          return false
-        }
-
-        if (productStockFilter === "in_stock" && style.totalStock <= 0) {
-          return false
-        }
-
-        if (productStockFilter === "out_of_stock" && style.totalStock > 0) {
-          return false
-        }
-
-        if (productStyleFilter !== "all" && style.style_id !== productStyleFilter) {
-          return false
-        }
-
-        return true
-      })
-      .sort((left, right) => {
-        if (left.searchRank !== right.searchRank) {
-          return left.searchRank - right.searchRank
-        }
-
-        const leftHasStock = left.totalStock > 0 ? 1 : 0
-        const rightHasStock = right.totalStock > 0 ? 1 : 0
-        if (leftHasStock !== rightHasStock) {
-          return rightHasStock - leftHasStock
-        }
-
-        if (left.totalStock !== right.totalStock) {
-          return right.totalStock - left.totalStock
-        }
-
-        return String(left.style_name || "").localeCompare(String(right.style_name || ""))
-      })
-  }, [productSearchScope, productStockFilter, productStyleFilter, query, styles])
-
-  useEffect(() => {
-    if (productStyleFilter === "all") {
-      return
-    }
-
-    const stillExists = styles.some((style) => style.style_id === productStyleFilter)
-    if (!stillExists) {
-      setProductStyleFilter("all")
-    }
-  }, [productStyleFilter, styles])
-
-  useEffect(() => {
-    if (visibleStyles.length === 0) {
-      setSelectedStyleId(null)
-      return
-    }
-
-    const hasSelectedStyle = visibleStyles.some((style) => style.style_id === selectedStyleId)
-    if (!hasSelectedStyle) {
-      setSelectedStyleId(visibleStyles[0].style_id)
-    }
-  }, [visibleStyles, selectedStyleId])
-
-  const selectedStyle = useMemo(
-    () => visibleStyles.find((style) => style.style_id === selectedStyleId) || null,
-    [visibleStyles, selectedStyleId]
+  const catalogStyles = useMemo(() => buildProductSearchResults(styles, ""), [styles])
+  const searchableStyles = useMemo(
+    () => (query.trim() ? buildProductSearchResults(styles, query) : catalogStyles),
+    [catalogStyles, query, styles]
   )
 
+  const sizeOptions = useMemo(
+    () =>
+      getVariantOptionValues(
+        selectedProductStyle?.variants || [],
+        "size_code",
+        selectedColorCode ? { color_code: selectedColorCode } : {}
+      ),
+    [selectedColorCode, selectedProductStyle]
+  )
+
+  const colorOptions = useMemo(
+    () =>
+      getVariantOptionValues(
+        selectedProductStyle?.variants || [],
+        "color_code",
+        selectedSizeCode ? { size_code: selectedSizeCode } : {}
+      ),
+    [selectedProductStyle, selectedSizeCode]
+  )
+
+  const selectedVariant = useMemo(
+    () =>
+      findVariantByAttributes(
+        selectedProductStyle?.variants || [],
+        selectedSizeCode,
+        selectedColorCode
+      ),
+    [selectedColorCode, selectedProductStyle, selectedSizeCode]
+  )
+  const previewWholesaleApplies = useMemo(
+    () => shouldApplyWholesalePreview(cart, posContext?.pricing),
+    [cart, posContext?.pricing]
+  )
+  const selectedVariantAutoPrice =
+    selectedVariant &&
+    previewWholesaleApplies &&
+    selectedVariant.wholesale_price !== null &&
+    selectedVariant.wholesale_price !== undefined
+      ? selectedVariant.wholesale_price
+      : selectedVariant?.retail_price
+
+  useEffect(() => {
+    if (!productPickerOpen) {
+      return
+    }
+
+    function handlePointerDown(event) {
+      if (productPickerRef.current && !productPickerRef.current.contains(event.target)) {
+        setProductPickerOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown)
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown)
+    }
+  }, [productPickerOpen])
+
+  useEffect(() => {
+    if (!searchableStyles.length) {
+      setHighlightedProductIndex(0)
+      return
+    }
+
+    setHighlightedProductIndex((current) =>
+      Math.min(Math.max(current, 0), searchableStyles.length - 1)
+    )
+  }, [searchableStyles])
+
+  useEffect(() => {
+    if (!customerPickerOpen) {
+      return
+    }
+
+    function handlePointerDown(event) {
+      if (customerPickerRef.current && !customerPickerRef.current.contains(event.target)) {
+        setCustomerPickerOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown)
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown)
+    }
+  }, [customerPickerOpen])
+
+  useEffect(() => {
+    if (!documentPickerOpen) {
+      return
+    }
+
+    function handlePointerDown(event) {
+      if (documentPickerRef.current && !documentPickerRef.current.contains(event.target)) {
+        setDocumentPickerOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown)
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown)
+    }
+  }, [documentPickerOpen])
+
+  useEffect(() => {
+    if (!customerResults.length) {
+      setHighlightedCustomerIndex(0)
+      return
+    }
+
+    setHighlightedCustomerIndex((current) =>
+      Math.min(Math.max(current, 0), customerResults.length - 1)
+    )
+  }, [customerResults])
+
+  useEffect(() => {
+    if (!selectedProductStyle?.style_id) {
+      return
+    }
+
+    const refreshedStyle =
+      catalogStyles.find((style) => style.style_id === selectedProductStyle.style_id) || null
+
+    if (refreshedStyle) {
+      setSelectedProductStyle(refreshedStyle)
+    }
+  }, [catalogStyles, selectedProductStyle?.style_id])
+
+  useEffect(() => {
+    if (!selectedProductStyle) {
+      setSelectedSizeCode("")
+      setSelectedColorCode("")
+      return
+    }
+
+    setSelectedSizeCode((current) => {
+      if (current && sizeOptions.includes(current)) {
+        return current
+      }
+
+      return sizeOptions.length === 1 ? sizeOptions[0] : ""
+    })
+  }, [selectedProductStyle, sizeOptions])
+
+  useEffect(() => {
+    if (!selectedProductStyle) {
+      return
+    }
+
+    setSelectedColorCode((current) => {
+      if (current && colorOptions.includes(current)) {
+        return current
+      }
+
+      return colorOptions.length === 1 ? colorOptions[0] : ""
+    })
+  }, [colorOptions, selectedProductStyle])
+
   const totals = useMemo(
-    () => calculateSalePreview(cart, documentType, saleDiscount),
-    [cart, documentType, saleDiscount]
+    () => calculateSalePreview(cart, documentType, saleDiscount, posContext?.pricing),
+    [cart, documentType, posContext?.pricing, saleDiscount]
   )
 
   const saleDiscountError = useMemo(() => {
@@ -875,8 +1099,10 @@ export default function NuevaVentaPage() {
     () => cart.find((item) => item.variant_id === priceTargetId) || null,
     [cart, priceTargetId]
   )
-  const hasCommercialAdjustments =
-    totals.saleDiscountAmount > 0 || cart.some((item) => Boolean(item.price_override))
+  const priceTargetPreviewItem = useMemo(
+    () => totals.items.find((item) => item.variant_id === priceTargetId) || null,
+    [priceTargetId, totals.items]
+  )
   const documentGuidance =
     documentType === "boleta"
       ? customerIsValid
@@ -940,6 +1166,25 @@ export default function NuevaVentaPage() {
   const canEditSelectedCustomer =
     Boolean(selectedCustomer?.customer_id) &&
     selectedCustomer?.customer_id !== genericCustomer?.customer_id
+  const activeDocumentOption =
+    DOC_TYPES.find((docType) => docType.value === documentType) || DOC_TYPES[0]
+  const ActiveDocumentIcon = getDocumentIcon(activeDocumentOption.value)
+  const productInputValue =
+    productPickerOpen || query ? query : selectedProductStyle?.style_name || ""
+  const productInputPlaceholder =
+    selectedProductStyle && !productPickerOpen && !query
+      ? selectedProductStyle.style_name
+      : "Buscar por estilo, SKU, talla o color"
+  const customerInputValue =
+    customerPickerOpen || customerQuery
+      ? customerQuery
+      : selectedCustomer
+        ? buildCustomerDisplayName(selectedCustomer)
+        : ""
+  const customerInputPlaceholder =
+    selectedCustomer && !customerPickerOpen && !customerQuery
+      ? buildCustomerDisplayName(selectedCustomer)
+      : "Nombre, documento o codigo"
 
   useEffect(() => {
     if (paymentMode === "mixed" && mixedPayments.length === 0) {
@@ -976,7 +1221,13 @@ export default function NuevaVentaPage() {
   function openPriceSheet(item) {
     setPriceTargetId(item.variant_id)
     setPriceForm({
-      unit_price_final: String(item.price_override?.unit_price_final ?? item.retail_price ?? ""),
+      unit_price_final: String(
+        item.price_override?.unit_price_final ??
+          item.unit_price_list ??
+          item.wholesale_price ??
+          item.retail_price ??
+          ""
+      ),
       reason: item.price_override?.reason || "",
     })
     setPriceFormError(null)
@@ -1046,7 +1297,9 @@ export default function NuevaVentaPage() {
   }
 
   function addToCart(variant) {
-    const hasPrice = variant.retail_price !== null && variant.retail_price !== undefined
+    const hasPrice =
+      (variant.retail_price !== null && variant.retail_price !== undefined) ||
+      (variant.wholesale_price !== null && variant.wholesale_price !== undefined)
     const availableStock = Number(variant.stock || 0)
 
     if (!hasPrice || availableStock <= 0) {
@@ -1063,6 +1316,7 @@ export default function NuevaVentaPage() {
                 ...item,
                 quantity: Math.min(item.quantity + 1, availableStock),
                 retail_price: variant.retail_price,
+                wholesale_price: variant.wholesale_price,
                 stock: availableStock,
               }
             : item
@@ -1080,6 +1334,7 @@ export default function NuevaVentaPage() {
           label: `${variant.style_name} - ${variant.size_code} / ${variant.color_code}`,
           quantity: 1,
           retail_price: variant.retail_price,
+          wholesale_price: variant.wholesale_price,
           stock: availableStock,
           price_override: null,
         },
@@ -1108,10 +1363,41 @@ export default function NuevaVentaPage() {
     }
   }
 
+  function focusProductSearch() {
+    window.requestAnimationFrame(() => {
+      productSearchInputRef.current?.focus()
+    })
+  }
+
+  function focusCustomerSearch() {
+    window.requestAnimationFrame(() => {
+      customerSearchInputRef.current?.focus()
+    })
+  }
+
+  function clearProductSelection() {
+    setSelectedProductStyle(null)
+    setSelectedSizeCode("")
+    setSelectedColorCode("")
+    setQuery("")
+    setHighlightedProductIndex(0)
+  }
+
+  function selectProductStyle(style) {
+    setSelectedProductStyle(style)
+    setSelectedSizeCode("")
+    setSelectedColorCode("")
+    setQuery("")
+    setHighlightedProductIndex(0)
+    setProductPickerOpen(false)
+  }
+
   function selectCustomer(customer) {
     setSelectedCustomer(customer)
     setCustomerQuery("")
     setCustomerResults([])
+    setHighlightedCustomerIndex(0)
+    setCustomerPickerOpen(false)
   }
 
   function openCustomerSheet(mode) {
@@ -1251,65 +1537,72 @@ export default function NuevaVentaPage() {
             <div className="mx-auto max-w-7xl space-y-4">
               <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.18em] text-violet-600">
-                        Punto de venta
-                      </p>
-                      <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">
-                        Nueva venta
-                      </h1>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-                        <MapPin className="h-3.5 w-3.5 text-violet-600" />
-                        {locationsLoading
-                          ? "Cargando sede..."
-                          : defaultLocation?.name || "Sin sede asignada"}
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${
-                          posContextLoading
-                            ? "border-slate-200 bg-slate-50 text-slate-700"
-                            : buildCashTone(cashStatus)
-                        }`}
-                      >
-                        {posContextLoading ? (
-                          <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-                        ) : null}
-                        {posContextLoading ? "Validando caja" : buildCashLabel(cashStatus)}
-                      </span>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:text-slate-700"
-                            aria-label="Reglas del punto de venta"
-                          >
-                            <Info className="h-4 w-4" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom" sideOffset={8}>
-                          El backend valida caja, stock y precio retail vigente al confirmar.
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-violet-600">
+                      Punto de venta
+                    </p>
+                    <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">
+                      Nueva venta
+                    </h1>
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    <Link
-                      href="/clientes"
-                      className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  <div className="flex flex-wrap items-start justify-end gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
+                      <MapPin className="h-3.5 w-3.5 text-violet-600" />
+                      {locationsLoading ? "Cargando sede..." : defaultLocation?.name || "Sin sede asignada"}
+                    </span>
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${
+                        posContextLoading
+                          ? "border-slate-200 bg-slate-50 text-slate-700"
+                          : buildCashTone(cashStatus)
+                      }`}
                     >
-                      Clientes
-                    </Link>
-                    <Link
-                      href="/transaction-history"
-                      className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                    >
-                      Historial
-                    </Link>
+                      {posContextLoading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : null}
+                      {posContextLoading ? "Validando caja" : buildCashLabel(cashStatus)}
+                    </span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:text-slate-700"
+                          aria-label="Reglas del punto de venta"
+                        >
+                          <Info className="h-4 w-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" sideOffset={8}>
+                        El backend valida caja, stock y el precio vigente segun la regla comercial activa al confirmar.
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Link
+                          href="/clientes"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                          aria-label="Ir a clientes"
+                        >
+                          <Users className="h-4 w-4" />
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" sideOffset={8}>
+                        Clientes
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Link
+                          href="/transaction-history"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+                          aria-label="Ir al historial de ventas"
+                        >
+                          <History className="h-4 w-4" />
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" sideOffset={8}>
+                        Historial
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 </div>
               </header>
@@ -1410,13 +1703,17 @@ export default function NuevaVentaPage() {
                   </div>
                 ) : null}
 
-                <section className="grid gap-4 xl:grid-cols-[1.45fr_1fr]">
-                  <div className="space-y-4">
-                    <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
+                <section className="grid gap-4 xl:grid-cols-2">
+                  <div className="contents">
+                    <article
+                      className={`relative rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6 xl:order-2 xl:col-span-2 ${
+                        productPickerOpen ? "z-30" : "z-0"
+                      }`}
+                    >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
                           <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-700">
-                            1
+                            2
                           </span>
                           <div className="flex items-center gap-2">
                             <h2 className="text-lg font-semibold text-slate-800">Productos</h2>
@@ -1447,232 +1744,269 @@ export default function NuevaVentaPage() {
                         </button>
                       </div>
 
-                      <div className="relative mt-4">
+                      <div ref={productPickerRef} className="relative mt-4">
                         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                         <input
+                          ref={productSearchInputRef}
                           type="text"
-                          value={query}
-                          onChange={(event) => setQuery(event.target.value)}
-                          placeholder="Buscar por estilo, SKU, talla o color"
-                          className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                          value={productInputValue}
+                          onFocus={() => {
+                            setProductPickerOpen(true)
+                            if (!query) {
+                              setHighlightedProductIndex(0)
+                            }
+                          }}
+                          onChange={(event) => {
+                            setQuery(event.target.value)
+                            setProductPickerOpen(true)
+                            setHighlightedProductIndex(0)
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                              setProductPickerOpen(false)
+                              return
+                            }
+
+                            if (!searchableStyles.length) {
+                              return
+                            }
+
+                            if (event.key === "ArrowDown") {
+                              event.preventDefault()
+                              setProductPickerOpen(true)
+                              setHighlightedProductIndex((current) =>
+                                Math.min(current + 1, searchableStyles.length - 1)
+                              )
+                            }
+
+                            if (event.key === "ArrowUp") {
+                              event.preventDefault()
+                              setProductPickerOpen(true)
+                              setHighlightedProductIndex((current) => Math.max(current - 1, 0))
+                            }
+
+                            if (event.key === "Enter" && productPickerOpen) {
+                              event.preventDefault()
+                              selectProductStyle(searchableStyles[highlightedProductIndex])
+                            }
+                          }}
+                          placeholder={productInputPlaceholder}
+                          className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-9 pr-48 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
                         />
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        {PRODUCT_STOCK_FILTERS.map((filter) => (
-                          <button
-                            key={filter.value}
-                            type="button"
-                            onClick={() => setProductStockFilter(filter.value)}
-                            className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                              productStockFilter === filter.value
-                                ? "border-violet-300 bg-violet-50 text-violet-800"
-                                : "border-slate-200 bg-white text-slate-600 hover:border-violet-200"
-                            }`}
-                          >
-                            {filter.label}
-                          </button>
-                        ))}
-                      </div>
-
-                      <div className="mt-3 grid gap-2 sm:grid-cols-[auto_auto_1fr]">
-                        <div className="flex flex-wrap gap-2">
-                          {PRODUCT_SEARCH_SCOPES.map((scope) => (
+                        {selectedProductStyle || query ? (
+                          <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1.5">
+                            {selectedProductStyle && !query && !productPickerOpen ? (
+                              <>
+                                <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
+                                  Stock {selectedProductStyle.totalStock}
+                                </span>
+                                {selectedProductStyle.style_code ? (
+                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                                    {selectedProductStyle.style_code}
+                                  </span>
+                                ) : null}
+                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                                  {selectedProductStyle.variants.length} variantes
+                                </span>
+                              </>
+                            ) : null}
                             <button
-                              key={scope.value}
                               type="button"
-                              onClick={() => setProductSearchScope(scope.value)}
-                              className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                                productSearchScope === scope.value
-                                  ? "border-slate-300 bg-slate-900 text-white"
-                                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
-                              }`}
+                              onClick={() => {
+                                clearProductSelection()
+                                focusProductSearch()
+                              }}
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:text-slate-800"
+                              aria-label="Limpiar producto"
                             >
-                              {scope.label}
+                              <X className="h-3.5 w-3.5" />
                             </button>
-                          ))}
-                        </div>
-
-                        <select
-                          value={productStyleFilter}
-                          onChange={(event) => setProductStyleFilter(event.target.value)}
-                          className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-                        >
-                          <option value="all">Todos los estilos</option>
-                          {styles.map((style) => (
-                            <option key={style.style_id} value={style.style_id}>
-                              {style.style_name}
-                            </option>
-                          ))}
-                        </select>
-
-                        <div className="flex items-center justify-end">
-                          <span className="text-xs text-slate-500">
-                            {visibleStyles.length} estilo{visibleStyles.length === 1 ? "" : "s"}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
-                          <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
-                            <Tag className="h-4 w-4 text-violet-600" />
-                            Estilos
                           </div>
+                        ) : null}
 
-                          {!defaultLocation?.location_id ? (
-                            <p className="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-6 text-center text-sm text-slate-500">
-                              Configura una sede para operar ventas.
-                            </p>
-                          ) : loadingVariants ? (
-                            <p className="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-6 text-center text-sm text-slate-500">
-                              Cargando productos...
-                            </p>
-                          ) : styles.length === 0 ? (
-                            <p className="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-6 text-center text-sm text-slate-500">
-                              No hay estilos vendibles para la sede actual.
-                            </p>
-                          ) : visibleStyles.length === 0 ? (
-                            <p className="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-6 text-center text-sm text-slate-500">
-                              Ningun estilo coincide con los filtros actuales.
-                            </p>
-                          ) : (
-                            <div className="space-y-2">
-                              {visibleStyles.map((style) => {
-                                return (
-                                  <button
-                                    key={style.style_id}
-                                    type="button"
-                                    onClick={() => setSelectedStyleId(style.style_id)}
-                                    className={`w-full rounded-2xl border px-3 py-2.5 text-left transition ${
-                                      selectedStyleId === style.style_id
-                                        ? "border-violet-400 bg-violet-50 ring-1 ring-violet-300"
-                                        : "border-slate-200 bg-white hover:border-violet-200 hover:bg-violet-50/60"
-                                    }`}
-                                  >
-                                    <p className="truncate text-sm font-semibold text-slate-900">
-                                      {style.style_name}
-                                    </p>
-                                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
-                                      {style.style_code ? (
-                                        <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">
-                                          {style.style_code}
-                                        </span>
-                                      ) : null}
-                                      <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-600">
-                                        {style.variants.length} variantes
-                                      </span>
-                                      <span
-                                        className={`rounded-full px-2 py-0.5 font-medium ${
-                                          style.totalStock > 0
-                                            ? "bg-emerald-50 text-emerald-700"
-                                            : "bg-rose-50 text-rose-700"
+                        {productPickerOpen ? (
+                          <div className="absolute left-0 right-0 top-[calc(100%+0.55rem)] z-20 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+                            {loadingVariants ? (
+                              <p className="px-3 py-4 text-sm text-slate-500">Buscando productos...</p>
+                            ) : !defaultLocation?.location_id ? (
+                              <p className="px-3 py-4 text-sm text-slate-500">
+                                Configura una sede para operar ventas.
+                              </p>
+                            ) : styles.length === 0 ? (
+                              <p className="px-3 py-4 text-sm text-slate-500">
+                                No hay productos vendibles para la sede actual.
+                              </p>
+                            ) : searchableStyles.length === 0 ? (
+                              <p className="px-3 py-4 text-sm text-slate-500">
+                                No encontramos coincidencias para esta busqueda.
+                              </p>
+                            ) : (
+                              <div
+                                className="max-h-72 overflow-y-auto p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                                style={{ scrollbarWidth: "none" }}
+                              >
+                                <div className="space-y-1.5">
+                                  {searchableStyles.map((style, index) => {
+                                    const isHighlighted = index === highlightedProductIndex
+                                    return (
+                                      <button
+                                        key={style.style_id}
+                                        type="button"
+                                        onMouseEnter={() => setHighlightedProductIndex(index)}
+                                        onClick={() => selectProductStyle(style)}
+                                        className={`block w-full rounded-2xl border px-3 py-2.5 text-left transition ${
+                                          isHighlighted
+                                            ? "border-violet-300 bg-violet-50"
+                                            : "border-transparent bg-slate-50 hover:border-violet-200 hover:bg-violet-50/70"
                                         }`}
                                       >
-                                        Stock {style.totalStock}
-                                      </span>
-                                    </div>
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="rounded-2xl border border-slate-200 bg-white p-3">
-                          <div className="mb-3 flex items-center justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-slate-800">
-                                {selectedStyle?.style_name || "Selecciona un estilo"}
-                              </p>
-                              <p className="truncate text-xs text-slate-500">
-                                {selectedStyle?.style_code || "Tallas, colores y precio vigente"}
-                              </p>
-                            </div>
-                            {selectedStyle ? (
-                              <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
-                                {selectedStyle.variants.length} opciones
-                              </span>
-                            ) : null}
+                                        <div className="flex items-center justify-between gap-3">
+                                          <div className="min-w-0 flex-1">
+                                            <p className="truncate text-sm font-semibold text-slate-900">
+                                              {style.style_name}
+                                            </p>
+                                            <p className="mt-0.5 text-[11px] text-slate-500">
+                                              {style.variants.length} variante
+                                              {style.variants.length === 1 ? "" : "s"}
+                                            </p>
+                                          </div>
+                                          <span
+                                            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                              style.totalStock > 0
+                                                ? "bg-emerald-50 text-emerald-700"
+                                                : "bg-rose-50 text-rose-700"
+                                            }`}
+                                          >
+                                            {style.totalStock}
+                                          </span>
+                                        </div>
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            )}
                           </div>
+                        ) : null}
+                      </div>
 
-                          {!selectedStyle ? (
-                            <p className="rounded-xl border border-dashed border-slate-300 px-3 py-8 text-center text-sm text-slate-500">
-                              Sin estilo seleccionado.
-                            </p>
-                          ) : (
-                            <div className="space-y-2">
-                              {selectedStyle.variants.map((variant) => {
-                                const hasPrice =
-                                  variant.retail_price !== null && variant.retail_price !== undefined
-                                const stock = Number(variant.stock || 0)
-                                const outOfStock = stock <= 0
-                                const disabled = !hasPrice || outOfStock
+                      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                        {!selectedProductStyle ? (
+                          <p className="text-sm text-slate-500">
+                            Selecciona un producto para configurar talla, color y agregarlo a la venta.
+                          </p>
+                        ) : (
+                          <div className="flex flex-wrap items-end gap-3">
+                            <label className="w-24 space-y-1.5">
+                              <span className="text-[11px] font-medium text-slate-500">Talla</span>
+                              <select
+                                value={selectedSizeCode}
+                                onChange={(event) => setSelectedSizeCode(event.target.value)}
+                                className="w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                              >
+                                <option value="">{sizeOptions.length ? "Talla" : "Sin tallas"}</option>
+                                {sizeOptions.map((sizeCode) => (
+                                  <option key={sizeCode} value={sizeCode}>
+                                    {sizeCode}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
 
-                                return (
-                                  <div
-                                    key={variant.variant_id}
-                                    className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5"
+                            <label className="min-w-[160px] flex-1 space-y-1.5 sm:w-48 sm:flex-none">
+                              <span className="text-[11px] font-medium text-slate-500">Color</span>
+                              <select
+                                value={selectedColorCode}
+                                onChange={(event) => setSelectedColorCode(event.target.value)}
+                                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                              >
+                                <option value="">
+                                  {colorOptions.length ? "Selecciona color" : "Sin colores"}
+                                </option>
+                                {colorOptions.map((colorCode) => (
+                                  <option key={colorCode} value={colorCode}>
+                                    {colorCode}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+
+                            <div className="min-w-[220px] flex-1 rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2.5">
+                              {!selectedVariant ? (
+                                <p className="text-sm text-slate-500">Completa talla y color.</p>
+                              ) : (
+                                <div className="flex flex-wrap items-center gap-2 text-sm">
+                                  <span className="font-semibold text-slate-900">
+                                    {selectedVariant.size_code} / {selectedVariant.color_code}
+                                  </span>
+                                  <span className="text-slate-300">•</span>
+                                  <span className="text-slate-500">{selectedVariant.sku}</span>
+                                  <span className="text-slate-300">•</span>
+                                  <span className="font-medium text-slate-700">
+                                    {selectedVariantAutoPrice !== null &&
+                                    selectedVariantAutoPrice !== undefined
+                                      ? `S/. ${formatMoney(selectedVariantAutoPrice)}`
+                                      : "Sin precio"}
+                                  </span>
+                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                                    {previewWholesaleApplies &&
+                                    selectedVariant.wholesale_price !== null &&
+                                    selectedVariant.wholesale_price !== undefined
+                                      ? "Mayorista"
+                                      : "Retail"}
+                                  </span>
+                                  <span
+                                    className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                      Number(selectedVariant.stock || 0) > 0
+                                        ? "bg-emerald-50 text-emerald-700"
+                                        : "bg-rose-50 text-rose-700"
+                                    }`}
                                   >
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        <p className="text-sm font-semibold text-slate-900">
-                                          {variant.size_code} / {variant.color_code}
-                                        </p>
-                                        <span
-                                          className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                                            stock > 0
-                                              ? "bg-emerald-50 text-emerald-700"
-                                              : "bg-rose-50 text-rose-700"
-                                          }`}
-                                        >
-                                          Stock {stock}
-                                        </span>
-                                      </div>
-                                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                                        <span>{variant.sku}</span>
-                                        <span className="text-slate-300">•</span>
-                                        <span>
-                                          {hasPrice
-                                            ? `S/. ${formatMoney(variant.retail_price)}`
-                                            : "Sin precio vigente"}
-                                        </span>
-                                      </div>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => addToCart(variant)}
-                                      disabled={disabled}
-                                      className="rounded-xl bg-violet-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                      {outOfStock ? "Sin stock" : hasPrice ? "Agregar" : "Sin precio"}
-                                    </button>
-                                  </div>
-                                )
-                              })}
+                                    Stock {Number(selectedVariant.stock || 0)}
+                                  </span>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
+
+                            <button
+                              type="button"
+                              onClick={() => selectedVariant && addToCart(selectedVariant)}
+                              disabled={
+                                !selectedVariant ||
+                                (selectedVariant.retail_price === null &&
+                                  selectedVariant.wholesale_price === null) ||
+                                (selectedVariant.retail_price === undefined &&
+                                  selectedVariant.wholesale_price === undefined) ||
+                                Number(selectedVariant.stock || 0) <= 0
+                              }
+                              className="h-11 min-w-[112px] rounded-xl bg-violet-700 px-4 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {!selectedVariant
+                                ? "Agregar"
+                                : Number(selectedVariant.stock || 0) <= 0
+                                  ? "Sin stock"
+                                  : (selectedVariant.retail_price === null &&
+                                        selectedVariant.wholesale_price === null) ||
+                                      (selectedVariant.retail_price === undefined &&
+                                        selectedVariant.wholesale_price === undefined)
+                                    ? "Sin precio"
+                                    : "Agregar"}
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </article>
 
-                    <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
+                    <article className="relative z-0 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6 xl:order-3 xl:col-span-2">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
                           <ShoppingBasket className="h-5 w-5 text-violet-600" />
-                          <div className="flex items-center gap-2">
-                            <h2 className="text-lg font-semibold text-slate-800">Detalle de venta</h2>
-                            {cartCount > 0 ? (
-                              <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-bold text-violet-700">
-                                {cartCount} uds.
-                              </span>
-                            ) : null}
-                          </div>
+                          <h2 className="text-lg font-semibold text-slate-800">Detalle de venta</h2>
                         </div>
                         <span className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
-                          {hasCommercialAdjustments
-                            ? "Precio con ajustes comerciales"
-                            : "Precio aplicado: retail vigente"}
+                          {totals.wholesaleApplied
+                            ? `Precio aplicado: mayorista por ${posContext?.pricing?.wholesale_min_qty_total || 3}+ uds.`
+                            : "Precio aplicado: retail segun vigencia"}
                         </span>
                       </div>
 
@@ -1681,134 +2015,164 @@ export default function NuevaVentaPage() {
                           Aun no hay productos agregados a la venta.
                         </p>
                       ) : (
-                        <div className="mt-4 space-y-2">
-                          {totals.items.map((item) => (
-                            <div
-                              key={item.variant_id}
-                              className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3"
-                            >
-                              <div className="flex flex-wrap items-start justify-between gap-3">
-                                <div className="min-w-0 flex-1">
-                                  <p className="truncate text-sm font-semibold text-slate-900">
-                                    {item.label}
-                                  </p>
-                                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                                    <span>{item.sku}</span>
-                                    <span className="text-slate-300">•</span>
-                                    <span>
-                                      {item.retail_price == null
-                                        ? "Sin precio vigente"
-                                        : `Retail S/. ${formatMoney(item.retail_price)}`}
-                                    </span>
-                                    {item.price_override ? (
-                                      <>
-                                        <span className="text-slate-300">•</span>
-                                        <span className="font-medium text-violet-700">
-                                          Ajuste manual activo
+                        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50">
+                          <div className="hidden border-b border-slate-200 bg-slate-100/80 px-4 py-2 xl:grid xl:grid-cols-[minmax(0,1.7fr)_140px_140px_140px_96px] xl:items-center xl:gap-5">
+                            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Producto</span>
+                            <span className="text-center text-[11px] font-semibold uppercase tracking-wide text-slate-500">Cantidad</span>
+                            <span className="text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500">Precio final</span>
+                            <span className="text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500">Subtotal</span>
+                            <span className="text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500">Acciones</span>
+                          </div>
+
+                          <div className="max-h-[360px] overflow-y-auto">
+                            {totals.items.map((item, index) => (
+                              <div
+                                key={item.variant_id}
+                                className={`px-4 py-3 ${index !== totals.items.length - 1 ? "border-b border-slate-200" : ""}`}
+                              >
+                                <div className="flex flex-col gap-3 xl:grid xl:grid-cols-[minmax(0,1.7fr)_140px_140px_140px_96px] xl:items-center xl:gap-5">
+                                  <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                      <p className="truncate text-sm font-semibold text-slate-900">
+                                        {item.style_name}
+                                      </p>
+                                      <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-slate-600">
+                                        <span className="rounded-full bg-slate-200 px-2 py-0.5">
+                                          Talla {item.size_code}
                                         </span>
-                                      </>
+                                        <span className="rounded-full bg-slate-200 px-2 py-0.5">
+                                          Color {item.color_code}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                                      <span>{item.sku}</span>
+                                      <span className="text-slate-300">•</span>
+                                      <span>
+                                        {item.price_type_applied === "wholesale" ? "Mayorista" : "Retail"} S/.{" "}
+                                        {formatMoney(item.unit_price_list)}
+                                      </span>
+                                      {item.price_override ? (
+                                        <>
+                                          <span className="text-slate-300">•</span>
+                                          <span className="font-medium text-violet-700">
+                                            Ajuste manual activo
+                                          </span>
+                                        </>
+                                      ) : null}
+                                    </div>
+                                    {item.price_override?.reason ? (
+                                      <p className="mt-1 text-[11px] text-violet-700">
+                                        Motivo del ajuste: {item.price_override.reason}
+                                      </p>
                                     ) : null}
                                   </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => openPriceSheet(item)}
-                                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100"
-                                  >
-                                    <Tag className="h-3.5 w-3.5" />
-                                    {item.price_override ? "Editar precio" : "Ajustar precio"}
-                                  </button>
-                                  {item.price_override ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => clearPriceAdjustment(item.variant_id)}
-                                      className="rounded-lg p-1 text-slate-400 transition hover:bg-white hover:text-amber-600"
-                                      aria-label="Quitar ajuste"
-                                    >
-                                      <CircleAlert className="h-4 w-4" />
-                                    </button>
-                                  ) : null}
-                                  <button
-                                    type="button"
-                                    onClick={() => removeFromCart(item.variant_id)}
-                                    className="rounded-lg p-1 text-slate-400 transition hover:bg-white hover:text-red-500"
-                                    aria-label="Quitar producto"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              </div>
 
-                              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                                <div className="flex items-center gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => updateQty(item.variant_id, -1)}
-                                    className="rounded-lg border border-slate-300 bg-white p-1 text-slate-600 hover:bg-slate-100"
-                                  >
-                                    <Minus className="h-3 w-3" />
-                                  </button>
-                                  <span className="min-w-8 text-center text-sm font-semibold text-slate-800">
-                                    {item.quantity}
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => updateQty(item.variant_id, 1)}
-                                    disabled={item.quantity >= item.stock}
-                                    className="rounded-lg border border-slate-300 bg-white p-1 text-slate-600 hover:bg-slate-100 disabled:opacity-40"
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </button>
-                                </div>
+                                  <div className="flex items-center justify-between gap-3 xl:justify-center">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 xl:hidden">
+                                      Cantidad
+                                    </p>
+                                    <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-1.5 py-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => updateQty(item.variant_id, -1)}
+                                        className="rounded-lg border border-slate-300 bg-white p-1 text-slate-600 hover:bg-slate-100"
+                                      >
+                                        <Minus className="h-3 w-3" />
+                                      </button>
+                                      <span className="min-w-8 text-center text-sm font-semibold text-slate-800">
+                                        {item.quantity}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => updateQty(item.variant_id, 1)}
+                                        disabled={item.quantity >= item.stock}
+                                        className="rounded-lg border border-slate-300 bg-white p-1 text-slate-600 hover:bg-slate-100 disabled:opacity-40"
+                                      >
+                                        <Plus className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  </div>
 
-                                <div className="flex flex-wrap items-center gap-4 text-sm">
-                                  <div className="text-right">
-                                    <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                                  <div className="text-left xl:text-right">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 xl:hidden">
                                       Precio final
                                     </p>
                                     <p className="font-semibold text-slate-800">
                                       S/. {formatMoney(item.preview_unit_price_final)}
                                     </p>
                                   </div>
-                                  {item.line_discount_amount > 0 ? (
-                                    <div className="text-right">
-                                      <p className="text-[11px] uppercase tracking-wide text-slate-500">
-                                        Desc.
-                                      </p>
-                                      <p className="font-semibold text-amber-700">
-                                        - S/. {formatMoney(item.line_discount_amount)}
-                                      </p>
-                                    </div>
-                                  ) : null}
-                                  <div className="text-right">
-                                    <p className="text-[11px] uppercase tracking-wide text-slate-500">
+
+                                  <div className="text-left xl:text-right">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 xl:hidden">
                                       Subtotal
                                     </p>
                                     <p className="font-semibold text-slate-900">
                                       S/. {formatMoney(item.line_subtotal)}
                                     </p>
+                                    {item.line_discount_amount > 0 ? (
+                                      <p className="mt-0.5 text-[11px] font-semibold text-amber-700">
+                                        Desc. - S/. {formatMoney(item.line_discount_amount)}
+                                      </p>
+                                    ) : null}
+                                  </div>
+
+                                  <div className="flex items-center justify-between gap-2 xl:justify-end">
+                                    <div className="flex items-center gap-1">
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <button
+                                            type="button"
+                                            onClick={() => openPriceSheet(item)}
+                                            className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-800"
+                                            aria-label={item.price_override ? "Editar precio" : "Ajustar precio"}
+                                          >
+                                            <PencilLine className="h-4 w-4" />
+                                          </button>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="bottom" sideOffset={8}>
+                                          {item.price_override ? "Editar precio" : "Ajustar precio"}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                      {item.price_override ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => clearPriceAdjustment(item.variant_id)}
+                                          className="rounded-lg p-1 text-slate-400 transition hover:bg-white hover:text-amber-600"
+                                          aria-label="Quitar ajuste"
+                                        >
+                                          <CircleAlert className="h-4 w-4" />
+                                        </button>
+                                      ) : null}
+                                      <button
+                                        type="button"
+                                        onClick={() => removeFromCart(item.variant_id)}
+                                        className="rounded-lg border border-red-200 bg-red-50 p-1.5 text-red-600 transition hover:border-red-300 hover:bg-red-100 hover:text-red-700"
+                                        aria-label="Quitar producto"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
-                              {item.price_override?.reason ? (
-                                <p className="mt-2 text-xs text-violet-700">
-                                  Motivo del ajuste: {item.price_override.reason}
-                                </p>
-                              ) : null}
-                            </div>
-                          ))}
+                            ))}
+                          </div>
                         </div>
                       )}
                     </article>
                   </div>
 
-                  <div className="space-y-4">
-                    <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
+                  <div className="contents">
+                    <article
+                      className={`relative rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6 xl:order-1 xl:col-span-2 ${
+                        customerPickerOpen || documentPickerOpen ? "z-30" : "z-0"
+                      }`}
+                    >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
                           <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-700">
-                            2
+                            1
                           </span>
                           <h2 className="text-lg font-semibold text-slate-800">Cliente</h2>
                         </div>
@@ -1824,110 +2188,208 @@ export default function NuevaVentaPage() {
                       </div>
 
                       <div className="mt-4 space-y-3">
-                        <div className="relative">
-                          <div className="mb-1 flex items-center gap-2">
-                            <label className="text-xs font-medium text-slate-600">
-                              Buscar cliente
-                            </label>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:text-slate-700"
-                                  aria-label="Ayuda de cliente"
-                                >
-                                  <Info className="h-3.5 w-3.5" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom" sideOffset={8}>
-                                Escribe al menos 2 caracteres. Si no existe, crea el cliente aqui mismo.
-                              </TooltipContent>
-                            </Tooltip>
+                        <div className="grid gap-3 lg:grid-cols-[180px_minmax(0,1fr)]">
+                          <div ref={documentPickerRef} className="relative">
+                            <button
+                              type="button"
+                              onClick={() => setDocumentPickerOpen((current) => !current)}
+                              className="flex h-full w-full items-center justify-between rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 transition hover:border-violet-300"
+                            >
+                              <span className="flex min-w-0 items-center gap-2">
+                                <ActiveDocumentIcon className="h-4 w-4 shrink-0 text-violet-600" />
+                                <span className="truncate">{activeDocumentOption.label}</span>
+                              </span>
+                              <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+                            </button>
+
+                            {documentPickerOpen ? (
+                              <div className="absolute left-0 right-0 top-[calc(100%+0.55rem)] z-30 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl">
+                                <div className="p-1.5">
+                                  <div className="space-y-1.5">
+                                    {DOC_TYPES.map((docType) => {
+                                      const Icon = getDocumentIcon(docType.value)
+                                      const selected = documentType === docType.value
+                                      return (
+                                        <button
+                                          key={docType.value}
+                                          type="button"
+                                          onClick={() => {
+                                            setDocumentType(docType.value)
+                                            setDocumentPickerOpen(false)
+                                          }}
+                                          className={`flex w-full items-center gap-2 rounded-2xl border px-3 py-2.5 text-left text-sm transition ${
+                                            selected
+                                              ? "border-violet-300 bg-violet-50 font-semibold text-violet-800"
+                                              : "border-transparent bg-slate-50 text-slate-700 hover:border-violet-200 hover:bg-violet-50/70"
+                                          }`}
+                                        >
+                                          <Icon className="h-4 w-4" />
+                                          <span>{docType.label}</span>
+                                        </button>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            ) : null}
                           </div>
-                          <input
-                            type="text"
-                            value={customerQuery}
-                            onChange={(event) => setCustomerQuery(event.target.value)}
-                            placeholder="Nombre, documento o codigo"
-                            className={INPUT_CLASS}
-                          />
-                          {customerQuery.trim().length >= 2 ? (
-                            <div className="absolute left-0 right-0 top-[calc(100%+0.45rem)] z-10 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-                              {loadingCustomers ? (
-                                <p className="px-2 py-3 text-xs text-slate-500">Buscando clientes...</p>
-                              ) : customerResults.length > 0 ? (
-                                <div className="space-y-2">
-                                  {customerResults.map((customer) => (
-                                    <button
-                                      key={customer.customer_id}
-                                      type="button"
-                                      onClick={() => selectCustomer(customer)}
-                                      className="block w-full rounded-xl border border-transparent bg-slate-50 px-3 py-2 text-left text-sm transition hover:border-violet-200 hover:bg-violet-50"
-                                    >
-                                      <span className="font-medium text-slate-800">
-                                        {buildCustomerDisplayName(customer)}
-                                      </span>
-                                      <span className="mt-1 block text-xs text-slate-500">
-                                        {buildCustomerDocument(customer)}
-                                      </span>
-                                    </button>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                                  No encontramos coincidencias. Puedes crear el cliente y seguir con la venta.
-                                </div>
-                              )}
-                            </div>
-                          ) : null}
+
+                          <div ref={customerPickerRef} className="relative">
+                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <input
+                              ref={customerSearchInputRef}
+                              type="text"
+                              value={customerInputValue}
+                              onFocus={() => {
+                                setCustomerPickerOpen(true)
+                                setHighlightedCustomerIndex(0)
+                              }}
+                              onChange={(event) => {
+                                setCustomerQuery(event.target.value)
+                                setCustomerPickerOpen(true)
+                                setHighlightedCustomerIndex(0)
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === "Escape") {
+                                  setCustomerPickerOpen(false)
+                                  return
+                                }
+
+                                if (!customerResults.length) {
+                                  return
+                                }
+
+                                if (event.key === "ArrowDown") {
+                                  event.preventDefault()
+                                  setCustomerPickerOpen(true)
+                                  setHighlightedCustomerIndex((current) =>
+                                    Math.min(current + 1, customerResults.length - 1)
+                                  )
+                                }
+
+                                if (event.key === "ArrowUp") {
+                                  event.preventDefault()
+                                  setCustomerPickerOpen(true)
+                                  setHighlightedCustomerIndex((current) => Math.max(current - 1, 0))
+                                }
+
+                                if (event.key === "Enter" && customerPickerOpen) {
+                                  event.preventDefault()
+                                  if (customerResults[highlightedCustomerIndex]) {
+                                    selectCustomer(customerResults[highlightedCustomerIndex])
+                                  }
+                                }
+                              }}
+                              placeholder={customerInputPlaceholder}
+                              className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-9 pr-10 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                            />
+                            {selectedCustomer || customerQuery ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCustomerQuery("")
+                                  if (genericCustomer) {
+                                    setSelectedCustomer(genericCustomer)
+                                  }
+                                  focusCustomerSearch()
+                                }}
+                                className="absolute right-3 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:text-slate-800"
+                                aria-label="Limpiar cliente"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            ) : null}
+
+                            {customerPickerOpen ? (
+                              <div className="absolute left-0 right-0 top-[calc(100%+0.55rem)] z-30 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl">
+                                {loadingCustomers ? (
+                                  <p className="px-3 py-4 text-sm text-slate-500">Buscando clientes...</p>
+                                ) : customerResults.length > 0 ? (
+                                  <div
+                                    className="max-h-72 overflow-y-auto p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                                    style={{ scrollbarWidth: "none" }}
+                                  >
+                                    <div className="space-y-1.5">
+                                      {customerResults.map((customer, index) => {
+                                        const isHighlighted = index === highlightedCustomerIndex
+                                        return (
+                                          <button
+                                            key={customer.customer_id}
+                                            type="button"
+                                            onMouseEnter={() => setHighlightedCustomerIndex(index)}
+                                            onClick={() => selectCustomer(customer)}
+                                            className={`block w-full rounded-2xl border px-3 py-2.5 text-left transition ${
+                                              isHighlighted
+                                                ? "border-violet-300 bg-violet-50"
+                                                : "border-transparent bg-slate-50 hover:border-violet-200 hover:bg-violet-50/70"
+                                            }`}
+                                          >
+                                            <span className="block truncate text-sm font-semibold text-slate-900">
+                                              {buildCustomerDisplayName(customer)}
+                                            </span>
+                                            <span className="mt-0.5 block truncate text-[11px] text-slate-500">
+                                              {buildCustomerDocument(customer)}
+                                            </span>
+                                          </button>
+                                        )
+                                      })}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="px-3 py-4 text-sm text-slate-500">
+                                    No encontramos coincidencias. Puedes crear el cliente y seguir con la venta.
+                                  </div>
+                                )}
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
 
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                          <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="flex flex-wrap items-start gap-3 xl:grid xl:grid-cols-[minmax(0,1.15fr)_max-content_minmax(0,1fr)_max-content_max-content] xl:items-center">
                             <div className="min-w-0">
-                              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                Cliente seleccionado
-                              </p>
-                              <p className="mt-2 text-sm font-semibold text-slate-900">
+                              <p className="truncate text-sm font-semibold text-slate-900">
                                 {buildCustomerDisplayName(selectedCustomer)}
                               </p>
-                              <p className="mt-1 text-xs text-slate-500">
-                                {buildCustomerDocument(selectedCustomer)}
-                              </p>
-                              {selectedCustomer?.address ? (
-                                <p className="mt-1 text-xs text-slate-500">
-                                  {selectedCustomer.address}
-                                </p>
-                              ) : null}
-
-                              <div className="mt-2 flex flex-wrap gap-2">
-                                <span
-                                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                                    customerIsValid
-                                      ? "bg-emerald-50 text-emerald-700"
-                                      : "bg-amber-50 text-amber-700"
-                                  }`}
-                                >
-                                  {customerIsValid
-                                    ? "Listo para el comprobante"
-                                    : documentType === "factura"
-                                      ? "Falta RUC o direccion"
-                                      : documentType === "boleta"
-                                        ? "Falta DNI o CE valido"
-                                        : "Venta libre"}
-                                </span>
-                              </div>
                             </div>
 
-                            <div className="flex flex-wrap gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-xs text-slate-500">
+                                {buildCustomerDocument(selectedCustomer)}
+                              </p>
+                            </div>
+
+                            <div className="min-w-0">
+                              <p className="truncate text-xs text-slate-500">
+                                {selectedCustomer?.address || "Venta de mostrador"}
+                              </p>
+                            </div>
+
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                customerIsValid
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : "bg-amber-50 text-amber-700"
+                              }`}
+                            >
+                              {customerIsValid
+                                ? "Listo para el comprobante"
+                                : documentType === "factura"
+                                  ? "Falta RUC o direccion"
+                                  : documentType === "boleta"
+                                    ? "Falta DNI o CE valido"
+                                    : "Venta libre"}
+                            </span>
+
+                            <div className="flex flex-wrap items-center gap-2 justify-self-end">
                               {canEditSelectedCustomer ? (
                                 <button
                                   type="button"
                                   onClick={() => openCustomerSheet("edit")}
-                                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
                                 >
                                   <PencilLine className="h-3.5 w-3.5" />
-                                  Editar cliente
+                                  Editar
                                 </button>
                               ) : null}
 
@@ -1936,7 +2398,7 @@ export default function NuevaVentaPage() {
                                 <button
                                   type="button"
                                   onClick={() => setSelectedCustomer(genericCustomer)}
-                                  className="text-xs font-semibold text-violet-700 hover:underline"
+                                  className="inline-flex items-center rounded-xl px-2 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-50"
                                 >
                                   Usar mostrador
                                 </button>
@@ -1946,7 +2408,7 @@ export default function NuevaVentaPage() {
                         </div>
 
                         {!customerIsValid ? (
-                          <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                          <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700 md:text-[13px]">
                             {documentType === "boleta"
                               ? "Para boleta debes seleccionar un cliente con DNI o CE valido."
                               : "Para factura debes seleccionar un cliente con RUC y direccion fiscal."}
@@ -1955,62 +2417,24 @@ export default function NuevaVentaPage() {
                       </div>
                     </article>
 
-                    <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur">
-                      <div className="flex items-center gap-3">
+                    <article className="relative z-0 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur xl:order-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
                         <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-700">
                           3
                         </span>
                         <h2 className="text-lg font-semibold text-slate-800">Cobro y confirmacion</h2>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                            customerIsValid
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-amber-50 text-amber-700"
+                          }`}
+                        >
+                          {activeDocumentOption.label}
+                        </span>
                       </div>
 
                       <div className="mt-4 space-y-4">
-                        <div>
-                          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-                            <label className="block text-xs font-medium text-slate-600">
-                              Tipo de comprobante
-                            </label>
-                            <span
-                              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                                customerIsValid
-                                  ? "bg-emerald-50 text-emerald-700"
-                                  : "bg-amber-50 text-amber-700"
-                              }`}
-                            >
-                              {documentGuidance}
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            {DOC_TYPES.map((docType) => {
-                              const Icon = getDocumentIcon(docType.value)
-                              const selected = documentType === docType.value
-                              const invalidSelection =
-                                selected &&
-                                (docType.value === "boleta" || docType.value === "factura") &&
-                                !customerIsValid
-
-                              return (
-                                <button
-                                  key={docType.value}
-                                  type="button"
-                                  onClick={() => setDocumentType(docType.value)}
-                                  className={`rounded-2xl border px-3 py-2.5 text-left text-sm transition ${
-                                    selected
-                                      ? invalidSelection
-                                        ? "border-amber-300 bg-amber-50 font-semibold text-amber-800 ring-1 ring-amber-200"
-                                        : "border-violet-400 bg-violet-50 font-semibold text-violet-800 ring-1 ring-violet-300"
-                                      : "border-slate-200 bg-white text-slate-700 hover:border-violet-200"
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <Icon className="h-4 w-4" />
-                                    <span>{docType.label}</span>
-                                  </div>
-                                </button>
-                              )
-                            })}
-                          </div>
-                        </div>
-
                         <div>
                           <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
                             <label className="block text-xs font-medium text-slate-600">
@@ -2155,11 +2579,25 @@ export default function NuevaVentaPage() {
                       </div>
                     </article>
 
-                    <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur">
+                    <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur xl:order-5">
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
                           <CreditCard className="h-4 w-4 text-violet-600" />
                           <h2 className="text-lg font-semibold text-slate-800">Resumen</h2>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                                aria-label="Informacion del resumen"
+                              >
+                                <Info className="h-4 w-4" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" sideOffset={8}>
+                              El precio final se valida con el backend usando el precio vigente segun la regla comercial activa.
+                            </TooltipContent>
+                          </Tooltip>
                         </div>
                         <span
                           className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${
@@ -2177,20 +2615,27 @@ export default function NuevaVentaPage() {
                         </span>
                       </div>
 
-                      <p className="mt-3 text-xs text-slate-500">
-                        El precio final se valida con el backend usando el retail vigente.
-                      </p>
-
                       {cartCount > 0 ? (
                         <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                           <div className="flex items-center justify-between gap-3">
-                            <div>
+                            <div className="flex items-center gap-2">
                               <p className="text-sm font-semibold text-slate-800">
                                 Ajustes comerciales
                               </p>
-                              <p className="text-xs text-slate-500">
-                                Aplica descuento general aqui y precio manual desde el detalle.
-                              </p>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="rounded-full p-1 text-slate-400 transition hover:bg-white hover:text-slate-600"
+                                    aria-label="Informacion de ajustes comerciales"
+                                  >
+                                    <Info className="h-3.5 w-3.5" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" sideOffset={8}>
+                                  Aplica descuento general aqui y precio manual desde el detalle.
+                                </TooltipContent>
+                              </Tooltip>
                             </div>
                             <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
                               Reglas comerciales
@@ -2259,7 +2704,23 @@ export default function NuevaVentaPage() {
                           ) : null}
 
                           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-                            <span>Precio manual por item disponible en Detalle de venta.</span>
+                            <div className="flex items-center gap-1.5">
+                              <span>Precio manual por item</span>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="rounded-full p-1 text-slate-400 transition hover:bg-white hover:text-slate-600"
+                                    aria-label="Informacion de precio manual"
+                                  >
+                                    <Info className="h-3.5 w-3.5" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" sideOffset={8}>
+                                  Disponible desde Detalle de venta para cada item.
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
                             <span className="font-semibold text-slate-700">
                               Descuento aplicado: S/. {formatMoney(totals.saleDiscountAmount)}
                             </span>
@@ -2628,16 +3089,31 @@ export default function NuevaVentaPage() {
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <p className="text-sm font-semibold text-slate-900">{priceTargetItem.label}</p>
                   <p className="mt-1 text-xs text-slate-500">{priceTargetItem.sku}</p>
-                  <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                  <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
                     <div>
-                      <p className="text-[11px] uppercase tracking-wide text-slate-500">Retail</p>
+                      <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                        {priceTargetPreviewItem?.price_type_applied === "wholesale" ? "Mayorista" : "Retail"}
+                      </p>
                       <p className="font-semibold text-slate-800">
-                        S/. {formatMoney(priceTargetItem.retail_price)}
+                        S/.{" "}
+                        {formatMoney(
+                          priceTargetPreviewItem?.unit_price_list ??
+                            priceTargetItem.wholesale_price ??
+                            priceTargetItem.retail_price
+                        )}
                       </p>
                     </div>
                     <div>
                       <p className="text-[11px] uppercase tracking-wide text-slate-500">Cantidad</p>
                       <p className="font-semibold text-slate-800">{priceTargetItem.quantity}</p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-slate-500">Regla aplicada</p>
+                      <p className="font-semibold text-slate-800">
+                        {priceTargetPreviewItem?.price_type_applied === "wholesale"
+                          ? "Mayorista 3+"
+                          : "Retail"}
+                      </p>
                     </div>
                   </div>
                 </div>

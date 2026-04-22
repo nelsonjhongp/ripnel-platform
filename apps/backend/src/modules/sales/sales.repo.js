@@ -31,7 +31,8 @@ async function findSellableVariants(locationId, searchQuery) {
        c.code AS color_code,
        c.name AS color_name,
        i.qty AS stock,
-       get_current_style_size_price(pv.style_id, pv.size_id, 'retail', CURRENT_DATE) AS retail_price
+       get_current_style_size_price(pv.style_id, pv.size_id, 'retail', CURRENT_DATE) AS retail_price,
+       get_current_style_size_price(pv.style_id, pv.size_id, 'wholesale', CURRENT_DATE) AS wholesale_price
      FROM product_variants pv
      INNER JOIN product_styles ps ON ps.style_id = pv.style_id
      INNER JOIN sizes s ON s.size_id = pv.size_id
@@ -46,6 +47,21 @@ async function findSellableVariants(locationId, searchQuery) {
   );
 
   return result.rows;
+}
+
+async function findActiveWholesaleMinQtyRule(executor = query) {
+  const result = await executor(
+    `SELECT rule_type, min_qty
+     FROM pricing_rules
+     WHERE rule_type = 'WHOLESALE_MIN_QTY_TOTAL'
+       AND active = TRUE
+       AND valid_from <= CURRENT_DATE
+       AND (valid_to IS NULL OR valid_to >= CURRENT_DATE)
+     ORDER BY valid_from DESC, updated_at DESC
+     LIMIT 1`
+  );
+
+  return result.rows[0] || null;
 }
 
 async function findAllSales(filters = {}) {
@@ -461,6 +477,15 @@ async function getCurrentRetailPriceInTx(clientQuery, styleId, sizeId) {
   return result.rows[0] ? result.rows[0].price : null;
 }
 
+async function getCurrentWholesalePriceInTx(clientQuery, styleId, sizeId) {
+  const result = await clientQuery(
+    `SELECT get_current_style_size_price($1, $2, 'wholesale', CURRENT_DATE) AS price`,
+    [styleId, sizeId]
+  );
+
+  return result.rows[0] ? result.rows[0].price : null;
+}
+
 async function getInventoryQtyInTx(clientQuery, locationId, variantId) {
   const result = await clientQuery(
     `SELECT qty FROM inventory WHERE location_id = $1 AND variant_id = $2 FOR UPDATE`,
@@ -596,6 +621,7 @@ async function insertStockMovementInTx(clientQuery, movementData) {
 
 module.exports = {
   findSellableVariants,
+  findActiveWholesaleMinQtyRule,
   findAllSales,
   findSaleById,
   findSaleDetailsBySaleId,
@@ -607,6 +633,7 @@ module.exports = {
   findCustomerByInternalCode,
   findVariantById,
   getCurrentRetailPriceInTx,
+  getCurrentWholesalePriceInTx,
   getInventoryQtyInTx,
   nextSaleNumberInTx,
   insertSale,
