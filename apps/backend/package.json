@@ -3,6 +3,7 @@
   "private": true,
   "main": "src/server.js",
   "scripts": {
+    "dev:backend": "node --watch src/server.js",
     "dev": "node --watch src/server.js",
     "start": "node src/server.js"
   },

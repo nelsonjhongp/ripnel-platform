@@ -4,6 +4,7 @@ const { env } = require('../../config/env');
 const { renderProformaSalePdfBuffer } = require('./sales-proforma-pdf');
 const {
   findSellableVariants,
+  findActiveWholesaleMinQtyRule,
   findAllSales,
   findSaleById,
   findSaleDetailsBySaleId,
@@ -14,6 +15,7 @@ const {
   findCustomerByInternalCode,
   findVariantById,
   getCurrentRetailPriceInTx,
+  getCurrentWholesalePriceInTx,
   getInventoryQtyInTx,
   nextSaleNumberInTx,
   insertSale,
@@ -297,6 +299,18 @@ function normalizeReceiptQueueLimit(value, fallback = 50) {
 
 function round2(value) {
   return Math.round(value * 100) / 100;
+}
+
+function sumSaleItemQuantity(items = []) {
+  return items.reduce((accumulator, item) => accumulator + Number(item.quantity || 0), 0);
+}
+
+function shouldApplyWholesaleRule(totalQuantity, wholesaleRule) {
+  return Boolean(
+    wholesaleRule &&
+      Number.isInteger(Number(wholesaleRule.min_qty)) &&
+      totalQuantity >= Number(wholesaleRule.min_qty)
+  );
 }
 
 function pickFirstText(...values) {
@@ -1308,6 +1322,7 @@ async function getPosContext(input = {}) {
   const { user, location } = await resolveOperatingContext(input.user_id);
   const businessDate = todayPeruDate();
   const cashClosing = await findCashClosingByLocationAndDate(location.location_id, businessDate);
+  const wholesaleRule = await findActiveWholesaleMinQtyRule();
 
   let cashStatus = 'missing';
   let saleEnabled = false;
@@ -1339,6 +1354,10 @@ async function getPosContext(input = {}) {
       sale_enabled: saleEnabled,
       cash_closing_id: cashClosing ? cashClosing.cash_closing_id : null,
       message,
+    },
+    pricing: {
+      wholesale_min_qty_total: wholesaleRule ? Number(wholesaleRule.min_qty) : null,
+      wholesale_rule_type: wholesaleRule ? wholesaleRule.rule_type : null,
     },
   };
 }
@@ -1461,11 +1480,14 @@ async function createSale(input = {}) {
   }
 
   const client = await pool.connect();
+  const totalQuantity = sumSaleItemQuantity(normalizedItems);
 
   try {
     await client.query('begin');
     const clientQuery = client.query.bind(client);
     await assertOpenCashForLocation(location, clientQuery);
+    const wholesaleRule = await findActiveWholesaleMinQtyRule(clientQuery);
+    const wholesaleApplies = shouldApplyWholesaleRule(totalQuantity, wholesaleRule);
 
     const confirmedAt = new Date().toISOString();
     const computedItems = [];
@@ -1485,26 +1507,43 @@ async function createSale(input = {}) {
         );
       }
 
-      const resolvedPrice = normalizeAmount(
+      const resolvedRetailPrice = normalizeAmount(
         await getCurrentRetailPriceInTx(clientQuery, item.style_id, item.size_id)
       );
 
-      if (resolvedPrice === null) {
+      if (resolvedRetailPrice === null) {
         throw new AppError(`No current retail price found for ${item.sku}`, 409);
       }
 
+      const resolvedWholesalePrice = wholesaleApplies
+        ? normalizeAmount(
+            await getCurrentWholesalePriceInTx(clientQuery, item.style_id, item.size_id)
+          )
+        : null;
+      const autoUnitPrice =
+        wholesaleApplies && resolvedWholesalePrice !== null
+          ? resolvedWholesalePrice
+          : resolvedRetailPrice;
+      const autoPriceType =
+        wholesaleApplies && resolvedWholesalePrice !== null ? 'wholesale' : 'retail';
+      const autoPricingRuleApplied =
+        wholesaleApplies && resolvedWholesalePrice !== null
+          ? wholesaleRule.rule_type
+          : null;
+
       const unitPriceBeforeDiscount = item.price_override
         ? item.price_override.unit_price_final
-        : resolvedPrice;
+        : autoUnitPrice;
       const lineSubtotalBeforeDiscount = round2(unitPriceBeforeDiscount * item.quantity);
       baseSubtotalAmount += lineSubtotalBeforeDiscount;
 
       computedItems.push({
         ...item,
-        unit_price_list: resolvedPrice,
+        unit_price_list: autoUnitPrice,
         unit_price_final: unitPriceBeforeDiscount,
-        price_type_applied: 'retail',
+        price_type_applied: autoPriceType,
         pricing_basis: item.price_override ? 'manual_override' : 'auto',
+        pricing_rule_applied: autoPricingRuleApplied,
         override_reason: item.price_override ? item.price_override.reason : null,
         overridden_by: item.price_override ? user.user_id : null,
         overridden_at: item.price_override ? confirmedAt : null,
