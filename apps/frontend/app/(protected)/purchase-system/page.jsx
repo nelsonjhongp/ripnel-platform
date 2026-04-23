@@ -1125,7 +1125,7 @@ export default function NuevaVentaPage() {
     }
 
     if (!cashReady) {
-      return posContext?.cash?.message || "La caja operativa aun no permite confirmar ventas."
+      return posContext?.cash?.message || "La venta no se puede registrar hasta que se abra una caja"
     }
 
     if (cart.length === 0) {
@@ -2729,6 +2729,32 @@ export default function NuevaVentaPage() {
                       ) : null}
 
                       <div className="mt-4 space-y-2 text-sm">
+                        <div
+                          className={`rounded-2xl border px-3 py-2 ${
+                            cashReady
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                              : "border-amber-200 bg-amber-50 text-amber-800"
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-semibold">
+                              Estado de caja: {cashReady ? "Abierta" : buildCashLabel(cashStatus)}
+                            </span>
+                            {!cashReady ? (
+                              canOpenCashModule ? (
+                                <Link
+                                  href="/caja"
+                                  className="rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-100"
+                                >
+                                  Ir a Caja del dia
+                                </Link>
+                              ) : (
+                                <span className="text-xs">Solicita apertura a caja/admin.</span>
+                              )
+                            ) : null}
+                          </div>
+                        </div>
+
                         {totals.saleDiscountAmount > 0 ? (
                           <div className="flex justify-between text-slate-600">
                             <span>Subtotal base</span>

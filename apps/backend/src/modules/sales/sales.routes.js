@@ -5,6 +5,7 @@ const {
 	getSellableVariants,
 	getSales,
 	getReceiptQueue,
+	getCustomersAnalytics,
 	getSaleById,
 	postSale,
 	postRetrySaleReceipt,
@@ -21,6 +22,7 @@ router.get('/context', getSalesPosContext);
 router.get('/sellable-variants', getSellableVariants);
 router.get('/receipts/queue', getReceiptQueue);
 router.post('/receipts/retry-pending', postRetryPendingReceipts);
+router.get('/analytics/customers', getCustomersAnalytics);
 router.get('/', getSales);
 router.get('/:saleId/proforma-pdf', getSaleProformaPdfFile);
 router.get('/:saleId/pdf', getSalePdfFile);
