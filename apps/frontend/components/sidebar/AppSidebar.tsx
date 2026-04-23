@@ -332,17 +332,17 @@ export function AppSidebar({
         }
       })
       .filter((group) => {
-      if (group.permission && !has(group.permission)) return false
+        if (group.permission && !has(group.permission)) return false
 
-      if (group.onlyForRoles && user?.role_name && !group.onlyForRoles.includes(user.role_name)) {
-        return false
-      }
+        if (group.onlyForRoles && user?.role_name && !group.onlyForRoles.includes(user.role_name)) {
+          return false
+        }
 
-      if (group.excludeRoles && user?.role_name && group.excludeRoles.includes(user.role_name)) {
-        return false
-      }
+        if (group.excludeRoles && user?.role_name && group.excludeRoles.includes(user.role_name)) {
+          return false
+        }
 
-      return group.items.length > 0
+        return group.items.length > 0
       })
   }, [loading, has, user?.role_name])
 
