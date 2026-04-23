@@ -110,6 +110,7 @@ const sidebarGroups: SidebarGroup[] = [
       { title: "Variantes", url: "/productos/variantes" },
     ],
   },
+  /*
   {
     title: "Precios",
     icon: ReceiptText,
@@ -132,6 +133,7 @@ const sidebarGroups: SidebarGroup[] = [
       { title: "Recepciones pendientes", url: "/transferencias/recepciones-pendientes" },
     ],
   },
+  */
   {
     title: "Administracion",
     icon: Settings,

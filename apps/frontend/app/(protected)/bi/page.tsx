@@ -23,8 +23,14 @@ const LEGACY_POWERBI_URLS = [
 function withEmbedOptions(rawUrl: string) {
   if (!rawUrl) return ""
 
-  const separator = rawUrl.includes("?") ? "&" : "?"
-  return `${rawUrl}${separator}navContentPaneEnabled=false&filterPaneEnabled=false`
+  const nextUrl = new URL(rawUrl)
+  nextUrl.searchParams.set("navContentPaneEnabled", "false")
+  nextUrl.searchParams.set("filterPaneEnabled", "false")
+  nextUrl.searchParams.set("actionBarEnabled", "false")
+  nextUrl.searchParams.set("chromeless", "1")
+  nextUrl.searchParams.set("pageView", "fitToWidth")
+  nextUrl.searchParams.set("zoom", "125")
+  return nextUrl.toString()
 }
 
 export default function BusinessIntelligencePage() {
@@ -122,9 +128,9 @@ export default function BusinessIntelligencePage() {
           </div>
         </header>
 
-        <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-          <div className="space-y-5">
-            <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur">
+        <div className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)]">
+          <div className="h-full">
+            <article className="h-full rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur">
               <div className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4 text-sky-600" />
                 <h2 className="text-lg font-semibold text-slate-900">Selecciona una vista BI</h2>
@@ -168,76 +174,84 @@ export default function BusinessIntelligencePage() {
                 })}
               </div>
             </article>
-
-            <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur">
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-violet-600" />
-                <h2 className="text-lg font-semibold text-slate-900">Uso recomendado</h2>
-              </div>
-              <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-                <p>
-                  Usa <strong>Dashboard</strong> para decidir rapido que atender hoy en la sede
-                  activa.
-                </p>
-                <p>
-                  Usa <strong>BI</strong> para comparativos, visualizaciones, clientes o analisis
-                  gerencial fuera del flujo operativo.
-                </p>
-              </div>
-            </article>
           </div>
 
-          <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
-            {selectedView ? (
-              <>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                      Vista activa
-                    </p>
-                    <h2 className="mt-1 text-xl font-semibold text-slate-900">{selectedView.title}</h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">{selectedView.description}</p>
-                  </div>
-                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
-                    {selectedView.category}
-                  </span>
-                </div>
-
-                <div className="mt-5 overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50">
-                  {selectedView.embedUrl ? (
-                    <iframe
-                      title={selectedView.title}
-                      src={withEmbedOptions(selectedView.embedUrl)}
-                      className="h-[72vh] w-full"
-                      loading="lazy"
-                      allowFullScreen
-                    />
-                  ) : (
-                    <div className="flex h-[72vh] items-center justify-center px-6 text-center">
-                      <div className="max-w-lg space-y-3">
-                        <p className="text-lg font-semibold text-slate-900">
-                          Esta vista aun no tiene URL embebida configurada
-                        </p>
-                        <p className="text-sm leading-6 text-slate-600">
-                          Configura la variable publica correspondiente en `apps/frontend/.env.local`
-                          para publicar el dashboard real dentro de esta pantalla.
-                        </p>
-                      </div>
+          <div>
+            <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
+              {selectedView ? (
+                <>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                        Vista activa
+                      </p>
+                      <h2 className="mt-1 text-xl font-semibold text-slate-900">{selectedView.title}</h2>
+                      <p className="mt-2 text-sm leading-6 text-slate-600">{selectedView.description}</p>
                     </div>
-                  )}
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                      {selectedView.category}
+                    </span>
+                  </div>
+
+                  <div className="relative mt-5 overflow-hidden rounded-[24px] bg-white">
+                    <div
+                      className="pointer-events-none absolute inset-x-0 top-0 z-20 h-16 bg-white"
+                      aria-hidden="true"
+                    />
+                    <div
+                      className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-40 bg-white"
+                      aria-hidden="true"
+                    />
+                    {selectedView.embedUrl ? (
+                      <iframe
+                        title={selectedView.title}
+                        src={withEmbedOptions(selectedView.embedUrl)}
+                        className="pointer-events-none h-[58vh] w-full -translate-y-8"
+                        loading="lazy"
+                        allowFullScreen
+                      />
+                    ) : (
+                      <div className="flex h-[58vh] items-center justify-center px-6 text-center">
+                        <div className="max-w-lg space-y-3">
+                          <p className="text-lg font-semibold text-slate-900">
+                            Esta vista aun no tiene URL embebida configurada
+                          </p>
+                          <p className="text-sm leading-6 text-slate-600">
+                            Configura la variable publica correspondiente en `apps/frontend/.env.local`
+                            para publicar el dashboard real dentro de esta pantalla.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="flex h-[58vh] items-center justify-center text-center">
+                  <div className="max-w-lg space-y-3">
+                    <p className="text-lg font-semibold text-slate-900">No hay vistas BI disponibles</p>
+                    <p className="text-sm leading-6 text-slate-600">
+                      Agrega al menos una URL de Power BI para usar este modulo de analitica.
+                    </p>
+                  </div>
                 </div>
-              </>
-            ) : (
-              <div className="flex h-[72vh] items-center justify-center text-center">
-                <div className="max-w-lg space-y-3">
-                  <p className="text-lg font-semibold text-slate-900">No hay vistas BI disponibles</p>
-                  <p className="text-sm leading-6 text-slate-600">
-                    Agrega al menos una URL de Power BI para usar este modulo de analitica.
+              )}
+              <div className="mt-6 border-t border-slate-200 pt-5">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-violet-600" />
+                  <h2 className="text-lg font-semibold text-slate-900">Uso recomendado</h2>
+                </div>
+                <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
+                  <p>
+                    Usa <strong>Dashboard</strong> para decidir rapido que atender hoy en la sede activa.
+                  </p>
+                  <p>
+                    Usa <strong>BI</strong> para comparativos, visualizaciones, clientes o analisis
+                    gerencial fuera del flujo operativo.
                   </p>
                 </div>
               </div>
-            )}
-          </article>
+            </article>
+          </div>
         </div>
       </div>
     </section>

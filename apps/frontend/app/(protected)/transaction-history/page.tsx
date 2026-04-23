@@ -6,7 +6,7 @@ import { CalendarRange, Filter, ReceiptText, RotateCcw, Search } from "lucide-re
 
 import { PermissionGuard } from "@/components/auth/PermissionGuard"
 import { InlineStatusCard } from "@/components/feedback/status-page"
-import { ApiError, apiFetch } from "@/lib/api"
+import { ApiError, apiFetch, buildApiUrl } from "@/lib/api"
 
 type SaleStatus = "confirmed" | "draft" | "cancelled"
 
@@ -341,12 +341,33 @@ export default function TransactionHistoryPage() {
                           Ver venta
                         </Link>
                         {sale.status === "confirmed" ? (
-                          <Link
-                            href={`/postventa/${sale.sale_id}`}
-                            className="inline-flex items-center justify-center rounded-xl bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800"
-                          >
-                            Postventa
-                          </Link>
+                          <>
+                            {["boleta", "factura"].includes(sale.document_type) ? (
+                              <a
+                                href={buildApiUrl(`/api/sales/${sale.sale_id}/pdf`)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 transition hover:bg-blue-100"
+                              >
+                                Descargar PDF
+                              </a>
+                            ) : sale.document_type === "proforma" ? (
+                              <a
+                                href={buildApiUrl(`/api/sales/${sale.sale_id}/proforma-pdf`)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 transition hover:bg-blue-100"
+                              >
+                                PDF Proforma
+                              </a>
+                            ) : null}
+                            <Link
+                              href={`/postventa/${sale.sale_id}`}
+                              className="inline-flex items-center justify-center rounded-xl bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800"
+                            >
+                              Postventa
+                            </Link>
+                          </>
                         ) : null}
                       </div>
                     </div>
