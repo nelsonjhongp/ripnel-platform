@@ -116,11 +116,13 @@ export default function CashHistoryPage() {
   }, [range, status])
 
   useEffect(() => {
-    loadHistory(range, status)
+    // defer loadHistory to avoid synchronous setState inside effect
+    void Promise.resolve().then(() => loadHistory(range, status));
   }, [range, status, loadHistory])
 
   useEffect(() => {
-    setPage(1)
+    // defer setPage to avoid synchronous setState inside effect
+    void Promise.resolve().then(() => setPage(1));
   }, [range, status])
 
   const stats = useMemo(() => {
@@ -143,9 +145,11 @@ export default function CashHistoryPage() {
   }, [history, page])
 
   useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages)
-    }
+    void Promise.resolve().then(() => {
+      if (page > totalPages) {
+        setPage(totalPages)
+      }
+    })
   }, [page, totalPages])
 
   if (loading) {

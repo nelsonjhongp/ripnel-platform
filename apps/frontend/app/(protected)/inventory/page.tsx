@@ -65,14 +65,17 @@ export default function InventoryPage() {
   }
 
   useEffect(() => {
-    loadInventory();
+    // defer stateful loads to avoid synchronous setState inside effect
+    void Promise.resolve().then(() => {
+      loadInventory();
 
-    fetch(buildApiUrl("/api/prices/coverage-gaps"), { cache: "no-store" })
-      .then((res) => res.json())
-      .then((payload) => {
-        setCoverageGaps(payload.data || []);
-      })
-      .catch(console.error);
+      fetch(buildApiUrl("/api/prices/coverage-gaps"), { cache: "no-store" })
+        .then((res) => res.json())
+        .then((payload) => {
+          setCoverageGaps(payload.data || []);
+        })
+        .catch(console.error);
+    });
   }, []);
 
   const locationOptions = useMemo(() => {

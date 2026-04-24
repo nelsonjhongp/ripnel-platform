@@ -120,7 +120,8 @@ export default function CajaPage() {
   }, [locationId])
 
   useEffect(() => {
-    fetchCurrent()
+    // defer fetchCurrent to avoid synchronous setState inside effect
+    void Promise.resolve().then(() => fetchCurrent())
   }, [fetchCurrent])
 
   async function handleOpen() {

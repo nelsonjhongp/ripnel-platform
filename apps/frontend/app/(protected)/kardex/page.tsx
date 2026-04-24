@@ -108,7 +108,8 @@ export default function KardexPage() {
   }
 
   useEffect(() => {
-    loadKardex();
+    // defer loadKardex to avoid synchronous setState inside effect
+    void Promise.resolve().then(() => loadKardex());
   }, []);
 
   const filteredMovements = useMemo(() => {

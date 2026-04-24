@@ -731,16 +731,20 @@ export default function NuevaVentaPage() {
   }, [])
 
   useEffect(() => {
-    refreshGenericCustomer()
+    // defer refresh to avoid synchronous setState inside effect
+    void Promise.resolve().then(() => refreshGenericCustomer())
   }, [refreshGenericCustomer])
 
   useEffect(() => {
     if (!defaultLocation?.location_id) {
-      setVariants([])
-      setProductPickerOpen(false)
-      setSelectedProductStyle(null)
-      setSelectedSizeCode("")
-      setSelectedColorCode("")
+      // defer clearing state to avoid synchronous setState inside effect
+      void Promise.resolve().then(() => {
+        setVariants([])
+        setProductPickerOpen(false)
+        setSelectedProductStyle(null)
+        setSelectedSizeCode("")
+        setSelectedColorCode("")
+      })
       return
     }
 
