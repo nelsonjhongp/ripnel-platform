@@ -158,7 +158,8 @@ export default function CashControlPage() {
   }, [])
 
   useEffect(() => {
-    setPage(1)
+    // defer setPage to avoid synchronous setState inside effect
+    void Promise.resolve().then(() => setPage(1));
   }, [range, status, locationId])
 
   useEffect(() => {

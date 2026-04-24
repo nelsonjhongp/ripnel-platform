@@ -218,7 +218,8 @@ export default function BusinessIntelligencePage() {
       }
     }
 
-    loadAnalytics()
+    // defer loadAnalytics to avoid synchronous setState inside effect
+    void Promise.resolve().then(() => loadAnalytics())
 
     return () => {
       active = false

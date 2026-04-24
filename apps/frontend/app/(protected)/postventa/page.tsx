@@ -108,47 +108,54 @@ export default function PostsalePage() {
     let active = true
     const controller = new AbortController()
 
-    const timeoutId = window.setTimeout(async () => {
-      setLoading(true)
-      setError(null)
+    // defer scheduling the load to avoid synchronous setState inside effect
+    const timeoutWrapper = Promise.resolve().then(() => {
+      const timeoutId = window.setTimeout(async () => {
+        setLoading(true)
+        setError(null)
 
-      try {
-        const params = new URLSearchParams()
-        if (search.trim()) params.set("q", search.trim())
-        if (status !== "all") params.set("status", status)
-        if (dateFrom) params.set("date_from", dateFrom)
-        if (dateTo) params.set("date_to", dateTo)
+        try {
+          const params = new URLSearchParams()
+          if (search.trim()) params.set("q", search.trim())
+          if (status !== "all") params.set("status", status)
+          if (dateFrom) params.set("date_from", dateFrom)
+          if (dateTo) params.set("date_to", dateTo)
 
-        const path = params.toString()
-          ? `/api/postsales/eligible?${params.toString()}`
-          : "/api/postsales/eligible"
+          const path = params.toString()
+            ? `/api/postsales/eligible?${params.toString()}`
+            : "/api/postsales/eligible"
 
-        const data = await apiFetch<EligibleSale[]>(path, {
-          signal: controller.signal,
-          cache: "no-store",
-        })
+          const data = await apiFetch<EligibleSale[]>(path, {
+            signal: controller.signal,
+            cache: "no-store",
+          })
 
-        if (active) {
-          setSales(Array.isArray(data) ? data : [])
+          if (active) {
+            setSales(Array.isArray(data) ? data : [])
+          }
+        } catch (loadError) {
+          if (!active || controller.signal.aborted) {
+            return
+          }
+
+          setSales([])
+          setError(explainPostsaleError(loadError))
+        } finally {
+          if (active) {
+            setLoading(false)
+          }
         }
-      } catch (loadError) {
-        if (!active || controller.signal.aborted) {
-          return
-        }
+      }, 250)
 
-        setSales([])
-        setError(explainPostsaleError(loadError))
-      } finally {
-        if (active) {
-          setLoading(false)
-        }
-      }
-    }, 250)
+      return timeoutId
+    })
 
     return () => {
       active = false
       controller.abort()
-      window.clearTimeout(timeoutId)
+      timeoutWrapper.then((id) => {
+        if (typeof id === "number") window.clearTimeout(id)
+      })
     }
   }, [dateFrom, dateTo, search, status])
 

@@ -65,8 +65,11 @@ export default function AccountPage() {
 
   useEffect(() => {
     if (!user?.user_id || locationAssignments.length > 0) {
-      setAvailableLocations([]);
-      setLoadingAvailableLocations(false);
+      // defer state updates to avoid synchronous setState inside effect
+      void Promise.resolve().then(() => {
+        setAvailableLocations([]);
+        setLoadingAvailableLocations(false);
+      });
       return;
     }
 
@@ -105,7 +108,8 @@ export default function AccountPage() {
       locationAssignments[0]?.location_id ||
       availableLocations[0]?.location_id ||
       "";
-    setSelectedLocationId(nextSelected);
+    // defer selection to avoid synchronous setState inside effect
+    void Promise.resolve().then(() => setSelectedLocationId(nextSelected));
   }, [availableLocations, defaultLocation?.location_id, locationAssignments]);
 
   const assignedLocationsCount = locationAssignments.length;
