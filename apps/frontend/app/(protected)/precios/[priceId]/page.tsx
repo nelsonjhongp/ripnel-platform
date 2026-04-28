@@ -39,21 +39,26 @@ const pricePages: Record<
 
 export default async function PricePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ priceId: string }>
+  searchParams: Promise<{ style_id?: string | string[] }>
 }) {
   const { priceId } = await params
+  const resolvedSearchParams = await searchParams
+  const styleIdParam = resolvedSearchParams.style_id
+  const initialStyleId = Array.isArray(styleIdParam) ? styleIdParam[0] : styleIdParam
 
   if (!pricePages[priceId]) {
     notFound()
   }
 
   if (priceId === "listado-de-precios") {
-    return <ListPrices mode="list" />
+    return <ListPrices mode="list" initialStyleId={initialStyleId || null} />
   }
 
   if (priceId === "crear-y-editar-precio") {
-    return <ListPrices mode="editor" />
+    return <ListPrices mode="editor" initialStyleId={initialStyleId || null} />
   }
 
   if (priceId === "regla-mayorista") {

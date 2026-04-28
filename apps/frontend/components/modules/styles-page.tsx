@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { LoaderCircle, PencilLine, Plus, RefreshCw, Search } from "lucide-react";
 import { buildApiUrl } from "@/lib/api";
 
@@ -38,6 +39,12 @@ type FormState = {
   name: string;
   description: string;
   active: boolean;
+};
+
+type CreatedStyleSummary = {
+  style_id: string;
+  style_code: string | null;
+  name: string;
 };
 
 const initialFormState: FormState = {
@@ -101,7 +108,11 @@ async function requestStylesModuleData() {
   };
 }
 
-export function StylesPage() {
+export function StylesPage({
+  initialStyleId = null,
+}: {
+  initialStyleId?: string | null;
+}) {
   const [styles, setStyles] = useState<StyleItem[]>([]);
   const [garmentTypes, setGarmentTypes] = useState<OptionItem[]>([]);
   const [fabrics, setFabrics] = useState<OptionItem[]>([]);
@@ -115,6 +126,8 @@ export function StylesPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [editingStyleId, setEditingStyleId] = useState<string | null>(null);
   const [formState, setFormState] = useState<FormState>(initialFormState);
+  const [lastCreatedStyle, setLastCreatedStyle] = useState<CreatedStyleSummary | null>(null);
+  const hasAppliedInitialSelection = useRef(false);
 
   async function loadData() {
     setLoading(true);
@@ -148,6 +161,24 @@ export function StylesPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (
+      hasAppliedInitialSelection.current ||
+      !initialStyleId ||
+      editingStyleId === initialStyleId ||
+      !styles.length
+    ) {
+      return;
+    }
+
+    const matchedStyle = styles.find((style) => style.style_id === initialStyleId);
+
+    if (matchedStyle) {
+      hasAppliedInitialSelection.current = true;
+      handleEdit(matchedStyle);
+    }
+  }, [editingStyleId, initialStyleId, styles]);
 
   const activeCount = styles.filter((style) => style.active).length;
   const inactiveCount = styles.length - activeCount;
@@ -195,6 +226,7 @@ export function StylesPage() {
 
   function handleEdit(style: StyleItem) {
     setEditingStyleId(style.style_id);
+    setLastCreatedStyle(null);
     setFormState({
       garment_type_id: style.garment_type_id,
       fabric_id: style.fabric_id || "",
@@ -295,9 +327,15 @@ export function StylesPage() {
 
       if (isEditing) {
         updateStyleInList(payload.data);
+        setLastCreatedStyle(null);
         setSuccessMessage("Style actualizado correctamente.");
       } else {
         setStyles((current) => [payload.data, ...current]);
+        setLastCreatedStyle({
+          style_id: payload.data.style_id,
+          style_code: payload.data.style_code,
+          name: payload.data.name,
+        });
         setSuccessMessage(`Style creado correctamente con codigo ${payload.data.style_code}.`);
       }
 
@@ -328,8 +366,8 @@ export function StylesPage() {
                 Estilos de producto
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                Este modulo registra solo el style base. La configuracion de tallas,
-                colores y variantes operativas se hace despues desde Variantes.
+                Aqui registras solo el style base. El siguiente paso natural es
+                completar tallas, colores y combinaciones desde Variantes.
               </p>
             </div>
 
@@ -498,6 +536,18 @@ export function StylesPage() {
                             <PencilLine className="h-3.5 w-3.5" />
                             Editar
                           </button>
+                          <Link
+                            href={`/productos/variantes?style_id=${encodeURIComponent(style.style_id)}`}
+                            className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                          >
+                            Variantes
+                          </Link>
+                          <Link
+                            href={`/precios/crear-y-editar-precio?style_id=${encodeURIComponent(style.style_id)}`}
+                            className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                          >
+                            Precios
+                          </Link>
                           <button
                             type="button"
                             onClick={() => handleToggleActive(style)}
@@ -544,9 +594,38 @@ export function StylesPage() {
               <p className="mt-2 text-sm leading-6 text-slate-500">
                 {editingStyleId
                   ? "Solo se habilitan name, description, target y estado. Los campos identitarios quedan bloqueados."
-                  : "Registra el producto base y deja la configuracion operativa para el modulo de Variantes."}
+                  : "Registra el producto base y deja la configuracion operativa para Variantes y Precios."}
               </p>
             </div>
+
+            {lastCreatedStyle ? (
+              <div className="mt-5 rounded-3xl border border-emerald-200 bg-emerald-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                  Siguiente paso
+                </p>
+                <h3 className="mt-1 text-base font-semibold text-emerald-950">
+                  {lastCreatedStyle.name}
+                </h3>
+                <p className="mt-1 text-sm text-emerald-800">
+                  El style ya existe. Ahora conviene definir tallas y colores antes de
+                  cargar precios o stock.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link
+                    href={`/productos/variantes?style_id=${encodeURIComponent(lastCreatedStyle.style_id)}`}
+                    className="inline-flex items-center justify-center rounded-2xl bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800"
+                  >
+                    Configurar variantes
+                  </Link>
+                  <Link
+                    href={`/precios/crear-y-editar-precio?style_id=${encodeURIComponent(lastCreatedStyle.style_id)}`}
+                    className="inline-flex items-center justify-center rounded-2xl border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100"
+                  >
+                    Ir a precios
+                  </Link>
+                </div>
+              </div>
+            ) : null}
 
             <form onSubmit={handleSubmit} className="mt-5 space-y-4">
               <div className="space-y-1.5">
