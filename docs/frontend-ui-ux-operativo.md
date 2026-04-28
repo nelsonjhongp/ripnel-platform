@@ -5,7 +5,9 @@ Guia breve para futuras interfaces operativas de RIPNEL.
 ## Cuando usar ayudas contextuales
 
 - Evitar texto explicativo permanente cuando la pantalla ya se entiende por jerarquia visual.
+- No agregar texto o informacion adicional no solicitada dentro de la interfaz; si la duda puede resolverse con ayuda puntual, responderla primero en chat o usar ayuda contextual minima.
 - Usar iconos de informacion para aclarar metricas, estados o reglas de negocio que no sean obvias.
+- Reutilizar el patron de `Tooltip` ya existente antes de crear nuevos bloques de apoyo visual.
 - Mantener los tooltips como ayuda puntual, no como reemplazo de errores, alertas o validaciones criticas.
 - Preferir ayuda contextual en:
   - tarjetas resumen;
@@ -51,6 +53,26 @@ Guia breve para futuras interfaces operativas de RIPNEL.
 - Lista principal con densidad alta.
 - Detalle expandible solo cuando agregue contexto real.
 - Copy corto, operativo y consistente con el lenguaje ERP del proyecto.
+
+## Patron para cuenta y configuracion operativa
+
+- Tratar `Cuenta` y ajustes como vistas operativas, no como perfil decorativo.
+- Preferir anchos mas contenidos para configuracion y preferencias; una referencia razonable es una columna principal tipo `max-w-4xl` o menor, no full width si la lectura no lo necesita.
+- Priorizar una superficie continua con secciones separadas por bordes antes que varias cards independientes apiladas como dashboard.
+- Evitar KPIs grandes o bloques resumen si el dato ya aparece en campos principales.
+- Preferir layouts compactos de dos paneles o dos columnas, con poco espacio muerto.
+- Si una seccion como `Apariencia` o `Sede operativa` ya se entiende por su titulo, no agregar parrafos visibles debajo salvo que la accion sea ambigua.
+- Si el ajuste es evidente por contexto, no agregar tooltip ni copy de apoyo.
+- Para elecciones como sede default:
+  - preferir `select` o dropdown cuando el usuario solo necesita escoger una opcion;
+  - usar tarjetas/radios solo si la comparacion simultanea entre opciones aporta una decision real.
+- En ajustes de apariencia:
+  - usar filas cortas;
+  - label breve a la izquierda;
+  - control o selector a la derecha;
+  - evitar exponer ajustes que no se entiendan claramente para el usuario final;
+  - los controles deben mostrar affordance visible: `cursor-pointer`, hover y focus claros.
+- Para temas visuales de modulos operativos y settings, preferir fondos sobrios y solidos en grises o grafito antes que gradientes protagonistas.
 
 ## Patron para modulos de caja
 

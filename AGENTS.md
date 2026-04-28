@@ -57,6 +57,13 @@ Do not invent tables or fields if the migration already defines them.
 - Use the existing sidebar shell and keep navigation aligned with real modules.
 - Avoid links to modules that do not exist unless there is an intentional placeholder page.
 - Use `ripnel-logo.svg` when appropriate, but optimize heavy assets before production.
+- Do not add visible explanatory copy when the hierarchy, labels and actions already communicate the screen.
+- Prefer contextual help with the existing tooltip pattern over persistent descriptive text.
+- If a setting is self-explanatory in context, do not add a tooltip just because help is available.
+- In operational views, prioritize dense rows, compact controls and direct actions over large cards and decorative whitespace.
+- For single operational selections with several options, prefer `select` / dropdown controls before expanded radio-card lists unless comparison between options is essential.
+- For account, preferences, and settings pages, prefer narrower content widths and continuous section stacks over dashboard-like grids of unrelated cards.
+- Interactive controls such as `select`, segmented options, and icon actions must show clear affordance through cursor, hover, and focus states.
 
 ## Backend conventions
 
