@@ -79,6 +79,12 @@ function normalizePositiveInteger(value) {
   return parsed;
 }
 
+function normalizeNonNegativeInteger(value) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) return null;
+  return parsed;
+}
+
 function normalizeAmount(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) return null;
@@ -1367,6 +1373,8 @@ async function listSales(input = {}) {
   const q = normalizeText(input.q);
   const dateFrom = normalizeDate(input.date_from);
   const dateTo = normalizeDate(input.date_to);
+  const limit = Math.min(normalizePositiveInteger(input.limit) || 25, 100);
+  const offset = normalizeNonNegativeInteger(input.offset) || 0;
   const { location } = await resolveOperatingContext(input.user_id);
 
   if (status && !['draft', 'confirmed', 'cancelled'].includes(status)) {
@@ -1385,13 +1393,23 @@ async function listSales(input = {}) {
     throw new AppError('date_from cannot be greater than date_to', 400);
   }
 
-  return findAllSales({
+  const salesPage = await findAllSales({
     status,
     q,
     dateFrom,
     dateTo,
     locationId: location.location_id,
+    limit,
+    offset,
   });
+
+  return {
+    items: salesPage.items,
+    total: salesPage.total,
+    limit,
+    offset,
+    has_more: offset + salesPage.items.length < salesPage.total,
+  };
 }
 
 async function listReceiptQueue(input = {}) {
