@@ -42,6 +42,8 @@ async function getSales(req, res, next) {
       q: req.query.q,
       date_from: req.query.date_from,
       date_to: req.query.date_to,
+      limit: req.query.limit,
+      offset: req.query.offset,
     });
     return res.json(sales);
   } catch (error) {

@@ -96,6 +96,19 @@ async function findAllSales(filters = {}) {
   }
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const limit = Number.isInteger(filters.limit) ? filters.limit : 25;
+  const offset = Number.isInteger(filters.offset) ? filters.offset : 0;
+
+  const countResult = await query(
+    `SELECT COUNT(*)::int AS total
+     FROM sales s
+     ${whereClause}`,
+    values
+  );
+
+  const paginatedValues = [...values, limit, offset];
+  const limitRef = `$${paginatedValues.length - 1}`;
+  const offsetRef = `$${paginatedValues.length}`;
 
   const result = await query(
     `SELECT
@@ -123,11 +136,15 @@ async function findAllSales(filters = {}) {
      INNER JOIN users u ON u.user_id = s.seller_user_id
      ${whereClause}
      ORDER BY COALESCE(s.confirmed_at, s.created_at) DESC, s.created_at DESC
-     LIMIT 200`,
-    values
+     LIMIT ${limitRef}
+     OFFSET ${offsetRef}`,
+    paginatedValues
   );
 
-  return result.rows;
+  return {
+    items: result.rows,
+    total: countResult.rows[0] ? countResult.rows[0].total : 0,
+  };
 }
 
 async function findSaleById(saleId, locationId = null) {
