@@ -129,6 +129,18 @@ async function findSizeById(sizeId) {
   return result.rows[0] || null;
 }
 
+async function findConfiguredStyleSize(styleId, sizeId) {
+  const result = await query(
+    `select style_id, size_id
+     from style_sizes
+     where style_id = $1
+       and size_id = $2`,
+    [styleId, sizeId]
+  );
+
+  return result.rows[0] || null;
+}
+
 async function insertPrice(payload, executor = query) {
   const result = await executor(
     `insert into style_size_prices (
@@ -218,6 +230,7 @@ module.exports = {
   findPriceById,
   findStyleById,
   findSizeById,
+  findConfiguredStyleSize,
   insertPrice,
   closePreviousPricesForNewStart,
   updatePrice,

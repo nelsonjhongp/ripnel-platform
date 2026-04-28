@@ -1,11 +1,12 @@
 const { AppError } = require('../../shared/errors');
 const { pool } = require('../../shared/db');
+const { listProducts } = require('../products/products.service');
 const {
   findAllPrices,
-  findStylesMissingCommercialPrices,
   findPriceById,
   findStyleById,
   findSizeById,
+  findConfiguredStyleSize,
   insertPrice,
   closePreviousPricesForNewStart,
   updatePrice,
@@ -112,6 +113,12 @@ async function createPrice(input) {
     throw new AppError('Size is invalid', 400);
   }
 
+  const configuredStyleSize = await findConfiguredStyleSize(styleId, sizeId);
+
+  if (!configuredStyleSize) {
+    throw new AppError('Size is not configured for this style', 400);
+  }
+
   const client = await pool.connect();
 
   try {
@@ -160,7 +167,46 @@ async function createPrice(input) {
 }
 
 async function listPriceCoverageGaps() {
-  return findStylesMissingCommercialPrices();
+  const products = await listProducts();
+
+  return products
+    .filter(
+      (product) =>
+        product.missing_retail_size_count > 0 &&
+        (product.active_variant_count > 0 || product.inventory_row_count > 0)
+    )
+    .sort((left, right) => {
+      if (
+        left.sizes_with_stock_without_retail_count !==
+        right.sizes_with_stock_without_retail_count
+      ) {
+        return (
+          right.sizes_with_stock_without_retail_count -
+          left.sizes_with_stock_without_retail_count
+        );
+      }
+
+      if (left.inventory_row_count !== right.inventory_row_count) {
+        return right.inventory_row_count - left.inventory_row_count;
+      }
+
+      return String(left.name || '').localeCompare(String(right.name || ''), 'es');
+    })
+    .map((product) => ({
+      style_id: product.style_id,
+      style_code: product.style_code,
+      style_name: product.name,
+      variant_count: product.variant_count,
+      inventory_row_count: product.inventory_row_count,
+      price_row_count: product.retail_sizes_covered_count,
+      configured_size_count: product.configured_size_count,
+      retail_sizes_covered_count: product.retail_sizes_covered_count,
+      missing_retail_size_count: product.missing_retail_size_count,
+      sizes_with_stock_without_retail_count:
+        product.sizes_with_stock_without_retail_count,
+      total_stock_qty: product.total_stock_qty,
+      status: product.status,
+    }));
 }
 
 async function patchPrice(priceId, input) {
