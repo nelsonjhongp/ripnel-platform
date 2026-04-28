@@ -161,6 +161,6 @@ export function getCashStatusLabel(status: CashClosing["status"]) {
 
 export function getCashStatusTone(status: CashClosing["status"]) {
   return status === "open"
-    ? "border-amber-200 bg-amber-50 text-amber-700"
-    : "border-slate-200 bg-slate-100 text-slate-600"
+    ? "sales-chip sales-chip-warning"
+    : "sales-chip sales-chip-neutral"
 }

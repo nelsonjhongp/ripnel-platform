@@ -1,54 +1,50 @@
-import { AlertTriangle, ReceiptText } from "lucide-react"
+"use client"
+
+import { ReceiptText } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
 export function CashRegisterStatus({
   totalItems = 0,
   subtotal = 0,
+  totalLabel = "Items",
+  summaryLabel = "Subtotal",
   onClear,
-  reminderText = "En el siguiente paso se captura la informacion del cliente y luego el metodo de pago.",
   className,
 }) {
   return (
-    <article
-      className={cn(
-        "space-y-4 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6",
-        className
-      )}
-    >
-      <h2 className="mb-2 flex items-center gap-2 text-lg font-semibold text-slate-800">
-        <ReceiptText className="h-4 w-4 text-violet-600" />
-        Estado de caja
-      </h2>
-
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-xs uppercase tracking-wide text-slate-500">Items en orden</p>
-        <p className="mt-1 text-2xl font-bold text-slate-900">{totalItems}</p>
+    <section className={cn("space-y-3", className)}>
+      <div className="flex items-center gap-2">
+        <ReceiptText className="h-4 w-4 text-[var(--ripnel-accent)]" />
+        <h2 className="text-base font-semibold text-[var(--ops-text)]">Estado de venta</h2>
       </div>
 
-      <div className="rounded-2xl border border-violet-100 bg-violet-50/60 p-4">
-        <p className="text-xs uppercase tracking-wide text-slate-500">Subtotal</p>
-        <p className="mt-1 text-2xl font-bold text-slate-900">S/. {subtotal.toFixed(2)}</p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="sales-panel-muted rounded-lg p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+            {totalLabel}
+          </p>
+          <p className="mt-1 text-2xl font-semibold text-[var(--ops-text)]">{totalItems}</p>
+        </div>
+
+        <div className="rounded-lg border border-[color:color-mix(in_srgb,var(--ripnel-accent)_24%,var(--ops-border-strong))] bg-[var(--ripnel-accent-soft)] p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+            {summaryLabel}
+          </p>
+          <p className="mt-1 text-2xl font-semibold text-[var(--ops-text)]">S/. {subtotal.toFixed(2)}</p>
+        </div>
       </div>
 
-      <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">
-        <p className="flex items-center gap-2 font-semibold">
-          <AlertTriangle className="h-4 w-4" />
-          Recordatorio de flujo
-        </p>
-        <p className="mt-1">{reminderText}</p>
-      </div>
-
-      {onClear && (
+      {onClear ? (
         <button
           type="button"
           onClick={onClear}
-          className="w-full rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+          className="mt-3 w-full rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-4 py-2 text-sm font-semibold text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
         >
-          Limpiar orden actual
+          Limpiar venta
         </button>
-      )}
-    </article>
+      ) : null}
+    </section>
   )
 }
 
