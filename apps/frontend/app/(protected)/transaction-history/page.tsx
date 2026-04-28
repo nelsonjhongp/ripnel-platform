@@ -2,10 +2,19 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import { CalendarRange, Filter, ReceiptText, RotateCcw, Search } from "lucide-react"
+import {
+  CalendarRange,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  RotateCcw,
+  Search,
+} from "lucide-react"
 
 import { PermissionGuard } from "@/components/auth/PermissionGuard"
 import { InlineStatusCard } from "@/components/feedback/status-page"
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
+import { Button } from "@/components/ui/button"
 import { ApiError, apiFetch } from "@/lib/api"
 
 type SaleStatus = "confirmed" | "draft" | "cancelled"
@@ -27,6 +36,16 @@ type SaleItem = {
   seller_name: string
 }
 
+type SalesPageResponse = {
+  items: SaleItem[]
+  total: number
+  limit: number
+  offset: number
+  has_more: boolean
+}
+
+const PAGE_SIZE = 25
+
 const STATUS_OPTIONS = [
   { value: "all", label: "Todos" },
   { value: "confirmed", label: "Confirmadas" },
@@ -34,16 +53,16 @@ const STATUS_OPTIONS = [
   { value: "cancelled", label: "Anuladas" },
 ]
 
-const STATUS_STYLES: Record<string, string> = {
-  confirmed: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  draft: "border-amber-200 bg-amber-50 text-amber-700",
-  cancelled: "border-rose-200 bg-rose-50 text-rose-700",
-}
-
 const STATUS_LABELS: Record<string, string> = {
   confirmed: "Confirmada",
   draft: "Borrador",
   cancelled: "Anulada",
+}
+
+const STATUS_CLASSES: Record<string, string> = {
+  confirmed: "sales-chip sales-chip-success",
+  draft: "sales-chip sales-chip-warning",
+  cancelled: "sales-chip sales-chip-danger",
 }
 
 function explainSalesError(error: unknown) {
@@ -70,14 +89,45 @@ function formatDateTime(value: string | null, fallback: string) {
   })
 }
 
+function MetricPill({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string
+  value: string | number
+  tone?: "default" | "success" | "warning"
+}) {
+  const toneClass =
+    tone === "success"
+      ? "sales-chip sales-chip-success"
+      : tone === "warning"
+        ? "sales-chip sales-chip-warning"
+        : "ops-metric-pill"
+
+  return (
+    <article className={`${toneClass} rounded-full px-4 py-2.5`}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] opacity-80">{label}</p>
+      <p className="mt-1 text-lg font-semibold leading-none">{value}</p>
+    </article>
+  )
+}
+
 export default function TransactionHistoryPage() {
   const [sales, setSales] = useState<SaleItem[]>([])
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState("all")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalResults, setTotalResults] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [dateFrom, dateTo, search, status])
 
   useEffect(() => {
     let active = true
@@ -93,15 +143,19 @@ export default function TransactionHistoryPage() {
         if (search.trim()) params.set("q", search.trim())
         if (dateFrom) params.set("date_from", dateFrom)
         if (dateTo) params.set("date_to", dateTo)
+        params.set("limit", String(PAGE_SIZE))
+        params.set("offset", String((currentPage - 1) * PAGE_SIZE))
 
-        const path = params.toString() ? `/api/sales?${params.toString()}` : "/api/sales"
-        const data = await apiFetch<SaleItem[]>(path, {
+        const path = `/api/sales?${params.toString()}`
+        const data = await apiFetch<SalesPageResponse>(path, {
           signal: controller.signal,
           cache: "no-store",
         })
 
         if (active) {
-          setSales(Array.isArray(data) ? data : [])
+          setSales(Array.isArray(data?.items) ? data.items : [])
+          setTotalResults(Number(data?.total || 0))
+          setHasMore(Boolean(data?.has_more))
         }
       } catch (loadError) {
         if (!active || controller.signal.aborted) {
@@ -109,6 +163,8 @@ export default function TransactionHistoryPage() {
         }
 
         setSales([])
+        setTotalResults(0)
+        setHasMore(false)
         setError(explainSalesError(loadError))
       } finally {
         if (active) {
@@ -122,95 +178,89 @@ export default function TransactionHistoryPage() {
       controller.abort()
       window.clearTimeout(timeoutId)
     }
-  }, [dateFrom, dateTo, search, status])
+  }, [currentPage, dateFrom, dateTo, search, status])
+
+  const totalPages = Math.max(1, Math.ceil(totalResults / PAGE_SIZE))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+
+  useEffect(() => {
+    if (currentPage !== safeCurrentPage) {
+      setCurrentPage(safeCurrentPage)
+    }
+  }, [currentPage, safeCurrentPage])
 
   const totals = useMemo(() => {
     const confirmed = sales.filter((item) => item.status === "confirmed")
     const revenue = confirmed.reduce((acc, item) => acc + Number(item.total_amount || 0), 0)
     const pending = sales.filter((item) => item.status === "draft").length
-    return { count: sales.length, revenue, pending }
-  }, [sales])
+    return {
+      count: totalResults,
+      revenue,
+      pending,
+    }
+  }, [sales, totalResults])
 
   const hasActiveFilters =
     Boolean(search.trim()) || status !== "all" || Boolean(dateFrom) || Boolean(dateTo)
+  const firstVisible = sales.length === 0 ? 0 : (safeCurrentPage - 1) * PAGE_SIZE + 1
+  const lastVisible = sales.length === 0 ? 0 : firstVisible + sales.length - 1
 
   function clearFilters() {
     setSearch("")
     setStatus("all")
     setDateFrom("")
     setDateTo("")
+    setCurrentPage(1)
   }
 
   return (
     <PermissionGuard permission="sales.pos">
-      <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
-        <div className="mx-auto max-w-7xl space-y-5">
-          <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-violet-600">Operaciones de venta</p>
-                <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">Historial de ventas</h1>
-                <p className="mt-1 text-sm text-slate-600">
-                  Consulta ventas reales de la sede operativa actual, filtra por estado y fecha,
-                  y abre el detalle comercial sin salir del flujo ERP.
-                </p>
-              </div>
+      <section className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
+        <div className="mx-auto max-w-[1180px] space-y-4">
+          <PosHeader
+            eyebrow="Operacion comercial"
+            title="Historial de ventas"
+            actions={
+              <>
+                <Button asChild variant="outline" size="sm" className="rounded-full">
+                  <Link href="/postventa">Postventa</Link>
+                </Button>
+                <Button asChild variant="accent" size="sm" className="rounded-full">
+                  <Link href="/purchase-system">Nueva venta</Link>
+                </Button>
+              </>
+            }
+          />
 
-              <div className="flex flex-wrap gap-2">
-                <Link
-                  href="/postventa"
-                  className="inline-flex items-center justify-center rounded-2xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm font-semibold text-violet-800 transition hover:bg-violet-100"
-                >
-                  Postventa
-                </Link>
-                <Link
-                  href="/purchase-system"
-                  className="inline-flex items-center justify-center rounded-2xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800"
-                >
-                  Nueva venta
-                </Link>
-              </div>
-            </div>
-          </header>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Ventas visibles</p>
-              <p className="mt-2 text-2xl font-bold text-slate-900">{totals.count}</p>
-            </article>
-            <article className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
-              <p className="text-xs uppercase tracking-wide text-emerald-700">Ingreso confirmado</p>
-              <p className="mt-2 text-2xl font-bold text-emerald-800">S/. {totals.revenue.toFixed(2)}</p>
-            </article>
-            <article className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-              <p className="text-xs uppercase tracking-wide text-amber-700">Borradores</p>
-              <p className="mt-2 text-2xl font-bold text-amber-800">{totals.pending}</p>
-            </article>
+          <div className="flex flex-wrap gap-2">
+            <MetricPill label="Ventas visibles" value={totals.count} />
+            <MetricPill label="Ingreso visible" value={`S/. ${totals.revenue.toFixed(2)}`} tone="success" />
+            <MetricPill label="Borradores en pagina" value={totals.pending} tone="warning" />
           </div>
 
-          <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
-            <div className="grid gap-3 lg:grid-cols-[1.4fr_0.75fr_0.95fr_0.95fr_auto] lg:items-end">
+          <article className="sales-panel rounded-lg p-4 shadow-sm md:p-5">
+            <div className="grid gap-3 lg:grid-cols-[1.35fr_0.8fr_0.92fr_0.92fr_auto] lg:items-end">
               <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
                 <input
                   type="text"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Buscar por nro. venta o cliente"
-                  className="w-full rounded-2xl border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                  className="sales-field w-full rounded-lg py-2.5 pl-9 pr-3 text-sm"
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                   Estado
                 </label>
-                <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-                  <Filter className="h-4 w-4 text-slate-500" />
+                <div className="sales-panel-muted flex items-center gap-2 rounded-lg px-3 py-2">
+                  <Filter className="h-4 w-4 text-[var(--ops-text-muted)]" />
                   <select
                     value={status}
                     onChange={(event) => setStatus(event.target.value)}
-                    className="w-full bg-transparent text-sm text-slate-700 outline-none"
+                    className="w-full cursor-pointer bg-transparent text-sm text-[var(--ops-text)] outline-none"
                   >
                     {STATUS_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -222,48 +272,49 @@ export default function TransactionHistoryPage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                   Fecha desde
                 </label>
-                <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-                  <CalendarRange className="h-4 w-4 text-slate-500" />
+                <div className="sales-panel-muted flex items-center gap-2 rounded-lg px-3 py-2">
+                  <CalendarRange className="h-4 w-4 text-[var(--ops-text-muted)]" />
                   <input
                     type="date"
                     value={dateFrom}
                     onChange={(event) => setDateFrom(event.target.value)}
-                    className="w-full bg-transparent text-sm text-slate-700 outline-none"
+                    className="w-full bg-transparent text-sm text-[var(--ops-text)] outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                   Fecha hasta
                 </label>
-                <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-                  <CalendarRange className="h-4 w-4 text-slate-500" />
+                <div className="sales-panel-muted flex items-center gap-2 rounded-lg px-3 py-2">
+                  <CalendarRange className="h-4 w-4 text-[var(--ops-text-muted)]" />
                   <input
                     type="date"
                     value={dateTo}
                     onChange={(event) => setDateTo(event.target.value)}
-                    className="w-full bg-transparent text-sm text-slate-700 outline-none"
+                    className="w-full bg-transparent text-sm text-[var(--ops-text)] outline-none"
                   />
                 </div>
               </div>
 
-              <button
-                type="button"
+              <Button
                 onClick={clearFilters}
                 disabled={!hasActiveFilters}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                variant="outline"
+                size="lg"
+                className="h-10 rounded-lg"
               >
                 <RotateCcw className="h-4 w-4" />
                 Limpiar
-              </button>
+              </Button>
             </div>
 
-            <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
-              <div className="hidden grid-cols-[1fr_0.9fr_1fr_0.85fr_0.9fr_0.8fr_0.8fr_0.9fr] gap-3 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:grid">
+            <div className="mt-4 overflow-hidden rounded-lg border border-[var(--ops-border-strong)]">
+              <div className="sales-panel-muted hidden grid-cols-[1fr_0.9fr_1fr_0.85fr_0.9fr_0.8fr_0.8fr_0.9fr] gap-3 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)] lg:grid">
                 <span>Venta</span>
                 <span>Fecha</span>
                 <span>Cliente</span>
@@ -274,9 +325,11 @@ export default function TransactionHistoryPage() {
                 <span>Acciones</span>
               </div>
 
-              <div className="divide-y divide-slate-200 bg-white">
+              <div className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
                 {loading ? (
-                  <div className="px-4 py-10 text-center text-sm text-slate-500">Cargando ventas...</div>
+                  <div className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                    Cargando ventas...
+                  </div>
                 ) : error ? (
                   <div className="px-4 py-6">
                     <InlineStatusCard
@@ -286,67 +339,61 @@ export default function TransactionHistoryPage() {
                     />
                   </div>
                 ) : sales.length === 0 ? (
-                  <div className="px-4 py-10 text-center text-sm text-slate-500">
+                  <div className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
                     No se encontraron ventas con los filtros aplicados.
                   </div>
                 ) : (
                   sales.map((sale) => (
                     <div
                       key={sale.sale_id}
-                      className="grid gap-3 px-4 py-4 transition hover:bg-slate-50 lg:grid-cols-[1fr_0.9fr_1fr_0.85fr_0.9fr_0.8fr_0.8fr_0.9fr] lg:items-center"
+                      className="grid gap-3 px-4 py-3 transition hover:bg-[var(--ops-surface-muted)] lg:grid-cols-[1fr_0.9fr_1fr_0.85fr_0.9fr_0.8fr_0.8fr_0.9fr] lg:items-center"
                     >
                       <div>
-                        <p className="font-semibold text-slate-900">{sale.sale_number || "Sin correlativo"}</p>
-                        <p className="mt-1 text-xs uppercase tracking-wide text-violet-600">
+                        <p className="font-semibold text-[var(--ops-text)]">
+                          {sale.sale_number || "Sin correlativo"}
+                        </p>
+                        <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ripnel-accent-hover)]">
                           {sale.document_type}
                         </p>
                       </div>
 
-                      <div className="text-sm text-slate-700">
+                      <div className="text-sm text-[var(--ops-text)]">
                         {formatDateTime(sale.confirmed_at, sale.created_at)}
                       </div>
 
                       <div>
-                        <p className="text-sm font-medium text-slate-800">
+                        <p className="text-sm font-medium text-[var(--ops-text)]">
                           {sale.customer_name_text || "Cliente general"}
                         </p>
                       </div>
 
-                      <div className="text-sm text-slate-700">{sale.seller_name}</div>
+                      <div className="text-sm text-[var(--ops-text)]">{sale.seller_name}</div>
 
-                      <div className="text-sm text-slate-700">{sale.location_name}</div>
+                      <div className="text-sm text-[var(--ops-text)]">{sale.location_name}</div>
 
                       <div>
                         <span
-                          className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                            STATUS_STYLES[sale.status] || "border-slate-200 bg-slate-100 text-slate-700"
-                          }`}
+                          className={`${STATUS_CLASSES[sale.status] || "sales-chip"} rounded-full px-2.5 py-1 text-xs font-semibold`}
                         >
                           {STATUS_LABELS[sale.status] || sale.status}
                         </span>
                       </div>
 
                       <div>
-                        <p className="text-sm font-semibold text-slate-900">
+                        <p className="text-sm font-semibold text-[var(--ops-text)]">
                           S/. {Number(sale.total_amount).toFixed(2)}
                         </p>
-                        <p className="text-xs text-slate-500">{sale.currency}</p>
+                        <p className="text-xs text-[var(--ops-text-muted)]">{sale.currency}</p>
                       </div>
 
                       <div className="flex flex-wrap gap-2">
-                        <Link
-                          href={`/purchase-system/${sale.sale_id}`}
-                          className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-                        >
-                          Ver venta
-                        </Link>
+                        <Button asChild variant="outline" size="sm" className="rounded-full">
+                          <Link href={`/purchase-system/${sale.sale_id}`}>Ver venta</Link>
+                        </Button>
                         {sale.status === "confirmed" ? (
-                          <Link
-                            href={`/postventa/${sale.sale_id}`}
-                            className="inline-flex items-center justify-center rounded-xl bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800"
-                          >
-                            Postventa
-                          </Link>
+                          <Button asChild variant="accent" size="sm" className="rounded-full">
+                            <Link href={`/postventa/${sale.sale_id}`}>Postventa</Link>
+                          </Button>
                         ) : null}
                       </div>
                     </div>
@@ -354,14 +401,41 @@ export default function TransactionHistoryPage() {
                 )}
               </div>
             </div>
-          </article>
 
-          <div className="rounded-3xl border border-violet-200 bg-violet-50/80 p-4 text-sm text-violet-800 shadow-sm">
-            <div className="flex items-center gap-2">
-              <ReceiptText className="h-4 w-4" />
-              <p>Selecciona una venta para revisar cabecera, lineas, pagos y consistencia total dentro de la sede operativa.</p>
+            <div className="mt-4 flex flex-col gap-3 border-t border-[var(--ops-border-strong)] pt-4 md:flex-row md:items-center md:justify-between">
+              <span className="ops-secondary-text text-[var(--ops-text-muted)]">
+                {totalResults === 0 ? "0 resultados" : `${firstVisible}-${lastVisible} de ${totalResults}`}
+              </span>
+
+              <div className="flex items-center gap-2 self-end md:self-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  disabled={safeCurrentPage <= 1}
+                  className="rounded-full"
+                  aria-label="Pagina anterior"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="min-w-16 text-center text-sm font-medium text-[var(--ops-text)]">
+                  {safeCurrentPage}/{totalPages}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  disabled={!hasMore}
+                  className="rounded-full"
+                  aria-label="Pagina siguiente"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-          </div>
+          </article>
         </div>
       </section>
     </PermissionGuard>

@@ -476,8 +476,8 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
 
   return (
     <PermissionGuard permission="sales.postsale.view">
-      <section className="min-h-screen bg-[radial-gradient(circle_at_top,#fef3c7_0%,#fff7ed_28%,#f8fafc_65%,#eef2ff_100%)] px-4 py-6 md:px-8">
-        <div className="mx-auto max-w-7xl space-y-5">
+      <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
+        <div className="mx-auto max-w-7xl space-y-[var(--ops-stack-gap)]">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Link
               href="/postventa"
@@ -510,10 +510,10 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
             </div>
           </div>
 
-          <header className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
+          <header className="rounded-3xl border border-slate-200 bg-white/90 p-[var(--ops-panel-padding)] shadow-sm backdrop-blur">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-xs uppercase tracking-wide text-amber-700">Postventa operativa</p>
+                <p className="text-xs uppercase tracking-wide text-violet-600">Postventa operativa</p>
                 <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">
                   {context.sale.sale_number || "Sin correlativo"}
                 </h1>
@@ -574,9 +574,9 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
             />
           ) : null}
 
-          <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-            <div className="space-y-5">
-              <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
+          <div className="grid gap-[var(--ops-stack-gap)] xl:grid-cols-[1.2fr_0.8fr]">
+            <div className="space-y-[var(--ops-stack-gap)]">
+              <article className="rounded-3xl border border-slate-200 bg-white/90 p-[var(--ops-panel-padding)] shadow-sm backdrop-blur">
                 <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
                   <PackageSearch className="h-4 w-4 text-amber-700" />
                   Venta base
@@ -625,7 +625,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
               </article>
 
               {context.exchanges.length > 0 ? (
-                <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
+                <article className="rounded-3xl border border-slate-200 bg-white/90 p-[var(--ops-panel-padding)] shadow-sm backdrop-blur">
                   <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
                     <RefreshCcw className="h-4 w-4 text-amber-700" />
                     Trazabilidad de cambios
@@ -697,8 +697,8 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
               ) : null}
             </div>
 
-            <div className="space-y-5">
-              <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur">
+            <div className="space-y-[var(--ops-stack-gap)]">
+              <article className="rounded-3xl border border-slate-200 bg-white/90 p-[var(--ops-panel-padding)] shadow-sm backdrop-blur">
                 <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
                   <User className="h-4 w-4 text-amber-700" />
                   Cliente y operación
@@ -725,7 +725,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                 </div>
               </article>
 
-              <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur">
+              <article className="rounded-3xl border border-slate-200 bg-white/90 p-[var(--ops-panel-padding)] shadow-sm backdrop-blur">
                 <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
                   <CreditCard className="h-4 w-4 text-amber-700" />
                   Pagos y neutralización
@@ -783,7 +783,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
               {has("sales.postsale.exchange") ? (
                 <form
                   onSubmit={handleExchangeSubmit}
-                  className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur"
+                  className="rounded-3xl border border-slate-200 bg-white/90 p-[var(--ops-panel-padding)] shadow-sm backdrop-blur"
                 >
                   <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
                     <RefreshCcw className="h-4 w-4 text-amber-700" />
@@ -943,7 +943,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
               {has("sales.postsale.cancel") ? (
                 <form
                   onSubmit={handleCancelSubmit}
-                  className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur"
+                  className="rounded-3xl border border-slate-200 bg-white/90 p-[var(--ops-panel-padding)] shadow-sm backdrop-blur"
                 >
                   <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
                     <Undo2 className="h-4 w-4 text-sky-700" />
@@ -996,7 +996,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
               ) : null}
 
               {context.sale.notes ? (
-                <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur">
+                <article className="rounded-3xl border border-slate-200 bg-white/90 p-[var(--ops-panel-padding)] shadow-sm backdrop-blur">
                   <h2 className="mb-2 text-lg font-semibold text-slate-800">Notas originales</h2>
                   <p className="text-sm text-slate-600">{context.sale.notes}</p>
                 </article>

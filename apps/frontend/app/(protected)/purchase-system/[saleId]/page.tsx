@@ -12,6 +12,8 @@ import {
   LoadingPage,
   NotFoundPage,
 } from "@/components/feedback/status-page"
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
+import { Button } from "@/components/ui/button"
 import { ApiError, apiFetch } from "@/lib/api"
 
 type SaleDetail = {
@@ -187,56 +189,52 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
 
   return (
     <PermissionGuard permission="sales.pos">
-      <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
+      <section className="sales-page min-h-screen px-4 py-6 md:px-8">
         <div className="mx-auto max-w-6xl space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Link
-              href="/transaction-history"
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Volver al historial
-            </Link>
+            <Button asChild variant="outline" size="sm" className="rounded-lg">
+              <Link href="/transaction-history">
+                <ArrowLeft className="h-4 w-4" />
+                Volver al historial
+              </Link>
+            </Button>
 
-            <Link
-              href="/purchase-system"
-              className="inline-flex items-center gap-2 rounded-xl bg-violet-700 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-800"
+            <Button
+              asChild
+              size="sm"
+              className="rounded-lg bg-[var(--ripnel-accent)] text-white hover:bg-[var(--ripnel-accent-hover)]"
             >
-              Registrar nueva venta
-            </Link>
+              <Link href="/purchase-system">Registrar nueva venta</Link>
+            </Button>
           </div>
 
-          <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-violet-600">Detalle de venta</p>
-                <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">
-                  {sale.sale_number || "Sin correlativo"}
-                </h1>
-                <p className="mt-1 text-sm text-slate-600">
-                  {sale.document_type} • {sale.status} •{" "}
-                  {new Date(sale.confirmed_at || sale.created_at).toLocaleString("es-PE")}
-                </p>
-              </div>
-
-              {canDownloadDocument ? (
-                <a
-                  href={documentPath || "#"}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-800 shadow-sm transition hover:bg-violet-100"
+          <PosHeader
+            eyebrow="Detalle de venta"
+            title={sale.sale_number || "Sin correlativo"}
+            subtitle={`${sale.document_type} • ${sale.status} • ${new Date(
+              sale.confirmed_at || sale.created_at
+            ).toLocaleString("es-PE")}`}
+            actions={
+              canDownloadDocument ? (
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg border-[color:color-mix(in_srgb,var(--ripnel-accent)_22%,var(--ops-border-strong))] bg-[var(--ripnel-accent-soft)] text-[var(--ripnel-accent-hover)] hover:bg-[var(--ripnel-accent-soft)]"
                 >
-                  <ReceiptText className="h-4 w-4" />
-                  {downloadLabel}
-                </a>
+                  <a href={documentPath || "#"} target="_blank" rel="noreferrer">
+                    <ReceiptText className="h-4 w-4" />
+                    {downloadLabel}
+                  </a>
+                </Button>
               ) : (
-                <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-medium text-slate-500">
+                <span className="sales-chip rounded-lg px-3 py-2 text-sm font-medium text-[var(--ops-text-muted)]">
                   <ReceiptText className="h-4 w-4" />
                   {downloadLabel}
                 </span>
-              )}
-            </div>
-          </header>
+              )
+            }
+          />
 
           {consistency && !consistency.headerMatches && (
             <InlineStatusCard
@@ -256,29 +254,29 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
 
           <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
             <div className="space-y-5">
-              <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
-                <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
-                  <ReceiptText className="h-4 w-4 text-violet-600" />
+              <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
+                <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-[var(--ops-text)]">
+                  <ReceiptText className="h-4 w-4 text-[var(--ripnel-accent)]" />
                   Productos vendidos
                 </h2>
                 <div className="space-y-2">
                   {sale.details.map((line) => (
                     <div
                       key={line.sale_detail_id}
-                      className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+                      className="sales-panel-muted rounded-lg px-4 py-3"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                          <p className="font-semibold text-slate-900">{line.style_name}</p>
-                          <p className="text-xs text-slate-500">
+                          <p className="font-semibold text-[var(--ops-text)]">{line.style_name}</p>
+                          <p className="text-xs text-[var(--ops-text-muted)]">
                             {line.sku} • {line.size_code} / {line.color_code}
                           </p>
                         </div>
-                        <p className="text-sm font-semibold text-slate-900">
+                        <p className="text-sm font-semibold text-[var(--ops-text)]">
                           S/. {Number(line.line_total).toFixed(2)}
                         </p>
                       </div>
-                      <div className="mt-2 grid gap-2 text-sm text-slate-600 md:grid-cols-4">
+                      <div className="mt-2 grid gap-2 text-sm text-[var(--ops-text-muted)] md:grid-cols-4">
                         <span>Cantidad: {line.quantity}</span>
                         <span>Lista: S/. {Number(line.unit_price_list).toFixed(2)}</span>
                         <span>Final: S/. {Number(line.unit_price_final).toFixed(2)}</span>
@@ -290,20 +288,20 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
               </article>
 
               {sale.notes && (
-                <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur">
-                  <h2 className="mb-2 text-lg font-semibold text-slate-800">Notas</h2>
-                  <p className="text-sm text-slate-600">{sale.notes}</p>
+                <article className="sales-panel rounded-lg p-5 shadow-sm">
+                  <h2 className="mb-2 text-base font-semibold text-[var(--ops-text)]">Notas</h2>
+                  <p className="text-sm text-[var(--ops-text-muted)]">{sale.notes}</p>
                 </article>
               )}
             </div>
 
             <div className="space-y-5">
-              <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur">
-                <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
-                  <User className="h-4 w-4 text-violet-600" />
+              <article className="sales-panel rounded-lg p-5 shadow-sm">
+                <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-[var(--ops-text)]">
+                  <User className="h-4 w-4 text-[var(--ripnel-accent)]" />
                   Cliente
                 </h2>
-                <div className="space-y-2 text-sm text-slate-700">
+                <div className="space-y-2 text-sm text-[var(--ops-text)]">
                   <p>
                     <span className="font-medium">Nombre:</span> {sale.customer_name_text || "Cliente general"}
                   </p>
@@ -323,23 +321,23 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
                 </div>
               </article>
 
-              <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur">
-                <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
-                  <CreditCard className="h-4 w-4 text-violet-600" />
+              <article className="sales-panel rounded-lg p-5 shadow-sm">
+                <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-[var(--ops-text)]">
+                  <CreditCard className="h-4 w-4 text-[var(--ripnel-accent)]" />
                   Pagos
                 </h2>
-                <div className="space-y-2 text-sm text-slate-700">
+                <div className="space-y-2 text-sm text-[var(--ops-text)]">
                   {sale.payments.length === 0 ? (
                     <p>No hay pagos registrados.</p>
                   ) : (
                     sale.payments.map((payment) => (
                       <div
                         key={payment.payment_id}
-                        className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2"
+                        className="sales-panel-muted rounded-lg px-3 py-2"
                       >
-                        <p className="font-medium capitalize text-slate-800">{payment.method}</p>
+                        <p className="font-medium capitalize text-[var(--ops-text)]">{payment.method}</p>
                         <p>Monto: S/. {Number(payment.amount).toFixed(2)}</p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-[var(--ops-text-muted)]">
                           {new Date(payment.paid_at).toLocaleString("es-PE")}
                         </p>
                       </div>
@@ -348,30 +346,30 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
                 </div>
               </article>
 
-              <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur">
-                <h2 className="mb-4 text-lg font-semibold text-slate-800">Resumen y consistencia</h2>
+              <article className="sales-panel rounded-lg p-5 shadow-sm">
+                <h2 className="mb-4 text-base font-semibold text-[var(--ops-text)]">Resumen y consistencia</h2>
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between text-slate-600">
+                  <div className="flex justify-between text-[var(--ops-text-muted)]">
                     <span>Subtotal cabecera</span>
                     <span>S/. {Number(sale.subtotal_amount).toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-slate-600">
+                  <div className="flex justify-between text-[var(--ops-text-muted)]">
                     <span>IGV cabecera</span>
                     <span>S/. {Number(sale.tax_amount).toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-slate-600">
+                  <div className="flex justify-between text-[var(--ops-text-muted)]">
                     <span>Subtotal lineas</span>
                     <span>S/. {Number(consistency?.lineSubtotal || 0).toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-slate-600">
+                  <div className="flex justify-between text-[var(--ops-text-muted)]">
                     <span>IGV lineas</span>
                     <span>S/. {Number(consistency?.lineTax || 0).toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-slate-600">
+                  <div className="flex justify-between text-[var(--ops-text-muted)]">
                     <span>Total pagos</span>
                     <span>S/. {Number(consistency?.paymentTotal || 0).toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-bold text-slate-900">
+                  <div className="flex justify-between border-t border-[var(--ops-border-strong)] pt-2 text-base font-semibold text-[var(--ops-text)]">
                     <span>Total venta</span>
                     <span>S/. {Number(sale.total_amount).toFixed(2)}</span>
                   </div>
@@ -380,7 +378,7 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
                 {consistency && (
                   <div className="mt-4 space-y-2 text-sm">
                     <div
-                      className={`rounded-2xl border px-3 py-2 ${
+                      className={`rounded-lg border px-3 py-2 ${
                         consistency.headerMatches
                           ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                           : "border-amber-200 bg-amber-50 text-amber-800"
@@ -391,7 +389,7 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
                         : "Cabecera y lineas no coinciden."}
                     </div>
                     <div
-                      className={`rounded-2xl border px-3 py-2 ${
+                      className={`rounded-lg border px-3 py-2 ${
                         consistency.paymentMatches
                           ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                           : "border-amber-200 bg-amber-50 text-amber-800"

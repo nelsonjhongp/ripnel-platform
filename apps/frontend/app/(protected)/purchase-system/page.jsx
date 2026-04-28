@@ -20,7 +20,6 @@ import {
   ScanLine,
   Search,
   ShieldAlert,
-  ShieldCheck,
   ShoppingBasket,
   Smartphone,
   Trash2,
@@ -32,6 +31,15 @@ import {
 import { PermissionGuard } from "@/components/auth/PermissionGuard"
 import { InlineStatusCard } from "@/components/feedback/status-page"
 import { useAuth } from "@/components/auth/AuthProvider"
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
+import { SalesWizardRail } from "@/components/ui/purchase-system/SalesWizardRail"
+import { Button } from "@/components/ui/button"
+import {
+  CompactPickerEmpty,
+  CompactPickerList,
+  CompactPickerOption,
+  CompactPickerPopover,
+} from "@/components/ui/compact-picker"
 import {
   Sheet,
   SheetContent,
@@ -77,8 +85,7 @@ const SELLER_DOC_RULES = {
   passport: { label: "Pasaporte", regex: /^[A-Za-z0-9]{6,15}$/ },
 }
 
-const INPUT_CLASS =
-  "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+const INPUT_CLASS = "sales-field w-full rounded-lg px-3 py-2 text-sm"
 
 function round2(value) {
   return Math.round(value * 100) / 100
@@ -294,9 +301,9 @@ function buildCashLabel(status) {
 }
 
 function buildCashTone(status) {
-  if (status === "open") return "border-emerald-200 bg-emerald-50 text-emerald-800"
-  if (status === "closed") return "border-rose-200 bg-rose-50 text-rose-800"
-  return "border-amber-200 bg-amber-50 text-amber-800"
+  if (status === "open") return "sales-chip sales-chip-success"
+  if (status === "closed") return "sales-chip sales-chip-danger"
+  return "sales-chip sales-chip-warning"
 }
 
 function getDocumentIcon(documentType) {
@@ -310,6 +317,42 @@ function getPaymentMethodIcon(method) {
   if (method === "cash") return Banknote
   if (method === "transfer") return Landmark
   return Smartphone
+}
+
+function getPaymentMethodLabel(method) {
+  return PAYMENT_METHODS.find((option) => option.value === method)?.label || "Sin definir"
+}
+
+function getPaymentReferenceMeta(method) {
+  if (method === "cash") {
+    return {
+      label: "Referencia",
+      placeholder: "Opcional",
+      helper: "En efectivo es opcional. Solo usalo si necesitas dejar una observacion corta.",
+    }
+  }
+
+  if (method === "transfer") {
+    return {
+      label: "Operacion / voucher",
+      placeholder: "Nro. de operacion o voucher",
+      helper: "Registra el numero de operacion o voucher para rastrear el deposito.",
+    }
+  }
+
+  if (method === "yape" || method === "plin") {
+    return {
+      label: "Operacion / celular",
+      placeholder: "Ultimos 4 digitos o codigo",
+      helper: "Registra codigo o ultimos 4 digitos para identificar el abono.",
+    }
+  }
+
+  return {
+    label: "Referencia",
+    placeholder: "Codigo de referencia",
+    helper: "Usa este campo para dejar el dato que ayude a rastrear el pago.",
+  }
 }
 
 function isCustomerValidForDocumentType(customer, documentType) {
@@ -634,11 +677,17 @@ function replaceCustomerInResults(results, customer) {
 
 export default function NuevaVentaPage() {
   const { user, defaultLocation, locationsLoading, has } = useAuth()
+  const wizardViewportRef = useRef(null)
+  const customerSectionRef = useRef(null)
+  const productSectionRef = useRef(null)
+  const paymentSectionRef = useRef(null)
+  const summarySectionRef = useRef(null)
   const productPickerRef = useRef(null)
   const productSearchInputRef = useRef(null)
   const customerPickerRef = useRef(null)
   const customerSearchInputRef = useRef(null)
   const documentPickerRef = useRef(null)
+  const stageOrder = ["products", "customer", "payment", "summary"]
 
   const [query, setQuery] = useState("")
   const [variants, setVariants] = useState([])
@@ -690,6 +739,7 @@ export default function NuevaVentaPage() {
   const [submitting, setSubmitting] = useState(false)
   const [confirmedSale, setConfirmedSale] = useState(null)
   const [error, setError] = useState(null)
+  const [activeStage, setActiveStage] = useState("products")
 
   const refreshPosContext = useCallback(async () => {
     if (!defaultLocation?.location_id) {
@@ -1185,6 +1235,88 @@ export default function NuevaVentaPage() {
     selectedCustomer && !customerPickerOpen && !customerQuery
       ? buildCustomerDisplayName(selectedCustomer)
       : "Nombre, documento o codigo"
+  const progressItems = [
+    {
+      id: "products",
+      label: "Productos",
+      icon: ShoppingBasket,
+      active: activeStage === "products",
+      complete: cartCount > 0,
+    },
+    {
+      id: "customer",
+      label: "Cliente",
+      icon: Users,
+      active: activeStage === "customer",
+      complete: Boolean(selectedCustomer) && customerIsValid,
+    },
+    {
+      id: "payment",
+      label: "Cobro",
+      icon: CreditCard,
+      active: activeStage === "payment",
+      complete: cartCount > 0 && !mixedPaymentsPreview.error && !saleDiscountError,
+    },
+    {
+      id: "summary",
+      label: "Resumen",
+      icon: Receipt,
+      active: activeStage === "summary",
+      complete: false,
+    },
+  ]
+  const stageRefs = {
+    customer: customerSectionRef,
+    products: productSectionRef,
+    payment: paymentSectionRef,
+    summary: summarySectionRef,
+  }
+  const currentStageIndex = stageOrder.indexOf(activeStage)
+  const canGoPrevious = currentStageIndex > 0
+  const canGoNext = currentStageIndex < stageOrder.length - 1
+  const canAdvanceStage =
+    activeStage === "products"
+      ? cartCount > 0
+      : activeStage === "customer"
+        ? cartCount > 0 && customerIsValid
+        : activeStage === "payment"
+          ? cartCount > 0
+          : false
+  const nextStageLabel =
+    activeStage === "products"
+      ? "Ir a cliente"
+      : activeStage === "customer"
+        ? "Ir a cobro"
+        : activeStage === "payment"
+          ? "Ir a resumen"
+          : null
+  const selectedCustomerName = buildCustomerDisplayName(selectedCustomer)
+  const selectedCustomerDocument = buildCustomerDocument(selectedCustomer)
+  const paymentSummaryLabel =
+    paymentMode === "mixed"
+      ? `${mixedPaymentsPreview.payments.length || mixedPayments.length} lineas de pago`
+      : getPaymentMethodLabel(paymentMethod)
+
+  function goToStage(stageId) {
+    setActiveStage(stageId)
+    requestAnimationFrame(() => {
+      wizardViewportRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      })
+      stageRefs[stageId]?.current?.focus?.()
+    })
+  }
+
+  function moveStage(direction) {
+    const currentIndex = stageOrder.indexOf(activeStage)
+    const nextIndex = Math.min(stageOrder.length - 1, Math.max(0, currentIndex + direction))
+    const nextStage = stageOrder[nextIndex]
+
+    if (nextStage) {
+      goToStage(nextStage)
+    }
+  }
 
   useEffect(() => {
     if (paymentMode === "mixed" && mixedPayments.length === 0) {
@@ -1519,6 +1651,7 @@ export default function NuevaVentaPage() {
         value: "",
         reason: "",
       })
+      setActiveStage("products")
       closePriceSheet()
       await refreshPosContext()
     } catch (submitError) {
@@ -1533,79 +1666,74 @@ export default function NuevaVentaPage() {
     <PermissionGuard permission="sales.pos">
       <Sheet open={customerSheetOpen} onOpenChange={setCustomerSheetOpen}>
         <TooltipProvider delayDuration={120}>
-          <div className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
-            <div className="mx-auto max-w-7xl space-y-4">
-              <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.18em] text-violet-600">
-                      Punto de venta
-                    </p>
-                    <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">
-                      Nueva venta
-                    </h1>
-                  </div>
-
-                  <div className="flex flex-wrap items-start justify-end gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-                      <MapPin className="h-3.5 w-3.5 text-violet-600" />
-                      {locationsLoading ? "Cargando sede..." : defaultLocation?.name || "Sin sede asignada"}
+          <div className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
+            <div className="mx-auto max-w-[1180px] space-y-3">
+              <PosHeader
+                eyebrow="Punto de venta"
+                title="Nueva venta"
+                meta={
+                  <>
+                    <span className="sales-chip rounded-full px-3 py-1 text-xs font-semibold">
+                      <MapPin className="h-3.5 w-3.5 text-[var(--ripnel-accent)]" />
+                      {locationsLoading
+                        ? "Cargando sede..."
+                        : defaultLocation?.name || "Sin sede asignada"}
                     </span>
                     <span
                       className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${
                         posContextLoading
-                          ? "border-slate-200 bg-slate-50 text-slate-700"
+                          ? "sales-chip"
                           : buildCashTone(cashStatus)
                       }`}
                     >
-                      {posContextLoading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : null}
+                      {posContextLoading ? (
+                        <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                      ) : null}
                       {posContextLoading ? "Validando caja" : buildCashLabel(cashStatus)}
                     </span>
+                  </>
+                }
+                actions={
+                  <>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <button
+                        <Button
                           type="button"
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:text-slate-700"
+                          variant="outline"
+                          size="icon-sm"
+                          className="rounded-full"
                           aria-label="Reglas del punto de venta"
                         >
                           <Info className="h-4 w-4" />
-                        </button>
+                        </Button>
                       </TooltipTrigger>
                       <TooltipContent side="bottom" sideOffset={8}>
-                        El backend valida caja, stock y el precio vigente segun la regla comercial activa al confirmar.
+                        La venta solo se confirma si la caja esta operativa, hay stock y existe un precio vigente.
                       </TooltipContent>
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Link
-                          href="/clientes"
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                          aria-label="Ir a clientes"
-                        >
-                          <Users className="h-4 w-4" />
-                        </Link>
+                        <Button asChild variant="outline" size="icon-sm" className="rounded-full">
+                          <Link href="/clientes" aria-label="Ir a clientes">
+                            <Users className="h-4 w-4" />
+                          </Link>
+                        </Button>
                       </TooltipTrigger>
-                      <TooltipContent side="bottom" sideOffset={8}>
-                        Clientes
-                      </TooltipContent>
+                      <TooltipContent side="bottom" sideOffset={8}>Clientes</TooltipContent>
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Link
-                          href="/transaction-history"
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-                          aria-label="Ir al historial de ventas"
-                        >
-                          <History className="h-4 w-4" />
-                        </Link>
+                        <Button asChild variant="outline" size="icon-sm" className="rounded-full">
+                          <Link href="/transaction-history" aria-label="Ir al historial de ventas">
+                            <History className="h-4 w-4" />
+                          </Link>
+                        </Button>
                       </TooltipTrigger>
-                      <TooltipContent side="bottom" sideOffset={8}>
-                        Historial
-                      </TooltipContent>
+                      <TooltipContent side="bottom" sideOffset={8}>Historial</TooltipContent>
                     </Tooltip>
-                  </div>
-                </div>
-              </header>
+                  </>
+                }
+              />
 
               {!defaultLocation?.location_id && !locationsLoading ? (
                 <InlineStatusCard
@@ -1670,15 +1798,29 @@ export default function NuevaVentaPage() {
                 />
               ) : null}
 
+              <div ref={wizardViewportRef}>
+                <SalesWizardRail
+                  items={progressItems}
+                  currentStep={currentStageIndex}
+                  onSelect={goToStage}
+                  onPrevious={() => moveStage(-1)}
+                  onNext={() => moveStage(1)}
+                  canGoPrevious={canGoPrevious}
+                  canGoNext={canGoNext}
+                  canAdvance={canAdvanceStage}
+                  nextLabel={nextStageLabel}
+                />
+              </div>
+
               <div className="relative">
                 {cashOverlayVisible ? (
-                  <div className="absolute inset-0 z-20 flex items-center justify-center rounded-[28px] bg-slate-950/58 p-4 backdrop-blur-sm">
-                    <div className="w-full max-w-md rounded-3xl bg-slate-950/95 p-6 text-white shadow-2xl ring-1 ring-white/10">
+                  <div className="ops-overlay-backdrop absolute inset-0 z-20 flex items-center justify-center rounded-[28px] p-4">
+                    <div className="ops-overlay-panel w-full max-w-md rounded-2xl p-6">
                       <div className="flex items-start gap-3">
-                        <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+                        <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
                         <div className="space-y-2">
                           <p className="text-lg font-semibold">Venta bloqueada por caja</p>
-                          <p className="text-sm leading-6 text-slate-200">
+                          <p className="text-sm leading-6 text-[var(--ops-text-muted)]">
                             {posContext?.cash?.message ||
                               "No pudimos validar la caja operativa de esta sede."}
                           </p>
@@ -1687,14 +1829,11 @@ export default function NuevaVentaPage() {
 
                       <div className="mt-5 flex flex-wrap gap-2">
                         {canOpenCashModule ? (
-                          <Link
-                            href="/caja"
-                            className="inline-flex items-center justify-center rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
-                          >
-                            Ir a caja del dia
-                          </Link>
+                          <Button asChild variant="accent" size="sm" className="h-9 rounded-xl px-4">
+                            <Link href="/caja">Ir a caja del dia</Link>
+                          </Button>
                         ) : (
-                          <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-slate-200">
+                          <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-4 py-2.5 text-sm text-[var(--ops-text-muted)]">
                             Coordina con caja o con un administrador para habilitar la venta.
                           </div>
                         )}
@@ -1703,25 +1842,31 @@ export default function NuevaVentaPage() {
                   </div>
                 ) : null}
 
-                <section className="grid gap-4 xl:grid-cols-2">
+                <section className="grid gap-3 xl:grid-cols-[minmax(0,1.18fr)_360px]">
                   <div className="contents">
                     <article
-                      className={`relative rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6 xl:order-2 xl:col-span-2 ${
-                        productPickerOpen ? "z-30" : "z-0"
+                      ref={productSectionRef}
+                      onMouseEnter={() => setActiveStage("products")}
+                      className={`sales-panel relative rounded-lg p-4 shadow-sm md:p-5 xl:order-2 xl:col-span-2 ${
+                        activeStage === "products"
+                          ? productPickerOpen
+                            ? "z-30"
+                            : "z-0"
+                          : "hidden"
                       }`}
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
-                          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-700">
-                            2
+                          <span className="sales-chip sales-chip-accent rounded-full px-2.5 py-1 text-sm font-semibold">
+                            <ShoppingBasket className="h-4 w-4" />
                           </span>
                           <div className="flex items-center gap-2">
-                            <h2 className="text-lg font-semibold text-slate-800">Productos</h2>
+                            <h2 className="text-lg font-semibold text-[var(--ops-text)]">Productos</h2>
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <button
                                   type="button"
-                                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:text-slate-700"
+                                  className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-[var(--ops-border-strong)] text-[var(--ops-text-muted)] transition hover:border-[var(--ripnel-accent)] hover:text-[var(--ripnel-accent-hover)]"
                                   aria-label="Ayuda de productos"
                                 >
                                   <Info className="h-3.5 w-3.5" />
@@ -1737,7 +1882,7 @@ export default function NuevaVentaPage() {
                         <button
                           type="button"
                           disabled
-                          className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-500 opacity-80"
+                          className="sales-panel-muted inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-[var(--ops-text-muted)] opacity-80"
                         >
                           <ScanLine className="h-4 w-4" />
                           Escanear producto
@@ -1745,7 +1890,7 @@ export default function NuevaVentaPage() {
                       </div>
 
                       <div ref={productPickerRef} className="relative mt-4">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
                         <input
                           ref={productSearchInputRef}
                           type="text"
@@ -1791,21 +1936,21 @@ export default function NuevaVentaPage() {
                             }
                           }}
                           placeholder={productInputPlaceholder}
-                          className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-9 pr-48 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                          className="sales-field w-full rounded-xl py-2.5 pl-9 pr-48 text-sm"
                         />
                         {selectedProductStyle || query ? (
                           <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1.5">
                             {selectedProductStyle && !query && !productPickerOpen ? (
                               <>
-                                <span className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
+                                <span className="sales-chip sales-chip-accent rounded-full px-2 py-0.5 text-[11px] font-semibold">
                                   Stock {selectedProductStyle.totalStock}
                                 </span>
                                 {selectedProductStyle.style_code ? (
-                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                                  <span className="sales-chip rounded-full px-2 py-0.5 text-[11px] font-semibold">
                                     {selectedProductStyle.style_code}
                                   </span>
                                 ) : null}
-                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                                <span className="sales-chip rounded-full px-2 py-0.5 text-[11px] font-semibold">
                                   {selectedProductStyle.variants.length} variantes
                                 </span>
                               </>
@@ -1816,7 +1961,7 @@ export default function NuevaVentaPage() {
                                 clearProductSelection()
                                 focusProductSearch()
                               }}
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:text-slate-800"
+                              className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] text-[var(--ops-text-muted)] transition hover:border-[var(--ripnel-accent)] hover:text-[var(--ripnel-accent-hover)]"
                               aria-label="Limpiar producto"
                             >
                               <X className="h-3.5 w-3.5" />
@@ -1825,84 +1970,76 @@ export default function NuevaVentaPage() {
                         ) : null}
 
                         {productPickerOpen ? (
-                          <div className="absolute left-0 right-0 top-[calc(100%+0.55rem)] z-20 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+                          <CompactPickerPopover className="absolute left-0 right-0 top-[calc(100%+0.55rem)] z-20">
                             {loadingVariants ? (
-                              <p className="px-3 py-4 text-sm text-slate-500">Buscando productos...</p>
+                              <CompactPickerEmpty>Buscando productos...</CompactPickerEmpty>
                             ) : !defaultLocation?.location_id ? (
-                              <p className="px-3 py-4 text-sm text-slate-500">
+                              <CompactPickerEmpty>
                                 Configura una sede para operar ventas.
-                              </p>
+                              </CompactPickerEmpty>
                             ) : styles.length === 0 ? (
-                              <p className="px-3 py-4 text-sm text-slate-500">
+                              <CompactPickerEmpty>
                                 No hay productos vendibles para la sede actual.
-                              </p>
+                              </CompactPickerEmpty>
                             ) : searchableStyles.length === 0 ? (
-                              <p className="px-3 py-4 text-sm text-slate-500">
+                              <CompactPickerEmpty>
                                 No encontramos coincidencias para esta busqueda.
-                              </p>
+                              </CompactPickerEmpty>
                             ) : (
-                              <div
-                                className="max-h-72 overflow-y-auto p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                              <CompactPickerList
+                                className="max-h-72 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                                 style={{ scrollbarWidth: "none" }}
                               >
-                                <div className="space-y-1.5">
+                                <div className="divide-y divide-[color:color-mix(in_srgb,var(--ops-border-strong)_72%,transparent)]">
                                   {searchableStyles.map((style, index) => {
                                     const isHighlighted = index === highlightedProductIndex
                                     return (
-                                      <button
+                                      <CompactPickerOption
                                         key={style.style_id}
-                                        type="button"
+                                        active={isHighlighted}
                                         onMouseEnter={() => setHighlightedProductIndex(index)}
                                         onClick={() => selectProductStyle(style)}
-                                        className={`block w-full rounded-2xl border px-3 py-2.5 text-left transition ${
-                                          isHighlighted
-                                            ? "border-violet-300 bg-violet-50"
-                                            : "border-transparent bg-slate-50 hover:border-violet-200 hover:bg-violet-50/70"
-                                        }`}
+                                        className="py-2.5"
                                       >
                                         <div className="flex items-center justify-between gap-3">
                                           <div className="min-w-0 flex-1">
-                                            <p className="truncate text-sm font-semibold text-slate-900">
+                                            <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
                                               {style.style_name}
                                             </p>
-                                            <p className="mt-0.5 text-[11px] text-slate-500">
+                                            <p className="mt-0.5 text-[11px] text-[var(--ops-text-muted)]">
                                               {style.variants.length} variante
                                               {style.variants.length === 1 ? "" : "s"}
                                             </p>
                                           </div>
                                           <span
-                                            className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                                              style.totalStock > 0
-                                                ? "bg-emerald-50 text-emerald-700"
-                                                : "bg-rose-50 text-rose-700"
-                                            }`}
+                                            className={`${style.totalStock > 0 ? "sales-chip sales-chip-success" : "sales-chip sales-chip-danger"} rounded-full px-2 py-0.5 text-[11px] font-semibold`}
                                           >
                                             {style.totalStock}
                                           </span>
                                         </div>
-                                      </button>
+                                      </CompactPickerOption>
                                     )
                                   })}
                                 </div>
-                              </div>
+                              </CompactPickerList>
                             )}
-                          </div>
+                          </CompactPickerPopover>
                         ) : null}
                       </div>
 
-                      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                      <div className="ops-empty-state mt-4 rounded-xl p-3.5">
                         {!selectedProductStyle ? (
-                          <p className="text-sm text-slate-500">
+                          <p className="text-sm text-[var(--ops-text-muted)]">
                             Selecciona un producto para configurar talla, color y agregarlo a la venta.
                           </p>
                         ) : (
                           <div className="flex flex-wrap items-end gap-3">
                             <label className="w-24 space-y-1.5">
-                              <span className="text-[11px] font-medium text-slate-500">Talla</span>
+                              <span className="text-[11px] font-medium text-[var(--ops-text-muted)]">Talla</span>
                               <select
                                 value={selectedSizeCode}
                                 onChange={(event) => setSelectedSizeCode(event.target.value)}
-                                className="w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-xs text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                                className="sales-field sales-field-interactive w-full rounded-xl px-2.5 py-2 text-xs"
                               >
                                 <option value="">{sizeOptions.length ? "Talla" : "Sin tallas"}</option>
                                 {sizeOptions.map((sizeCode) => (
@@ -1914,11 +2051,11 @@ export default function NuevaVentaPage() {
                             </label>
 
                             <label className="min-w-[160px] flex-1 space-y-1.5 sm:w-48 sm:flex-none">
-                              <span className="text-[11px] font-medium text-slate-500">Color</span>
+                              <span className="text-[11px] font-medium text-[var(--ops-text-muted)]">Color</span>
                               <select
                                 value={selectedColorCode}
                                 onChange={(event) => setSelectedColorCode(event.target.value)}
-                                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                                className="sales-field sales-field-interactive w-full rounded-xl px-3 py-2 text-sm"
                               >
                                 <option value="">
                                   {colorOptions.length ? "Selecciona color" : "Sin colores"}
@@ -1931,24 +2068,24 @@ export default function NuevaVentaPage() {
                               </select>
                             </label>
 
-                            <div className="min-w-[220px] flex-1 rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2.5">
+                            <div className="ops-empty-state-compact min-w-[220px] flex-1 rounded-xl px-3 py-2.5">
                               {!selectedVariant ? (
-                                <p className="text-sm text-slate-500">Completa talla y color.</p>
+                                <p className="text-sm text-[var(--ops-text-muted)]">Completa talla y color.</p>
                               ) : (
                                 <div className="flex flex-wrap items-center gap-2 text-sm">
-                                  <span className="font-semibold text-slate-900">
+                                  <span className="font-semibold text-[var(--ops-text)]">
                                     {selectedVariant.size_code} / {selectedVariant.color_code}
                                   </span>
-                                  <span className="text-slate-300">•</span>
-                                  <span className="text-slate-500">{selectedVariant.sku}</span>
-                                  <span className="text-slate-300">•</span>
-                                  <span className="font-medium text-slate-700">
+                                  <span className="text-[var(--ops-border-soft)]">•</span>
+                                  <span className="text-[var(--ops-text-muted)]">{selectedVariant.sku}</span>
+                                  <span className="text-[var(--ops-border-soft)]">•</span>
+                                  <span className="font-medium text-[var(--ops-text)]">
                                     {selectedVariantAutoPrice !== null &&
                                     selectedVariantAutoPrice !== undefined
                                       ? `S/. ${formatMoney(selectedVariantAutoPrice)}`
                                       : "Sin precio"}
                                   </span>
-                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                                  <span className="sales-chip rounded-full px-2 py-0.5 text-[11px] font-semibold">
                                     {previewWholesaleApplies &&
                                     selectedVariant.wholesale_price !== null &&
                                     selectedVariant.wholesale_price !== undefined
@@ -1956,11 +2093,7 @@ export default function NuevaVentaPage() {
                                       : "Retail"}
                                   </span>
                                   <span
-                                    className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                                      Number(selectedVariant.stock || 0) > 0
-                                        ? "bg-emerald-50 text-emerald-700"
-                                        : "bg-rose-50 text-rose-700"
-                                    }`}
+                                    className={`${Number(selectedVariant.stock || 0) > 0 ? "sales-chip sales-chip-success" : "sales-chip sales-chip-danger"} rounded-full px-2 py-0.5 text-[11px] font-semibold`}
                                   >
                                     Stock {Number(selectedVariant.stock || 0)}
                                   </span>
@@ -1979,7 +2112,7 @@ export default function NuevaVentaPage() {
                                   selectedVariant.wholesale_price === undefined) ||
                                 Number(selectedVariant.stock || 0) <= 0
                               }
-                              className="h-11 min-w-[112px] rounded-xl bg-violet-700 px-4 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="h-11 min-w-[112px] cursor-pointer rounded-xl bg-[var(--ripnel-accent)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               {!selectedVariant
                                 ? "Agregar"
@@ -1997,13 +2130,17 @@ export default function NuevaVentaPage() {
                       </div>
                     </article>
 
-                    <article className="relative z-0 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6 xl:order-3 xl:col-span-2">
+                    <article
+                      className={`sales-panel relative z-0 rounded-lg p-4 shadow-sm md:p-5 xl:order-3 xl:col-span-2 ${
+                        activeStage === "products" ? "" : "hidden"
+                      }`}
+                    >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
-                          <ShoppingBasket className="h-5 w-5 text-violet-600" />
-                          <h2 className="text-lg font-semibold text-slate-800">Detalle de venta</h2>
+                          <ShoppingBasket className="h-5 w-5 text-[var(--ripnel-accent)]" />
+                          <h2 className="text-lg font-semibold text-[var(--ops-text)]">Detalle de venta</h2>
                         </div>
-                        <span className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
+                        <span className="sales-chip sales-chip-accent rounded-full px-3 py-1 text-xs font-semibold">
                           {totals.wholesaleApplied
                             ? `Precio aplicado: mayorista por ${posContext?.pricing?.wholesale_min_qty_total || 3}+ uds.`
                             : "Precio aplicado: retail segun vigencia"}
@@ -2011,83 +2148,83 @@ export default function NuevaVentaPage() {
                       </div>
 
                       {cart.length === 0 ? (
-                        <p className="mt-4 rounded-xl border border-dashed border-slate-300 py-8 text-center text-sm text-slate-500">
+                        <p className="ops-empty-state-compact mt-4 rounded-xl py-8 text-center text-sm">
                           Aun no hay productos agregados a la venta.
                         </p>
                       ) : (
-                        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50">
-                          <div className="hidden border-b border-slate-200 bg-slate-100/80 px-4 py-2 xl:grid xl:grid-cols-[minmax(0,1.7fr)_140px_140px_140px_96px] xl:items-center xl:gap-5">
-                            <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Producto</span>
-                            <span className="text-center text-[11px] font-semibold uppercase tracking-wide text-slate-500">Cantidad</span>
-                            <span className="text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500">Precio final</span>
-                            <span className="text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500">Subtotal</span>
-                            <span className="text-right text-[11px] font-semibold uppercase tracking-wide text-slate-500">Acciones</span>
+                        <div className="ops-empty-state mt-4 overflow-hidden rounded-xl">
+                          <div className="hidden border-b border-[var(--ops-border-strong)] px-4 py-2 xl:grid xl:grid-cols-[minmax(0,1.7fr)_140px_140px_140px_96px] xl:items-center xl:gap-5">
+                            <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">Producto</span>
+                            <span className="text-center text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">Cantidad</span>
+                            <span className="text-right text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">Precio final</span>
+                            <span className="text-right text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">Subtotal</span>
+                            <span className="text-right text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">Acciones</span>
                           </div>
 
                           <div className="max-h-[360px] overflow-y-auto">
                             {totals.items.map((item, index) => (
                               <div
                                 key={item.variant_id}
-                                className={`px-4 py-3 ${index !== totals.items.length - 1 ? "border-b border-slate-200" : ""}`}
+                                className={`px-4 py-3 ${index !== totals.items.length - 1 ? "border-b border-[var(--ops-border-strong)]" : ""}`}
                               >
                                 <div className="flex flex-col gap-3 xl:grid xl:grid-cols-[minmax(0,1.7fr)_140px_140px_140px_96px] xl:items-center xl:gap-5">
                                   <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                                      <p className="truncate text-sm font-semibold text-slate-900">
+                                      <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
                                         {item.style_name}
                                       </p>
-                                      <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-slate-600">
-                                        <span className="rounded-full bg-slate-200 px-2 py-0.5">
+                                      <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-[var(--ops-text-muted)]">
+                                        <span className="sales-chip rounded-full px-2 py-0.5">
                                           Talla {item.size_code}
                                         </span>
-                                        <span className="rounded-full bg-slate-200 px-2 py-0.5">
+                                        <span className="sales-chip rounded-full px-2 py-0.5">
                                           Color {item.color_code}
                                         </span>
                                       </div>
                                     </div>
-                                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--ops-text-muted)]">
                                       <span>{item.sku}</span>
-                                      <span className="text-slate-300">•</span>
+                                      <span className="text-[var(--ops-border-soft)]">•</span>
                                       <span>
                                         {item.price_type_applied === "wholesale" ? "Mayorista" : "Retail"} S/.{" "}
                                         {formatMoney(item.unit_price_list)}
                                       </span>
                                       {item.price_override ? (
                                         <>
-                                          <span className="text-slate-300">•</span>
-                                          <span className="font-medium text-violet-700">
+                                          <span className="text-[var(--ops-border-soft)]">•</span>
+                                          <span className="font-medium text-[var(--ripnel-accent-hover)]">
                                             Ajuste manual activo
                                           </span>
                                         </>
                                       ) : null}
                                     </div>
                                     {item.price_override?.reason ? (
-                                      <p className="mt-1 text-[11px] text-violet-700">
+                                      <p className="mt-1 text-[11px] text-[var(--ripnel-accent-hover)]">
                                         Motivo del ajuste: {item.price_override.reason}
                                       </p>
                                     ) : null}
                                   </div>
 
                                   <div className="flex items-center justify-between gap-3 xl:justify-center">
-                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 xl:hidden">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)] xl:hidden">
                                       Cantidad
                                     </p>
-                                    <div className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-1.5 py-1">
+                                    <div className="sales-field flex items-center gap-1 rounded-xl px-1.5 py-1">
                                       <button
                                         type="button"
                                         onClick={() => updateQty(item.variant_id, -1)}
-                                        className="rounded-lg border border-slate-300 bg-white p-1 text-slate-600 hover:bg-slate-100"
+                                        className="sales-field-interactive rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1 text-[var(--ops-text-muted)]"
                                       >
                                         <Minus className="h-3 w-3" />
                                       </button>
-                                      <span className="min-w-8 text-center text-sm font-semibold text-slate-800">
+                                      <span className="min-w-8 text-center text-sm font-semibold text-[var(--ops-text)]">
                                         {item.quantity}
                                       </span>
                                       <button
                                         type="button"
                                         onClick={() => updateQty(item.variant_id, 1)}
                                         disabled={item.quantity >= item.stock}
-                                        className="rounded-lg border border-slate-300 bg-white p-1 text-slate-600 hover:bg-slate-100 disabled:opacity-40"
+                                        className="sales-field-interactive rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1 text-[var(--ops-text-muted)] disabled:opacity-40"
                                       >
                                         <Plus className="h-3 w-3" />
                                       </button>
@@ -2095,19 +2232,19 @@ export default function NuevaVentaPage() {
                                   </div>
 
                                   <div className="text-left xl:text-right">
-                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 xl:hidden">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)] xl:hidden">
                                       Precio final
                                     </p>
-                                    <p className="font-semibold text-slate-800">
+                                    <p className="font-semibold text-[var(--ops-text)]">
                                       S/. {formatMoney(item.preview_unit_price_final)}
                                     </p>
                                   </div>
 
                                   <div className="text-left xl:text-right">
-                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 xl:hidden">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)] xl:hidden">
                                       Subtotal
                                     </p>
-                                    <p className="font-semibold text-slate-900">
+                                    <p className="font-semibold text-[var(--ops-text)]">
                                       S/. {formatMoney(item.line_subtotal)}
                                     </p>
                                     {item.line_discount_amount > 0 ? (
@@ -2124,7 +2261,7 @@ export default function NuevaVentaPage() {
                                           <button
                                             type="button"
                                             onClick={() => openPriceSheet(item)}
-                                            className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-800"
+                                            className="sales-field-interactive rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1.5 text-[var(--ops-text-muted)] transition"
                                             aria-label={item.price_override ? "Editar precio" : "Ajustar precio"}
                                           >
                                             <PencilLine className="h-4 w-4" />
@@ -2138,7 +2275,7 @@ export default function NuevaVentaPage() {
                                         <button
                                           type="button"
                                           onClick={() => clearPriceAdjustment(item.variant_id)}
-                                          className="rounded-lg p-1 text-slate-400 transition hover:bg-white hover:text-amber-600"
+                                          className="rounded-lg p-1 text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface)] hover:text-amber-600"
                                           aria-label="Quitar ajuste"
                                         >
                                           <CircleAlert className="h-4 w-4" />
@@ -2165,26 +2302,39 @@ export default function NuevaVentaPage() {
 
                   <div className="contents">
                     <article
-                      className={`relative rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6 xl:order-1 xl:col-span-2 ${
-                        customerPickerOpen || documentPickerOpen ? "z-30" : "z-0"
+                      ref={customerSectionRef}
+                      onMouseEnter={() => setActiveStage("customer")}
+                      className={`sales-panel relative rounded-lg p-4 shadow-sm md:p-5 xl:order-1 xl:col-span-2 ${
+                        activeStage === "customer"
+                          ? customerPickerOpen || documentPickerOpen
+                            ? "z-30"
+                            : "z-0"
+                          : "hidden"
                       }`}
                     >
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
-                          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-700">
-                            1
+                          <span className="sales-chip sales-chip-accent rounded-full px-2.5 py-1 text-sm font-semibold">
+                            <Users className="h-4 w-4" />
                           </span>
-                          <h2 className="text-lg font-semibold text-slate-800">Cliente</h2>
+                          <h2 className="text-lg font-semibold text-[var(--ops-text)]">Cliente</h2>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => openCustomerSheet("create")}
-                          className="inline-flex items-center gap-2 rounded-2xl border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-800 transition hover:bg-violet-100"
-                        >
-                          <UserPlus className="h-4 w-4" />
-                          Crear cliente
-                        </button>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="sales-chip rounded-full px-3 py-1 text-xs font-semibold">
+                            {cartCount} producto{cartCount === 1 ? "" : "s"} listos
+                          </span>
+                          <Button
+                            type="button"
+                            variant="accent"
+                            size="sm"
+                            onClick={() => openCustomerSheet("create")}
+                            className="rounded-full px-4"
+                          >
+                            <UserPlus className="h-4 w-4" />
+                            Crear cliente
+                          </Button>
+                        </div>
                       </div>
 
                       <div className="mt-4 space-y-3">
@@ -2193,49 +2343,44 @@ export default function NuevaVentaPage() {
                             <button
                               type="button"
                               onClick={() => setDocumentPickerOpen((current) => !current)}
-                              className="flex h-full w-full items-center justify-between rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 transition hover:border-violet-300"
+                              className="sales-field sales-field-interactive flex h-full w-full items-center justify-between rounded-xl px-3 py-2 text-sm"
                             >
                               <span className="flex min-w-0 items-center gap-2">
-                                <ActiveDocumentIcon className="h-4 w-4 shrink-0 text-violet-600" />
+                                <ActiveDocumentIcon className="h-4 w-4 shrink-0 text-[var(--ripnel-accent)]" />
                                 <span className="truncate">{activeDocumentOption.label}</span>
                               </span>
-                              <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" />
+                              <ChevronDown className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
                             </button>
 
                             {documentPickerOpen ? (
-                              <div className="absolute left-0 right-0 top-[calc(100%+0.55rem)] z-30 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl">
-                                <div className="p-1.5">
-                                  <div className="space-y-1.5">
-                                    {DOC_TYPES.map((docType) => {
-                                      const Icon = getDocumentIcon(docType.value)
-                                      const selected = documentType === docType.value
-                                      return (
-                                        <button
-                                          key={docType.value}
-                                          type="button"
-                                          onClick={() => {
-                                            setDocumentType(docType.value)
-                                            setDocumentPickerOpen(false)
-                                          }}
-                                          className={`flex w-full items-center gap-2 rounded-2xl border px-3 py-2.5 text-left text-sm transition ${
-                                            selected
-                                              ? "border-violet-300 bg-violet-50 font-semibold text-violet-800"
-                                              : "border-transparent bg-slate-50 text-slate-700 hover:border-violet-200 hover:bg-violet-50/70"
-                                          }`}
-                                        >
-                                          <Icon className="h-4 w-4" />
-                                          <span>{docType.label}</span>
-                                        </button>
-                                      )
-                                    })}
-                                  </div>
-                                </div>
-                              </div>
+                              <CompactPickerPopover className="absolute left-0 right-0 top-[calc(100%+0.45rem)] z-30">
+                                <CompactPickerList>
+                                  {DOC_TYPES.map((docType) => {
+                                    const Icon = getDocumentIcon(docType.value)
+                                    const selected = documentType === docType.value
+                                    return (
+                                      <CompactPickerOption
+                                        key={docType.value}
+                                        selected={selected}
+                                        onClick={() => {
+                                          setDocumentType(docType.value)
+                                          setDocumentPickerOpen(false)
+                                          setActiveStage("customer")
+                                        }}
+                                        className="flex items-center gap-2 text-sm"
+                                      >
+                                        <Icon className="h-4 w-4 shrink-0" />
+                                        <span>{docType.label}</span>
+                                      </CompactPickerOption>
+                                    )
+                                  })}
+                                </CompactPickerList>
+                              </CompactPickerPopover>
                             ) : null}
                           </div>
 
                           <div ref={customerPickerRef} className="relative">
-                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
                             <input
                               ref={customerSearchInputRef}
                               type="text"
@@ -2281,7 +2426,7 @@ export default function NuevaVentaPage() {
                                 }
                               }}
                               placeholder={customerInputPlaceholder}
-                              className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-9 pr-10 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                              className="sales-field w-full rounded-xl py-2.5 pl-9 pr-10 text-sm"
                             />
                             {selectedCustomer || customerQuery ? (
                               <button
@@ -2293,7 +2438,7 @@ export default function NuevaVentaPage() {
                                   }
                                   focusCustomerSearch()
                                 }}
-                                className="absolute right-3 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:text-slate-800"
+                                className="absolute right-3 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] text-[var(--ops-text-muted)] transition hover:border-[var(--ripnel-accent)] hover:text-[var(--ripnel-accent-hover)]"
                                 aria-label="Limpiar cliente"
                               >
                                 <X className="h-3.5 w-3.5" />
@@ -2301,76 +2446,68 @@ export default function NuevaVentaPage() {
                             ) : null}
 
                             {customerPickerOpen ? (
-                              <div className="absolute left-0 right-0 top-[calc(100%+0.55rem)] z-30 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl">
+                              <CompactPickerPopover className="absolute left-0 right-0 top-[calc(100%+0.45rem)] z-30">
                                 {loadingCustomers ? (
-                                  <p className="px-3 py-4 text-sm text-slate-500">Buscando clientes...</p>
+                                  <CompactPickerEmpty>Buscando clientes...</CompactPickerEmpty>
                                 ) : customerResults.length > 0 ? (
-                                  <div
-                                    className="max-h-72 overflow-y-auto p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                                  <CompactPickerList
+                                    className="max-h-60 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                                     style={{ scrollbarWidth: "none" }}
                                   >
-                                    <div className="space-y-1.5">
+                                    <div className="divide-y divide-[color:color-mix(in_srgb,var(--ops-border-strong)_72%,transparent)]">
                                       {customerResults.map((customer, index) => {
                                         const isHighlighted = index === highlightedCustomerIndex
                                         return (
-                                          <button
+                                          <CompactPickerOption
                                             key={customer.customer_id}
-                                            type="button"
+                                            active={isHighlighted}
                                             onMouseEnter={() => setHighlightedCustomerIndex(index)}
                                             onClick={() => selectCustomer(customer)}
-                                            className={`block w-full rounded-2xl border px-3 py-2.5 text-left transition ${
-                                              isHighlighted
-                                                ? "border-violet-300 bg-violet-50"
-                                                : "border-transparent bg-slate-50 hover:border-violet-200 hover:bg-violet-50/70"
-                                            }`}
+                                            className="py-2.5"
                                           >
-                                            <span className="block truncate text-sm font-semibold text-slate-900">
+                                            <span className="block truncate text-sm font-semibold text-[var(--ops-text)]">
                                               {buildCustomerDisplayName(customer)}
                                             </span>
-                                            <span className="mt-0.5 block truncate text-[11px] text-slate-500">
+                                            <span className="mt-0.5 block truncate text-[11px] text-[var(--ops-text-muted)]">
                                               {buildCustomerDocument(customer)}
                                             </span>
-                                          </button>
+                                          </CompactPickerOption>
                                         )
                                       })}
                                     </div>
-                                  </div>
+                                  </CompactPickerList>
                                 ) : (
-                                  <div className="px-3 py-4 text-sm text-slate-500">
+                                  <CompactPickerEmpty>
                                     No encontramos coincidencias. Puedes crear el cliente y seguir con la venta.
-                                  </div>
+                                  </CompactPickerEmpty>
                                 )}
-                              </div>
+                              </CompactPickerPopover>
                             ) : null}
                           </div>
                         </div>
 
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div className="sales-panel-muted rounded-xl px-4 py-3">
                           <div className="flex flex-wrap items-start gap-3 xl:grid xl:grid-cols-[minmax(0,1.15fr)_max-content_minmax(0,1fr)_max-content_max-content] xl:items-center">
                             <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold text-slate-900">
+                              <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
                                 {buildCustomerDisplayName(selectedCustomer)}
                               </p>
                             </div>
 
                             <div className="min-w-0">
-                              <p className="truncate text-xs text-slate-500">
+                              <p className="truncate text-xs text-[var(--ops-text-muted)]">
                                 {buildCustomerDocument(selectedCustomer)}
                               </p>
                             </div>
 
                             <div className="min-w-0">
-                              <p className="truncate text-xs text-slate-500">
+                              <p className="truncate text-xs text-[var(--ops-text-muted)]">
                                 {selectedCustomer?.address || "Venta de mostrador"}
                               </p>
                             </div>
 
                             <span
-                              className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                                customerIsValid
-                                  ? "bg-emerald-50 text-emerald-700"
-                                  : "bg-amber-50 text-amber-700"
-                              }`}
+                              className={`${customerIsValid ? "sales-chip sales-chip-success" : "sales-chip sales-chip-warning"} rounded-full px-2.5 py-1 text-[11px] font-semibold`}
                             >
                               {customerIsValid
                                 ? "Listo para el comprobante"
@@ -2386,7 +2523,7 @@ export default function NuevaVentaPage() {
                                 <button
                                   type="button"
                                   onClick={() => openCustomerSheet("edit")}
-                                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                                  className="sales-field-interactive inline-flex items-center gap-1.5 rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-1.5 text-xs font-medium text-[var(--ops-text)] transition"
                                 >
                                   <PencilLine className="h-3.5 w-3.5" />
                                   Editar
@@ -2398,7 +2535,7 @@ export default function NuevaVentaPage() {
                                 <button
                                   type="button"
                                   onClick={() => setSelectedCustomer(genericCustomer)}
-                                  className="inline-flex items-center rounded-xl px-2 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-50"
+                                  className="inline-flex cursor-pointer items-center rounded-xl px-2 py-1.5 text-xs font-semibold text-[var(--ripnel-accent-hover)] transition hover:bg-[var(--ripnel-accent-soft)]"
                                 >
                                   Usar mostrador
                                 </button>
@@ -2417,37 +2554,130 @@ export default function NuevaVentaPage() {
                       </div>
                     </article>
 
-                    <article className="relative z-0 rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur xl:order-4">
+                    <article
+                      ref={paymentSectionRef}
+                      onMouseEnter={() => setActiveStage("payment")}
+                      className={`sales-panel relative z-0 rounded-lg p-4 shadow-sm xl:order-4 xl:col-span-2 ${
+                        activeStage === "payment" ? "" : "hidden"
+                      }`}
+                    >
                       <div className="flex flex-wrap items-center justify-between gap-3">
-                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-700">
-                          3
-                        </span>
-                        <h2 className="text-lg font-semibold text-slate-800">Cobro y confirmacion</h2>
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                            customerIsValid
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-amber-50 text-amber-700"
-                          }`}
-                        >
-                          {activeDocumentOption.label}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className="sales-chip sales-chip-accent rounded-full px-2.5 py-1 text-sm font-semibold">
+                            <CreditCard className="h-4 w-4" />
+                          </span>
+                          <div className="space-y-0.5">
+                            <h2 className="text-lg font-semibold text-[var(--ops-text)]">Cobro</h2>
+                            <p className="text-xs text-[var(--ops-text-muted)]">
+                              {buildCustomerDisplayName(selectedCustomer)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="sales-chip rounded-full px-2.5 py-1 text-[11px] font-semibold">
+                            {cartCount} item{cartCount === 1 ? "" : "s"}
+                          </span>
+                          <span
+                            className={`${customerIsValid ? "sales-chip sales-chip-success" : "sales-chip sales-chip-warning"} rounded-full px-2.5 py-1 text-[11px] font-semibold`}
+                          >
+                            {activeDocumentOption.label}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="mt-4 space-y-4">
+                        {cartCount > 0 ? (
+                          <div className="sales-panel-muted rounded-xl px-3 py-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-semibold text-[var(--ops-text)]">
+                                  Ajustes comerciales
+                                </p>
+                                <span className="sales-chip rounded-full px-2 py-0.5 text-[11px] font-semibold">
+                                  Descuento actual: S/. {formatMoney(totals.saleDiscountAmount)}
+                                </span>
+                              </div>
+                              <span className="text-xs text-[var(--ops-text-muted)]">
+                                El precio manual por item sigue en Detalle de venta.
+                              </span>
+                            </div>
+
+                            <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,220px)_112px_minmax(0,1fr)]">
+                              <div className="grid grid-cols-3 gap-1.5">
+                                {SALE_DISCOUNT_OPTIONS.map((option) => (
+                                  <button
+                                    key={option.value}
+                                    type="button"
+                                    onClick={() =>
+                                      setSaleDiscount((current) => ({
+                                        ...current,
+                                        mode: option.value,
+                                        value: option.value === "none" ? "" : current.value,
+                                        reason: option.value === "none" ? "" : current.reason,
+                                      }))
+                                    }
+                                    className={`rounded-lg border px-2 py-2 text-[11px] font-semibold transition ${
+                                      saleDiscount.mode === option.value
+                                        ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_38%,var(--ops-border-strong))] bg-[var(--ripnel-accent-soft)] text-[var(--ripnel-accent-hover)]"
+                                        : "border-[var(--ops-border-strong)] bg-[var(--ops-surface)] text-[var(--ops-text-muted)]"
+                                    }`}
+                                  >
+                                    {option.label}
+                                  </button>
+                                ))}
+                              </div>
+
+                              {saleDiscount.mode !== "none" ? (
+                                <>
+                                  <input
+                                    value={saleDiscount.value}
+                                    onChange={(event) =>
+                                      setSaleDiscount((current) => ({
+                                        ...current,
+                                        value: event.target.value,
+                                      }))
+                                    }
+                                    placeholder={
+                                      saleDiscount.mode === "percent"
+                                        ? "Descuento %"
+                                        : "Descuento S/."
+                                    }
+                                    className={INPUT_CLASS}
+                                  />
+                                  <input
+                                    value={saleDiscount.reason}
+                                    onChange={(event) =>
+                                      setSaleDiscount((current) => ({
+                                        ...current,
+                                        reason: event.target.value,
+                                      }))
+                                    }
+                                    placeholder="Motivo comercial"
+                                    className={INPUT_CLASS}
+                                  />
+                                </>
+                              ) : (
+                                <div className="lg:col-span-2 flex items-center rounded-xl border border-dashed border-[var(--ops-border-soft)] px-3 py-2 text-sm text-[var(--ops-text-muted)]">
+                                  Sin descuento general aplicado.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : null}
+
                         <div>
                           <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-                            <label className="block text-xs font-medium text-slate-600">
+                            <label className="block text-xs font-medium text-[var(--ops-text-muted)]">
                               Metodo de pago
                             </label>
-                            <div className="flex items-center gap-2">
+                            <div className="inline-flex rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] p-1">
                               <button
                                 type="button"
                                 onClick={() => setPaymentModeWithDefaults("single")}
-                                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
+                                className={`cursor-pointer rounded-lg px-3 py-1.5 text-[11px] font-semibold transition ${
                                   paymentMode === "single"
-                                    ? "border border-violet-300 bg-violet-50 text-violet-800"
-                                    : "border border-slate-200 bg-white text-slate-500"
+                                    ? "bg-[var(--ops-surface)] text-[var(--ripnel-accent-hover)] shadow-sm"
+                                    : "text-[var(--ops-text-muted)]"
                                 }`}
                               >
                                 Pago unico
@@ -2455,10 +2685,10 @@ export default function NuevaVentaPage() {
                               <button
                                 type="button"
                                 onClick={() => setPaymentModeWithDefaults("mixed")}
-                                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
+                                className={`cursor-pointer rounded-lg px-3 py-1.5 text-[11px] font-semibold transition ${
                                   paymentMode === "mixed"
-                                    ? "border border-violet-300 bg-violet-50 text-violet-800"
-                                    : "border border-slate-200 bg-white text-slate-500"
+                                    ? "bg-[var(--ops-surface)] text-[var(--ripnel-accent-hover)] shadow-sm"
+                                    : "text-[var(--ops-text-muted)]"
                                 }`}
                               >
                                 Pago mixto
@@ -2476,10 +2706,10 @@ export default function NuevaVentaPage() {
                                     key={method.value}
                                     type="button"
                                     onClick={() => setPaymentMethod(method.value)}
-                                    className={`rounded-2xl border px-3 py-2.5 text-sm transition ${
+                                    className={`cursor-pointer rounded-xl border px-3 py-2.5 text-sm transition ${
                                       selected
-                                        ? "border-violet-400 bg-violet-50 font-semibold text-violet-800 ring-1 ring-violet-300"
-                                        : "border-slate-200 bg-white text-slate-700 hover:border-violet-200"
+                                        ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_40%,var(--ops-border-strong))] bg-[var(--ripnel-accent-soft)] font-semibold text-[var(--ripnel-accent-hover)]"
+                                        : "border-[var(--ops-border-strong)] bg-[var(--ops-surface)] text-[var(--ops-text)] hover:border-[color:color-mix(in_srgb,var(--ripnel-accent)_28%,var(--ops-border-strong))]"
                                     }`}
                                   >
                                     <div className="flex items-center justify-center gap-2">
@@ -2491,72 +2721,118 @@ export default function NuevaVentaPage() {
                               })}
                             </div>
                           ) : (
-                            <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <p className="text-xs text-slate-600">
-                                  Divide el cobro. La suma debe coincidir con el total de la venta.
-                                </p>
-                                <button
+                            <div className="sales-panel-muted rounded-xl px-3 py-3">
+                              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                                <span className="text-xs font-medium text-[var(--ops-text-muted)]">
+                                  El total debe cuadrar antes de confirmar.
+                                </span>
+                                <Button
                                   type="button"
+                                  variant="outline"
+                                  size="xs"
                                   onClick={addMixedPaymentDraft}
-                                  className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                                  className="rounded-full"
                                 >
                                   Agregar linea
-                                </button>
+                                </Button>
                               </div>
 
-                              <div className="space-y-2">
-                                {mixedPayments.map((payment, index) => (
-                                  <div
-                                    key={payment.id}
-                                    className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-3 md:grid-cols-[1fr_0.8fr_1fr_auto]"
-                                  >
-                                    <select
-                                      value={payment.method}
-                                      onChange={(event) =>
-                                        updateMixedPaymentDraft(payment.id, "method", event.target.value)
-                                      }
-                                      className={INPUT_CLASS}
+                              <div className="divide-y divide-[var(--ops-border-strong)]">
+                                {mixedPayments.map((payment, index) => {
+                                  const paymentReferenceMeta = getPaymentReferenceMeta(payment.method)
+
+                                  return (
+                                    <div
+                                      key={payment.id}
+                                      className="grid gap-2 py-3 md:grid-cols-[minmax(0,0.9fr)_112px_minmax(0,1fr)_auto] md:items-end"
                                     >
-                                      {PAYMENT_METHODS.map((method) => (
-                                        <option key={method.value} value={method.value}>
-                                          {method.label}
-                                        </option>
-                                      ))}
-                                    </select>
+                                      <div>
+                                        <div className="mb-1.5 flex items-center gap-2">
+                                          <span className="sales-chip sales-chip-accent rounded-full px-2 text-[11px] font-semibold">
+                                            {index + 1}
+                                          </span>
+                                          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
+                                            Linea de pago
+                                          </p>
+                                        </div>
+                                        <select
+                                          value={payment.method}
+                                          onChange={(event) =>
+                                            updateMixedPaymentDraft(payment.id, "method", event.target.value)
+                                          }
+                                          className={INPUT_CLASS}
+                                        >
+                                          {PAYMENT_METHODS.map((method) => (
+                                            <option key={method.value} value={method.value}>
+                                              {method.label}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
 
-                                    <input
-                                      value={payment.amount}
-                                      onChange={(event) =>
-                                        updateMixedPaymentDraft(payment.id, "amount", event.target.value)
-                                      }
-                                      placeholder="0.00"
-                                      className={INPUT_CLASS}
-                                    />
+                                      <div>
+                                        <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[var(--ops-text-muted)]">
+                                          Monto
+                                        </label>
+                                        <input
+                                          value={payment.amount}
+                                          onChange={(event) =>
+                                            updateMixedPaymentDraft(payment.id, "amount", event.target.value)
+                                          }
+                                          placeholder="0.00"
+                                          className={INPUT_CLASS}
+                                        />
+                                      </div>
 
-                                    <input
-                                      value={payment.reference}
-                                      onChange={(event) =>
-                                        updateMixedPaymentDraft(payment.id, "reference", event.target.value)
-                                      }
-                                      placeholder={`Referencia ${index + 1} (opcional)`}
-                                      className={INPUT_CLASS}
-                                    />
+                                      <div>
+                                        <div className="mb-1 flex items-center gap-1.5">
+                                          <label className="block text-[11px] font-medium uppercase tracking-wide text-[var(--ops-text-muted)]">
+                                            {paymentReferenceMeta.label}
+                                          </label>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <button
+                                                type="button"
+                                                className="rounded-full p-0.5 text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface)] hover:text-[var(--ops-text)]"
+                                                aria-label={`Informacion de ${paymentReferenceMeta.label.toLowerCase()}`}
+                                              >
+                                                <Info className="h-3.5 w-3.5" />
+                                              </button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="bottom" sideOffset={8}>
+                                              {paymentReferenceMeta.helper}
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        </div>
+                                        <input
+                                          value={payment.reference}
+                                          onChange={(event) =>
+                                            updateMixedPaymentDraft(payment.id, "reference", event.target.value)
+                                          }
+                                          placeholder={paymentReferenceMeta.placeholder}
+                                          className={`${INPUT_CLASS} ${
+                                            payment.method === "cash" ? "bg-[var(--ops-surface-muted)]" : ""
+                                          }`}
+                                        />
+                                      </div>
 
-                                    <button
-                                      type="button"
-                                      onClick={() => removeMixedPaymentDraft(payment.id)}
-                                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-100 disabled:opacity-40"
-                                      disabled={mixedPayments.length <= 2}
-                                    >
-                                      Quitar
-                                    </button>
-                                  </div>
-                                ))}
+                                      <div className="flex md:justify-end">
+                                        <button
+                                          type="button"
+                                          onClick={() => removeMixedPaymentDraft(payment.id)}
+                                          className="cursor-pointer rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-2.5 py-2 text-xs font-semibold text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40"
+                                          disabled={mixedPayments.length <= 2}
+                                        >
+                                          Quitar
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )
+                                })}
                               </div>
 
-                              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                                <span className="text-slate-500">
+                              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                                <span className="text-[var(--ops-text-muted)]">
                                   Asignado: S/. {formatMoney(mixedPaymentsPreview.enteredTotal)}
                                 </span>
                                 <span
@@ -2579,163 +2855,233 @@ export default function NuevaVentaPage() {
                       </div>
                     </article>
 
-                    <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur xl:order-5">
+                    <article
+                      ref={summarySectionRef}
+                      className={`sales-panel rounded-lg p-4 shadow-sm xl:order-5 ${
+                        activeStage === "summary" ? "" : "hidden"
+                      }`}
+                    >
                       <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <CreditCard className="h-4 w-4 text-violet-600" />
-                          <h2 className="text-lg font-semibold text-slate-800">Resumen</h2>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-                                aria-label="Informacion del resumen"
-                              >
-                                <Info className="h-4 w-4" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom" sideOffset={8}>
-                              El precio final se valida con el backend usando el precio vigente segun la regla comercial activa.
-                            </TooltipContent>
-                          </Tooltip>
+                        <div className="flex items-center gap-3">
+                          <span className="sales-chip sales-chip-accent rounded-full px-2.5 py-1 text-sm font-semibold">
+                            <Receipt className="h-4 w-4" />
+                          </span>
+                          <div>
+                            <h2 className="text-lg font-semibold text-[var(--ops-text)]">
+                              Resumen de venta
+                            </h2>
+                            <p className="text-sm text-[var(--ops-text-muted)]">
+                              Revisa cliente, productos y cobro antes del cierre.
+                            </p>
+                          </div>
                         </div>
+
                         <span
-                          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${
-                            cashReady
-                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                              : "border-amber-200 bg-amber-50 text-amber-700"
-                          }`}
+                          className={`${submitDisabled ? "sales-chip sales-chip-warning" : "sales-chip sales-chip-success"} rounded-full px-3 py-1 text-xs font-semibold`}
                         >
-                          {cashReady ? (
-                            <ShieldCheck className="h-3.5 w-3.5" />
-                          ) : (
-                            <ShieldAlert className="h-3.5 w-3.5" />
-                          )}
-                          {cashReady ? "Listo para confirmar" : "Pendiente por validar"}
+                          {submitDisabled ? "Pendiente por validar" : "Listo para finalizar"}
                         </span>
                       </div>
 
-                      {cartCount > 0 ? (
-                        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                      <div className="mt-4 space-y-3">
+                        <section className="sales-panel-muted rounded-xl p-4">
                           <div className="flex items-center justify-between gap-3">
                             <div className="flex items-center gap-2">
-                              <p className="text-sm font-semibold text-slate-800">
-                                Ajustes comerciales
-                              </p>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button
-                                    type="button"
-                                    className="rounded-full p-1 text-slate-400 transition hover:bg-white hover:text-slate-600"
-                                    aria-label="Informacion de ajustes comerciales"
-                                  >
-                                    <Info className="h-3.5 w-3.5" />
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent side="bottom" sideOffset={8}>
-                                  Aplica descuento general aqui y precio manual desde el detalle.
-                                </TooltipContent>
-                              </Tooltip>
+                              <Users className="h-4 w-4 text-[var(--ripnel-accent)]" />
+                              <h3 className="text-sm font-semibold text-[var(--ops-text)]">Cliente</h3>
                             </div>
-                            <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
-                              Reglas comerciales
-                            </span>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => goToStage("customer")}
+                              className="rounded-full"
+                            >
+                              <PencilLine className="h-3.5 w-3.5" />
+                              Editar
+                            </Button>
                           </div>
 
-                          <div className="mt-3 grid grid-cols-3 gap-2">
-                            {SALE_DISCOUNT_OPTIONS.map((option) => (
-                              <button
-                                key={option.value}
-                                type="button"
-                                onClick={() =>
-                                  setSaleDiscount((current) => ({
-                                    ...current,
-                                    mode: option.value,
-                                    value: option.value === "none" ? "" : current.value,
-                                    reason: option.value === "none" ? "" : current.reason,
-                                  }))
-                                }
-                                className={`rounded-xl border px-3 py-2 text-sm transition ${
-                                  saleDiscount.mode === option.value
-                                    ? "border-violet-300 bg-violet-50 font-semibold text-violet-800"
-                                    : "border-slate-200 bg-white text-slate-600 hover:border-violet-200"
-                                }`}
-                              >
-                                {option.label}
-                              </button>
-                            ))}
+                          <div className="mt-3 grid gap-3 text-sm md:grid-cols-3">
+                            <div>
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
+                                Comprobante
+                              </p>
+                              <p className="mt-1 font-medium text-[var(--ops-text)]">
+                                {activeDocumentOption.label}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
+                                Cliente
+                              </p>
+                              <p className="mt-1 font-medium text-[var(--ops-text)]">
+                                {selectedCustomerName}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
+                                Documento
+                              </p>
+                              <p className="mt-1 font-medium text-[var(--ops-text)]">
+                                {selectedCustomerDocument}
+                              </p>
+                            </div>
+                          </div>
+                        </section>
+
+                        <section className="sales-panel-muted rounded-xl p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                              <ShoppingBasket className="h-4 w-4 text-[var(--ripnel-accent)]" />
+                              <h3 className="text-sm font-semibold text-[var(--ops-text)]">
+                                Productos ({cartCount})
+                              </h3>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => goToStage("products")}
+                              className="rounded-full"
+                            >
+                              <PencilLine className="h-3.5 w-3.5" />
+                              Editar
+                            </Button>
                           </div>
 
-                          {saleDiscount.mode !== "none" ? (
-                            <div className="mt-3 grid gap-3 md:grid-cols-[0.85fr_1.15fr]">
-                              <div>
-                                <label className="mb-1 block text-xs font-medium text-slate-600">
-                                  {saleDiscount.mode === "percent" ? "Descuento %" : "Descuento S/."}
-                                </label>
-                                <input
-                                  value={saleDiscount.value}
-                                  onChange={(event) =>
-                                    setSaleDiscount((current) => ({
-                                      ...current,
-                                      value: event.target.value,
-                                    }))
-                                  }
-                                  placeholder={saleDiscount.mode === "percent" ? "10" : "15.00"}
-                                  className={INPUT_CLASS}
-                                />
-                              </div>
-                              <div>
-                                <label className="mb-1 block text-xs font-medium text-slate-600">
-                                  Motivo comercial
-                                </label>
-                                <input
-                                  value={saleDiscount.reason}
-                                  onChange={(event) =>
-                                    setSaleDiscount((current) => ({
-                                      ...current,
-                                      reason: event.target.value,
-                                    }))
-                                  }
-                                  placeholder="Cliente frecuente, cierre, ajuste comercial..."
-                                  className={INPUT_CLASS}
-                                />
-                              </div>
+                          <div className="mt-3 overflow-hidden rounded-xl border border-[var(--ops-border-strong)]">
+                            <div className="hidden bg-[var(--ops-surface)] px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)] md:grid md:grid-cols-[minmax(0,1.5fr)_120px_90px_120px] md:gap-4">
+                              <span>Producto</span>
+                              <span>Variacion</span>
+                              <span className="text-center">Cant.</span>
+                              <span className="text-right">Subtotal</span>
+                            </div>
+                            <div className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                              {totals.items.map((item) => (
+                                <div
+                                  key={item.variant_id}
+                                  className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[minmax(0,1.5fr)_120px_90px_120px] md:items-center md:gap-4"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="truncate font-medium text-[var(--ops-text)]">
+                                      {item.style_name}
+                                    </p>
+                                    <p className="mt-0.5 text-[11px] text-[var(--ops-text-muted)]">
+                                      {item.sku}
+                                    </p>
+                                  </div>
+                                  <p className="text-[var(--ops-text-muted)]">
+                                    {item.color_code} / {item.size_code}
+                                  </p>
+                                  <p className="text-center font-medium text-[var(--ops-text)]">
+                                    {item.quantity}
+                                  </p>
+                                  <p className="text-left font-semibold text-[var(--ops-text)] md:text-right">
+                                    S/. {formatMoney(item.line_subtotal)}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </section>
+
+                        <section className="sales-panel-muted rounded-xl p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                              <CreditCard className="h-4 w-4 text-[var(--ripnel-accent)]" />
+                              <h3 className="text-sm font-semibold text-[var(--ops-text)]">Cobro</h3>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => goToStage("payment")}
+                              className="rounded-full"
+                            >
+                              <PencilLine className="h-3.5 w-3.5" />
+                              Editar
+                            </Button>
+                          </div>
+
+                          <div className="mt-3 grid gap-3 text-sm md:grid-cols-3">
+                            <div>
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
+                                Modalidad
+                              </p>
+                              <p className="mt-1 font-medium text-[var(--ops-text)]">
+                                {paymentMode === "mixed" ? "Pago mixto" : "Pago unico"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
+                                Medio principal
+                              </p>
+                              <p className="mt-1 font-medium text-[var(--ops-text)]">
+                                {paymentSummaryLabel}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
+                                Cobro asignado
+                              </p>
+                              <p className="mt-1 font-medium text-[var(--ops-text)]">
+                                S/.{" "}
+                                {formatMoney(
+                                  paymentMode === "mixed"
+                                    ? mixedPaymentsPreview.enteredTotal
+                                    : totals.total
+                                )}
+                              </p>
+                            </div>
+                          </div>
+
+                          {paymentMode === "mixed" ? (
+                            <div className="mt-3 divide-y divide-[var(--ops-border-strong)] rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                              {mixedPayments.map((payment) => {
+                                const PaymentMethodIcon = getPaymentMethodIcon(payment.method)
+                                return (
+                                  <div
+                                    key={payment.id}
+                                    className="grid gap-2 px-3 py-2.5 text-sm md:grid-cols-[minmax(0,1fr)_112px_minmax(0,1fr)] md:items-center"
+                                  >
+                                    <div className="flex items-center gap-2 font-medium text-[var(--ops-text)]">
+                                      <PaymentMethodIcon className="h-4 w-4 text-[var(--ripnel-accent)]" />
+                                      {getPaymentMethodLabel(payment.method)}
+                                    </div>
+                                    <span className="font-medium text-[var(--ops-text)]">
+                                      S/. {formatMoney(parseAmountInput(payment.amount) || 0)}
+                                    </span>
+                                    <span className="truncate text-[var(--ops-text-muted)]">
+                                      {trimOrNull(payment.reference) || "Sin referencia"}
+                                    </span>
+                                  </div>
+                                )
+                              })}
                             </div>
                           ) : null}
+                        </section>
+                      </div>
+                    </article>
 
-                          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-                            <div className="flex items-center gap-1.5">
-                              <span>Precio manual por item</span>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button
-                                    type="button"
-                                    className="rounded-full p-1 text-slate-400 transition hover:bg-white hover:text-slate-600"
-                                    aria-label="Informacion de precio manual"
-                                  >
-                                    <Info className="h-3.5 w-3.5" />
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent side="bottom" sideOffset={8}>
-                                  Disponible desde Detalle de venta para cada item.
-                                </TooltipContent>
-                              </Tooltip>
-                            </div>
-                            <span className="font-semibold text-slate-700">
-                              Descuento aplicado: S/. {formatMoney(totals.saleDiscountAmount)}
-                            </span>
-                          </div>
-                        </div>
-                      ) : null}
+                    <article
+                      className={`sales-panel rounded-lg p-4 shadow-sm xl:order-6 xl:sticky xl:top-20 xl:self-start ${
+                        activeStage === "summary" ? "" : "hidden"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Receipt className="h-4 w-4 text-[var(--ripnel-accent)]" />
+                        <h2 className="text-base font-semibold text-[var(--ops-text)]">Totales</h2>
+                      </div>
 
-                      <div className="mt-4 space-y-2 text-sm">
+                      <div className="mt-3 space-y-2 text-sm">
                         {totals.saleDiscountAmount > 0 ? (
-                          <div className="flex justify-between text-slate-600">
+                          <div className="flex justify-between text-[var(--ops-text-muted)]">
                             <span>Subtotal base</span>
                             <span>S/. {formatMoney(totals.baseSubtotal)}</span>
                           </div>
                         ) : null}
-                        <div className="flex justify-between text-slate-600">
+                        <div className="flex justify-between text-[var(--ops-text-muted)]">
                           <span>Subtotal</span>
                           <span>S/. {formatMoney(totals.subtotal)}</span>
                         </div>
@@ -2745,39 +3091,73 @@ export default function NuevaVentaPage() {
                             <span>- S/. {formatMoney(totals.saleDiscountAmount)}</span>
                           </div>
                         ) : null}
-                        <div className="flex justify-between text-slate-600">
+                        <div className="flex justify-between text-[var(--ops-text-muted)]">
                           <span>IGV ({(totals.taxRate * 100).toFixed(0)}%)</span>
                           <span>S/. {formatMoney(totals.tax)}</span>
                         </div>
-                        <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-bold text-slate-900">
-                          <span>Total</span>
+                        <div className="flex justify-between border-t border-[var(--ops-border-strong)] pt-2 text-base font-bold text-[var(--ops-text)]">
+                          <span>Total a pagar</span>
                           <span>S/. {formatMoney(totals.total)}</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 space-y-2">
+                        <div className="sales-panel-muted rounded-xl px-3 py-2.5">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                            Cobro asignado
+                          </p>
+                          <p className="mt-1 text-xl font-semibold text-[var(--ops-text)]">
+                            S/.{" "}
+                            {formatMoney(
+                              paymentMode === "mixed"
+                                ? mixedPaymentsPreview.enteredTotal
+                                : totals.total
+                            )}
+                          </p>
+                        </div>
+                        <div className="sales-panel-muted rounded-xl px-3 py-2.5">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                            Estado
+                          </p>
+                          <p
+                            className={`mt-1 text-sm font-semibold ${
+                              submitDisabled ? "text-amber-700" : "text-emerald-700"
+                            }`}
+                          >
+                            {summaryStatusMessage}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                          Acciones
+                        </p>
+                        <div className="mt-2 space-y-2">
+                          <Button type="button" variant="outline" className="w-full justify-start" disabled>
+                            <Receipt className="h-4 w-4" />
+                            Imprimir comprobante
+                          </Button>
+                          <Button type="button" variant="outline" className="w-full justify-start" disabled>
+                            <Users className="h-4 w-4" />
+                            Enviar por correo
+                          </Button>
+                          <Button type="button" variant="outline" className="w-full justify-start" disabled>
+                            <History className="h-4 w-4" />
+                            Descargar PDF
+                          </Button>
+                          <Button type="button" variant="outline" className="w-full justify-start" disabled>
+                            <BadgeCheck className="h-4 w-4" />
+                            Guardar venta como borrador
+                          </Button>
                         </div>
                       </div>
 
                       {totals.hasMissingPrice ? (
                         <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                          Hay items sin precio vigente. El backend rechazara la venta hasta que exista
-                          un precio activo.
+                          Hay items sin precio vigente. Ajustalos antes del cierre.
                         </p>
                       ) : null}
-
-                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
-                        <span
-                          className={
-                            submitDisabled ? "font-medium text-amber-700" : "font-medium text-emerald-700"
-                          }
-                        >
-                          {summaryStatusMessage}
-                        </span>
-                        {paymentMode === "mixed" ? (
-                          <span className="text-xs font-semibold text-slate-500">
-                            {Math.abs(mixedPaymentsPreview.difference) < 0.01
-                              ? "Pago mixto listo"
-                              : `Diferencia: S/. ${formatMoney(Math.abs(mixedPaymentsPreview.difference))}`}
-                          </span>
-                        ) : null}
-                      </div>
 
                       {error ? (
                         <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -2789,9 +3169,9 @@ export default function NuevaVentaPage() {
                         type="button"
                         onClick={confirmSale}
                         disabled={submitDisabled}
-                        className="mt-4 w-full rounded-2xl bg-violet-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="mt-4 w-full cursor-pointer rounded-2xl bg-[var(--ripnel-accent)] px-4 py-3 text-sm font-bold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        {submitting ? "Procesando..." : "Confirmar venta"}
+                        {submitting ? "Procesando..." : "Finalizar venta"}
                       </button>
                     </article>
                   </div>
@@ -2824,10 +3204,10 @@ export default function NuevaVentaPage() {
                     type="button"
                     onClick={() => setCustomerForm(createEmptyCustomerForm("retail"))}
                     disabled={customerSheetMode === "edit"}
-                    className={`rounded-xl border px-3 py-2 text-left text-sm transition ${
+                    className={`cursor-pointer rounded-xl border px-3 py-2 text-left text-sm transition ${
                       customerForm.entry_mode === "retail"
-                        ? "border-violet-400 bg-violet-50 font-semibold text-violet-800 ring-1 ring-violet-300"
-                        : "border-slate-200 text-slate-700 hover:border-violet-200"
+                        ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_40%,var(--ops-border-strong))] bg-[var(--ripnel-accent-soft)] font-semibold text-[var(--ripnel-accent-hover)] ring-1 ring-[color:color-mix(in_srgb,var(--ripnel-accent)_28%,transparent)]"
+                        : "border-[var(--ops-border-strong)] text-[var(--ops-text)] hover:border-[color:color-mix(in_srgb,var(--ripnel-accent)_28%,var(--ops-border-strong))]"
                     } disabled:cursor-not-allowed disabled:opacity-60`}
                   >
                     Cliente retail
@@ -2836,10 +3216,10 @@ export default function NuevaVentaPage() {
                     type="button"
                     onClick={() => setCustomerForm(createEmptyCustomerForm("factura"))}
                     disabled={customerSheetMode === "edit"}
-                    className={`rounded-xl border px-3 py-2 text-left text-sm transition ${
+                    className={`cursor-pointer rounded-xl border px-3 py-2 text-left text-sm transition ${
                       customerForm.entry_mode === "factura"
-                        ? "border-violet-400 bg-violet-50 font-semibold text-violet-800 ring-1 ring-violet-300"
-                        : "border-slate-200 text-slate-700 hover:border-violet-200"
+                        ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_40%,var(--ops-border-strong))] bg-[var(--ripnel-accent-soft)] font-semibold text-[var(--ripnel-accent-hover)] ring-1 ring-[color:color-mix(in_srgb,var(--ripnel-accent)_28%,transparent)]"
+                        : "border-[var(--ops-border-strong)] text-[var(--ops-text)] hover:border-[color:color-mix(in_srgb,var(--ripnel-accent)_28%,var(--ops-border-strong))]"
                     } disabled:cursor-not-allowed disabled:opacity-60`}
                   >
                     Cliente factura
@@ -3052,7 +3432,7 @@ export default function NuevaVentaPage() {
                 type="button"
                 onClick={submitCustomerForm}
                 disabled={customerSaving}
-                className="flex-1 rounded-2xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:opacity-50"
+                className="flex-1 cursor-pointer rounded-2xl bg-[var(--ripnel-accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {customerSaving
                   ? "Guardando..."
@@ -3186,7 +3566,7 @@ export default function NuevaVentaPage() {
               <button
                 type="button"
                 onClick={submitPriceAdjustment}
-                className="flex-1 rounded-2xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800"
+                className="flex-1 cursor-pointer rounded-2xl bg-[var(--ripnel-accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)]"
               >
                 Guardar ajuste
               </button>

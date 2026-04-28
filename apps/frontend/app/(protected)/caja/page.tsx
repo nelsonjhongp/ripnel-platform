@@ -33,25 +33,25 @@ const METHOD_CONFIG = [
     key: "cash" as const,
     label: "Efectivo",
     icon: Banknote,
-    valueClass: "text-emerald-900",
+    valueClass: "text-[var(--ops-text)]",
   },
   {
     key: "yape" as const,
     label: "Yape",
     icon: Smartphone,
-    valueClass: "text-violet-900",
+    valueClass: "text-[var(--ops-text)]",
   },
   {
     key: "plin" as const,
     label: "Plin",
     icon: Smartphone,
-    valueClass: "text-sky-900",
+    valueClass: "text-[var(--ops-text)]",
   },
   {
     key: "transfer" as const,
     label: "Transferencia",
     icon: ArrowRightLeft,
-    valueClass: "text-amber-900",
+    valueClass: "text-[var(--ops-text)]",
   },
 ]
 
@@ -77,7 +77,7 @@ function HelpTooltip({ content }: { content: string }) {
       <TooltipTrigger asChild>
         <button
           type="button"
-          className="inline-flex h-5 w-5 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+          className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)]"
           aria-label="Más información"
         >
           <Info className="h-3.5 w-3.5" />
@@ -166,12 +166,13 @@ export default function CajaPage() {
   if (!locationId) {
     return (
       <PermissionGuard allowedRoles={CASH_ALLOWED_ROLES}>
-        <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
+        <section className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
           <div className="mx-auto max-w-4xl">
             <InlineStatusCard
               title="Sin sede asignada"
               description="Tu usuario no tiene una sede default configurada. Contacta a un administrador antes de aperturar caja."
               tone="warning"
+              variant="ops"
             />
           </div>
         </section>
@@ -189,17 +190,17 @@ export default function CajaPage() {
   return (
     <PermissionGuard allowedRoles={CASH_ALLOWED_ROLES}>
       <TooltipProvider delayDuration={120}>
-        <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
+        <section className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
           <div className="mx-auto max-w-5xl space-y-5">
-            <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
-              <p className="text-xs uppercase tracking-wide text-violet-600">Operaciones de caja</p>
-              <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">Caja del día</h1>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+            <header className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
+              <p className="text-xs uppercase tracking-wide text-[var(--ripnel-accent-hover)]">Operaciones de caja</p>
+              <h1 className="mt-1 text-2xl font-semibold text-[var(--ops-text)] md:text-3xl">Caja del día</h1>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-[var(--ops-text-muted)]">
                 <span>{defaultLocation.name}</span>
                 {businessDate ? (
                   <>
-                    <span className="text-slate-300">•</span>
-                    <span className="font-medium text-slate-800">
+                    <span className="text-[var(--ops-border-soft)]">•</span>
+                    <span className="font-medium text-[var(--ops-text)]">
                       {formatBusinessDate(businessDate)}
                     </span>
                     <HelpTooltip content="La fecha operativa corresponde al día de trabajo de la sede actual en horario de Lima." />
@@ -209,12 +210,12 @@ export default function CajaPage() {
             </header>
 
             {error ? (
-              <div className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+              <div className="sales-chip sales-chip-danger flex items-center gap-3 rounded-xl px-4 py-3 text-sm">
                 <X className="h-4 w-4 shrink-0" />
                 {error}
                 <button
                   onClick={() => setError(null)}
-                  className="ml-auto text-rose-600 transition hover:text-rose-800"
+                  className="ml-auto text-current transition hover:opacity-80"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -222,19 +223,19 @@ export default function CajaPage() {
             ) : null}
 
             {loading ? (
-              <div className="flex items-center justify-center py-16 text-slate-500">
+              <div className="flex items-center justify-center py-16 text-[var(--ops-text-muted)]">
                 <RefreshCw className="h-5 w-5 animate-spin" />
                 <span className="ml-2 text-sm">Cargando caja...</span>
               </div>
             ) : (
               <>
                 <article
-                  className={`rounded-3xl border p-5 shadow-md md:p-6 ${
+                  className={`sales-panel rounded-lg p-5 shadow-sm md:p-6 ${
                     isOpen
-                      ? "border-emerald-200 bg-emerald-50/80"
+                      ? "border-emerald-300/70 bg-[color:color-mix(in_srgb,#22c55e_12%,var(--ops-surface))]"
                       : isClosed
-                        ? "border-slate-200 bg-slate-50"
-                        : "border-amber-200 bg-amber-50/80"
+                        ? "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)]"
+                        : "border-amber-300/70 bg-[color:color-mix(in_srgb,#f59e0b_13%,var(--ops-surface))]"
                   }`}
                 >
                   <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -251,10 +252,10 @@ export default function CajaPage() {
                         <p
                           className={`text-lg font-semibold ${
                             isOpen
-                              ? "text-emerald-800"
+                              ? "text-emerald-700"
                               : isClosed
-                                ? "text-slate-700"
-                                : "text-amber-800"
+                                ? "text-[var(--ops-text)]"
+                                : "text-amber-700"
                           }`}
                         >
                           {isOpen
@@ -265,21 +266,21 @@ export default function CajaPage() {
                         </p>
 
                         {isOpen && current?.closing?.opened_by_name ? (
-                          <p className="text-sm text-emerald-800/80">
+                          <p className="text-sm text-emerald-700/90">
                             Aperturada por{" "}
                             <span className="font-medium">{current.closing.opened_by_name}</span>
                           </p>
                         ) : null}
 
                         {isClosed && current?.closing?.closed_by_name ? (
-                          <p className="text-sm text-slate-700/80">
+                          <p className="text-sm text-[var(--ops-text-muted)]">
                             Cerrada por{" "}
                             <span className="font-medium">{current.closing.closed_by_name}</span>
                           </p>
                         ) : null}
 
                         {hasNoClosing ? (
-                          <p className="text-sm text-amber-800/80">
+                          <p className="text-sm text-amber-700/90">
                             Abre caja para habilitar ventas en esta sede.
                           </p>
                         ) : null}
@@ -291,7 +292,7 @@ export default function CajaPage() {
                         <button
                           onClick={handleOpen}
                           disabled={actionLoading}
-                          className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-emerald-700 disabled:opacity-60"
+                          className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60"
                         >
                           {actionLoading ? "Abriendo..." : "Abrir caja"}
                         </button>
@@ -301,7 +302,7 @@ export default function CajaPage() {
                         <button
                           onClick={() => setShowCloseConfirm(true)}
                           disabled={actionLoading}
-                          className="rounded-2xl bg-slate-800 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-slate-900 disabled:opacity-60"
+                          className="rounded-xl bg-[var(--ops-text)] px-4 py-2 text-sm font-semibold text-[var(--ops-surface)] shadow-sm transition hover:opacity-90 disabled:opacity-60"
                         >
                           Cerrar caja
                         </button>
@@ -310,7 +311,7 @@ export default function CajaPage() {
                       <button
                         onClick={fetchCurrent}
                         disabled={loading || actionLoading}
-                        className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+                        className="sales-field sales-field-interactive rounded-xl px-3 py-2 text-[var(--ops-text-muted)] disabled:opacity-60"
                         title="Actualizar"
                       >
                         <RefreshCw className="h-4 w-4" />
@@ -321,49 +322,49 @@ export default function CajaPage() {
 
                 {summary ? (
                   <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-                    <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
+                    <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <div className="flex items-center gap-2">
-                            <p className="text-xs uppercase tracking-wide text-slate-500">
+                            <p className="text-xs uppercase tracking-wide text-[var(--ops-text-muted)]">
                               Total del día
                             </p>
                             <HelpTooltip content="Suma las ventas confirmadas de la sede en la fecha operativa actual." />
                           </div>
-                          <p className="mt-2 text-4xl font-bold text-slate-900">
+                          <p className="mt-2 text-4xl font-bold text-[var(--ops-text)]">
                             {formatAmount(summary.grand_total)}
                           </p>
                         </div>
 
-                        <div className="rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-right">
+                        <div className="sales-chip sales-chip-accent rounded-xl px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <p className="text-[11px] uppercase tracking-wide text-violet-700">
+                            <p className="text-[11px] uppercase tracking-wide">
                               Ventas confirmadas
                             </p>
                             <HelpTooltip content="Cantidad de ventas confirmadas para la sede actual en esta fecha operativa." />
                           </div>
-                          <p className="mt-1 text-2xl font-bold text-violet-800">
+                          <p className="mt-1 text-2xl font-bold">
                             {summary.sale_count}
                           </p>
                         </div>
                       </div>
                     </article>
 
-                    <Collapsible className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
+                    <Collapsible className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <div className="flex items-center gap-2">
-                            <p className="text-xs uppercase tracking-wide text-slate-500">
+                            <p className="text-xs uppercase tracking-wide text-[var(--ops-text-muted)]">
                               Pagos del sistema
                             </p>
                             <HelpTooltip content="Total de pagos registrados en el sistema para la fecha operativa actual." />
                           </div>
-                          <p className="mt-1 text-2xl font-bold text-slate-900">
+                          <p className="mt-1 text-2xl font-bold text-[var(--ops-text)]">
                             {formatAmount(summary.consistency.payment_total)}
                           </p>
                         </div>
 
-                        <CollapsibleTrigger className="group inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50">
+                        <CollapsibleTrigger className="sales-field sales-field-interactive group inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[var(--ops-text)]">
                           Ver medios de pago
                           <ChevronDown className="h-4 w-4 transition group-data-[state=open]:rotate-180" />
                         </CollapsibleTrigger>
@@ -377,11 +378,11 @@ export default function CajaPage() {
                           return (
                             <div
                               key={method.key}
-                              className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+                              className="sales-panel-muted flex items-center justify-between rounded-xl px-4 py-3"
                             >
                               <div className="flex items-center gap-2">
-                                <Icon className="h-4 w-4 text-slate-500" />
-                                <span className="text-sm font-medium text-slate-700">
+                                <Icon className="h-4 w-4 text-[var(--ops-text-muted)]" />
+                                <span className="text-sm font-medium text-[var(--ops-text)]">
                                   {method.label}
                                 </span>
                               </div>
@@ -398,10 +399,10 @@ export default function CajaPage() {
 
                 {summary ? (
                   <article
-                    className={`rounded-3xl border p-4 shadow-md md:px-5 md:py-4 ${
+                    className={`sales-panel rounded-lg p-4 shadow-sm md:px-5 md:py-4 ${
                       consistencyOk
-                        ? "border-emerald-200 bg-emerald-50/80"
-                        : "border-amber-200 bg-amber-50/90"
+                        ? "border-emerald-300/70 bg-[color:color-mix(in_srgb,#22c55e_12%,var(--ops-surface))]"
+                        : "border-amber-300/70 bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))]"
                     }`}
                   >
                     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -418,21 +419,21 @@ export default function CajaPage() {
                         </div>
                       </div>
 
-                      <div className="grid gap-2 sm:grid-cols-3 md:min-w-[28rem]">
-                        <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3">
-                          <p className="text-[11px] uppercase tracking-wide text-slate-500">Ventas</p>
-                          <p className="mt-1 text-lg font-semibold text-slate-900">
+                        <div className="grid gap-2 sm:grid-cols-3 md:min-w-[28rem]">
+                        <div className="sales-panel-muted rounded-xl px-4 py-3">
+                          <p className="text-[11px] uppercase tracking-wide text-[var(--ops-text-muted)]">Ventas</p>
+                          <p className="mt-1 text-lg font-semibold text-[var(--ops-text)]">
                             {formatAmount(summary.grand_total)}
                           </p>
                         </div>
-                        <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3">
-                          <p className="text-[11px] uppercase tracking-wide text-slate-500">Pagos</p>
-                          <p className="mt-1 text-lg font-semibold text-slate-900">
+                        <div className="sales-panel-muted rounded-xl px-4 py-3">
+                          <p className="text-[11px] uppercase tracking-wide text-[var(--ops-text-muted)]">Pagos</p>
+                          <p className="mt-1 text-lg font-semibold text-[var(--ops-text)]">
                             {formatAmount(summary.consistency.payment_total)}
                           </p>
                         </div>
-                        <div className="rounded-2xl border border-white/70 bg-white/80 px-4 py-3">
-                          <p className="text-[11px] uppercase tracking-wide text-slate-500">
+                        <div className="sales-panel-muted rounded-xl px-4 py-3">
+                          <p className="text-[11px] uppercase tracking-wide text-[var(--ops-text-muted)]">
                             Diferencia
                           </p>
                           <p
@@ -451,33 +452,33 @@ export default function CajaPage() {
             )}
 
             {showCloseConfirm ? (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-                <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
-                  <h2 className="text-lg font-bold text-slate-900">Confirmar cierre de caja</h2>
-                  <p className="mt-1 text-sm text-slate-600">
+              <div className="ops-overlay-backdrop fixed inset-0 z-50 flex items-center justify-center px-4">
+                <div className="ops-overlay-panel w-full max-w-md rounded-2xl p-6">
+                  <h2 className="text-lg font-semibold text-[var(--ops-text)]">Confirmar cierre de caja</h2>
+                  <p className="mt-1 text-sm text-[var(--ops-text-muted)]">
                     Se consolidarán los pagos registrados y ventas confirmadas de la fecha operativa
                     actual para esta sede.
                   </p>
 
                   {summary ? (
-                    <div className="mt-4 space-y-1 rounded-2xl bg-slate-50 p-4">
+                    <div className="sales-panel-muted mt-4 space-y-1 rounded-xl p-4">
                       {METHOD_CONFIG.map((method) => (
                         <div key={method.key} className="flex justify-between text-sm">
-                          <span className="text-slate-600">{method.label}</span>
-                          <span className="font-medium text-slate-900">
+                          <span className="text-[var(--ops-text-muted)]">{method.label}</span>
+                          <span className="font-medium text-[var(--ops-text)]">
                             {formatAmount(summary.by_method[method.key])}
                           </span>
                         </div>
                       ))}
-                      <div className="mt-2 flex justify-between border-t border-slate-200 pt-2 text-sm font-semibold">
-                        <span className="text-slate-800">Total</span>
-                        <span className="text-slate-900">{formatAmount(summary.grand_total)}</span>
+                      <div className="mt-2 flex justify-between border-t border-[var(--ops-border-strong)] pt-2 text-sm font-semibold">
+                        <span className="text-[var(--ops-text)]">Total</span>
+                        <span className="text-[var(--ops-text)]">{formatAmount(summary.grand_total)}</span>
                       </div>
                     </div>
                   ) : null}
 
                   <div className="mt-4">
-                    <label className="mb-1 block text-xs font-medium text-slate-700">
+                    <label className="mb-1 block text-xs font-medium text-[var(--ops-text)]">
                       Observaciones (opcional)
                     </label>
                     <textarea
@@ -485,7 +486,7 @@ export default function CajaPage() {
                       onChange={(event) => setCloseNotes(event.target.value)}
                       rows={2}
                       placeholder="Ej: Sin novedades"
-                      className="w-full rounded-2xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                      className="sales-field w-full rounded-xl px-3 py-2 text-sm outline-none transition focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_72%,transparent)]"
                     />
                   </div>
 
@@ -493,14 +494,14 @@ export default function CajaPage() {
                     <button
                       onClick={() => setShowCloseConfirm(false)}
                       disabled={actionLoading}
-                      className="flex-1 rounded-2xl border border-slate-200 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                      className="sales-field sales-field-interactive flex-1 rounded-xl py-2 text-sm font-medium text-[var(--ops-text)]"
                     >
                       Cancelar
                     </button>
                     <button
                       onClick={handleClose}
                       disabled={actionLoading}
-                      className="flex-1 rounded-2xl bg-slate-800 py-2 text-sm font-semibold text-white shadow transition hover:bg-slate-900 disabled:opacity-60"
+                      className="flex-1 rounded-xl bg-[var(--ops-text)] py-2 text-sm font-semibold text-[var(--ops-surface)] shadow-sm transition hover:opacity-90 disabled:opacity-60"
                     >
                       {actionLoading ? "Cerrando..." : "Cerrar caja"}
                     </button>

@@ -55,7 +55,7 @@ function HelpTooltip({ content }: { content: string }) {
       <TooltipTrigger asChild>
         <button
           type="button"
-          className="inline-flex h-5 w-5 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+          className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)]"
           aria-label="Más información"
         >
           <Info className="h-3.5 w-3.5" />
@@ -225,6 +225,7 @@ export default function CashControlPage() {
       <LoadingPage
         title="Cargando control de cajas"
         description="Estamos reuniendo sesiones, sedes y alertas operativas para la vista administrativa."
+        variant="ops"
       />
     )
   }
@@ -234,6 +235,7 @@ export default function CashControlPage() {
       <ErrorPage
         title="No pudimos abrir el control de cajas"
         description={error}
+        variant="ops"
       />
     )
   }
@@ -244,16 +246,16 @@ export default function CashControlPage() {
   return (
     <PermissionGuard allowedRoles={ADMIN_ALLOWED_ROLES}>
       <TooltipProvider delayDuration={120}>
-        <section className="min-h-screen bg-[radial-gradient(circle_at_top,#dbeafe_0%,#eff6ff_32%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
+        <section className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
           <div className="mx-auto max-w-7xl space-y-5">
-            <header className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
+            <header className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="text-xs uppercase tracking-wide text-sky-700">Caja</p>
+                    <p className="text-xs uppercase tracking-wide text-[var(--ripnel-accent-hover)]">Caja</p>
                     <HelpTooltip content="Vista administrativa transversal para revisar varias sedes, estados de caja y alertas operativas sin intervenir otras cajas." />
                   </div>
-                  <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">
+                  <h1 className="mt-1 text-2xl font-semibold text-[var(--ops-text)] md:text-3xl">
                     Control de cajas
                   </h1>
                 </div>
@@ -261,7 +263,7 @@ export default function CashControlPage() {
                 <div className="flex flex-wrap gap-2">
                   <Link
                     href="/caja"
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition hover:bg-slate-50"
+                    className="sales-field sales-field-interactive inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--ops-text)] shadow-sm"
                   >
                     <ArrowLeft className="h-4 w-4" />
                     Caja del día
@@ -269,7 +271,7 @@ export default function CashControlPage() {
                   <button
                     type="button"
                     onClick={() => setReloadKey((current) => current + 1)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition hover:bg-slate-50"
+                    className="sales-field sales-field-interactive inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--ops-text)] shadow-sm"
                   >
                     <RefreshCw className="h-4 w-4" />
                     Actualizar
@@ -279,12 +281,12 @@ export default function CashControlPage() {
             </header>
 
             {error ? (
-              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+              <div className="sales-chip sales-chip-danger rounded-xl px-4 py-3 text-sm">
                 {error}
               </div>
             ) : null}
 
-            <div className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white/95 p-4 shadow-md backdrop-blur lg:flex-row lg:items-center lg:justify-between">
+            <div className="sales-panel rounded-lg p-4 shadow-sm lg:flex lg:items-center lg:justify-between">
               <div className="flex flex-wrap gap-2">
                 {[
                   { value: "7d", label: "7 días" },
@@ -296,8 +298,8 @@ export default function CashControlPage() {
                     onClick={() => setRange(option.value as RangeFilter)}
                     className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
                       range === option.value
-                        ? "bg-slate-900 text-white"
-                        : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                        ? "bg-[var(--ops-text)] text-[var(--ops-surface)]"
+                        : "sales-field text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
                     }`}
                   >
                     {option.label}
@@ -318,8 +320,8 @@ export default function CashControlPage() {
                       onClick={() => setStatus(option.value as StatusFilter)}
                       className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
                         status === option.value
-                          ? "bg-sky-600 text-white"
-                          : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                          ? "bg-[var(--ripnel-accent)] text-white"
+                          : "sales-field text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
                       }`}
                     >
                       {option.label}
@@ -330,7 +332,7 @@ export default function CashControlPage() {
                 <select
                   value={locationId}
                   onChange={(event) => setLocationId(event.target.value)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                  className="sales-field rounded-xl px-3 py-2 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_72%,transparent)]"
                 >
                   <option value="all">Todas las sedes</option>
                   {locations.map((location) => (
@@ -343,35 +345,35 @@ export default function CashControlPage() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-[11px] uppercase tracking-wide text-slate-500">Sesiones</p>
-                <p className="mt-2 text-2xl font-bold text-slate-900">{stats?.session_count || 0}</p>
+              <article className="ops-metric-pill rounded-xl p-4 shadow-sm">
+                <p className="text-[11px] uppercase tracking-wide text-[var(--ops-text-muted)]">Sesiones</p>
+                <p className="mt-2 text-2xl font-bold text-[var(--ops-text)]">{stats?.session_count || 0}</p>
               </article>
-              <article className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+              <article className="sales-chip sales-chip-warning rounded-xl p-4 shadow-sm">
                 <p className="text-[11px] uppercase tracking-wide text-amber-700">
                   Pendientes de cierre
                 </p>
                 <p className="mt-2 text-2xl font-bold text-amber-800">{stats?.open_count || 0}</p>
               </article>
-              <article className="rounded-2xl border border-sky-200 bg-sky-50 p-4 shadow-sm">
-                <p className="text-[11px] uppercase tracking-wide text-sky-700">Sedes abiertas</p>
-                <p className="mt-2 text-2xl font-bold text-sky-800">
+              <article className="sales-chip sales-chip-success rounded-xl p-4 shadow-sm">
+                <p className="text-[11px] uppercase tracking-wide">Sedes abiertas</p>
+                <p className="mt-2 text-2xl font-bold">
                   {stats?.open_location_count || 0}
                 </p>
               </article>
-              <article className="rounded-2xl border border-violet-200 bg-violet-50 p-4 shadow-sm">
-                <p className="text-[11px] uppercase tracking-wide text-violet-700">Total registrado</p>
-                <p className="mt-2 text-2xl font-bold text-violet-800">
+              <article className="sales-chip sales-chip-accent rounded-xl p-4 shadow-sm">
+                <p className="text-[11px] uppercase tracking-wide">Total registrado</p>
+                <p className="mt-2 text-2xl font-bold">
                   {formatAmount(stats?.total_registered || 0)}
                 </p>
               </article>
             </div>
 
             <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-              <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
+              <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
                 <div className="flex items-center gap-2">
                   <LineChart className="h-4 w-4 text-sky-600" />
-                  <h2 className="text-sm font-semibold text-slate-900">Tendencia diaria</h2>
+                  <h2 className="text-sm font-semibold text-[var(--ops-text)]">Tendencia diaria</h2>
                 </div>
 
                 <div className="mt-4 h-64">
@@ -384,10 +386,13 @@ export default function CashControlPage() {
                             <stop offset="100%" stopColor="#0ea5e9" stopOpacity={0.02} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
-                        <XAxis dataKey="short_date" tick={{ fontSize: 12, fill: "#64748b" }} />
+                        <CartesianGrid stroke="var(--ops-border-strong)" strokeDasharray="3 3" />
+                        <XAxis
+                          dataKey="short_date"
+                          tick={{ fontSize: 12, fill: "var(--ops-text-muted)" }}
+                        />
                         <YAxis
-                          tick={{ fontSize: 12, fill: "#64748b" }}
+                          tick={{ fontSize: 12, fill: "var(--ops-text-muted)" }}
                           tickFormatter={(value) => `S/. ${value}`}
                           width={72}
                         />
@@ -409,34 +414,43 @@ export default function CashControlPage() {
                       title="Sin datos para la tendencia"
                       description="Ajusta los filtros o espera nuevas sesiones registradas."
                       tone="neutral"
+                      variant="ops"
                     />
                   )}
                 </div>
               </article>
 
-              <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
+              <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
                 <div className="flex items-center gap-2">
                   <MapPinned className="h-4 w-4 text-violet-600" />
-                  <h2 className="text-sm font-semibold text-slate-900">Comparativo por sede</h2>
+                  <h2 className="text-sm font-semibold text-[var(--ops-text)]">Comparativo por sede</h2>
                 </div>
 
                 <div className="mt-4 h-64">
                   {locationChartData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={locationChartData} layout="vertical" margin={{ left: 24 }}>
-                        <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" horizontal={false} />
-                        <XAxis type="number" tick={{ fontSize: 12, fill: "#64748b" }} />
+                        <CartesianGrid
+                          stroke="var(--ops-border-strong)"
+                          strokeDasharray="3 3"
+                          horizontal={false}
+                        />
+                        <XAxis type="number" tick={{ fontSize: 12, fill: "var(--ops-text-muted)" }} />
                         <YAxis
                           type="category"
                           dataKey="short_name"
-                          tick={{ fontSize: 12, fill: "#64748b" }}
+                          tick={{ fontSize: 12, fill: "var(--ops-text-muted)" }}
                           width={110}
                         />
                         <RechartsTooltip
                           formatter={(value: number) => formatAmount(value)}
                           labelFormatter={(label) => String(label)}
                         />
-                        <Bar dataKey="total_registered" fill="#8b5cf6" radius={[0, 8, 8, 0]} />
+                        <Bar
+                          dataKey="total_registered"
+                          fill="var(--ripnel-accent)"
+                          radius={[0, 8, 8, 0]}
+                        />
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
@@ -444,6 +458,7 @@ export default function CashControlPage() {
                       title="Sin datos por sede"
                       description="Todavía no hay suficiente información para comparar sedes con estos filtros."
                       tone="neutral"
+                      variant="ops"
                     />
                   )}
                 </div>
@@ -451,10 +466,10 @@ export default function CashControlPage() {
             </div>
 
             <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-              <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
+              <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
                 <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-slate-700" />
-                  <h2 className="text-sm font-semibold text-slate-900">Sesiones multi-sede</h2>
+                  <ShieldCheck className="h-4 w-4 text-[var(--ops-text-muted)]" />
+                  <h2 className="text-sm font-semibold text-[var(--ops-text)]">Sesiones multi-sede</h2>
                 </div>
 
                 {!sessions || sessions.items.length === 0 ? (
@@ -463,11 +478,12 @@ export default function CashControlPage() {
                       title="Sin sesiones para mostrar"
                       description="No hay sesiones registradas para los filtros seleccionados."
                       tone="neutral"
+                      variant="ops"
                     />
                   </div>
                 ) : (
                   <>
-                    <div className="mt-4 hidden grid-cols-[0.9fr_0.95fr_1fr_0.85fr_36px] items-center gap-3 border-b border-slate-200 px-3 pb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500 md:grid">
+                    <div className="mt-4 hidden grid-cols-[0.9fr_0.95fr_1fr_0.85fr_36px] items-center gap-3 border-b border-[var(--ops-border-strong)] px-3 pb-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)] md:grid">
                       <span>Fecha / estado</span>
                       <span>Sede</span>
                       <span>Apertura / cierre</span>
@@ -475,26 +491,26 @@ export default function CashControlPage() {
                       <span />
                     </div>
 
-                    <div className="divide-y divide-slate-100">
+                    <div className="divide-y divide-[var(--ops-border-strong)]">
                       {sessions.items.map((closing) => (
                         <Link
                           key={closing.cash_closing_id}
                           href={`/caja/historial/${closing.cash_closing_id}`}
-                          className="grid gap-3 px-3 py-4 transition hover:bg-slate-50 md:grid-cols-[0.9fr_0.95fr_1fr_0.85fr_36px] md:items-center"
+                           className="grid gap-3 px-3 py-4 transition hover:bg-[var(--ops-surface-muted)] md:grid-cols-[0.9fr_0.95fr_1fr_0.85fr_36px] md:items-center"
                         >
                           <div className="space-y-2">
-                            <p className="text-sm font-semibold text-slate-900">
+                             <p className="text-sm font-semibold text-[var(--ops-text)]">
                               {formatBusinessDate(closing.business_date)}
                             </p>
                             <CashStatusBadge status={closing.status} />
                           </div>
 
-                          <div className="space-y-1 text-sm text-slate-600">
-                            <p className="font-medium text-slate-800">{closing.location_name}</p>
+                           <div className="space-y-1 text-sm text-[var(--ops-text-muted)]">
+                             <p className="font-medium text-[var(--ops-text)]">{closing.location_name}</p>
                             <p>{closing.opened_by_name || "Usuario no identificado"}</p>
                           </div>
 
-                          <div className="space-y-1 text-sm text-slate-600">
+                           <div className="space-y-1 text-sm text-[var(--ops-text-muted)]">
                             <p>Apertura: {formatDateTime(closing.created_at)}</p>
                             <p>
                               {closing.closed_at
@@ -504,7 +520,7 @@ export default function CashControlPage() {
                           </div>
 
                           <div className="text-left md:text-right">
-                            <p className="text-sm font-semibold text-slate-900">
+                             <p className="text-sm font-semibold text-[var(--ops-text)]">
                               {formatAmount(closing.total_all)}
                             </p>
                             {closing.is_consistent === false ? (
@@ -516,15 +532,15 @@ export default function CashControlPage() {
                             )}
                           </div>
 
-                          <div className="flex items-center justify-end text-slate-400">
+                           <div className="flex items-center justify-end text-[var(--ops-text-muted)]">
                             <ChevronRight className="h-4 w-4" />
                           </div>
                         </Link>
                       ))}
                     </div>
 
-                    <div className="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 md:flex-row md:items-center md:justify-between">
-                      <p className="text-sm text-slate-500">
+                    <div className="mt-4 flex flex-col gap-3 border-t border-[var(--ops-border-strong)] pt-4 md:flex-row md:items-center md:justify-between">
+                      <p className="text-sm text-[var(--ops-text-muted)]">
                         Página {pagination?.page || 1} de {pagination?.total_pages || 1}
                       </p>
 
@@ -533,7 +549,7 @@ export default function CashControlPage() {
                           type="button"
                           onClick={() => setPage((current) => Math.max(current - 1, 1))}
                           disabled={!pagination || pagination.page <= 1}
-                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="sales-field sales-field-interactive rounded-xl px-3 py-2 text-sm font-medium text-[var(--ops-text)] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Anterior
                         </button>
@@ -545,7 +561,7 @@ export default function CashControlPage() {
                             )
                           }
                           disabled={!pagination || pagination.page >= pagination.total_pages}
-                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="sales-field sales-field-interactive rounded-xl px-3 py-2 text-sm font-medium text-[var(--ops-text)] disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Siguiente
                         </button>
@@ -555,15 +571,15 @@ export default function CashControlPage() {
                 )}
               </article>
 
-              <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
+              <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  <h2 className="text-sm font-semibold text-slate-900">Alertas operativas</h2>
+                  <h2 className="text-sm font-semibold text-[var(--ops-text)]">Alertas operativas</h2>
                 </div>
 
                 <div className="mt-4 space-y-4">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs uppercase tracking-wide text-slate-500">
+                  <div className="sales-panel-muted rounded-xl p-4">
+                    <p className="text-xs uppercase tracking-wide text-[var(--ops-text-muted)]">
                       Sedes con caja pendiente
                     </p>
                     <div className="mt-3 space-y-2">
@@ -571,22 +587,22 @@ export default function CashControlPage() {
                         summary.alerts.open_locations.map((location) => (
                           <div
                             key={location.location_id}
-                            className="flex items-center justify-between rounded-xl bg-white px-3 py-2"
-                          >
-                            <span className="text-sm text-slate-700">{location.location_name}</span>
+                             className="sales-field flex items-center justify-between rounded-xl px-3 py-2"
+                           >
+                             <span className="text-sm text-[var(--ops-text)]">{location.location_name}</span>
                             <span className="text-sm font-semibold text-amber-700">
                               {location.open_count}
                             </span>
                           </div>
                         ))
                       ) : (
-                        <p className="text-sm text-slate-500">No hay sedes pendientes con estos filtros.</p>
+                         <p className="text-sm text-[var(--ops-text-muted)]">No hay sedes pendientes con estos filtros.</p>
                       )}
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs uppercase tracking-wide text-slate-500">
+                  <div className="sales-panel-muted rounded-xl p-4">
+                    <p className="text-xs uppercase tracking-wide text-[var(--ops-text-muted)]">
                       Diferencias por revisar
                     </p>
                     <div className="mt-3 space-y-2">
@@ -595,25 +611,25 @@ export default function CashControlPage() {
                           <Link
                             key={session.cash_closing_id}
                             href={`/caja/historial/${session.cash_closing_id}`}
-                            className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 transition hover:bg-slate-100"
-                          >
-                            <div>
-                              <p className="text-sm font-medium text-slate-800">
-                                {session.location_name}
-                              </p>
-                              <p className="text-xs text-slate-500">
-                                {formatBusinessDate(session.business_date)}
-                              </p>
-                            </div>
+                             className="sales-field sales-field-interactive flex items-center justify-between gap-3 rounded-xl px-3 py-2"
+                           >
+                             <div>
+                               <p className="text-sm font-medium text-[var(--ops-text)]">
+                                 {session.location_name}
+                               </p>
+                               <p className="text-xs text-[var(--ops-text-muted)]">
+                                 {formatBusinessDate(session.business_date)}
+                               </p>
+                             </div>
                             <span className="text-sm font-semibold text-amber-700">
                               {formatAmount(session.difference)}
                             </span>
                           </Link>
                         ))
                       ) : (
-                        <p className="text-sm text-slate-500">
-                          No hay diferencias activas para revisar.
-                        </p>
+                         <p className="text-sm text-[var(--ops-text-muted)]">
+                           No hay diferencias activas para revisar.
+                         </p>
                       )}
                     </div>
                   </div>
