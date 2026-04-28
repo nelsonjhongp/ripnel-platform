@@ -31,10 +31,15 @@ const productPages: Record<
 
 export default async function ProductPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ productId: string }>
+  searchParams: Promise<{ style_id?: string | string[] }>
 }) {
   const { productId } = await params
+  const resolvedSearchParams = await searchParams
+  const styleIdParam = resolvedSearchParams.style_id
+  const initialStyleId = Array.isArray(styleIdParam) ? styleIdParam[0] : styleIdParam
   const page = productPages[productId]
 
   if (!page) {
@@ -42,11 +47,11 @@ export default async function ProductPage({
   }
 
   if (productId === "estilos") {
-    return <StylesPage />
+    return <StylesPage initialStyleId={initialStyleId || null} />
   }
 
   if (productId === "variantes") {
-    return <VariantsPage />
+    return <VariantsPage initialStyleId={initialStyleId || null} />
   }
 
   return (

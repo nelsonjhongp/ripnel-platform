@@ -1,8 +1,10 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   Boxes,
+  CircleAlert,
   LoaderCircle,
   PackagePlus,
   RefreshCw,
@@ -23,8 +25,27 @@ type StyleItem = {
   fabric_name: string | null;
   fabric_detail_name: string | null;
   target_name: string | null;
-  size_codes: string[];
-  color_codes: string[];
+  configured_size_count: number;
+  configured_color_count: number;
+  expected_variant_count: number;
+  variant_count: number;
+  retail_sizes_covered_count: number;
+  wholesale_sizes_covered_count: number;
+  missing_retail_size_count: number;
+  missing_wholesale_size_count: number;
+  total_stock_qty: number;
+  status:
+    | "inactive"
+    | "draft"
+    | "pending_variants"
+    | "pending_prices"
+    | "ready_no_stock"
+    | "ready";
+  next_step_label: string;
+  warnings: {
+    missing_wholesale_prices: boolean;
+    stock_without_retail_price: boolean;
+  };
 };
 
 type StyleBase = {
@@ -79,6 +100,28 @@ type VariantSnapshot = {
     existing_count: number;
     missing_count: number;
   };
+};
+
+type WorkspaceSize = {
+  size_id: string;
+  code: string;
+  name: string;
+  sort_order: number;
+  active: boolean;
+  has_current_retail_price: boolean;
+  has_current_wholesale_price: boolean;
+  retail_price_count: number;
+  wholesale_price_count: number;
+  current_retail_price: number | null;
+  current_wholesale_price: number | null;
+  stock_qty: number;
+  has_stock: boolean;
+};
+
+type ProductWorkspace = {
+  product: StyleItem;
+  configured_sizes: WorkspaceSize[];
+  configured_colors: ColorItem[];
 };
 
 type VariantFormState = {
@@ -143,7 +186,7 @@ async function requestApiData<T>(path: string, init?: RequestInit): Promise<T> {
 
 async function requestVariantsBaseData() {
   const [stylesData, sizesData, colorsData] = await Promise.all([
-    requestApiData<StyleItem[]>("/api/styles"),
+    requestApiData<StyleItem[]>("/api/products"),
     requestApiData<SizeItem[]>("/api/sizes"),
     requestApiData<ColorItem[]>("/api/colors"),
   ]);
@@ -155,12 +198,65 @@ async function requestVariantsBaseData() {
   };
 }
 
-export function VariantsPage() {
+function getStatusBadgeClass(status: StyleItem["status"]) {
+  if (status === "ready") {
+    return "bg-emerald-100 text-emerald-700";
+  }
+
+  if (status === "ready_no_stock") {
+    return "bg-sky-100 text-sky-700";
+  }
+
+  if (status === "pending_prices") {
+    return "bg-rose-100 text-rose-700";
+  }
+
+  if (status === "pending_variants") {
+    return "bg-amber-100 text-amber-700";
+  }
+
+  if (status === "draft") {
+    return "bg-slate-900 text-white";
+  }
+
+  return "bg-slate-200 text-slate-700";
+}
+
+function getStatusLabel(status: StyleItem["status"]) {
+  if (status === "pending_variants") {
+    return "Faltan variantes";
+  }
+
+  if (status === "pending_prices") {
+    return "Faltan precios";
+  }
+
+  if (status === "ready_no_stock") {
+    return "Listo sin stock";
+  }
+
+  if (status === "draft") {
+    return "Borrador";
+  }
+
+  if (status === "ready") {
+    return "Listo";
+  }
+
+  return "Inactivo";
+}
+
+export function VariantsPage({
+  initialStyleId = null,
+}: {
+  initialStyleId?: string | null;
+}) {
   const [styles, setStyles] = useState<StyleItem[]>([]);
   const [sizes, setSizes] = useState<SizeItem[]>([]);
   const [colors, setColors] = useState<ColorItem[]>([]);
   const [selectedStyleId, setSelectedStyleId] = useState<string>("");
   const [selectedSnapshot, setSelectedSnapshot] = useState<VariantSnapshot | null>(null);
+  const [selectedWorkspace, setSelectedWorkspace] = useState<ProductWorkspace | null>(null);
   const [formState, setFormState] = useState<VariantFormState>(initialFormState);
   const [styleSearch, setStyleSearch] = useState("");
   const [styleStatusFilter, setStyleStatusFilter] = useState<StatusFilter>("all");
@@ -173,6 +269,7 @@ export function VariantsPage() {
   const [togglingVariantId, setTogglingVariantId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const hasAppliedInitialSelection = useRef(false);
 
   async function loadBaseData() {
     setLoading(true);
@@ -186,7 +283,11 @@ export function VariantsPage() {
       setColors(colorsData);
 
       if (!selectedStyleId && stylesData.length) {
-        setSelectedStyleId(stylesData[0].style_id);
+        const preferredStyle =
+          initialStyleId &&
+          stylesData.find((style) => style.style_id === initialStyleId)?.style_id;
+
+        setSelectedStyleId(preferredStyle || stylesData[0].style_id);
       }
     } catch (requestError) {
       setError(
@@ -204,8 +305,12 @@ export function VariantsPage() {
     setError(null);
 
     try {
-      const snapshot = await requestApiData<VariantSnapshot>(`/api/variants/styles/${styleId}`);
+      const [snapshot, workspace] = await Promise.all([
+        requestApiData<VariantSnapshot>(`/api/variants/styles/${styleId}`),
+        requestApiData<ProductWorkspace>(`/api/products/${styleId}/workspace`),
+      ]);
       setSelectedSnapshot(snapshot);
+      setSelectedWorkspace(workspace);
       setFormState({
         sizeIds: snapshot.configured_sizes.map((item) => item.size_id),
         colorIds: snapshot.configured_colors.map((item) => item.color_id),
@@ -217,6 +322,7 @@ export function VariantsPage() {
           : "No se pudo cargar la configuracion del style"
       );
       setSelectedSnapshot(null);
+      setSelectedWorkspace(null);
       setFormState(initialFormState);
     } finally {
       setLoadingSelected(false);
@@ -240,7 +346,11 @@ export function VariantsPage() {
         setColors(colorsData);
 
         if (stylesData.length) {
-          setSelectedStyleId((current) => current || stylesData[0].style_id);
+          const preferredStyle =
+            initialStyleId &&
+            stylesData.find((style) => style.style_id === initialStyleId)?.style_id;
+
+          setSelectedStyleId((current) => current || preferredStyle || stylesData[0].style_id);
         }
       })
       .catch((requestError) => {
@@ -263,11 +373,25 @@ export function VariantsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialStyleId]);
+
+  useEffect(() => {
+    if (
+      hasAppliedInitialSelection.current ||
+      !initialStyleId ||
+      !styles.some((style) => style.style_id === initialStyleId)
+    ) {
+      return;
+    }
+
+    hasAppliedInitialSelection.current = true;
+    setSelectedStyleId(initialStyleId);
+  }, [initialStyleId, styles]);
 
   useEffect(() => {
     if (!selectedStyleId) {
       setSelectedSnapshot(null);
+      setSelectedWorkspace(null);
       setFormState(initialFormState);
       return;
     }
@@ -356,12 +480,7 @@ export function VariantsPage() {
   const projectedColorsCount = formState.colorIds.length || 1;
   const projectedCombinations = formState.sizeIds.length * projectedColorsCount;
   const totalVariants = useMemo(
-    () =>
-      styles.reduce(
-        (total, style) =>
-          total + style.size_codes.length * Math.max(style.color_codes.length, 1),
-        0
-      ),
+    () => styles.reduce((total, style) => total + style.expected_variant_count, 0),
     [styles]
   );
 
@@ -384,6 +503,8 @@ export function VariantsPage() {
     };
   }, [selectedSnapshot?.variants]);
 
+  const selectedProduct = selectedWorkspace?.product || null;
+
   async function handleSaveConfig(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedStyleId) {
@@ -395,22 +516,15 @@ export function VariantsPage() {
     setSuccessMessage(null);
 
     try {
-      const snapshot = await requestApiData<VariantSnapshot>(
-        `/api/variants/styles/${selectedStyleId}/config`,
-        {
-          method: "PUT",
-          body: JSON.stringify({
-            size_ids: formState.sizeIds,
-            color_ids: formState.colorIds,
-          }),
-        }
-      );
-
-      setSelectedSnapshot(snapshot);
-      setFormState({
-        sizeIds: snapshot.configured_sizes.map((item) => item.size_id),
-        colorIds: snapshot.configured_colors.map((item) => item.color_id),
+      await requestApiData<VariantSnapshot>(`/api/variants/styles/${selectedStyleId}/config`, {
+        method: "PUT",
+        body: JSON.stringify({
+          size_ids: formState.sizeIds,
+          color_ids: formState.colorIds,
+        }),
       });
+
+      await loadStyleSnapshot(selectedStyleId);
       setSuccessMessage("Configuracion guardada correctamente.");
       await loadBaseData();
     } catch (requestError) {
@@ -630,14 +744,25 @@ export function VariantsPage() {
                                 {style.style_code}
                               </span>
                             ) : null}
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusBadgeClass(
+                                style.status
+                              )}`}
+                            >
+                              {getStatusLabel(style.status)}
+                            </span>
                           </div>
                           <p className="mt-2 text-sm text-slate-500">
                             {style.garment_type_name}
                             {style.fabric_name ? ` - ${style.fabric_name}` : ""}
                           </p>
                           <p className="mt-2 text-xs text-slate-500">
-                            Configuracion actual: {style.size_codes.length} tallas /{" "}
-                            {style.color_codes.length} colores
+                            Configuracion actual: {style.configured_size_count} tallas /{" "}
+                            {style.configured_color_count} colores
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Variantes {style.variant_count}/{style.expected_variant_count} ·
+                            retail {style.retail_sizes_covered_count}/{style.configured_size_count}
                           </p>
                         </div>
 
@@ -691,6 +816,15 @@ export function VariantsPage() {
                             {selectedSnapshot.style.style_code}
                           </span>
                         ) : null}
+                        {selectedProduct ? (
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(
+                              selectedProduct.status
+                            )}`}
+                          >
+                            {getStatusLabel(selectedProduct.status)}
+                          </span>
+                        ) : null}
                         <span
                           className={`rounded-full px-3 py-1 text-xs font-semibold ${
                             selectedSnapshot.style.active
@@ -719,11 +853,105 @@ export function VariantsPage() {
                           {selectedSnapshot.summary.existing_count} /{" "}
                           {selectedSnapshot.summary.total_possible}
                         </p>
+                        {selectedProduct ? (
+                          <>
+                            <p>
+                              <span className="font-medium text-slate-700">Retail:</span>{" "}
+                              {selectedProduct.retail_sizes_covered_count} /{" "}
+                              {selectedProduct.configured_size_count}
+                            </p>
+                            <p>
+                              <span className="font-medium text-slate-700">Mayorista:</span>{" "}
+                              {selectedProduct.wholesale_sizes_covered_count} /{" "}
+                              {selectedProduct.configured_size_count}
+                            </p>
+                          </>
+                        ) : null}
                       </div>
                     </div>
                     <Shirt className="h-10 w-10 text-slate-300" />
                   </div>
                 </div>
+
+                {selectedProduct ? (
+                  <div className="rounded-3xl border border-slate-200 bg-white p-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="space-y-3">
+                        <div className="grid gap-3 md:grid-cols-4">
+                          <article className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                              Retail
+                            </p>
+                            <p className="mt-1 text-lg font-semibold text-slate-900">
+                              {selectedProduct.retail_sizes_covered_count}/
+                              {selectedProduct.configured_size_count}
+                            </p>
+                          </article>
+                          <article className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                              Mayorista
+                            </p>
+                            <p className="mt-1 text-lg font-semibold text-slate-900">
+                              {selectedProduct.wholesale_sizes_covered_count}/
+                              {selectedProduct.configured_size_count}
+                            </p>
+                          </article>
+                          <article className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                              Stock
+                            </p>
+                            <p className="mt-1 text-lg font-semibold text-slate-900">
+                              {selectedProduct.total_stock_qty}
+                            </p>
+                          </article>
+                          <article className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                              Siguiente paso
+                            </p>
+                            <p className="mt-1 text-sm font-semibold text-slate-900">
+                              {selectedProduct.next_step_label}
+                            </p>
+                          </article>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          {selectedProduct.missing_retail_size_count > 0 ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700">
+                              <CircleAlert className="h-3.5 w-3.5" />
+                              Faltan {selectedProduct.missing_retail_size_count} tallas retail
+                            </span>
+                          ) : null}
+                          {selectedProduct.warnings.missing_wholesale_prices ? (
+                            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                              Mayorista incompleto
+                            </span>
+                          ) : null}
+                          {selectedProduct.warnings.stock_without_retail_price ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700">
+                              <CircleAlert className="h-3.5 w-3.5" />
+                              Stock sin precio retail
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Link
+                          href={`/precios/crear-y-editar-precio?style_id=${encodeURIComponent(selectedProduct.style_id)}`}
+                          className="inline-flex items-center justify-center rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
+                        >
+                          Ir a precios
+                        </Link>
+                        <Link
+                          href={`/precios/listado-de-precios?style_id=${encodeURIComponent(selectedProduct.style_id)}`}
+                          className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                        >
+                          Ver historial
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
 
                 <form onSubmit={handleSaveConfig} className="space-y-5">
                   <div className="space-y-2">
