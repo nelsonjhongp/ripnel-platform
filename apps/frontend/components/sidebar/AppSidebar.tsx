@@ -106,6 +106,7 @@ const sidebarGroups: SidebarGroup[] = [
     permission: "products.manage",
     excludeRoles: SELLER_FOCUSED_ROLES,
     items: [
+      { title: "Resumen", url: "/productos" },
       { title: "Estilos", url: "/productos/estilos" },
       { title: "Variantes", url: "/productos/variantes" },
     ],
@@ -200,11 +201,11 @@ function SidebarLink({
     <Link
       href={href}
       className={cn(
-        "flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium text-slate-800 transition hover:bg-slate-100",
-        active && "bg-slate-100 text-slate-950"
+        "flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium text-sidebar-foreground transition hover:bg-sidebar-accent",
+        active && "bg-sidebar-accent text-sidebar-foreground"
       )}
     >
-      {Icon ? <Icon className="h-4 w-4 text-slate-500" /> : <span className="h-4 w-4" />}
+      {Icon ? <Icon className="h-4 w-4 text-sidebar-foreground/65" /> : <span className="h-4 w-4" />}
       <span>{label}</span>
     </Link>
   )
@@ -246,7 +247,7 @@ function SidebarGroupSection({
     const isActive = pathname === item.url || pathname.startsWith(`${item.url}/`)
 
     return (
-      <div className="border-t border-slate-200 pt-2.5">
+      <div className="border-t border-sidebar-border pt-2.5">
         <SidebarLink href={item.url} label={title} icon={Icon} active={isActive} />
       </div>
     )
@@ -257,12 +258,12 @@ function SidebarGroupSection({
   )
 
   return (
-    <Collapsible defaultOpen={isActive} className="group border-t border-slate-200 pt-2.5">
+    <Collapsible defaultOpen={isActive} className="group border-t border-sidebar-border pt-2.5">
       <div className="rounded-xl px-1">
-        <CollapsibleTrigger className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left text-sm font-medium text-slate-900 transition hover:bg-slate-100">
-          <Icon className="h-4 w-4 text-slate-500" />
+        <CollapsibleTrigger className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left text-sm font-medium text-sidebar-foreground transition hover:bg-sidebar-accent">
+          <Icon className="h-4 w-4 text-sidebar-foreground/65" />
           <span>{title}</span>
-          <ChevronDown className="ml-auto h-4 w-4 text-slate-400 transition group-data-[state=open]:rotate-180" />
+          <ChevronDown className="ml-auto h-4 w-4 text-sidebar-foreground/55 transition group-data-[state=open]:rotate-180" />
         </CollapsibleTrigger>
         <CollapsibleContent className="pt-1">
           <div className="space-y-0.5 pl-2">
@@ -353,27 +354,27 @@ export function AppSidebar({
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-1 bg-[#f8fafc]">
+    <div className="flex min-h-screen w-full flex-1 bg-background">
       <Sidebar
         variant="sidebar"
-        className="border-slate-200 bg-white"
+        className="border-sidebar-border bg-sidebar text-sidebar-foreground"
         style={
           {
-            "--sidebar": "#ffffff",
-            "--sidebar-foreground": "#0f172a",
-            "--sidebar-primary": "#4f46e5",
-            "--sidebar-primary-foreground": "#ffffff",
-            "--sidebar-accent": "#f1f5f9",
-            "--sidebar-accent-foreground": "#0f172a",
-            "--sidebar-border": "#e2e8f0",
-            "--sidebar-ring": "#cbd5e1",
+            "--sidebar": "var(--theme-sidebar-bg)",
+            "--sidebar-foreground": "var(--theme-sidebar-fg)",
+            "--sidebar-primary": "var(--theme-sidebar-primary)",
+            "--sidebar-primary-foreground": "var(--theme-sidebar-primary-fg)",
+            "--sidebar-accent": "var(--theme-sidebar-accent)",
+            "--sidebar-accent-foreground": "var(--theme-sidebar-accent-fg)",
+            "--sidebar-border": "var(--theme-sidebar-border)",
+            "--sidebar-ring": "var(--theme-sidebar-ring)",
           } as React.CSSProperties
         }
         {...props}
       >
-        <SidebarHeader className="border-b border-slate-200 px-3 py-4">
+        <SidebarHeader className="border-b border-sidebar-border px-3 py-4">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full ring-1 ring-slate-200">
+            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full ring-1 ring-sidebar-border">
               <Image
                 src="/ripnel-logo.svg"
                 alt="Ripnel"
@@ -383,19 +384,19 @@ export function AppSidebar({
               />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-base font-semibold leading-5 text-slate-950">
+              <p className="truncate text-base font-semibold leading-5 text-sidebar-foreground">
                 Creaciones Ripnel
               </p>
-              <p className="text-xs text-slate-500">Sistema ERP</p>
+              <p className="text-xs text-sidebar-foreground/65">Sistema ERP</p>
             </div>
           </div>
 
-          <div className="mt-4 rounded-2xl bg-slate-100 px-2.5 py-2">
+          <div className="mt-4 rounded-2xl bg-sidebar-accent px-2.5 py-2">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
-                <Store className="h-4 w-4 shrink-0 text-slate-500" />
+                <Store className="h-4 w-4 shrink-0 text-sidebar-foreground/65" />
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-800">
+                  <p className="truncate text-sm font-semibold text-sidebar-foreground">
                     {locationsLoading
                       ? "Cargando sede..."
                       : locationsError
@@ -404,13 +405,13 @@ export function AppSidebar({
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => router.push("/account")}
-                className="inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-500 transition hover:bg-white hover:text-slate-700"
-                aria-label="Gestionar sede"
-              >
-                <Settings className="h-4 w-4" />
+                <button
+                  type="button"
+                  onClick={() => router.push("/account")}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full text-sidebar-foreground/65 transition hover:bg-background/70 hover:text-sidebar-foreground"
+                  aria-label="Gestionar sede"
+                >
+                  <Settings className="h-4 w-4" />
               </button>
             </div>
           </div>
@@ -420,7 +421,7 @@ export function AppSidebar({
           <nav className="space-y-2">
             <SidebarLink href="/inicio" label="Inicio" icon={House} active={pathname === "/inicio"} />
 
-            <div className="border-t border-slate-200 pt-2.5">
+            <div className="border-t border-sidebar-border pt-2.5">
               <SidebarLink
                 href="/dashboard"
                 label="Dashboard"
@@ -443,19 +444,19 @@ export function AppSidebar({
           </nav>
         </SidebarContent>
 
-        <SidebarFooter className="border-t border-slate-200 bg-white px-2.5 py-3">
+        <SidebarFooter className="border-t border-sidebar-border bg-sidebar px-2.5 py-3">
           <Link
             href="/account"
-            className="flex items-center gap-2.5 rounded-2xl px-2.5 py-2 transition hover:bg-slate-100"
+            className="flex items-center gap-2.5 rounded-2xl px-2.5 py-2 transition hover:bg-sidebar-accent"
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-700">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-foreground">
               <CircleUserRound className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-slate-900">
+              <p className="truncate text-sm font-semibold text-sidebar-foreground">
                 {user?.full_name || "Usuario"}
               </p>
-              <p className="truncate text-xs text-slate-500">{user?.role_name || "Rol"}</p>
+              <p className="truncate text-xs text-sidebar-foreground/65">{user?.role_name || "Rol"}</p>
             </div>
           </Link>
 

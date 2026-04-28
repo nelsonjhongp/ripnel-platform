@@ -19,7 +19,12 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
   if (!steps.length) return null
 
   return (
-    <div className={cn("w-full rounded-md bg-slate-50 p-4 shadow-sm", className)}>
+    <div
+      className={cn(
+        "sales-panel-muted w-full rounded-lg px-3 py-3 shadow-none md:px-4",
+        className
+      )}
+    >
       <div className="flex items-start">
         {steps.map((step, index) => {
           const isDone = index < currentStep
@@ -30,10 +35,14 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
               <div className="flex min-w-0 flex-col items-center text-center">
                 <div
                   className={cn(
-                    "flex h-7 w-7 items-center justify-center rounded-full border text-xs font-medium transition-colors",
-                    isDone && "border-slate-900 bg-slate-900 text-white",
-                    isCurrent && "border-slate-900 bg-white text-slate-900",
-                    !isDone && !isCurrent && "border-slate-300 bg-white text-slate-400"
+                    "flex h-7 w-7 items-center justify-center rounded-full border text-xs font-semibold transition-colors",
+                    isDone &&
+                      "border-[var(--ripnel-accent)] bg-[var(--ripnel-accent)] text-white",
+                    isCurrent &&
+                      "border-[var(--ripnel-accent)] bg-[var(--ops-surface)] text-[var(--ripnel-accent-hover)]",
+                    !isDone &&
+                      !isCurrent &&
+                      "border-[var(--ops-border-soft)] bg-[var(--ops-surface)] text-[var(--ops-text-muted)]"
                   )}
                 >
                   {isDone ? <Check className="h-4 w-4" /> : <span>{index + 1}</span>}
@@ -41,7 +50,9 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
                 <p
                   className={cn(
                     "mt-2 text-xs leading-tight",
-                    isDone || isCurrent ? "text-slate-700" : "text-slate-400"
+                    isDone || isCurrent
+                      ? "text-[var(--ops-text)]"
+                      : "text-[var(--ops-text-muted)]"
                   )}
                 >
                   {step.label}
@@ -52,7 +63,9 @@ export function Stepper({ steps, currentStep, className }: StepperProps) {
                 <div
                   className={cn(
                     "mx-3 mt-3 h-px flex-1",
-                    index < currentStep ? "bg-slate-900" : "bg-slate-300"
+                    index < currentStep
+                      ? "bg-[var(--ripnel-accent)]"
+                      : "bg-[var(--ops-border-soft)]"
                   )}
                 />
               )}
