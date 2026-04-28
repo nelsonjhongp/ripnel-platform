@@ -264,9 +264,13 @@ function cashTone(status: string | null | undefined) {
 }
 
 function priorityToneClasses(tone: OperationalPriority["tone"]) {
-  if (tone === "danger") return "border-rose-200 bg-rose-50 text-rose-900"
-  if (tone === "warning") return "border-amber-200 bg-amber-50 text-amber-900"
-  return "border-slate-200 bg-slate-50 text-slate-900"
+  if (tone === "danger") {
+    return "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-500/30 dark:bg-rose-500/15 dark:text-rose-200"
+  }
+  if (tone === "warning") {
+    return "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200"
+  }
+  return "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text)]"
 }
 
 export default function DashboardPage() {
@@ -483,7 +487,7 @@ export default function DashboardPage() {
           meta: `${salesToday.sale_count || 0} venta(s) confirmadas`,
           href: "/transaction-history",
           icon: ShoppingCart,
-          tone: "border-violet-200 bg-violet-50 text-violet-900",
+          tone: "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text)]",
         }
       : null,
     cash
@@ -496,7 +500,7 @@ export default function DashboardPage() {
             : "Sin apertura",
           href: "/caja",
           icon: Wallet,
-          tone: "border-emerald-200 bg-emerald-50 text-emerald-900",
+          tone: "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text)]",
         }
       : null,
     receipts
@@ -507,7 +511,7 @@ export default function DashboardPage() {
           meta: `${receipts.error_count || 0} error · ${receipts.pending_count || 0} pending`,
           href: "/transaction-history",
           icon: ReceiptText,
-          tone: "border-amber-200 bg-amber-50 text-amber-900",
+          tone: "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text)]",
         }
       : null,
     inventory
@@ -520,7 +524,7 @@ export default function DashboardPage() {
           meta: `${inventory.zero_stock_count || 0} en cero · ${inventory.low_stock_count || 0} bajo minimo`,
           href: "/inventory",
           icon: Boxes,
-          tone: "border-rose-200 bg-rose-50 text-rose-900",
+          tone: "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text)]",
         }
       : null,
     transfers
@@ -531,7 +535,7 @@ export default function DashboardPage() {
           meta: `${transfers.draft_outgoing_count || 0} salida(s) aun en borrador`,
           href: "/transferencias/recepciones-pendientes",
           icon: Truck,
-          tone: "border-sky-200 bg-sky-50 text-sky-900",
+          tone: "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text)]",
         }
       : null,
     postsales
@@ -542,38 +546,78 @@ export default function DashboardPage() {
           meta: `${postsales.eligible_cancel_count || 0} anulable(s) en ${postsales.recent_window_days} dias`,
           href: "/postventa",
           icon: PackageSearch,
-          tone: "border-orange-200 bg-orange-50 text-orange-900",
+          tone: "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text)]",
         }
       : null,
   ].filter(Boolean)
 
+  const paymentMix = salesToday?.by_method
+    ? [
+        { key: "cash", label: "Efectivo", amount: Number(salesToday.by_method.cash || 0) },
+        { key: "yape", label: "Yape", amount: Number(salesToday.by_method.yape || 0) },
+        { key: "plin", label: "Plin", amount: Number(salesToday.by_method.plin || 0) },
+        { key: "transfer", label: "Transferencia", amount: Number(salesToday.by_method.transfer || 0) },
+      ]
+    : []
+
+  const paymentMixMax = Math.max(
+    ...paymentMix.map((item) => item.amount),
+    1
+  )
+
+  const operationalMix = [
+    {
+      key: "receipts",
+      label: "Comprobantes abiertos",
+      value: Number(receipts?.open_count || 0),
+    },
+    {
+      key: "inventory",
+      label: "Stock crítico",
+      value:
+        Number(inventory?.zero_stock_count || 0) +
+        Number(inventory?.low_stock_count || 0),
+    },
+    {
+      key: "transfers",
+      label: "Recepciones pendientes",
+      value: Number(transfers?.pending_receipts_count || 0),
+    },
+    {
+      key: "postsales",
+      label: "Postventa habilitada",
+      value: Number(postsales?.eligible_exchange_count || 0),
+    },
+  ]
+
+  const operationalMixMax = Math.max(
+    ...operationalMix.map((item) => item.value),
+    1
+  )
+
   return (
-    <section className="min-h-screen bg-[radial-gradient(circle_at_top,#dbeafe_0%,#eff6ff_22%,#f8fafc_52%,#eef2ff_100%)] px-4 py-6 md:px-8">
-      <div className="mx-auto max-w-7xl space-y-5">
-        <header className="rounded-[28px] border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
+    <section className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
+      <div className="mx-auto max-w-7xl space-y-[var(--ops-stack-gap)]">
+        <header className="sales-panel rounded-lg p-[var(--ops-panel-padding)] shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--ripnel-accent-hover)]">
                 Dashboard operativo
               </p>
-              <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">
+              <h1 className="mt-1 text-2xl font-bold text-[var(--ops-text)] md:text-3xl">
                 {overview.context.location.name}
               </h1>
-              <p className="mt-1 text-sm text-slate-600">
+              <p className="mt-1 text-sm text-[var(--ops-text-muted)]">
                 {overview.context.location.code || "Sin codigo"} · {formatDate(overview.context.business_date)} ·{" "}
                 {overview.context.user.full_name}
                 {overview.context.user.role_name ? ` · ${overview.context.user.role_name}` : ""}
-              </p>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-                Esta portada resume la operacion critica del dia para la sede activa: caja,
-                ventas, comprobantes, postventa, transferencias, stock critico y actividad reciente.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-2">
               <Link
                 href="/bi"
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                className="sales-field sales-field-interactive inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium"
               >
                 <ArrowUpRight className="h-4 w-4" />
                 Abrir BI
@@ -582,7 +626,7 @@ export default function DashboardPage() {
                 type="button"
                 onClick={() => loadDashboard({ silent: true })}
                 disabled={refreshing}
-                className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex items-center gap-2 rounded-lg bg-[var(--ripnel-accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
                 {refreshing ? "Actualizando..." : "Actualizar"}
@@ -592,7 +636,7 @@ export default function DashboardPage() {
         </header>
 
         <article
-          className={`rounded-3xl border p-5 shadow-sm ${priorityToneClasses(primaryPriority.tone)}`}
+          className={`rounded-lg border px-[var(--ops-panel-padding)] py-4 shadow-sm ${priorityToneClasses(primaryPriority.tone)}`}
         >
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
@@ -606,7 +650,7 @@ export default function DashboardPage() {
             </div>
             <Link
               href={primaryPriority.href}
-              className="inline-flex items-center gap-2 rounded-2xl bg-white/80 px-4 py-2.5 text-sm font-semibold text-current transition hover:bg-white"
+              className="inline-flex items-center gap-2 rounded-lg bg-[var(--ops-surface)] px-4 py-2.5 text-sm font-semibold text-current transition hover:opacity-90"
             >
               Ir al módulo
               <ArrowUpRight className="h-4 w-4" />
@@ -626,11 +670,11 @@ export default function DashboardPage() {
                 <Link
                   key={alert.key}
                   href={alert.href}
-                  className={`rounded-3xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${toneClasses}`}
+                  className={`rounded-lg border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${toneClasses}`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3">
-                      <div className="rounded-2xl bg-white/70 p-2.5 text-current">
+                      <div className="rounded-lg bg-[var(--ops-surface)] p-2.5 text-current">
                         <CircleAlert className="h-5 w-5" />
                       </div>
                       <div>
@@ -656,7 +700,7 @@ export default function DashboardPage() {
               <Link
                 key={card.key}
                 href={card.href}
-                className={`rounded-3xl border p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${card.tone}`}
+                className={`rounded-lg border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${card.tone}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -666,7 +710,7 @@ export default function DashboardPage() {
                     <p className="mt-3 text-3xl font-bold text-current">{card.value}</p>
                     <p className="mt-2 text-sm text-current/75">{card.meta}</p>
                   </div>
-                  <div className="rounded-2xl bg-white/70 p-3">
+                  <div className="rounded-lg bg-[var(--ops-surface)] p-2.5">
                     <Icon className="h-5 w-5 text-current" />
                   </div>
                 </div>
@@ -675,22 +719,80 @@ export default function DashboardPage() {
           })}
         </div>
 
+        <article className="sales-panel rounded-lg p-[var(--ops-panel-padding)] shadow-sm">
+          <div className="grid gap-5 lg:grid-cols-2">
+            <section>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--ops-text-muted)]">
+                Mezcla de cobro
+              </p>
+              <h2 className="mt-1 text-base font-semibold text-[var(--ops-text)]">
+                Distribución por método
+              </h2>
+              <div className="mt-4 space-y-3">
+                {paymentMix.length > 0 ? (
+                  paymentMix.map((item) => (
+                    <div key={item.key} className="grid grid-cols-[120px_1fr_auto] items-center gap-3 text-sm">
+                      <span className="font-medium text-[var(--ops-text)]">{item.label}</span>
+                      <div className="h-2 overflow-hidden rounded-full bg-[var(--ops-surface-muted)]">
+                        <div
+                          className="h-full rounded-full bg-[var(--ripnel-accent)]"
+                          style={{ width: `${Math.max(8, (item.amount / paymentMixMax) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="font-semibold text-[var(--ops-text)]">
+                        {formatCurrency(item.amount)}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-[var(--ops-text-muted)]">
+                    Sin movimientos de cobro registrados hoy.
+                  </p>
+                )}
+              </div>
+            </section>
+
+            <section>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--ops-text-muted)]">
+                Presión operativa
+              </p>
+              <h2 className="mt-1 text-base font-semibold text-[var(--ops-text)]">
+                Carga por frente crítico
+              </h2>
+              <div className="mt-4 space-y-3">
+                {operationalMix.map((item) => (
+                  <div key={item.key} className="grid grid-cols-[160px_1fr_auto] items-center gap-3 text-sm">
+                    <span className="font-medium text-[var(--ops-text)]">{item.label}</span>
+                    <div className="h-2 overflow-hidden rounded-full bg-[var(--ops-surface-muted)]">
+                      <div
+                        className="h-full rounded-full bg-sky-500/80"
+                        style={{ width: `${Math.max(8, (item.value / operationalMixMax) * 100)}%` }}
+                      />
+                    </div>
+                    <span className="font-semibold text-[var(--ops-text)]">{item.value}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        </article>
+
         <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-5">
             {salesToday ? (
-              <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
+              <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-violet-600">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--ripnel-accent-hover)]">
                       Ventas y cobro del dia
                     </p>
-                    <h2 className="mt-1 text-xl font-semibold text-slate-900">
+                    <h2 className="mt-1 text-xl font-semibold text-[var(--ops-text)]">
                       Flujo comercial de la sede activa
                     </h2>
                   </div>
                   <Link
                     href="/purchase-system"
-                    className="inline-flex items-center gap-2 rounded-2xl border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-700 transition hover:bg-violet-100"
+                    className="sales-field sales-field-interactive inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium"
                   >
                     Nueva venta
                     <ArrowUpRight className="h-4 w-4" />
@@ -698,29 +800,29 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="mt-5 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-                  <div className="rounded-3xl border border-violet-200 bg-violet-50 p-5">
-                    <p className="text-sm font-semibold text-violet-800">Resumen rapido</p>
+                  <div className="sales-panel-muted rounded-lg p-5">
+                    <p className="text-sm font-semibold text-[var(--ops-text)]">Resumen rapido</p>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl bg-white/80 p-4">
+                      <div className="sales-panel rounded-lg p-4">
                         <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Total vendido</p>
                         <p className="mt-2 text-2xl font-bold text-slate-900">
                           {formatCurrency(salesToday.total_amount)}
                         </p>
                       </div>
-                      <div className="rounded-2xl bg-white/80 p-4">
+                      <div className="sales-panel rounded-lg p-4">
                         <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Ventas confirmadas</p>
                         <p className="mt-2 text-2xl font-bold text-slate-900">
                           {salesToday.sale_count || 0}
                         </p>
                       </div>
                     </div>
-                    <p className="mt-4 text-sm text-violet-900/80">
+                    <p className="mt-4 text-sm text-[var(--ops-text-muted)]">
                       Ultima confirmacion: {formatDateTime(salesToday.last_confirmed_at)}
                     </p>
                   </div>
 
-                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                    <p className="text-sm font-semibold text-slate-800">Metodos de pago</p>
+                  <div className="sales-panel-muted rounded-lg p-5">
+                    <p className="text-sm font-semibold text-[var(--ops-text)]">Metodos de pago</p>
                     <div className="mt-4 space-y-3">
                       {[
                         { key: "cash", label: "Efectivo" },
@@ -728,9 +830,9 @@ export default function DashboardPage() {
                         { key: "plin", label: "Plin" },
                         { key: "transfer", label: "Transferencia" },
                       ].map((item) => (
-                        <div key={item.key} className="flex items-center justify-between rounded-2xl bg-white px-4 py-3">
-                          <span className="text-sm text-slate-600">{item.label}</span>
-                          <span className="text-sm font-semibold text-slate-900">
+                        <div key={item.key} className="sales-panel flex items-center justify-between rounded-lg px-4 py-3">
+                          <span className="text-sm text-[var(--ops-text-muted)]">{item.label}</span>
+                          <span className="text-sm font-semibold text-[var(--ops-text)]">
                             {formatCurrency(salesToday.by_method?.[item.key as keyof PaymentTotals] as number)}
                           </span>
                         </div>
@@ -753,13 +855,13 @@ export default function DashboardPage() {
             ) : null}
 
             {cash ? (
-              <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
+              <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700 dark:text-emerald-300">
                       Caja del dia
                     </p>
-                    <h2 className="mt-1 text-xl font-semibold text-slate-900">
+                    <h2 className="mt-1 text-xl font-semibold text-[var(--ops-text)]">
                       Estado y consistencia operativa
                     </h2>
                   </div>
@@ -777,21 +879,21 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="mt-5 grid gap-4 lg:grid-cols-3">
-                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="sales-panel-muted rounded-lg p-4">
                     <div className="flex items-center gap-2">
                       <Banknote className="h-4 w-4 text-emerald-600" />
-                      <p className="text-sm font-semibold text-slate-800">Ventas vs pagos</p>
+                      <p className="text-sm font-semibold text-[var(--ops-text)]">Ventas vs pagos</p>
                     </div>
-                    <div className="mt-4 space-y-2 text-sm text-slate-600">
+                    <div className="mt-4 space-y-2 text-sm text-[var(--ops-text-muted)]">
                       <div className="flex justify-between">
                         <span>Total ventas</span>
-                        <span className="font-semibold text-slate-900">
+                        <span className="font-semibold text-[var(--ops-text)]">
                           {formatCurrency(cash.sales_summary?.consistency.sales_total)}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span>Total pagos</span>
-                        <span className="font-semibold text-slate-900">
+                        <span className="font-semibold text-[var(--ops-text)]">
                           {formatCurrency(cash.sales_summary?.consistency.payment_total)}
                         </span>
                       </div>
@@ -810,16 +912,16 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="sales-panel-muted rounded-lg p-4">
                     <div className="flex items-center gap-2">
                       <CreditCard className="h-4 w-4 text-sky-600" />
-                      <p className="text-sm font-semibold text-slate-800">Actividad del cierre</p>
+                      <p className="text-sm font-semibold text-[var(--ops-text)]">Actividad del cierre</p>
                     </div>
-                    <p className="mt-4 text-2xl font-bold text-slate-900">
+                    <p className="mt-4 text-2xl font-bold text-[var(--ops-text)]">
                       {cash.sales_summary?.sale_count || 0}
                     </p>
-                    <p className="mt-2 text-sm text-slate-600">venta(s) confirmadas hoy</p>
-                    <p className="mt-4 text-sm text-slate-600">
+                    <p className="mt-2 text-sm text-[var(--ops-text-muted)]">venta(s) confirmadas hoy</p>
+                    <p className="mt-4 text-sm text-[var(--ops-text-muted)]">
                       {cash.closing
                         ? `Registro ${cash.closing.status === "open" ? "abierto" : "cerrado"} para ${formatDate(
                             cash.closing.business_date
@@ -830,7 +932,7 @@ export default function DashboardPage() {
 
                   <Link
                     href="/caja"
-                    className="rounded-3xl border border-emerald-200 bg-emerald-50 p-4 transition hover:-translate-y-0.5 hover:shadow-sm"
+                    className="sales-panel-muted rounded-lg p-4 transition hover:-translate-y-0.5 hover:shadow-sm"
                   >
                     <div className="flex items-center gap-2">
                       <Wallet className="h-4 w-4 text-emerald-700" />
@@ -844,7 +946,7 @@ export default function DashboardPage() {
               </article>
             ) : null}
 
-            <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
+            <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
@@ -861,7 +963,7 @@ export default function DashboardPage() {
                   <Link
                     key={shortcut.key}
                     href={shortcut.href}
-                    className="rounded-3xl border border-slate-200 bg-slate-50 p-4 transition hover:-translate-y-0.5 hover:bg-white hover:shadow-sm"
+                    className="sales-panel-muted rounded-lg p-4 transition hover:-translate-y-0.5 hover:opacity-90 hover:shadow-sm"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-slate-900">{shortcut.label}</p>
@@ -876,21 +978,21 @@ export default function DashboardPage() {
 
           <div className="space-y-5">
             {receipts ? (
-              <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur">
+              <article className="sales-panel rounded-lg p-5 shadow-sm">
                 <div className="flex items-center gap-2">
                   <ReceiptText className="h-4 w-4 text-amber-600" />
-                  <h2 className="text-lg font-semibold text-slate-900">Comprobantes</h2>
+                  <h2 className="text-lg font-semibold text-[var(--ops-text)]">Comprobantes</h2>
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="sales-panel-muted rounded-lg p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Open</p>
                     <p className="mt-2 text-2xl font-bold text-slate-900">{receipts.open_count || 0}</p>
                   </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="sales-panel-muted rounded-lg p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Missing</p>
                     <p className="mt-2 text-2xl font-bold text-slate-900">{receipts.missing_count || 0}</p>
                   </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="sales-panel-muted rounded-lg p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Error</p>
                     <p className="mt-2 text-2xl font-bold text-slate-900">{receipts.error_count || 0}</p>
                   </div>
@@ -901,7 +1003,7 @@ export default function DashboardPage() {
                       <Link
                         key={`${item.sale_id}-${item.queue_status}`}
                         href={`/purchase-system/${item.sale_id}`}
-                        className="block rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 transition hover:bg-white"
+                        className="sales-panel-muted block rounded-lg px-4 py-3 transition hover:opacity-90"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -926,7 +1028,7 @@ export default function DashboardPage() {
                       </Link>
                     ))
                   ) : (
-                    <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                    <p className="sales-panel-muted rounded-lg px-4 py-6 text-sm text-[var(--ops-text-muted)]">
                       No hay comprobantes abiertos en este momento.
                     </p>
                   )}
@@ -935,25 +1037,25 @@ export default function DashboardPage() {
             ) : null}
 
             {postsales ? (
-              <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur">
+              <article className="sales-panel rounded-lg p-5 shadow-sm">
                 <div className="flex items-center gap-2">
                   <PackageSearch className="h-4 w-4 text-orange-600" />
-                  <h2 className="text-lg font-semibold text-slate-900">Postventa reciente</h2>
+                  <h2 className="text-lg font-semibold text-[var(--ops-text)]">Postventa reciente</h2>
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="sales-panel-muted rounded-lg p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Cambio</p>
                     <p className="mt-2 text-2xl font-bold text-slate-900">
                       {postsales.eligible_exchange_count || 0}
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="sales-panel-muted rounded-lg p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Anulable</p>
                     <p className="mt-2 text-2xl font-bold text-slate-900">
                       {postsales.eligible_cancel_count || 0}
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="sales-panel-muted rounded-lg p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Bloqueada</p>
                     <p className="mt-2 text-2xl font-bold text-slate-900">
                       {postsales.blocked_cancel_count || 0}
@@ -966,7 +1068,7 @@ export default function DashboardPage() {
                       <Link
                         key={item.sale_id}
                         href={`/postventa/${item.sale_id}`}
-                        className="block rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 transition hover:bg-white"
+                        className="sales-panel-muted block rounded-lg px-4 py-3 transition hover:opacity-90"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -994,7 +1096,7 @@ export default function DashboardPage() {
                       </Link>
                     ))
                   ) : (
-                    <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                    <p className="sales-panel-muted rounded-lg px-4 py-6 text-sm text-[var(--ops-text-muted)]">
                       No encontramos ventas recientes listas para postventa.
                     </p>
                   )}
@@ -1003,23 +1105,23 @@ export default function DashboardPage() {
             ) : null}
 
             {inventory ? (
-              <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur">
+              <article className="sales-panel rounded-lg p-5 shadow-sm">
                 <div className="flex items-center gap-2">
                   <Boxes className="h-4 w-4 text-rose-600" />
-                  <h2 className="text-lg font-semibold text-slate-900">Inventario critico</h2>
+                  <h2 className="text-lg font-semibold text-[var(--ops-text)]">Inventario critico</h2>
                 </div>
-                <p className="mt-2 text-sm text-slate-600">
+                <p className="mt-2 text-sm text-[var(--ops-text-muted)]">
                   Se consideran criticas las variantes con stock `0` o menor/igual a{" "}
                   {inventory.low_stock_threshold || 0}.
                 </p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="sales-panel-muted rounded-lg p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500">En cero</p>
                     <p className="mt-2 text-2xl font-bold text-slate-900">
                       {inventory.zero_stock_count || 0}
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="sales-panel-muted rounded-lg p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Bajo minimo</p>
                     <p className="mt-2 text-2xl font-bold text-slate-900">
                       {inventory.low_stock_count || 0}
@@ -1032,7 +1134,7 @@ export default function DashboardPage() {
                       <Link
                         key={item.variant_id}
                         href="/inventory"
-                        className="block rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 transition hover:bg-white"
+                        className="sales-panel-muted block rounded-lg px-4 py-3 transition hover:opacity-90"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -1054,7 +1156,7 @@ export default function DashboardPage() {
                       </Link>
                     ))
                   ) : (
-                    <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                    <p className="sales-panel-muted rounded-lg px-4 py-6 text-sm text-[var(--ops-text-muted)]">
                       No hay variantes criticas para la sede operativa.
                     </p>
                   )}
@@ -1063,12 +1165,12 @@ export default function DashboardPage() {
             ) : null}
 
             {transfers ? (
-              <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur">
+              <article className="sales-panel rounded-lg p-5 shadow-sm">
                 <div className="flex items-center gap-2">
                   <Truck className="h-4 w-4 text-sky-600" />
-                  <h2 className="text-lg font-semibold text-slate-900">Transferencias por recibir</h2>
+                  <h2 className="text-lg font-semibold text-[var(--ops-text)]">Transferencias por recibir</h2>
                 </div>
-                <div className="mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4">
+                <div className="sales-panel-muted mt-4 rounded-lg p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-sky-700">Pendientes</p>
                   <p className="mt-2 text-3xl font-bold text-sky-900">
                     {transfers.pending_receipts_count || 0}
@@ -1080,7 +1182,7 @@ export default function DashboardPage() {
                       <Link
                         key={item.transfer_id}
                         href={`/transferencias/${item.transfer_id}`}
-                        className="block rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 transition hover:bg-white"
+                        className="sales-panel-muted block rounded-lg px-4 py-3 transition hover:opacity-90"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -1101,7 +1203,7 @@ export default function DashboardPage() {
                       </Link>
                     ))
                   ) : (
-                    <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                    <p className="sales-panel-muted rounded-lg px-4 py-6 text-sm text-[var(--ops-text-muted)]">
                       No hay recepciones pendientes en este momento.
                     </p>
                   )}
@@ -1111,10 +1213,10 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
+        <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
           <div className="flex items-center gap-2">
             <ClipboardList className="h-4 w-4 text-slate-600" />
-            <h2 className="text-lg font-semibold text-slate-900">Actividad reciente</h2>
+            <h2 className="text-lg font-semibold text-[var(--ops-text)]">Actividad reciente</h2>
           </div>
           <div className="mt-4 space-y-3">
             {activityItems.length > 0 ? (
@@ -1122,7 +1224,7 @@ export default function DashboardPage() {
                 <Link
                   key={item.id}
                   href={item.href}
-                  className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 transition hover:bg-white md:flex-row md:items-center md:justify-between"
+                  className="sales-panel-muted flex flex-col gap-3 rounded-lg px-4 py-3 transition hover:opacity-90 md:flex-row md:items-center md:justify-between"
                 >
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{item.title}</p>
@@ -1140,7 +1242,7 @@ export default function DashboardPage() {
                 </Link>
               ))
             ) : (
-              <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+              <p className="sales-panel-muted rounded-lg px-4 py-6 text-sm text-[var(--ops-text-muted)]">
                 Aun no hay actividad reciente visible para tu rol en esta sede.
               </p>
             )}

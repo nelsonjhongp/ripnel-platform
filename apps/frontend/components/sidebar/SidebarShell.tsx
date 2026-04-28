@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation"
 import { ShoppingCart } from "lucide-react"
 import { AppSidebar } from "./AppSidebar"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth/AuthProvider"
 import {
   Breadcrumb,
@@ -35,7 +36,9 @@ export function SidebarShell({
 
     const routeTitles: Record<string, string> = {
       "/sidebar": "Panel del usuario",
-      "/account": "Cuenta",
+      "/account": "Perfil",
+      "/account/operacion": "Sede operativa",
+      "/account/apariencia": "Apariencia",
       "/inicio": "Inicio",
       "/dashboard": "Dashboard operativo",
       "/bi": "BI y analitica",
@@ -43,6 +46,7 @@ export function SidebarShell({
       "/admin-crud": "Gestion de usuarios",
       "/inventory": "Inventario",
       "/kardex": "Kardex",
+      "/purchase-system": "Nueva venta",
       "/transaction-history": "Historial de ventas",
       "/postventa": "Postventa",
     }
@@ -62,7 +66,7 @@ export function SidebarShell({
 
   return (
     <AppSidebar>
-      <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 md:px-5">
+      <header className="ops-topbar flex h-14 shrink-0 items-center justify-between gap-3 border-b px-4 md:px-5">
         <div className="flex items-center gap-2">
           <SidebarTrigger className="-ml-1" />
           <Breadcrumb>
@@ -79,13 +83,12 @@ export function SidebarShell({
         </div>
 
         {has("sales.pos") && (
-          <Link
-            href="/purchase-system"
-            className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-3.5 py-1 text-sm font-semibold text-white transition hover:bg-indigo-700"
-          >
-            <ShoppingCart className="h-4 w-4" />
-            Venta rapida
-          </Link>
+          <Button asChild variant="accent" size="sm" className="rounded-full px-3.5">
+            <Link href="/purchase-system">
+              <ShoppingCart className="h-4 w-4" />
+              Venta rapida
+            </Link>
+          </Button>
         )}
       </header>
 
