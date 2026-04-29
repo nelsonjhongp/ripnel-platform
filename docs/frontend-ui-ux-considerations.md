@@ -43,6 +43,17 @@ Guia rapida para decisiones visuales y de experiencia en RIPNEL.
 - Los detalles de fila se reservan para aclaraciones utiles, como el uso operativo de un campo.
 - Evitar frases tipo "Datos principales..." o "Configura aspectos..." cuando no agregan informacion nueva.
 
+## Densidad y jerarquia
+
+- Los titulos y subtitulos deben vivir como texto cuando no necesitan un contenedor para ordenar la pantalla.
+- No envolver cada seccion en un panel si el encabezado, el ritmo vertical y las superficies internas ya comunican la jerarquia.
+- Usar panel solo para contenido realmente primario, agrupado o accionable.
+- Evitar repetir contexto que ya es visible en sidebar, breadcrumb o topbar.
+- Preferir filas compactas, bandas, pills, chips y bloques bajos antes que cards altas.
+- Si una descripcion no cambia una decision o no evita un error, debe salir.
+- Evitar panel dentro de panel salvo que exista una razon operativa clara.
+- Cuando una accion es urgente o recurrente, evaluar primero topbar o franja superior antes que otro bloque dentro del contenido.
+
 ## Tokens visuales
 
 - Tema claro:
@@ -73,6 +84,10 @@ Guia rapida para decisiones visuales y de experiencia en RIPNEL.
 
 - La pantalla se entiende si se eliminan todos los parrafos secundarios?
 - Hay copy repetido entre titulo, seccion y fila?
+- El titulo necesita panel o puede vivir como texto?
+- Hay cajas duplicando la jerarquia visual?
+- Una accion urgente deberia subir al topbar o a la fila superior?
+- La pantalla se siente ERP operativo o dashboard decorativo?
 - Las filas tienen altura compacta y controles alineados?
 - Los colores usan tokens y no clases sueltas de slate/indigo sin razon?
 - El acento aparece solo donde ayuda a la jerarquia?

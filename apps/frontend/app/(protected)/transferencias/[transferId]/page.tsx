@@ -18,6 +18,10 @@ export default async function TransferPage({
     return <TransfersCreatePage />
   }
 
+  if (transferId === "solicitar-productos") {
+    return <TransfersCreatePage />
+  }
+
   if (transferId === "recepciones-pendientes") {
     return <TransfersPendingPage />
   }

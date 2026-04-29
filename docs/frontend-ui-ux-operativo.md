@@ -54,6 +54,23 @@ Guia breve para futuras interfaces operativas de RIPNEL.
 - Detalle expandible solo cuando agregue contexto real.
 - Copy corto, operativo y consistente con el lenguaje ERP del proyecto.
 
+## Patron compacto derivado de inicio
+
+- Header corto como texto; no usar hero-card si no agrega una decision operativa.
+- Priorizar acciones urgentes o recurrentes en topbar o en una fila superior compacta.
+- Mantener pendientes, accesos rapidos y metricas como secciones ligeras; no deben vivir en paneles pesados por defecto.
+- Agrupar metricas cerca de la decision o del bloque que representan; evitar dispersarlas en muchas tarjetas.
+- Minimizar `panel dentro de panel`; usar superficies internas puntuales solo para resaltar grupos o estados.
+- Si la vista ya se entiende por contexto, no repetir sede, rol o modulo en varios niveles visuales.
+
+## Anti patrones a evitar
+
+- Hero-card pesada con texto redundante.
+- Panel padre para titulo mas paneles hijos para cada item.
+- Subtitulos que solo repiten el nombre de la seccion.
+- Bloques altos para datos que caben en una fila compacta.
+- Acciones urgentes escondidas dentro del scroll cuando podrian vivir arriba.
+
 ## Patron para cuenta y configuracion operativa
 
 - Tratar `Cuenta` y ajustes como vistas operativas, no como perfil decorativo.

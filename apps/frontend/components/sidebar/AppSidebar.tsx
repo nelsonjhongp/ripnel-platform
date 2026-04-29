@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/components/auth/AuthProvider"
+import { resolveTransferCapabilities } from "@/lib/capabilities"
 
 type SidebarItem = {
   title: string
@@ -300,6 +301,7 @@ export function AppSidebar({
   const router = useRouter()
   const {
     user,
+    permissions,
     loading,
     locationsLoading,
     locationsError,
@@ -308,12 +310,31 @@ export function AppSidebar({
     logout,
   } = useAuth()
 
+  const transferCapabilities = React.useMemo(
+    () => resolveTransferCapabilities({ permissions, roleName: user?.role_name }),
+    [permissions, user?.role_name]
+  )
+
   const visibleGroups = React.useMemo(() => {
     if (loading) return []
 
     return sidebarGroups
       .map((group) => {
         const items = group.items.filter((item) => {
+          if (group.title === "Transferencias") {
+            if (item.url.endsWith("/crear-transferencia")) {
+              return transferCapabilities.requestCreate
+            }
+
+            if (item.url.endsWith("/listado-de-transferencias")) {
+              return transferCapabilities.visible
+            }
+
+            if (item.url.endsWith("/recepciones-pendientes")) {
+              return transferCapabilities.receive
+            }
+          }
+
           if (item.onlyForRoles && user?.role_name && !item.onlyForRoles.includes(user.role_name)) {
             return false
           }
@@ -331,6 +352,10 @@ export function AppSidebar({
         }
       })
       .filter((group) => {
+      if (group.title === "Transferencias") {
+        return transferCapabilities.visible && group.items.length > 0
+      }
+
       if (group.permission && !has(group.permission)) return false
 
       if (group.onlyForRoles && user?.role_name && !group.onlyForRoles.includes(user.role_name)) {
@@ -343,7 +368,7 @@ export function AppSidebar({
 
       return group.items.length > 0
       })
-  }, [loading, has, user?.role_name])
+  }, [loading, has, transferCapabilities, user?.role_name])
 
   const handleLogout = async () => {
     try {

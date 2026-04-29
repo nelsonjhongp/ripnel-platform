@@ -1667,7 +1667,7 @@ export default function NuevaVentaPage() {
       <Sheet open={customerSheetOpen} onOpenChange={setCustomerSheetOpen}>
         <TooltipProvider delayDuration={120}>
           <div className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
-            <div className="mx-auto max-w-[1180px] space-y-3">
+            <div className="mx-auto max-w-[1180px] space-y-4">
               <PosHeader
                 eyebrow="Punto de venta"
                 title="Nueva venta"
@@ -1842,12 +1842,12 @@ export default function NuevaVentaPage() {
                   </div>
                 ) : null}
 
-                <section className="grid gap-3 xl:grid-cols-[minmax(0,1.18fr)_360px]">
+                <section className="grid gap-4 xl:grid-cols-[minmax(0,1.18fr)_360px]">
                   <div className="contents">
                     <article
                       ref={productSectionRef}
                       onMouseEnter={() => setActiveStage("products")}
-                      className={`sales-panel relative rounded-lg p-4 shadow-sm md:p-5 xl:order-2 xl:col-span-2 ${
+                      className={`sales-panel relative rounded-xl p-4 shadow-sm md:p-5 xl:order-2 xl:col-span-2 ${
                         activeStage === "products"
                           ? productPickerOpen
                             ? "z-30"
@@ -2131,7 +2131,7 @@ export default function NuevaVentaPage() {
                     </article>
 
                     <article
-                      className={`sales-panel relative z-0 rounded-lg p-4 shadow-sm md:p-5 xl:order-3 xl:col-span-2 ${
+                      className={`sales-panel relative z-0 rounded-xl p-4 shadow-sm md:p-5 xl:order-3 xl:col-span-2 ${
                         activeStage === "products" ? "" : "hidden"
                       }`}
                     >
@@ -2304,7 +2304,7 @@ export default function NuevaVentaPage() {
                     <article
                       ref={customerSectionRef}
                       onMouseEnter={() => setActiveStage("customer")}
-                      className={`sales-panel relative rounded-lg p-4 shadow-sm md:p-5 xl:order-1 xl:col-span-2 ${
+                      className={`sales-panel relative rounded-xl p-4 shadow-sm md:p-5 xl:order-1 xl:col-span-2 ${
                         activeStage === "customer"
                           ? customerPickerOpen || documentPickerOpen
                             ? "z-30"
@@ -2557,7 +2557,7 @@ export default function NuevaVentaPage() {
                     <article
                       ref={paymentSectionRef}
                       onMouseEnter={() => setActiveStage("payment")}
-                      className={`sales-panel relative z-0 rounded-lg p-4 shadow-sm xl:order-4 xl:col-span-2 ${
+                      className={`sales-panel relative z-0 rounded-xl p-4 shadow-sm xl:order-4 xl:col-span-2 ${
                         activeStage === "payment" ? "" : "hidden"
                       }`}
                     >
@@ -2857,7 +2857,7 @@ export default function NuevaVentaPage() {
 
                     <article
                       ref={summarySectionRef}
-                      className={`sales-panel rounded-lg p-4 shadow-sm xl:order-5 ${
+                      className={`sales-panel rounded-xl p-4 shadow-sm xl:order-5 ${
                         activeStage === "summary" ? "" : "hidden"
                       }`}
                     >
@@ -3065,7 +3065,7 @@ export default function NuevaVentaPage() {
                     </article>
 
                     <article
-                      className={`sales-panel rounded-lg p-4 shadow-sm xl:order-6 xl:sticky xl:top-20 xl:self-start ${
+                      className={`sales-panel rounded-xl p-4 shadow-sm xl:order-6 xl:sticky xl:top-20 xl:self-start ${
                         activeStage === "summary" ? "" : "hidden"
                       }`}
                     >

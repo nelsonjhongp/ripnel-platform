@@ -3,13 +3,18 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRightLeft,
+  ClipboardList,
   LoaderCircle,
   Search,
   SendHorizonal,
   Truck,
   X,
 } from "lucide-react";
-import { buildApiUrl } from "@/lib/api";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { ForbiddenPage, LoadingPage } from "@/components/feedback/status-page";
+import type { ApiEnvelope } from "@/lib/api";
+import { apiFetch, unwrapApiData } from "@/lib/api";
+import { resolveTransferCapabilities } from "@/lib/capabilities";
 import {
   formatDateTime,
   formatTransferStatus,
@@ -27,6 +32,7 @@ const STATUS_OPTIONS: Array<"all" | TransferStatus> = [
 ];
 
 export function TransfersListPage() {
+  const { loading: authLoading, permissions, user } = useAuth();
   const [transfers, setTransfers] = useState<TransferSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,21 +42,23 @@ export function TransfersListPage() {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const transferCapabilities = useMemo(
+    () => resolveTransferCapabilities({ permissions, roleName: user?.role_name }),
+    [permissions, user?.role_name]
+  );
+
   async function loadTransfers() {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(buildApiUrl("/api/transfers"), {
-        cache: "no-store",
-      });
-      const payload = await response.json();
+      const payload = await apiFetch<ApiEnvelope<TransferSummary[]> | TransferSummary[]>(
+        "/api/transfers",
+        { cache: "no-store" }
+      );
+      const data = unwrapApiData(payload);
 
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo cargar transferencias");
-      }
-
-      setTransfers(payload.data || []);
+      setTransfers(data || []);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -72,19 +80,13 @@ export function TransfersListPage() {
     setNotice(null);
 
     try {
-      const response = await fetch(
-        buildApiUrl(`/api/transfers/${transferId}/ship`),
+      await apiFetch(
+        `/api/transfers/${transferId}/ship`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({}),
         }
       );
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo enviar la transferencia");
-      }
 
       await loadTransfers();
     } catch (requestError) {
@@ -104,19 +106,13 @@ export function TransfersListPage() {
     setNotice(null);
 
     try {
-      const response = await fetch(
-        buildApiUrl(`/api/transfers/${transferId}/cancel`),
+      await apiFetch(
+        `/api/transfers/${transferId}/cancel`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({}),
         }
       );
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo cancelar la transferencia");
-      }
 
       setNotice("Transferencia cancelada.");
       await loadTransfers();
@@ -163,18 +159,32 @@ export function TransfersListPage() {
     };
   }, [filteredTransfers]);
 
+  if (authLoading) {
+    return (
+      <LoadingPage
+        variant="ops"
+        title="Preparando seguimiento de transferencias"
+        description="Estamos validando tus capacidades visibles para mostrar solicitudes y movimientos entre tiendas."
+      />
+    );
+  }
+
+  if (!transferCapabilities.visible) {
+    return <ForbiddenPage variant="ops" />;
+  }
+
   return (
     <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
       <div className="mx-auto max-w-7xl space-y-5">
         <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
           <p className="text-xs uppercase tracking-wide text-violet-600">
-            Movimiento entre sedes
+            Seguimiento operativo
           </p>
           <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">
-            Listado de transferencias
+            Solicitudes y transferencias
           </h1>
           <p className="mt-1 text-sm text-slate-600">
-            Revisa borradores, transferencias enviadas y recepciones ya cerradas.
+            Revisa solicitudes abiertas, despachos pendientes y recepciones relacionadas con tus sedes visibles.
           </p>
         </header>
 
@@ -331,38 +341,49 @@ export function TransfersListPage() {
                       <td className="px-3 py-3 text-right text-sm">
                         {transfer.status === "draft" ? (
                           <div className="flex justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleCancelTransfer(transfer.transfer_id)}
-                              disabled={
-                                shippingId === transfer.transfer_id ||
-                                cancellingId === transfer.transfer_id
-                              }
-                              className="inline-flex items-center gap-2 rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition hover:border-rose-400 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {cancellingId === transfer.transfer_id ? (
-                                <LoaderCircle className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <X className="h-4 w-4" />
-                              )}
-                              Cancelar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleShipTransfer(transfer.transfer_id)}
-                              disabled={
-                                shippingId === transfer.transfer_id ||
-                                cancellingId === transfer.transfer_id
-                              }
-                              className="inline-flex items-center gap-2 rounded-xl border border-violet-300 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-700 transition hover:border-violet-400 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {shippingId === transfer.transfer_id ? (
-                                <LoaderCircle className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <SendHorizonal className="h-4 w-4" />
-                              )}
-                              Enviar
-                            </button>
+                            {transferCapabilities.requestCreate || transferCapabilities.manage ? (
+                              <button
+                                type="button"
+                                onClick={() => handleCancelTransfer(transfer.transfer_id)}
+                                disabled={
+                                  shippingId === transfer.transfer_id ||
+                                  cancellingId === transfer.transfer_id
+                                }
+                                className="inline-flex items-center gap-2 rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition hover:border-rose-400 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {cancellingId === transfer.transfer_id ? (
+                                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <X className="h-4 w-4" />
+                                )}
+                                Cancelar
+                              </button>
+                            ) : null}
+                            {transferCapabilities.ship ? (
+                              <button
+                                type="button"
+                                onClick={() => handleShipTransfer(transfer.transfer_id)}
+                                disabled={
+                                  shippingId === transfer.transfer_id ||
+                                  cancellingId === transfer.transfer_id
+                                }
+                                className="inline-flex items-center gap-2 rounded-xl border border-violet-300 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-700 transition hover:border-violet-400 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {shippingId === transfer.transfer_id ? (
+                                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <SendHorizonal className="h-4 w-4" />
+                                )}
+                                Enviar
+                              </button>
+                            ) : null}
+                            {!transferCapabilities.ship &&
+                            !(transferCapabilities.requestCreate || transferCapabilities.manage) ? (
+                              <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-600">
+                                <ClipboardList className="h-4 w-4" />
+                                Seguimiento
+                              </span>
+                            ) : null}
                           </div>
                         ) : transfer.status === "shipped" ? (
                           <span className="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">

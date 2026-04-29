@@ -12,23 +12,45 @@ const DEFAULT_STEPS = [
   { id: "payment", label: "Cobro" },
 ]
 
+/**
+ * @param {{
+ *   eyebrow?: string
+ *   title?: string
+ *   subtitle?: string | null
+ *   meta?: import("react").ReactNode
+ *   actions?: import("react").ReactNode
+ *   steps?: Array<{ id: string; label: string }>
+ *   currentStep?: number
+ *   progress?: any
+ *   className?: string
+ *   surface?: "plain" | "panel"
+ * }} props
+ */
 export function PosHeader({
   eyebrow = "Operacion comercial",
   title = "Nueva venta",
-  subtitle,
-  meta,
-  actions,
-  steps,
-  currentStep,
-  progress,
-  className,
+  subtitle = "",
+  meta = null,
+  actions = null,
+  steps = undefined,
+  currentStep = undefined,
+  progress = undefined,
+  className = "",
+  surface = "plain",
 }) {
   const showStepper = Array.isArray(steps) && typeof currentStep === "number"
   const progressItems = Array.isArray(progress?.items) ? progress.items : []
   const showProgress = progressItems.length > 0
 
   return (
-    <section className={cn("sales-panel rounded-lg px-5 py-5 shadow-sm md:px-6", className)}>
+    <section
+      className={cn(
+        surface === "panel"
+          ? "sales-panel rounded-xl px-5 py-5 shadow-sm md:px-6"
+          : "space-y-4",
+        className
+      )}
+    >
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0 space-y-1.5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ripnel-accent-hover)]">
@@ -51,7 +73,7 @@ export function PosHeader({
       </div>
 
       {showStepper ? (
-        <div className="mt-4">
+        <div className={surface === "panel" ? "mt-4" : ""}>
           <Stepper
             steps={steps?.length ? steps : DEFAULT_STEPS}
             currentStep={currentStep}
@@ -60,7 +82,7 @@ export function PosHeader({
       ) : null}
 
       {showProgress ? (
-        <div className="ops-progress-rail mt-4 flex flex-col gap-3 pt-3">
+        <div className={cn("ops-progress-rail flex flex-col gap-3", surface === "panel" ? "mt-4 pt-3" : "")}>
           <div className="flex flex-wrap gap-2">
             {progressItems.map((item) => {
               const Icon = item.icon

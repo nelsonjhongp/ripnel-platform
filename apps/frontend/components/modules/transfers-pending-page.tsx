@@ -2,34 +2,41 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { CheckCheck, LoaderCircle, Search, Truck } from "lucide-react";
-import { buildApiUrl } from "@/lib/api";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { ForbiddenPage, LoadingPage } from "@/components/feedback/status-page";
+import type { ApiEnvelope } from "@/lib/api";
+import { apiFetch, unwrapApiData } from "@/lib/api";
+import { resolveTransferCapabilities } from "@/lib/capabilities";
 import {
   formatDateTime,
   type TransferSummary,
 } from "./transfers-shared";
 
 export function TransfersPendingPage() {
+  const { loading: authLoading, permissions, user } = useAuth();
   const [transfers, setTransfers] = useState<TransferSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [receivingId, setReceivingId] = useState<string | null>(null);
 
+  const transferCapabilities = useMemo(
+    () => resolveTransferCapabilities({ permissions, roleName: user?.role_name }),
+    [permissions, user?.role_name]
+  );
+
   async function loadTransfers() {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(buildApiUrl("/api/transfers/pending-receipts"), {
-        cache: "no-store",
-      });
-      const payload = await response.json();
+      const payload = await apiFetch<ApiEnvelope<TransferSummary[]> | TransferSummary[]>(
+        "/api/transfers/pending-receipts",
+        { cache: "no-store" }
+      );
+      const data = unwrapApiData(payload);
 
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo cargar recepciones");
-      }
-
-      setTransfers(payload.data || []);
+      setTransfers(data || []);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -50,19 +57,13 @@ export function TransfersPendingPage() {
     setError(null);
 
     try {
-      const response = await fetch(
-        buildApiUrl(`/api/transfers/${transferId}/receive`),
+      await apiFetch(
+        `/api/transfers/${transferId}/receive`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({}),
         }
       );
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo recepcionar la transferencia");
-      }
 
       await loadTransfers();
     } catch (requestError) {
@@ -99,6 +100,20 @@ export function TransfersPendingPage() {
       ),
     };
   }, [filteredTransfers]);
+
+  if (authLoading) {
+    return (
+      <LoadingPage
+        variant="ops"
+        title="Preparando recepciones"
+        description="Estamos validando la sede activa y los permisos para confirmar ingresos pendientes."
+      />
+    );
+  }
+
+  if (!transferCapabilities.receive) {
+    return <ForbiddenPage variant="ops" />;
+  }
 
   return (
     <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">

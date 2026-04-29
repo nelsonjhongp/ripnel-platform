@@ -7,7 +7,6 @@ import {
   Banknote,
   Boxes,
   CircleAlert,
-  ClipboardList,
   CreditCard,
   PackageSearch,
   ReceiptText,
@@ -19,6 +18,9 @@ import {
 
 import { useAuth } from "@/components/auth/AuthProvider"
 import { ErrorPage, InlineStatusCard, LoadingPage } from "@/components/feedback/status-page"
+import { HomeQuickActions } from "@/components/home/home-quick-actions"
+import { HomeSectionCard } from "@/components/home/home-section-card"
+import { useSidebarTopbarActions } from "@/components/sidebar"
 import { ApiError, apiFetch } from "@/lib/api"
 
 type DashboardLocation = {
@@ -452,6 +454,21 @@ export default function DashboardPage() {
     }
   }, [overview])
 
+  const dashboardTopbarActions = useMemo(
+    () => [
+      {
+        key: "dashboard-bi",
+        label: "Abrir BI",
+        href: "/bi",
+        icon: <ArrowUpRight className="h-4 w-4" />,
+        variant: "outline" as const,
+      },
+    ],
+    []
+  )
+
+  useSidebarTopbarActions(dashboardTopbarActions)
+
   if ((loading || authLoading) && !overview) {
     return (
       <LoadingPage
@@ -595,102 +612,106 @@ export default function DashboardPage() {
     1
   )
 
+  const shortcutItems = overview.shortcuts.map((shortcut) => ({
+    key: shortcut.key,
+    label: shortcut.label,
+    href: shortcut.href,
+    description: shortcut.description,
+    tone: "default" as const,
+  }))
+
   return (
     <section className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
-      <div className="mx-auto max-w-7xl space-y-[var(--ops-stack-gap)]">
-        <header className="sales-panel rounded-lg p-[var(--ops-panel-padding)] shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--ripnel-accent-hover)]">
-                Dashboard operativo
-              </p>
-              <h1 className="mt-1 text-2xl font-bold text-[var(--ops-text)] md:text-3xl">
-                {overview.context.location.name}
-              </h1>
-              <p className="mt-1 text-sm text-[var(--ops-text-muted)]">
-                {overview.context.location.code || "Sin codigo"} · {formatDate(overview.context.business_date)} ·{" "}
-                {overview.context.user.full_name}
-                {overview.context.user.role_name ? ` · ${overview.context.user.role_name}` : ""}
-              </p>
-            </div>
+      <div className="mx-auto max-w-7xl space-y-6">
+        <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--ripnel-accent-hover)]">
+              Dashboard operativo
+            </p>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-[var(--ops-text)] md:text-[2rem]">
+              {overview.context.location.name}
+            </h1>
+            <p className="mt-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">
+              {overview.context.location.code || "Sin codigo"} · {formatDate(overview.context.business_date)}
+              {overview.context.user.role_name ? ` · ${overview.context.user.role_name}` : ""}
+            </p>
+          </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href="/bi"
-                className="sales-field sales-field-interactive inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium"
-              >
-                <ArrowUpRight className="h-4 w-4" />
-                Abrir BI
-              </Link>
-              <button
-                type="button"
-                onClick={() => loadDashboard({ silent: true })}
-                disabled={refreshing}
-                className="inline-flex items-center gap-2 rounded-lg bg-[var(--ripnel-accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-                {refreshing ? "Actualizando..." : "Actualizar"}
-              </button>
-            </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => loadDashboard({ silent: true })}
+              disabled={refreshing}
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--ripnel-accent)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+              {refreshing ? "Actualizando..." : "Actualizar"}
+            </button>
           </div>
         </header>
 
-        <article
-          className={`rounded-lg border px-[var(--ops-panel-padding)] py-4 shadow-sm ${priorityToneClasses(primaryPriority.tone)}`}
-        >
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className={`rounded-xl border px-4 py-3 ${priorityToneClasses(primaryPriority.tone)}`}>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-current/70">
-                Foco del día
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-current/70">
+                Foco del dia
               </p>
-              <h2 className="mt-1 text-xl font-semibold text-current">{primaryPriority.title}</h2>
-              <p className="mt-2 text-sm leading-6 text-current/80">
-                {primaryPriority.description}
-              </p>
+              <p className="mt-1 text-base font-semibold text-current">{primaryPriority.title}</p>
+              <p className="mt-1 text-sm text-current/80">{primaryPriority.description}</p>
             </div>
             <Link
               href={primaryPriority.href}
-              className="inline-flex items-center gap-2 rounded-lg bg-[var(--ops-surface)] px-4 py-2.5 text-sm font-semibold text-current transition hover:opacity-90"
+              className="inline-flex items-center gap-2 rounded-full bg-[var(--ops-surface)] px-3.5 py-2 text-sm font-semibold text-current transition hover:opacity-90"
             >
-              Ir al módulo
+              Ir al modulo
               <ArrowUpRight className="h-4 w-4" />
             </Link>
           </div>
-        </article>
+        </div>
 
         {alerts.length > 0 ? (
-          <div className="grid gap-3 lg:grid-cols-2">
-            {alerts.map((alert) => {
-              const toneClasses =
-                alert.tone === "danger"
-                  ? "border-rose-200 bg-rose-50 text-rose-900"
-                  : "border-amber-200 bg-amber-50 text-amber-900"
+          <section className="space-y-3">
+            <div className="flex items-center gap-2">
+              <CircleAlert className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />
+              <h2 className="text-base font-semibold text-[var(--ops-text)]">Pendientes del momento</h2>
+            </div>
 
-              return (
-                <Link
-                  key={alert.key}
-                  href={alert.href}
-                  className={`rounded-lg border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${toneClasses}`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div className="rounded-lg bg-[var(--ops-surface)] p-2.5 text-current">
-                        <CircleAlert className="h-5 w-5" />
-                      </div>
+            <div className="grid gap-2 lg:grid-cols-2">
+              {alerts.map((alert) => {
+                const toneClasses =
+                  alert.tone === "danger"
+                    ? "border-rose-200 bg-rose-50 text-rose-900"
+                    : "border-amber-200 bg-amber-50 text-amber-900"
+
+                return (
+                  <Link
+                    key={alert.key}
+                    href={alert.href}
+                    className={`rounded-xl border px-4 py-3 transition hover:-translate-y-0.5 hover:shadow-sm ${toneClasses}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-base font-semibold text-current">{alert.title}</p>
-                        <p className="mt-1 text-sm leading-6 text-current/80">{alert.description}</p>
+                        <p className="text-sm font-semibold text-current">{alert.title}</p>
+                        <p className="mt-1 line-clamp-1 text-sm text-current/75">{alert.description}</p>
                       </div>
+                      <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-current/70" />
                     </div>
-                    <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-current/70" />
-                  </div>
-                </Link>
-              )
-            })}
-          </div>
+                  </Link>
+                )
+              })}
+            </div>
+          </section>
         ) : null}
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <section className="space-y-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
+              Resumen rapido
+            </p>
+            <h2 className="mt-1 text-base font-semibold text-[var(--ops-text)]">Indicadores del dia</h2>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {headlineCards.map((card) => {
             if (!card) return null
 
@@ -700,11 +721,11 @@ export default function DashboardPage() {
               <Link
                 key={card.key}
                 href={card.href}
-                className={`rounded-lg border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${card.tone}`}
+                className={`rounded-xl border p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${card.tone}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-current/70">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-current/70">
                       {card.label}
                     </p>
                     <p className="mt-3 text-3xl font-bold text-current">{card.value}</p>
@@ -717,16 +738,17 @@ export default function DashboardPage() {
               </Link>
             )
           })}
-        </div>
+          </div>
+        </section>
 
-        <article className="sales-panel rounded-lg p-[var(--ops-panel-padding)] shadow-sm">
-          <div className="grid gap-5 lg:grid-cols-2">
+        <HomeSectionCard eyebrow="Pulso" title="Cobro y presión operativa">
+          <div className="grid gap-4 lg:grid-cols-2">
             <section>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--ops-text-muted)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
                 Mezcla de cobro
               </p>
               <h2 className="mt-1 text-base font-semibold text-[var(--ops-text)]">
-                Distribución por método
+                Distribucion por metodo
               </h2>
               <div className="mt-4 space-y-3">
                 {paymentMix.length > 0 ? (
@@ -752,12 +774,12 @@ export default function DashboardPage() {
               </div>
             </section>
 
-            <section>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--ops-text-muted)]">
+            <section className="sales-panel-muted rounded-xl p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
                 Presión operativa
               </p>
               <h2 className="mt-1 text-base font-semibold text-[var(--ops-text)]">
-                Carga por frente crítico
+                Carga por frente critico
               </h2>
               <div className="mt-4 space-y-3">
                 {operationalMix.map((item) => (
@@ -775,43 +797,27 @@ export default function DashboardPage() {
               </div>
             </section>
           </div>
-        </article>
+        </HomeSectionCard>
+
+        {shortcutItems.length > 0 ? <HomeQuickActions items={shortcutItems} /> : null}
 
         <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-5">
             {salesToday ? (
-              <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--ripnel-accent-hover)]">
-                      Ventas y cobro del dia
-                    </p>
-                    <h2 className="mt-1 text-xl font-semibold text-[var(--ops-text)]">
-                      Flujo comercial de la sede activa
-                    </h2>
-                  </div>
-                  <Link
-                    href="/purchase-system"
-                    className="sales-field sales-field-interactive inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium"
-                  >
-                    Nueva venta
-                    <ArrowUpRight className="h-4 w-4" />
-                  </Link>
-                </div>
-
+              <HomeSectionCard eyebrow="Ventas" title="Flujo comercial de la sede activa">
                 <div className="mt-5 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-                  <div className="sales-panel-muted rounded-lg p-5">
+                  <div className="sales-panel-muted rounded-xl p-5">
                     <p className="text-sm font-semibold text-[var(--ops-text)]">Resumen rapido</p>
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div className="sales-panel rounded-lg p-4">
-                        <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Total vendido</p>
-                        <p className="mt-2 text-2xl font-bold text-slate-900">
+                      <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4">
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">Total vendido</p>
+                        <p className="mt-2 text-2xl font-bold text-[var(--ops-text)]">
                           {formatCurrency(salesToday.total_amount)}
                         </p>
                       </div>
-                      <div className="sales-panel rounded-lg p-4">
-                        <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Ventas confirmadas</p>
-                        <p className="mt-2 text-2xl font-bold text-slate-900">
+                      <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4">
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">Ventas confirmadas</p>
+                        <p className="mt-2 text-2xl font-bold text-[var(--ops-text)]">
                           {salesToday.sale_count || 0}
                         </p>
                       </div>
@@ -821,7 +827,7 @@ export default function DashboardPage() {
                     </p>
                   </div>
 
-                  <div className="sales-panel-muted rounded-lg p-5">
+                  <div className="sales-panel-muted rounded-xl p-5">
                     <p className="text-sm font-semibold text-[var(--ops-text)]">Metodos de pago</p>
                     <div className="mt-4 space-y-3">
                       {[
@@ -830,17 +836,19 @@ export default function DashboardPage() {
                         { key: "plin", label: "Plin" },
                         { key: "transfer", label: "Transferencia" },
                       ].map((item) => (
-                        <div key={item.key} className="sales-panel flex items-center justify-between rounded-lg px-4 py-3">
+                        <div key={item.key} className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-4 py-3">
+                          <div className="flex items-center justify-between">
                           <span className="text-sm text-[var(--ops-text-muted)]">{item.label}</span>
                           <span className="text-sm font-semibold text-[var(--ops-text)]">
                             {formatCurrency(salesToday.by_method?.[item.key as keyof PaymentTotals] as number)}
                           </span>
+                          </div>
                         </div>
                       ))}
                     </div>
                   </div>
                 </div>
-              </article>
+              </HomeSectionCard>
             ) : null}
 
             {cash && !cash.sales_summary?.consistency.is_consistent ? (
@@ -855,16 +863,8 @@ export default function DashboardPage() {
             ) : null}
 
             {cash ? (
-              <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
+              <HomeSectionCard eyebrow="Caja" title="Estado y consistencia operativa">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-700 dark:text-emerald-300">
-                      Caja del dia
-                    </p>
-                    <h2 className="mt-1 text-xl font-semibold text-[var(--ops-text)]">
-                      Estado y consistencia operativa
-                    </h2>
-                  </div>
                   <span
                     className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${cashTone(
                       cash.closing?.status
@@ -879,7 +879,7 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="mt-5 grid gap-4 lg:grid-cols-3">
-                  <div className="sales-panel-muted rounded-lg p-4">
+                  <div className="sales-panel-muted rounded-xl p-4">
                     <div className="flex items-center gap-2">
                       <Banknote className="h-4 w-4 text-emerald-600" />
                       <p className="text-sm font-semibold text-[var(--ops-text)]">Ventas vs pagos</p>
@@ -912,7 +912,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  <div className="sales-panel-muted rounded-lg p-4">
+                  <div className="sales-panel-muted rounded-xl p-4">
                     <div className="flex items-center gap-2">
                       <CreditCard className="h-4 w-4 text-sky-600" />
                       <p className="text-sm font-semibold text-[var(--ops-text)]">Actividad del cierre</p>
@@ -932,7 +932,7 @@ export default function DashboardPage() {
 
                   <Link
                     href="/caja"
-                    className="sales-panel-muted rounded-lg p-4 transition hover:-translate-y-0.5 hover:shadow-sm"
+                    className="sales-panel-muted rounded-xl p-4 transition hover:-translate-y-0.5 hover:shadow-sm"
                   >
                     <div className="flex items-center gap-2">
                       <Wallet className="h-4 w-4 text-emerald-700" />
@@ -943,56 +943,23 @@ export default function DashboardPage() {
                     </p>
                   </Link>
                 </div>
-              </article>
+              </HomeSectionCard>
             ) : null}
-
-            <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                    Accesos rapidos
-                  </p>
-                  <h2 className="mt-1 text-xl font-semibold text-slate-900">
-                    Atajos para la operacion
-                  </h2>
-                </div>
-              </div>
-
-              <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {overview.shortcuts.map((shortcut) => (
-                  <Link
-                    key={shortcut.key}
-                    href={shortcut.href}
-                    className="sales-panel-muted rounded-lg p-4 transition hover:-translate-y-0.5 hover:opacity-90 hover:shadow-sm"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-slate-900">{shortcut.label}</p>
-                      <ArrowUpRight className="h-4 w-4 text-slate-400" />
-                    </div>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">{shortcut.description}</p>
-                  </Link>
-                ))}
-              </div>
-            </article>
           </div>
 
           <div className="space-y-5">
             {receipts ? (
-              <article className="sales-panel rounded-lg p-5 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <ReceiptText className="h-4 w-4 text-amber-600" />
-                  <h2 className="text-lg font-semibold text-[var(--ops-text)]">Comprobantes</h2>
-                </div>
+              <HomeSectionCard eyebrow="Comprobantes" title="Cola operativa">
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <div className="sales-panel-muted rounded-lg p-4">
+                  <div className="sales-panel-muted rounded-xl p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Open</p>
                     <p className="mt-2 text-2xl font-bold text-slate-900">{receipts.open_count || 0}</p>
                   </div>
-                  <div className="sales-panel-muted rounded-lg p-4">
+                  <div className="sales-panel-muted rounded-xl p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Missing</p>
                     <p className="mt-2 text-2xl font-bold text-slate-900">{receipts.missing_count || 0}</p>
                   </div>
-                  <div className="sales-panel-muted rounded-lg p-4">
+                  <div className="sales-panel-muted rounded-xl p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Error</p>
                     <p className="mt-2 text-2xl font-bold text-slate-900">{receipts.error_count || 0}</p>
                   </div>
@@ -1003,7 +970,7 @@ export default function DashboardPage() {
                       <Link
                         key={`${item.sale_id}-${item.queue_status}`}
                         href={`/purchase-system/${item.sale_id}`}
-                        className="sales-panel-muted block rounded-lg px-4 py-3 transition hover:opacity-90"
+                        className="sales-panel-muted block rounded-xl px-4 py-3 transition hover:opacity-90"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -1028,34 +995,30 @@ export default function DashboardPage() {
                       </Link>
                     ))
                   ) : (
-                    <p className="sales-panel-muted rounded-lg px-4 py-6 text-sm text-[var(--ops-text-muted)]">
+                    <p className="sales-panel-muted rounded-xl px-4 py-6 text-sm text-[var(--ops-text-muted)]">
                       No hay comprobantes abiertos en este momento.
                     </p>
                   )}
                 </div>
-              </article>
+              </HomeSectionCard>
             ) : null}
 
             {postsales ? (
-              <article className="sales-panel rounded-lg p-5 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <PackageSearch className="h-4 w-4 text-orange-600" />
-                  <h2 className="text-lg font-semibold text-[var(--ops-text)]">Postventa reciente</h2>
-                </div>
+              <HomeSectionCard eyebrow="Postventa" title="Ventas recientes con seguimiento">
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <div className="sales-panel-muted rounded-lg p-4">
+                  <div className="sales-panel-muted rounded-xl p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Cambio</p>
                     <p className="mt-2 text-2xl font-bold text-slate-900">
                       {postsales.eligible_exchange_count || 0}
                     </p>
                   </div>
-                  <div className="sales-panel-muted rounded-lg p-4">
+                  <div className="sales-panel-muted rounded-xl p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Anulable</p>
                     <p className="mt-2 text-2xl font-bold text-slate-900">
                       {postsales.eligible_cancel_count || 0}
                     </p>
                   </div>
-                  <div className="sales-panel-muted rounded-lg p-4">
+                  <div className="sales-panel-muted rounded-xl p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Bloqueada</p>
                     <p className="mt-2 text-2xl font-bold text-slate-900">
                       {postsales.blocked_cancel_count || 0}
@@ -1068,7 +1031,7 @@ export default function DashboardPage() {
                       <Link
                         key={item.sale_id}
                         href={`/postventa/${item.sale_id}`}
-                        className="sales-panel-muted block rounded-lg px-4 py-3 transition hover:opacity-90"
+                        className="sales-panel-muted block rounded-xl px-4 py-3 transition hover:opacity-90"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -1096,32 +1059,28 @@ export default function DashboardPage() {
                       </Link>
                     ))
                   ) : (
-                    <p className="sales-panel-muted rounded-lg px-4 py-6 text-sm text-[var(--ops-text-muted)]">
+                    <p className="sales-panel-muted rounded-xl px-4 py-6 text-sm text-[var(--ops-text-muted)]">
                       No encontramos ventas recientes listas para postventa.
                     </p>
                   )}
                 </div>
-              </article>
+              </HomeSectionCard>
             ) : null}
 
             {inventory ? (
-              <article className="sales-panel rounded-lg p-5 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <Boxes className="h-4 w-4 text-rose-600" />
-                  <h2 className="text-lg font-semibold text-[var(--ops-text)]">Inventario critico</h2>
-                </div>
+              <HomeSectionCard eyebrow="Inventario" title="Inventario critico">
                 <p className="mt-2 text-sm text-[var(--ops-text-muted)]">
                   Se consideran criticas las variantes con stock `0` o menor/igual a{" "}
                   {inventory.low_stock_threshold || 0}.
                 </p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="sales-panel-muted rounded-lg p-4">
+                  <div className="sales-panel-muted rounded-xl p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500">En cero</p>
                     <p className="mt-2 text-2xl font-bold text-slate-900">
                       {inventory.zero_stock_count || 0}
                     </p>
                   </div>
-                  <div className="sales-panel-muted rounded-lg p-4">
+                  <div className="sales-panel-muted rounded-xl p-4">
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Bajo minimo</p>
                     <p className="mt-2 text-2xl font-bold text-slate-900">
                       {inventory.low_stock_count || 0}
@@ -1134,7 +1093,7 @@ export default function DashboardPage() {
                       <Link
                         key={item.variant_id}
                         href="/inventory"
-                        className="sales-panel-muted block rounded-lg px-4 py-3 transition hover:opacity-90"
+                        className="sales-panel-muted block rounded-xl px-4 py-3 transition hover:opacity-90"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -1156,21 +1115,17 @@ export default function DashboardPage() {
                       </Link>
                     ))
                   ) : (
-                    <p className="sales-panel-muted rounded-lg px-4 py-6 text-sm text-[var(--ops-text-muted)]">
+                    <p className="sales-panel-muted rounded-xl px-4 py-6 text-sm text-[var(--ops-text-muted)]">
                       No hay variantes criticas para la sede operativa.
                     </p>
                   )}
                 </div>
-              </article>
+              </HomeSectionCard>
             ) : null}
 
             {transfers ? (
-              <article className="sales-panel rounded-lg p-5 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <Truck className="h-4 w-4 text-sky-600" />
-                  <h2 className="text-lg font-semibold text-[var(--ops-text)]">Transferencias por recibir</h2>
-                </div>
-                <div className="sales-panel-muted mt-4 rounded-lg p-4">
+              <HomeSectionCard eyebrow="Transferencias" title="Transferencias por recibir">
+                <div className="sales-panel-muted mt-4 rounded-xl p-4">
                   <p className="text-xs uppercase tracking-[0.2em] text-sky-700">Pendientes</p>
                   <p className="mt-2 text-3xl font-bold text-sky-900">
                     {transfers.pending_receipts_count || 0}
@@ -1182,7 +1137,7 @@ export default function DashboardPage() {
                       <Link
                         key={item.transfer_id}
                         href={`/transferencias/${item.transfer_id}`}
-                        className="sales-panel-muted block rounded-lg px-4 py-3 transition hover:opacity-90"
+                        className="sales-panel-muted block rounded-xl px-4 py-3 transition hover:opacity-90"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -1203,28 +1158,24 @@ export default function DashboardPage() {
                       </Link>
                     ))
                   ) : (
-                    <p className="sales-panel-muted rounded-lg px-4 py-6 text-sm text-[var(--ops-text-muted)]">
+                    <p className="sales-panel-muted rounded-xl px-4 py-6 text-sm text-[var(--ops-text-muted)]">
                       No hay recepciones pendientes en este momento.
                     </p>
                   )}
                 </div>
-              </article>
+              </HomeSectionCard>
             ) : null}
           </div>
         </div>
 
-        <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
-          <div className="flex items-center gap-2">
-            <ClipboardList className="h-4 w-4 text-slate-600" />
-            <h2 className="text-lg font-semibold text-[var(--ops-text)]">Actividad reciente</h2>
-          </div>
+        <HomeSectionCard eyebrow="Actividad" title="Actividad reciente">
           <div className="mt-4 space-y-3">
             {activityItems.length > 0 ? (
               activityItems.map((item) => (
                 <Link
                   key={item.id}
                   href={item.href}
-                  className="sales-panel-muted flex flex-col gap-3 rounded-lg px-4 py-3 transition hover:opacity-90 md:flex-row md:items-center md:justify-between"
+                  className="sales-panel-muted flex flex-col gap-3 rounded-xl px-4 py-3 transition hover:opacity-90 md:flex-row md:items-center md:justify-between"
                 >
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{item.title}</p>
@@ -1242,12 +1193,12 @@ export default function DashboardPage() {
                 </Link>
               ))
             ) : (
-              <p className="sales-panel-muted rounded-lg px-4 py-6 text-sm text-[var(--ops-text-muted)]">
+              <p className="sales-panel-muted rounded-xl px-4 py-6 text-sm text-[var(--ops-text-muted)]">
                 Aun no hay actividad reciente visible para tu rol en esta sede.
               </p>
             )}
           </div>
-        </article>
+        </HomeSectionCard>
       </div>
     </section>
   )

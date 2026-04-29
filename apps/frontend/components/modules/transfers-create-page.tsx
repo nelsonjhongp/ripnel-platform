@@ -8,7 +8,11 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { buildApiUrl } from "@/lib/api";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { ForbiddenPage, LoadingPage } from "@/components/feedback/status-page";
+import type { ApiEnvelope } from "@/lib/api";
+import { apiFetch, unwrapApiData } from "@/lib/api";
+import { resolveTransferCapabilities } from "@/lib/capabilities";
 
 type Location = {
   location_id: string;
@@ -37,6 +41,7 @@ type DraftLine = InventoryItem & {
 };
 
 export function TransfersCreatePage() {
+  const { loading: authLoading, defaultLocation, permissions, user } = useAuth();
   const [locations, setLocations] = useState<Location[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [draftLines, setDraftLines] = useState<DraftLine[]>([]);
@@ -52,20 +57,24 @@ export function TransfersCreatePage() {
     {}
   );
 
+  const transferCapabilities = useMemo(
+    () => resolveTransferCapabilities({ permissions, roleName: user?.role_name }),
+    [permissions, user?.role_name]
+  );
+
+  const isStoreRequestMode = transferCapabilities.requestCreate && !transferCapabilities.manage;
+
   async function loadLocations() {
     setLoadingLocations(true);
 
     try {
-      const response = await fetch(buildApiUrl("/api/locations"), {
-        cache: "no-store",
-      });
-      const payload = await response.json();
+      const payload = await apiFetch<ApiEnvelope<Location[]> | Location[]>(
+        "/api/locations",
+        { cache: "no-store" }
+      );
+      const data = unwrapApiData(payload);
 
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudieron cargar sedes");
-      }
-
-      setLocations((payload.data || []).filter((location: Location) => location.active));
+      setLocations((data || []).filter((location: Location) => location.active));
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -86,19 +95,13 @@ export function TransfersCreatePage() {
     setLoadingInventory(true);
 
     try {
-      const response = await fetch(
-        buildApiUrl(`/api/inventory?location_id=${locationId}`),
-        {
-          cache: "no-store",
-        }
+      const payload = await apiFetch<ApiEnvelope<InventoryItem[]> | InventoryItem[]>(
+        `/api/inventory?location_id=${locationId}`,
+        { cache: "no-store" }
       );
-      const payload = await response.json();
+      const data = unwrapApiData(payload);
 
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo cargar stock de origen");
-      }
-
-      setInventory((payload.data || []).filter((item: InventoryItem) => item.qty > 0));
+      setInventory((data || []).filter((item: InventoryItem) => item.qty > 0));
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -113,6 +116,12 @@ export function TransfersCreatePage() {
   useEffect(() => {
     loadLocations();
   }, []);
+
+  useEffect(() => {
+    if (isStoreRequestMode && defaultLocation?.location_id) {
+      setDestinationId(defaultLocation.location_id);
+    }
+  }, [defaultLocation?.location_id, isStoreRequestMode]);
 
   useEffect(() => {
     setDraftLines([]);
@@ -130,6 +139,14 @@ export function TransfersCreatePage() {
   const destinationOptions = useMemo(() => {
     return locations.filter((location) => location.location_id !== originId);
   }, [locations, originId]);
+
+  const originOptions = useMemo(() => {
+    const blockedDestinationId = isStoreRequestMode
+      ? defaultLocation?.location_id
+      : destinationId;
+
+    return locations.filter((location) => location.location_id !== blockedDestinationId);
+  }, [defaultLocation?.location_id, destinationId, isStoreRequestMode, locations]);
 
   const totals = useMemo(() => {
     return {
@@ -195,7 +212,7 @@ export function TransfersCreatePage() {
     setSuccessMessage(null);
 
     try {
-      if (!originId || !destinationId) {
+      if (!originId || !(isStoreRequestMode ? defaultLocation?.location_id : destinationId)) {
         throw new Error("Debes seleccionar origen y destino");
       }
 
@@ -203,28 +220,32 @@ export function TransfersCreatePage() {
         throw new Error("Debes agregar al menos una variante a la transferencia");
       }
 
-      const response = await fetch(buildApiUrl("/api/transfers"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          from_location_id: originId,
-          to_location_id: destinationId,
-          notes: notes.trim() || null,
-          lines: draftLines.map((line) => ({
-            variant_id: line.variant_id,
-            qty_requested: line.qty_requested,
-            notes: null,
-          })),
-        }),
-      });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo crear la transferencia");
-      }
+      const payload = await apiFetch<
+        ApiEnvelope<{ transfer_number?: string | null }> | { transfer_number?: string | null }
+      >(
+        "/api/transfers",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            from_location_id: originId,
+            to_location_id: isStoreRequestMode
+              ? defaultLocation?.location_id
+              : destinationId,
+            notes: notes.trim() || null,
+            lines: draftLines.map((line) => ({
+              variant_id: line.variant_id,
+              qty_requested: line.qty_requested,
+              notes: null,
+            })),
+          }),
+        }
+      );
+      const data = unwrapApiData(payload);
 
       setSuccessMessage(
-        `Transferencia ${payload.data.transfer_number || "creada"} registrada en borrador`
+        `${
+          isStoreRequestMode ? "Solicitud" : "Transferencia"
+        } ${data.transfer_number || "creada"} registrada en borrador`
       );
       setDraftLines([]);
       setPendingQuantities({});
@@ -241,18 +262,34 @@ export function TransfersCreatePage() {
     }
   }
 
+  if (authLoading) {
+    return (
+      <LoadingPage
+        variant="ops"
+        title="Preparando solicitud entre tiendas"
+        description="Estamos validando tu sede activa y los permisos operativos para este flujo."
+      />
+    )
+  }
+
+  if (!transferCapabilities.requestCreate) {
+    return <ForbiddenPage variant="ops" />
+  }
+
   return (
     <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
       <div className="mx-auto max-w-7xl space-y-5">
         <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
           <p className="text-xs uppercase tracking-wide text-violet-600">
-            Traslado interno
+            {isStoreRequestMode ? "Reposición entre tiendas" : "Traslado interno"}
           </p>
           <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">
-            Crear transferencia
+            {isStoreRequestMode ? "Solicitar productos" : "Crear transferencia"}
           </h1>
           <p className="mt-1 text-sm text-slate-600">
-            Arma un borrador de traslado entre sedes usando stock real del origen.
+            {isStoreRequestMode
+              ? "Pide productos para tu sede usando stock real de otra tienda u origen disponible."
+              : "Arma un borrador de traslado entre sedes usando stock real del origen."}
           </p>
         </header>
 
@@ -271,7 +308,7 @@ export function TransfersCreatePage() {
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
                 >
                   <option value="">Selecciona una sede</option>
-                  {locations.map((location) => (
+                  {originOptions.map((location) => (
                     <option key={location.location_id} value={location.location_id}>
                       {location.code} - {location.name}
                     </option>
@@ -280,11 +317,13 @@ export function TransfersCreatePage() {
               </label>
 
               <label className="space-y-2 text-sm">
-                <span className="font-medium text-slate-700">Destino</span>
+                <span className="font-medium text-slate-700">
+                  {isStoreRequestMode ? "Mi tienda" : "Destino"}
+                </span>
                 <select
                   value={destinationId}
                   onChange={(event) => setDestinationId(event.target.value)}
-                  disabled={loadingLocations || !originId}
+                  disabled={loadingLocations || !originId || isStoreRequestMode}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
                 >
                   <option value="">Selecciona una sede</option>
@@ -303,7 +342,11 @@ export function TransfersCreatePage() {
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
                 rows={3}
-                placeholder="Motivo operativo del traslado"
+                placeholder={
+                  isStoreRequestMode
+                    ? "Qué producto falta o por qué necesitas la reposición"
+                    : "Motivo operativo del traslado"
+                }
                 className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
               />
             </label>
@@ -469,7 +512,7 @@ export function TransfersCreatePage() {
                 submitting ||
                 loadingLocations ||
                 !originId ||
-                !destinationId ||
+                !(isStoreRequestMode ? defaultLocation?.location_id : destinationId) ||
                 !draftLines.length
               }
               className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
@@ -479,7 +522,7 @@ export function TransfersCreatePage() {
               ) : (
                 <ArrowRightLeft className="h-4 w-4" />
               )}
-              Crear transferencia en borrador
+              {isStoreRequestMode ? "Crear solicitud en borrador" : "Crear transferencia en borrador"}
             </button>
           </article>
         </form>
