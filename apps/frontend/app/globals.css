@@ -575,19 +575,31 @@ html[data-theme-preset="graphite"] {
   }
 
   .sales-wizard-shell {
-    padding-top: 0.125rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
   }
 
   .sales-wizard-rail-wrap {
+    display: flex;
+    justify-content: center;
     min-width: 0;
-    flex: 1;
+  }
+
+  .sales-wizard-rail-scroll {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    min-width: 0;
   }
 
   .sales-wizard-rail {
     display: flex;
-    min-width: max-content;
     align-items: center;
+    justify-content: center;
     gap: 0.5rem;
+    width: max-content;
+    min-width: max-content;
   }
 
   .sales-wizard-item {
@@ -690,14 +702,37 @@ html[data-theme-preset="graphite"] {
     background: color-mix(in srgb, var(--ripnel-accent) 38%, var(--ops-border-strong));
   }
 
+  .sales-wizard-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .sales-wizard-nav-end {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-width: 0;
+  }
+
+  .sales-wizard-nav-button {
+    cursor: pointer;
+  }
+
   @media (max-width: 767px) {
     .sales-wizard-rail-wrap {
+      justify-content: flex-start;
+    }
+
+    .sales-wizard-rail-scroll {
       overflow-x: auto;
       padding-bottom: 0.25rem;
       scrollbar-width: none;
+      justify-content: flex-start;
     }
 
-    .sales-wizard-rail-wrap::-webkit-scrollbar {
+    .sales-wizard-rail-scroll::-webkit-scrollbar {
       display: none;
     }
 
@@ -707,6 +742,14 @@ html[data-theme-preset="graphite"] {
 
     .sales-wizard-meta {
       font-size: 0.625rem;
+    }
+
+    .sales-wizard-nav {
+      flex-wrap: wrap;
+    }
+
+    .sales-wizard-nav-end {
+      margin-left: auto;
     }
   }
 }

@@ -17,10 +17,12 @@ export function SalesWizardRail({
   nextLabel = "Siguiente",
   className,
 }) {
+  void currentStep
+
   return (
     <section className={cn("sales-wizard-shell", className)}>
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="sales-wizard-rail-wrap">
+      <div className="sales-wizard-rail-wrap">
+        <div className="sales-wizard-rail-scroll">
           <ol className="sales-wizard-rail" aria-label="Progreso de venta">
             {items.map((item, index) => {
               const Icon = item.icon
@@ -65,41 +67,39 @@ export function SalesWizardRail({
             })}
           </ol>
         </div>
+      </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 xl:justify-end">
-          <span className="text-xs font-medium text-[var(--ops-text-muted)]">
-            Paso {Math.max(currentStep, 0) + 1} de {items.length}
-          </span>
-          <div className="flex items-center gap-2">
+      <div className="sales-wizard-nav">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onPrevious}
+          disabled={!canGoPrevious}
+          className="sales-wizard-nav-button rounded-full"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Anterior
+        </Button>
+
+        <div className="sales-wizard-nav-end">
+          {canGoNext ? (
             <Button
               type="button"
-              variant="outline"
+              variant="accent"
               size="sm"
-              onClick={onPrevious}
-              disabled={!canGoPrevious}
-              className="rounded-full"
+              onClick={onNext}
+              disabled={!canAdvance}
+              className="sales-wizard-nav-button rounded-full"
             >
-              <ChevronLeft className="h-4 w-4" />
-              Anterior
+              {nextLabel}
+              <ChevronRight className="h-4 w-4" />
             </Button>
-            {canGoNext ? (
-              <Button
-                type="button"
-                variant="accent"
-                size="sm"
-                onClick={onNext}
-                disabled={!canAdvance}
-                className="rounded-full"
-              >
-                {nextLabel}
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            ) : (
-              <span className="sales-chip sales-chip-success rounded-full px-3 py-1 text-xs font-semibold">
-                Etapa final
-              </span>
-            )}
-          </div>
+          ) : (
+            <span className="sales-chip sales-chip-success rounded-full px-3 py-1 text-xs font-semibold">
+              Etapa final
+            </span>
+          )}
         </div>
       </div>
     </section>

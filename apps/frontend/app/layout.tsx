@@ -30,14 +30,14 @@ export const viewport: Viewport = {
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: React.ReactNode
 }>) {
   return (
     <html
       lang="es"
       className={cn(poppins.className, "font-sans", geist.variable)}
     >
-      <body>
+      <body suppressHydrationWarning>
         <AuthProvider>
           <SidebarProvider>
             <TooltipProvider>{children}</TooltipProvider>
@@ -45,5 +45,5 @@ export default function RootLayout({
         </AuthProvider>
       </body>
     </html>
-  );
+  )
 }

@@ -221,24 +221,20 @@ export default function TransactionHistoryPage() {
             eyebrow="Operacion comercial"
             title="Historial de ventas"
             actions={
-              <>
-                <Button asChild variant="outline" size="sm" className="rounded-full">
-                  <Link href="/postventa">Postventa</Link>
-                </Button>
-                <Button asChild variant="accent" size="sm" className="rounded-full">
-                  <Link href="/purchase-system">Nueva venta</Link>
-                </Button>
-              </>
+              <Button asChild variant="outline" size="sm" className="rounded-full">
+                <Link href="/postventa">Postventa</Link>
+              </Button>
             }
           />
 
-          <div className="flex flex-wrap gap-2">
-            <MetricPill label="Ventas visibles" value={totals.count} />
-            <MetricPill label="Ingreso visible" value={`S/. ${totals.revenue.toFixed(2)}`} tone="success" />
-            <MetricPill label="Borradores en pagina" value={totals.pending} tone="warning" />
-          </div>
+          <article className="sales-panel rounded-xl p-4 shadow-sm md:p-5">
+            <div className="flex flex-wrap gap-2">
+              <MetricPill label="Ventas visibles" value={totals.count} />
+              <MetricPill label="Ingreso visible" value={`S/. ${totals.revenue.toFixed(2)}`} tone="success" />
+              <MetricPill label="Borradores en pagina" value={totals.pending} tone="warning" />
+            </div>
 
-          <article className="sales-panel rounded-lg p-4 shadow-sm md:p-5">
+            <div className="mt-4 border-t border-[var(--ops-border-strong)] pt-4">
             <div className="grid gap-3 lg:grid-cols-[1.35fr_0.8fr_0.92fr_0.92fr_auto] lg:items-end">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
@@ -311,6 +307,7 @@ export default function TransactionHistoryPage() {
                 <RotateCcw className="h-4 w-4" />
                 Limpiar
               </Button>
+            </div>
             </div>
 
             <div className="mt-4 overflow-hidden rounded-lg border border-[var(--ops-border-strong)]">

@@ -3,6 +3,7 @@
  */
 
 import { useAuth } from "@/components/auth/AuthProvider"
+import { resolveTransferCapabilities } from "@/lib/capabilities"
 
 export function usePermissions() {
   const { user, permissions } = useAuth()
@@ -54,7 +55,7 @@ export function usePermissions() {
   }
 
   const canAccessTransfers = (): boolean => {
-    return hasAnyRole(["ALMACEN", "ADMIN"])
+    return resolveTransferCapabilities({ permissions, roleName: user?.role_name }).visible
   }
 
   const canAccessInventory = (): boolean => {

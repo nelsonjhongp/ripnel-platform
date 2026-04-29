@@ -1,3 +1,3 @@
 export { AppSidebar } from "./AppSidebar"
-export { SidebarShell } from "./SidebarShell"
+export { SidebarShell, useSidebarTopbarActions } from "./SidebarShell"
 export { default } from "./AppSidebar"
