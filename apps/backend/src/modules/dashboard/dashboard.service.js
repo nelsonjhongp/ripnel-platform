@@ -1,4 +1,5 @@
 const { AppError } = require('../../shared/errors');
+const { pool } = require('../../shared/db');
 const { findActiveUserById } = require('../auth/auth.repo');
 const { findDefaultLocationByUserId } = require('../users/users.repo');
 const {
@@ -287,58 +288,66 @@ async function getDashboardOverview(input = {}) {
   const sections = buildSections({ permissions, roleName });
 
   const needsSalesAggregates = sections.sales || sections.cash;
+  const client = await pool.connect();
+  let salesHeadline = null;
+  let paymentRows = [];
+  let currentCashClosing = null;
+  let salesRow = null;
+  let receiptCounts = null;
+  let receiptItems = [];
+  let postsalesCounts = null;
+  let postsalesItems = [];
+  let transferCounts = null;
+  let transferItems = [];
+  let inventoryCounts = null;
+  let inventoryItems = [];
 
-  const [
-    salesHeadline,
-    paymentRows,
-    currentCashClosing,
-    salesRow,
-    receiptCounts,
-    receiptItems,
-    postsalesCounts,
-    postsalesItems,
-    transferCounts,
-    transferItems,
-    inventoryCounts,
-    inventoryItems,
-  ] = await Promise.all([
-    needsSalesAggregates
-      ? findSalesHeadlineByLocationAndDate(location.location_id, businessDate)
-      : Promise.resolve(null),
-    needsSalesAggregates
-      ? findPaymentTotalsByLocationAndDate(location.location_id, businessDate)
-      : Promise.resolve([]),
-    sections.cash
-      ? findCashClosingByLocationAndDate(location.location_id, businessDate)
-      : Promise.resolve(null),
-    needsSalesAggregates
-      ? countSalesByLocationAndDate(location.location_id, businessDate)
-      : Promise.resolve(null),
-    sections.receipts
-      ? findReceiptQueueCounts(location.location_id)
-      : Promise.resolve(null),
-    sections.receipts
-      ? findReceiptQueueItems(location.location_id, 5)
-      : Promise.resolve([]),
-    sections.postsales
-      ? findPostsalesWindowCounts(location.location_id, businessDate, POSTSALE_LOOKBACK_DAYS)
-      : Promise.resolve(null),
-    sections.postsales
-      ? findPostsalesWindowItems(location.location_id, businessDate, POSTSALE_LOOKBACK_DAYS, 5)
-      : Promise.resolve([]),
-    sections.transfers
-      ? findPendingTransfersCounts(location.location_id)
-      : Promise.resolve(null),
-    sections.transfers
-      ? findPendingTransfersItems(location.location_id, 5)
-      : Promise.resolve([]),
-    sections.inventory
-      ? findCriticalInventoryCounts(location.location_id, LOW_STOCK_THRESHOLD)
-      : Promise.resolve(null),
-    sections.inventory
-      ? findCriticalInventoryItems(location.location_id, LOW_STOCK_THRESHOLD, 6)
-      : Promise.resolve([]),
-  ]);
+  try {
+    const executor = client.query.bind(client);
+
+    if (needsSalesAggregates) {
+      salesHeadline = await findSalesHeadlineByLocationAndDate(location.location_id, businessDate, executor);
+      paymentRows = await findPaymentTotalsByLocationAndDate(location.location_id, businessDate, executor);
+      salesRow = await countSalesByLocationAndDate(location.location_id, businessDate, executor);
+    }
+
+    if (sections.cash) {
+      currentCashClosing = await findCashClosingByLocationAndDate(location.location_id, businessDate, executor);
+    }
+
+    if (sections.receipts) {
+      receiptCounts = await findReceiptQueueCounts(location.location_id, executor);
+      receiptItems = await findReceiptQueueItems(location.location_id, 5, executor);
+    }
+
+    if (sections.postsales) {
+      postsalesCounts = await findPostsalesWindowCounts(
+        location.location_id,
+        businessDate,
+        POSTSALE_LOOKBACK_DAYS,
+        executor
+      );
+      postsalesItems = await findPostsalesWindowItems(
+        location.location_id,
+        businessDate,
+        POSTSALE_LOOKBACK_DAYS,
+        5,
+        executor
+      );
+    }
+
+    if (sections.transfers) {
+      transferCounts = await findPendingTransfersCounts(location.location_id, executor);
+      transferItems = await findPendingTransfersItems(location.location_id, 5, executor);
+    }
+
+    if (sections.inventory) {
+      inventoryCounts = await findCriticalInventoryCounts(location.location_id, LOW_STOCK_THRESHOLD, executor);
+      inventoryItems = await findCriticalInventoryItems(location.location_id, LOW_STOCK_THRESHOLD, 6, executor);
+    }
+  } finally {
+    client.release();
+  }
 
   const paymentTotals = buildPaymentTotals(paymentRows);
   const salesConsistency = buildConsistency(paymentTotals, salesRow || {});
@@ -436,21 +445,38 @@ async function getDashboardActivity(input = {}) {
   const roleName = input.role_name || user.role_name || null;
   const sections = buildSections({ permissions, roleName });
 
-  const [
-    salesEvents,
-    receiptEvents,
-    postsaleEvents,
-    transferEvents,
-    adjustmentEvents,
-    cashEvents,
-  ] = await Promise.all([
-    sections.sales ? findRecentSalesEvents(location.location_id, 5) : Promise.resolve([]),
-    sections.receipts ? findRecentReceiptEvents(location.location_id, 5) : Promise.resolve([]),
-    sections.postsales ? findRecentPostsaleEvents(location.location_id, 5) : Promise.resolve([]),
-    sections.transfers ? findRecentTransferEvents(location.location_id, 5) : Promise.resolve([]),
-    sections.inventory ? findRecentAdjustmentEvents(location.location_id, 5) : Promise.resolve([]),
-    sections.cash ? findRecentCashEvents(location.location_id, 5) : Promise.resolve([]),
-  ]);
+  const client = await pool.connect();
+  let salesEvents = [];
+  let receiptEvents = [];
+  let postsaleEvents = [];
+  let transferEvents = [];
+  let adjustmentEvents = [];
+  let cashEvents = [];
+
+  try {
+    const executor = client.query.bind(client);
+
+    salesEvents = sections.sales
+      ? await findRecentSalesEvents(location.location_id, 5, executor)
+      : [];
+    receiptEvents = sections.receipts
+      ? await findRecentReceiptEvents(location.location_id, 5, executor)
+      : [];
+    postsaleEvents = sections.postsales
+      ? await findRecentPostsaleEvents(location.location_id, 5, executor)
+      : [];
+    transferEvents = sections.transfers
+      ? await findRecentTransferEvents(location.location_id, 5, executor)
+      : [];
+    adjustmentEvents = sections.inventory
+      ? await findRecentAdjustmentEvents(location.location_id, 5, executor)
+      : [];
+    cashEvents = sections.cash
+      ? await findRecentCashEvents(location.location_id, 5, executor)
+      : [];
+  } finally {
+    client.release();
+  }
 
   const items = [
     ...salesEvents.map(mapSalesEvent),
