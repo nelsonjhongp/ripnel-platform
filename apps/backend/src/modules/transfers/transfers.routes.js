@@ -1,4 +1,5 @@
 const express = require('express');
+const { requireAuth } = require('../../middlewares/auth');
 const {
   getTransfers,
   getPendingReceipts,
@@ -8,15 +9,18 @@ const {
   postReceiveTransfer,
   postCancelTransfer,
 } = require('./transfers.controller');
+const { requireTransferCapability } = require('./transfers-access');
 
 const router = express.Router();
 
-router.get('/', getTransfers);
-router.get('/pending-receipts', getPendingReceipts);
-router.get('/:transferId', getTransfer);
-router.post('/', postTransfer);
-router.post('/:transferId/ship', postShipTransfer);
-router.post('/:transferId/receive', postReceiveTransfer);
-router.post('/:transferId/cancel', postCancelTransfer);
+router.use(requireAuth);
+
+router.get('/', requireTransferCapability('visible'), getTransfers);
+router.get('/pending-receipts', requireTransferCapability('receive'), getPendingReceipts);
+router.get('/:transferId', requireTransferCapability('visible'), getTransfer);
+router.post('/', requireTransferCapability('request_create'), postTransfer);
+router.post('/:transferId/ship', requireTransferCapability('ship'), postShipTransfer);
+router.post('/:transferId/receive', requireTransferCapability('receive'), postReceiveTransfer);
+router.post('/:transferId/cancel', requireTransferCapability('visible'), postCancelTransfer);
 
 module.exports = router;

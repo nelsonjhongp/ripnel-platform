@@ -19,10 +19,14 @@ const {
   upsertInventoryQty,
   insertStockMovement,
 } = require('../inventory/inventory.repo');
-const { findUserById, findUserByEmail } = require('../users/users.repo');
+const {
+  findUserById,
+  findUserLocationsByUserId,
+  findDefaultLocationByUserId,
+} = require('../users/users.repo');
+const { buildTransferCapabilities } = require('./transfers-access');
 
 const ALLOWED_TRANSFER_STATUSES = ['draft', 'shipped', 'received', 'cancelled'];
-const DEVELOPMENT_ACTOR_EMAIL = 'nelson@ripnel.com';
 
 function normalizeUuid(value) {
   const normalized = String(value || '').trim();
@@ -66,29 +70,61 @@ function ensureUniqueVariantIds(lines) {
   return true;
 }
 
-async function resolveActorUserId(value, fieldLabel) {
-  const normalizedUserId = normalizeUuid(value);
+async function resolveTransferActorContext(auth = {}) {
+  const userId = normalizeUuid(auth.sub || auth.user_id);
 
-  if (normalizedUserId) {
-    const user = await findUserById(normalizedUserId);
-
-    if (!user) {
-      throw new AppError(`${fieldLabel} user is invalid`, 400);
-    }
-
-    return user.user_id;
+  if (!userId) {
+    throw new AppError('Not authenticated', 401, { code: 'AUTH_REQUIRED' });
   }
 
-  const fallbackUser = await findUserByEmail(DEVELOPMENT_ACTOR_EMAIL);
+  const [user, defaultLocation, assignments] = await Promise.all([
+    findUserById(userId),
+    findDefaultLocationByUserId(userId),
+    findUserLocationsByUserId(userId),
+  ]);
 
-  if (!fallbackUser) {
-    throw new AppError('Development transfer actor is not available', 500);
+  if (!user || user.active === false) {
+    throw new AppError('Not authenticated', 401, { code: 'AUTH_REQUIRED' });
   }
 
-  return fallbackUser.user_id;
+  const locationIds = assignments
+    .filter((assignment) => assignment.active)
+    .map((assignment) => assignment.location_id);
+
+  return {
+    user_id: userId,
+    role_name: auth.role_name || user.role_name || null,
+    permissions: Array.isArray(auth.permissions) ? auth.permissions : [],
+    default_location_id: defaultLocation ? defaultLocation.location_id : null,
+    location_ids: locationIds,
+    capabilities: buildTransferCapabilities({
+      permissions: Array.isArray(auth.permissions) ? auth.permissions : [],
+      roleName: auth.role_name || user.role_name,
+    }),
+  };
 }
 
-async function getTransferById(transferId) {
+function canAccessTransferHeader(transfer, actor) {
+  if (!transfer || !actor) {
+    return false;
+  }
+
+  if (actor.capabilities.manage) {
+    return true;
+  }
+
+  const locationIds = new Set(actor.location_ids || []);
+  const destinationVisible =
+    locationIds.has(transfer.to_location_id) &&
+    (actor.capabilities.request_view_own || actor.capabilities.receive);
+  const originVisible =
+    locationIds.has(transfer.from_location_id) && actor.capabilities.ship;
+
+  return destinationVisible || originVisible;
+}
+
+async function getTransferById(transferId, auth = {}) {
+  const actor = await resolveTransferActorContext(auth);
   const normalizedTransferId = normalizeUuid(transferId);
 
   if (!normalizedTransferId) {
@@ -101,6 +137,10 @@ async function getTransferById(transferId) {
     throw new AppError('Transfer not found', 404);
   }
 
+  if (!canAccessTransferHeader(header, actor)) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
   const lines = await findTransferLinesByTransferId(normalizedTransferId);
 
   return {
@@ -109,7 +149,8 @@ async function getTransferById(transferId) {
   };
 }
 
-async function listTransfers(input = {}) {
+async function listTransfers(input = {}, auth = {}) {
+  const actor = await resolveTransferActorContext(auth);
   const status = normalizeText(input.status);
 
   if (status && !ALLOWED_TRANSFER_STATUSES.includes(status)) {
@@ -123,21 +164,57 @@ async function listTransfers(input = {}) {
     query: normalizeText(input.query),
   };
 
-  return findAllTransfers(filters);
+  const transfers = await findAllTransfers(filters);
+
+  if (actor.capabilities.manage) {
+    return transfers;
+  }
+
+  return transfers.filter((transfer) => canAccessTransferHeader(transfer, actor));
 }
 
-async function listPendingReceipts() {
-  return findAllTransfers({ status: 'shipped' });
+async function listPendingReceipts(auth = {}) {
+  const actor = await resolveTransferActorContext(auth);
+  const transfers = await findAllTransfers({ status: 'shipped' });
+
+  if (actor.capabilities.manage) {
+    return transfers;
+  }
+
+  if (!actor.capabilities.receive) {
+    return [];
+  }
+
+  const locationIds = new Set(actor.location_ids || []);
+  return transfers.filter((transfer) => locationIds.has(transfer.to_location_id));
 }
 
-async function createTransfer(input) {
+async function createTransfer(input, auth = {}) {
+  const actor = await resolveTransferActorContext(auth);
   const fromLocationId = normalizeUuid(input.from_location_id);
-  const toLocationId = normalizeUuid(input.to_location_id);
+  const requestedToLocationId = normalizeUuid(input.to_location_id);
+  const toLocationId = actor.capabilities.manage
+    ? requestedToLocationId
+    : actor.default_location_id;
   const notes = normalizeText(input.notes);
   const lines = Array.isArray(input.lines) ? input.lines : [];
 
+  if (!actor.capabilities.manage && !actor.default_location_id) {
+    throw new AppError('Authenticated user has no default location assigned', 409, {
+      code: 'DEFAULT_LOCATION_REQUIRED',
+    });
+  }
+
   if (!fromLocationId || !toLocationId) {
     throw new AppError('Origin and destination locations are required', 400);
+  }
+
+  if (
+    !actor.capabilities.manage &&
+    requestedToLocationId &&
+    requestedToLocationId !== actor.default_location_id
+  ) {
+    throw new AppError('Store requests must use the current default location as destination', 400);
   }
 
   if (fromLocationId === toLocationId) {
@@ -147,8 +224,6 @@ async function createTransfer(input) {
   if (!lines.length) {
     throw new AppError('At least one transfer line is required', 400);
   }
-
-  const createdBy = await resolveActorUserId(input.created_by, 'Created by');
 
   const normalizedLines = lines.map((line) => ({
     variant_id: normalizeUuid(line.variant_id),
@@ -195,7 +270,7 @@ async function createTransfer(input) {
         to_location_id: toLocationId,
         status: 'draft',
         notes,
-        created_by: createdBy,
+        created_by: actor.user_id,
       },
       client.query.bind(client)
     );
@@ -229,10 +304,11 @@ async function createTransfer(input) {
     client.release();
   }
 
-  return getTransferById(createdTransferId);
+  return getTransferById(createdTransferId, auth);
 }
 
-async function shipTransferById(transferId, input = {}) {
+async function shipTransferById(transferId, input = {}, auth = {}) {
+  const actor = await resolveTransferActorContext(auth);
   const normalizedTransferId = normalizeUuid(transferId);
 
   if (!normalizedTransferId) {
@@ -245,11 +321,21 @@ async function shipTransferById(transferId, input = {}) {
     throw new AppError('Transfer not found', 404);
   }
 
+  if (!canAccessTransferHeader(transfer, actor)) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
+  if (
+    !actor.capabilities.manage &&
+    !actor.location_ids.includes(transfer.from_location_id)
+  ) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
   if (transfer.status !== 'draft') {
     throw new AppError('Only draft transfers can be shipped', 400);
   }
-
-  const shippedBy = await resolveActorUserId(input.shipped_by, 'Shipped by');
+  const shippedBy = actor.user_id;
 
   const lines = await findTransferLinesByTransferId(normalizedTransferId);
 
@@ -327,10 +413,11 @@ async function shipTransferById(transferId, input = {}) {
     client.release();
   }
 
-  return getTransferById(normalizedTransferId);
+  return getTransferById(normalizedTransferId, auth);
 }
 
-async function receiveTransferById(transferId, input = {}) {
+async function receiveTransferById(transferId, input = {}, auth = {}) {
+  const actor = await resolveTransferActorContext(auth);
   const normalizedTransferId = normalizeUuid(transferId);
 
   if (!normalizedTransferId) {
@@ -343,11 +430,21 @@ async function receiveTransferById(transferId, input = {}) {
     throw new AppError('Transfer not found', 404);
   }
 
+  if (!canAccessTransferHeader(transfer, actor)) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
+  if (
+    !actor.capabilities.manage &&
+    !actor.location_ids.includes(transfer.to_location_id)
+  ) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
   if (transfer.status !== 'shipped') {
     throw new AppError('Only shipped transfers can be received', 400);
   }
-
-  const receivedBy = await resolveActorUserId(input.received_by, 'Received by');
+  const receivedBy = actor.user_id;
 
   const lines = await findTransferLinesByTransferId(normalizedTransferId);
 
@@ -415,10 +512,11 @@ async function receiveTransferById(transferId, input = {}) {
     client.release();
   }
 
-  return getTransferById(normalizedTransferId);
+  return getTransferById(normalizedTransferId, auth);
 }
 
-async function cancelTransferById(transferId, input = {}) {
+async function cancelTransferById(transferId, input = {}, auth = {}) {
+  const actor = await resolveTransferActorContext(auth);
   const normalizedTransferId = normalizeUuid(transferId);
 
   if (!normalizedTransferId) {
@@ -431,15 +529,16 @@ async function cancelTransferById(transferId, input = {}) {
     throw new AppError('Transfer not found', 404);
   }
 
+  if (!canAccessTransferHeader(transfer, actor)) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
   if (transfer.status !== 'draft') {
     throw new AppError('Only draft transfers can be cancelled', 400);
   }
+  await markTransferCancelled(normalizedTransferId, actor.user_id);
 
-  const cancelledBy = await resolveActorUserId(input.cancelled_by, 'Cancelled by');
-
-  await markTransferCancelled(normalizedTransferId, cancelledBy);
-
-  return getTransferById(normalizedTransferId);
+  return getTransferById(normalizedTransferId, auth);
 }
 
 module.exports = {
