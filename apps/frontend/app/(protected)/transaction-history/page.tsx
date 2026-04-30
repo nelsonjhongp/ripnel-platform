@@ -1,14 +1,11 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
-  CalendarRange,
-  ChevronLeft,
-  ChevronRight,
   ChevronDown,
-  FilterX,
   Filter,
+  RotateCcw,
   Search,
 } from "lucide-react"
 
@@ -16,6 +13,7 @@ import { PermissionGuard } from "@/components/auth/PermissionGuard"
 import { InlineStatusCard } from "@/components/feedback/status-page"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Button } from "@/components/ui/button"
+import { DateFilterPicker } from "@/components/ui/date-filter-picker"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +21,13 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Pagination } from "@/components/ui/pagination"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { ApiError, apiFetch } from "@/lib/api"
 
@@ -105,24 +110,38 @@ function MetricPill({
 }: {
   label: string
   value: string | number
-  tone?: "default" | "success" | "warning"
+  tone?: "default" | "accent" | "warning"
 }) {
   const toneClass =
-    tone === "success"
-      ? "border-emerald-300/70 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300"
+    tone === "accent"
+      ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))] text-[var(--ops-text)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--ripnel-accent)_14%,transparent)]"
       : tone === "warning"
-        ? "border-sky-300/70 bg-sky-50 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-300"
-        : "border-[var(--ops-border-strong)] bg-[var(--ops-surface)] text-[var(--ops-text)]"
+        ? "border-[color:color-mix(in_srgb,#f59e0b_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
+        : "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text)]"
+  const labelClass =
+    tone === "accent"
+      ? "text-[color:color-mix(in_srgb,var(--ripnel-accent)_72%,var(--ops-text))]"
+      : tone === "warning"
+        ? "text-[color:color-mix(in_srgb,#f59e0b_82%,var(--ops-text))]"
+        : "text-[var(--ops-text-muted)]"
+  const valueClass =
+    tone === "accent"
+      ? "text-[var(--ops-text)]"
+      : tone === "warning"
+        ? "text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
+        : "text-[var(--ops-text)]"
 
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-3 rounded-2xl border px-[var(--ops-metric-px)] py-[var(--ops-metric-py)] shadow-sm",
+        "inline-flex items-center gap-2.5 rounded-full border px-3 py-2",
         toneClass
       )}
     >
-      <span className="text-[11px] font-semibold uppercase tracking-wide opacity-80">{label}</span>
-      <span className="text-lg font-semibold leading-none">{value}</span>
+      <span className={cn("text-[11px] font-semibold uppercase tracking-[0.16em]", labelClass)}>
+        {label}
+      </span>
+      <span className={cn("text-base font-semibold leading-none", valueClass)}>{value}</span>
     </div>
   )
 }
@@ -135,11 +154,8 @@ export default function TransactionHistoryPage() {
   const [dateTo, setDateTo] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalResults, setTotalResults] = useState(0)
-  const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const dateFromRef = useRef<HTMLInputElement | null>(null)
-  const dateToRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     setCurrentPage(1)
@@ -171,7 +187,6 @@ export default function TransactionHistoryPage() {
         if (active) {
           setSales(Array.isArray(data?.items) ? data.items : [])
           setTotalResults(Number(data?.total || 0))
-          setHasMore(Boolean(data?.has_more))
         }
       } catch (loadError) {
         if (!active || controller.signal.aborted) {
@@ -180,7 +195,6 @@ export default function TransactionHistoryPage() {
 
         setSales([])
         setTotalResults(0)
-        setHasMore(false)
         setError(explainSalesError(loadError))
       } finally {
         if (active) {
@@ -229,174 +243,148 @@ export default function TransactionHistoryPage() {
     setCurrentPage(1)
   }
 
-  function openNativeDatePicker(input: HTMLInputElement | null) {
-    if (!input) return
-
-    if (typeof input.showPicker === "function") {
-      input.showPicker()
-      return
-    }
-
-    input.focus()
-    input.click()
-  }
-
   return (
     <PermissionGuard permission="sales.pos">
-      <section className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
-        <div className="mx-auto max-w-[1180px] space-y-4">
-          <PosHeader
-            eyebrow="Operacion comercial"
-            title="Historial de ventas"
-            actions={
-              <Button asChild variant="outline" size="sm" className="rounded-full">
-                <Link href="/postventa">Postventa</Link>
-              </Button>
-            }
-          />
+      <TooltipProvider delayDuration={120}>
+        <section className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
+          <div className="mx-auto max-w-[1180px] space-y-4">
+            <PosHeader
+              eyebrow="Operacion comercial"
+              title="Historial de ventas"
+              actions={
+                <Button asChild variant="outline" size="sm" className="rounded-full">
+                  <Link href="/postventa">Postventa</Link>
+                </Button>
+              }
+            />
 
-          <div className="flex flex-wrap justify-center gap-2">
-            <MetricPill label="Ventas visibles" value={totals.count} />
-            <MetricPill label="Ingreso visible" value={`S/. ${totals.revenue.toFixed(2)}`} tone="success" />
-            <MetricPill label="Borradores" value={totals.pending} tone="warning" />
-          </div>
-
-          <div className="space-y-4 border-t border-[var(--ops-border-strong)] pt-4">
-            <div className="grid gap-2.5 lg:grid-cols-[1.35fr_0.78fr_0.88fr_0.88fr_auto] lg:items-end">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Buscar por nro. venta o cliente"
-                  className="sales-field h-10 w-full rounded-lg py-2 pl-9 pr-3 text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  Estado
-                </label>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className="sales-field flex h-10 w-full cursor-pointer items-center gap-2 rounded-lg px-3 text-left text-sm text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
-                    >
-                      <Filter className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                      <span className="flex-1">{STATUS_OPTIONS.find((option) => option.value === status)?.label ?? "Todos"}</span>
-                      <ChevronDown className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="start"
-                    sideOffset={8}
-                    className="min-w-[var(--radix-dropdown-menu-trigger-width)] border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1 text-[var(--ops-text)]"
-                  >
-                    <DropdownMenuRadioGroup value={status} onValueChange={setStatus}>
-                      {STATUS_OPTIONS.map((option) => (
-                        <DropdownMenuRadioItem
-                          key={option.value}
-                          value={option.value}
-                          className="cursor-pointer rounded-md px-3 py-2 text-sm focus:bg-[var(--ops-surface-muted)] focus:text-[var(--ops-text)]"
-                        >
-                          {option.label}
-                        </DropdownMenuRadioItem>
-                      ))}
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  Fecha desde
-                </label>
-                <div
-                  className="sales-field flex h-10 cursor-pointer items-center gap-2 rounded-lg px-3 transition hover:bg-[var(--ops-surface-muted)]"
-                  onClick={() => openNativeDatePicker(dateFromRef.current)}
-                >
-                  <CalendarRange className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                  <input
-                    ref={dateFromRef}
-                    type="date"
-                    value={dateFrom}
-                    onChange={(event) => setDateFrom(event.target.value)}
-                    className="w-full cursor-pointer bg-transparent text-sm text-[var(--ops-text)] outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  Fecha hasta
-                </label>
-                <div
-                  className="sales-field flex h-10 cursor-pointer items-center gap-2 rounded-lg px-3 transition hover:bg-[var(--ops-surface-muted)]"
-                  onClick={() => openNativeDatePicker(dateToRef.current)}
-                >
-                  <CalendarRange className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                  <input
-                    ref={dateToRef}
-                    type="date"
-                    value={dateTo}
-                    onChange={(event) => setDateTo(event.target.value)}
-                    className="w-full cursor-pointer bg-transparent text-sm text-[var(--ops-text)] outline-none"
-                  />
-                </div>
-              </div>
-
-              <Button
-                onClick={clearFilters}
-                disabled={!hasActiveFilters}
-                variant="outline"
-                size="sm"
-                className="h-10 rounded-lg px-4"
-              >
-                <FilterX className="h-4 w-4" />
-                Limpiar
-              </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <MetricPill label="Ventas visibles" value={totals.count} />
+              <MetricPill label="Ingreso visible" value={`S/. ${totals.revenue.toFixed(2)}`} tone="accent" />
+              <MetricPill label="Borradores" value={totals.pending} tone="warning" />
             </div>
 
-            <div className="overflow-x-auto">
-              <div className="min-w-[980px] border-y border-[var(--ops-border-strong)]">
-                <div className="sales-panel-muted grid grid-cols-[1fr_0.9fr_1fr_0.85fr_0.9fr_0.8fr_0.8fr_0.9fr] gap-3 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                  <span>Venta</span>
-                  <span>Fecha</span>
-                  <span>Cliente</span>
-                  <span>Vendedor</span>
-                  <span>Sede</span>
-                  <span>Estado</span>
-                  <span>Total</span>
-                  <span>Acciones</span>
+            <div className="space-y-4 border-t border-[var(--ops-border-strong)] pt-4">
+              <div className="grid gap-2.5 lg:grid-cols-[1.45fr_0.84fr_0.84fr_0.84fr_auto] lg:items-end">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Buscar por nro. venta o cliente"
+                    className="sales-field h-10 w-full rounded-lg py-2 pl-9 pr-3 text-sm"
+                  />
                 </div>
 
-                <div className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                  {loading ? (
-                    <div className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                      Cargando ventas...
-                    </div>
-                  ) : error ? (
-                    <div className="px-4 py-6">
-                      <InlineStatusCard
-                        title="No pudimos cargar el historial"
-                        description={error}
-                        tone="danger"
-                      />
-                    </div>
-                  ) : sales.length === 0 ? (
-                    <div className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                      No se encontraron ventas con los filtros aplicados.
-                    </div>
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                    Estado
+                  </label>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="sales-field flex h-10 w-full cursor-pointer items-center gap-2 rounded-lg px-3 text-left text-sm text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
+                      >
+                        <Filter className="h-4 w-4 text-[var(--ops-text-muted)]" />
+                        <span className="flex-1">{STATUS_OPTIONS.find((option) => option.value === status)?.label ?? "Todos"}</span>
+                        <ChevronDown className="h-4 w-4 text-[var(--ops-text-muted)]" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="start"
+                      sideOffset={8}
+                      className="min-w-[var(--radix-dropdown-menu-trigger-width)] border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1 text-[var(--ops-text)]"
+                    >
+                      <DropdownMenuRadioGroup value={status} onValueChange={setStatus}>
+                        {STATUS_OPTIONS.map((option) => (
+                          <DropdownMenuRadioItem
+                            key={option.value}
+                            value={option.value}
+                            className="cursor-pointer rounded-md px-3 py-2 text-sm focus:bg-[var(--ops-surface-muted)] focus:text-[var(--ops-text)]"
+                          >
+                            {option.label}
+                          </DropdownMenuRadioItem>
+                        ))}
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                <DateFilterPicker
+                  label="Fecha desde"
+                  value={dateFrom}
+                  onChange={setDateFrom}
+                  ariaLabel="Fecha desde"
+                  max={dateTo || undefined}
+                />
+
+                <DateFilterPicker
+                  label="Fecha hasta"
+                  value={dateTo}
+                  onChange={setDateTo}
+                  ariaLabel="Fecha hasta"
+                  min={dateFrom || undefined}
+                />
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={clearFilters}
+                      disabled={!hasActiveFilters}
+                      variant="outline"
+                      size="icon-sm"
+                      className="h-10 w-10 rounded-lg"
+                      aria-label="Limpiar filtros"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={8}>
+                    Limpiar filtros
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+
+              <div className="overflow-x-auto">
+                <div className="min-w-[980px] border-y border-[var(--ops-border-strong)]">
+                  <div className="sales-panel-muted grid grid-cols-[0.84fr_0.74fr_1fr_0.88fr_0.86fr_0.78fr_0.72fr_0.98fr] gap-x-2 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
+                    <span>Venta</span>
+                    <span>Fecha</span>
+                    <span>Cliente</span>
+                    <span>Vendedor</span>
+                    <span>Sede</span>
+                    <span>Estado</span>
+                    <span>Total</span>
+                    <span>Acciones</span>
+                  </div>
+
+                  <div className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                    {loading ? (
+                      <div className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                        Cargando ventas...
+                      </div>
+                    ) : error ? (
+                      <div className="px-4 py-6">
+                        <InlineStatusCard
+                          title="No pudimos cargar el historial"
+                          description={error}
+                          tone="danger"
+                        />
+                      </div>
+                    ) : sales.length === 0 ? (
+                      <div className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                        No se encontraron ventas con los filtros aplicados.
+                      </div>
                   ) : (
                     sales.map((sale) => (
                       <div
                         key={sale.sale_id}
-                        className="grid grid-cols-[1fr_0.9fr_1fr_0.85fr_0.9fr_0.8fr_0.8fr_0.9fr] gap-[var(--ops-row-gap)] px-4 py-[var(--ops-row-py)] transition hover:bg-[var(--ops-surface-muted)]"
+                        className="grid grid-cols-[0.84fr_0.74fr_1fr_0.88fr_0.86fr_0.78fr_0.72fr_0.98fr] gap-x-2 px-4 py-[var(--ops-row-py)] transition hover:bg-[var(--ops-surface-muted)]"
                       >
-                        <div>
-                          <p className="font-semibold text-[var(--ops-text)]">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
                             {sale.sale_number || "Sin correlativo"}
                           </p>
                           <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ripnel-accent-hover)]">
@@ -404,88 +392,86 @@ export default function TransactionHistoryPage() {
                           </p>
                         </div>
 
-                        <div className="text-sm text-[var(--ops-text)]">
+                        <div className="text-xs leading-5 text-[var(--ops-text-muted)]">
                           {formatDateTime(sale.confirmed_at, sale.created_at)}
                         </div>
 
-                        <div>
-                          <p className="text-sm font-medium leading-5 text-[var(--ops-text)]">
-                            {sale.customer_name_text || "Cliente general"}
-                          </p>
-                        </div>
+                          <div>
+                            <p className="text-sm font-medium leading-5 text-[var(--ops-text)]">
+                              {sale.customer_name_text || "Cliente general"}
+                            </p>
+                          </div>
 
-                        <div className="text-sm text-[var(--ops-text)]">{sale.seller_name}</div>
+                          <div className="text-sm text-[var(--ops-text)]">{sale.seller_name}</div>
 
-                        <div className="text-sm text-[var(--ops-text)]">{sale.location_name}</div>
+                          <div className="text-sm text-[var(--ops-text)]">{sale.location_name}</div>
 
-                        <div>
-                          <span
-                            className={`${STATUS_CLASSES[sale.status] || "sales-chip"} rounded-full px-2.5 py-1 text-xs font-semibold`}
-                          >
-                            {STATUS_LABELS[sale.status] || sale.status}
-                          </span>
-                        </div>
+                          <div>
+                            <span
+                              className={`${STATUS_CLASSES[sale.status] || "sales-chip"} rounded-full px-2.5 py-1 text-xs font-semibold`}
+                            >
+                              {STATUS_LABELS[sale.status] || sale.status}
+                            </span>
+                          </div>
 
                         <div>
                           <p className="text-sm font-semibold text-[var(--ops-text)]">
                             S/. {Number(sale.total_amount).toFixed(2)}
                           </p>
-                          <p className="text-xs text-[var(--ops-text-muted)]">{sale.currency}</p>
+                          <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
+                            {sale.currency}
+                          </p>
                         </div>
 
-                        <div className="flex flex-wrap gap-2">
-                          <Button asChild variant="outline" size="sm" className="rounded-full">
-                            <Link href={`/purchase-system/${sale.sale_id}`}>Ver venta</Link>
-                          </Button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                asChild
+                                variant="outline"
+                                size="sm"
+                                className="rounded-full px-3"
+                              >
+                                <Link href={`/purchase-system/${sale.sale_id}`} aria-label="Ver venta">
+                                  Ver venta
+                                </Link>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" sideOffset={8}>
+                              Ver venta
+                            </TooltipContent>
+                          </Tooltip>
                           {sale.status === "confirmed" ? (
-                            <Button asChild variant="accent" size="sm" className="rounded-full">
+                            <Button asChild variant="accent" size="sm" className="rounded-full px-3">
                               <Link href={`/postventa/${sale.sale_id}`}>Postventa</Link>
                             </Button>
-                          ) : null}
+                          ) : (
+                            <span className="inline-block h-7 w-[5.25rem]" aria-hidden="true" />
+                          )}
                         </div>
                       </div>
                     ))
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between">
-              <span className="ops-secondary-text text-[var(--ops-text-muted)]">
-                {totalResults === 0 ? "0 resultados" : `${firstVisible}-${lastVisible} de ${totalResults}`}
-              </span>
-
-              <div className="flex items-center gap-2 self-end md:self-auto">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon-sm"
-                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-                  disabled={safeCurrentPage <= 1}
-                  className="rounded-lg"
-                  aria-label="Pagina anterior"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="min-w-16 text-center text-sm font-medium text-[var(--ops-text)]">
-                  {safeCurrentPage}/{totalPages}
+              <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between">
+                <span className="ops-secondary-text text-[var(--ops-text-muted)]">
+                  {totalResults === 0 ? "0 resultados" : `${firstVisible}-${lastVisible} de ${totalResults}`}
                 </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon-sm"
-                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-                  disabled={!hasMore}
-                  className="rounded-lg"
-                  aria-label="Pagina siguiente"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+
+                <Pagination
+                  page={safeCurrentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  className="self-end md:self-auto"
+                />
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </TooltipProvider>
     </PermissionGuard>
   )
 }
