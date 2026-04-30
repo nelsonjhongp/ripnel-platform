@@ -158,35 +158,35 @@ function PermissionSelector({
   totalPermissions: number;
 }) {
   return (
-    <div className="flex h-full min-h-0 flex-col rounded-2xl border border-slate-200 bg-slate-50/50">
-      <div className="border-b border-slate-200 px-4 py-3">
+    <div className="flex h-full min-h-0 flex-col rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)]">
+      <div className="border-b border-[var(--ops-border-strong)] px-4 py-3">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
-            <div className="text-sm font-medium text-slate-700">Permisos del rol</div>
-            <div className="mt-1 text-xs text-slate-500">
+            <div className="text-sm font-medium text-[var(--ops-text)]">Permisos del rol</div>
+            <div className="mt-1 text-xs text-[var(--ops-text-muted)]">
               Busca, filtra por modulo y marca solo lo necesario.
             </div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-right">
-            <div className="text-[11px] uppercase tracking-wide text-slate-500">
+          <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-2 text-right">
+            <div className="text-[11px] uppercase tracking-wide text-[var(--ops-text-muted)]">
               Seleccionados
             </div>
-            <div className="text-base font-semibold text-slate-900">
+            <div className="text-base font-semibold text-[var(--ops-text)]">
               {selectedKeys.length}
             </div>
           </div>
         </div>
 
         {selectedPermissions.length > 0 ? (
-          <div className="mt-3 rounded-2xl border border-violet-200 bg-violet-50/70 p-3">
+          <div className="mt-3 rounded-2xl border border-[var(--ops-border-soft)] bg-[var(--ripnel-accent-soft)]/70 p-3">
             <div className="mb-2 flex items-center justify-between gap-3">
-              <div className="text-xs font-medium uppercase tracking-wide text-violet-700">
+              <div className="text-xs font-medium uppercase tracking-wide text-[var(--ripnel-accent-hover)]">
                 Seleccionados: {selectedPermissions.length}
               </div>
               <button
                 type="button"
                 onClick={onClearAll}
-                className="text-xs font-medium text-violet-700 transition hover:text-violet-900"
+                className="text-xs font-medium text-[var(--ripnel-accent-hover)] transition hover:opacity-80"
               >
                 Limpiar todo
               </button>
@@ -197,25 +197,25 @@ function PermissionSelector({
                   key={`selected-${permission.permission_id}`}
                   type="button"
                   onClick={() => onTogglePermission(permission.key)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-violet-300 bg-white px-2.5 py-1 text-xs font-medium text-violet-800 transition hover:border-violet-400 hover:bg-violet-100"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--ops-border-soft)] bg-[var(--ops-field)] px-2.5 py-1 text-xs font-medium text-[var(--ripnel-accent-hover)] transition hover:bg-[var(--ripnel-accent-soft)]"
                   title={permission.description || permission.key}
                 >
                   <span className="max-w-[14rem] truncate">{permission.key}</span>
-                  <span className="text-sm leading-none text-violet-500">x</span>
+                  <span className="text-sm leading-none text-[var(--ripnel-accent-hover)]">x</span>
                 </button>
               ))}
             </div>
           </div>
         ) : (
-          <div className="mt-3 rounded-2xl border border-dashed border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-500">
+          <div className="mt-3 rounded-2xl border border-dashed border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-2.5 text-sm text-[var(--ops-text-muted)]">
             Todavia no has seleccionado permisos para este rol.
           </div>
         )}
       </div>
 
-      <div className="flex flex-col gap-3 border-b border-slate-200 px-4 py-3">
+      <div className="flex flex-col gap-3 border-b border-[var(--ops-border-strong)] px-4 py-3">
         <label className="block space-y-1">
-          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          <span className="text-xs font-medium uppercase tracking-wide text-[var(--ops-text-muted)]">
             Buscar permiso
           </span>
           <input
@@ -223,12 +223,12 @@ function PermissionSelector({
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder="Buscar por clave o descripcion"
-            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-violet-500"
+            className="w-full rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-2 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)]"
           />
         </label>
 
         <div className="space-y-2">
-          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          <div className="text-xs font-medium uppercase tracking-wide text-[var(--ops-text-muted)]">
             Modulo
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1">
@@ -242,8 +242,8 @@ function PermissionSelector({
                   onClick={() => onModuleChange(module.key)}
                   className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                     isActive
-                      ? "border-violet-300 bg-violet-100 text-violet-800"
-                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                      ? "border-[var(--ops-border-soft)] bg-[var(--ripnel-accent-soft)] text-[var(--ripnel-accent-hover)]"
+                      : "border-[var(--ops-border-strong)] bg-[var(--ops-field)] text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
                   }`}
                 >
                   {module.label} ({module.count})
@@ -256,7 +256,7 @@ function PermissionSelector({
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {loading ? (
-          <div className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-500">
+          <div className="rounded-2xl bg-[var(--ops-field)] px-4 py-3 text-sm text-[var(--ops-text-muted)]">
             Cargando permisos...
           </div>
         ) : error ? (
@@ -264,11 +264,11 @@ function PermissionSelector({
             {error}
           </div>
         ) : totalPermissions === 0 ? (
-          <div className="rounded-2xl bg-white px-4 py-3 text-sm text-slate-500">
+          <div className="rounded-2xl bg-[var(--ops-field)] px-4 py-3 text-sm text-[var(--ops-text-muted)]">
             No hay permisos registrados todavia.
           </div>
         ) : groups.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
+          <div className="rounded-2xl border border-dashed border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-4 py-6 text-center text-sm text-[var(--ops-text-muted)]">
             No hay permisos que coincidan con la busqueda o el modulo seleccionado.
           </div>
         ) : (
@@ -280,11 +280,11 @@ function PermissionSelector({
 
               return (
                 <div key={group.group} className="space-y-2">
-                  <div className="sticky top-0 z-10 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-100/95 px-3 py-2 backdrop-blur">
-                    <div className="text-sm font-semibold text-slate-900">
+                  <div className="sticky top-0 z-10 flex items-center justify-between rounded-xl border border-[var(--ops-border-strong)] bg-slate-100/95 px-3 py-2 backdrop-blur">
+                    <div className="text-sm font-semibold text-[var(--ops-text)]">
                       {formatPermissionGroupLabel(group.group)}
                     </div>
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs text-[var(--ops-text-muted)]">
                       {selectedCount}/{group.permissions.length}
                     </div>
                   </div>
@@ -298,26 +298,26 @@ function PermissionSelector({
                           key={permission.permission_id}
                           className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2 transition ${
                             checked
-                              ? "border-violet-300 bg-violet-50"
-                              : "border-slate-200 bg-white hover:bg-slate-50"
+                              ? "border-[var(--ops-border-soft)] bg-[var(--ripnel-accent-soft)]"
+                              : "border-[var(--ops-border-strong)] bg-[var(--ops-field)] hover:bg-[var(--ops-surface-muted)]"
                           }`}
                         >
                           <input
                             type="checkbox"
                             checked={checked}
                             onChange={() => onTogglePermission(permission.key)}
-                            className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                            className="mt-0.5 h-4 w-4 rounded border-[var(--ops-border-strong)]"
                           />
                           <span className="min-w-0 flex-1">
                             <span className="flex items-center gap-2">
-                              <span className="truncate text-sm font-medium text-slate-900">
+                              <span className="truncate text-sm font-medium text-[var(--ops-text)]">
                                 {permission.key}
                               </span>
-                              <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                              <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--ops-text-muted)]">
                                 {group.group}
                               </span>
                             </span>
-                            <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                            <span className="mt-0.5 block text-xs leading-5 text-[var(--ops-text-muted)]">
                               {permission.description || "Sin descripcion"}
                             </span>
                           </span>
@@ -351,6 +351,7 @@ export default function AdminCrudPage() {
 
   const [userQuery, setUserQuery] = useState("");
   const [roleQuery, setRoleQuery] = useState("");
+  const [activeSection, setActiveSection] = useState<"users" | "roles">("users");
 
   const [showUserForm, setShowUserForm] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -800,7 +801,9 @@ export default function AdminCrudPage() {
   }
 
   function roleBadgeClass(active: boolean) {
-    return active ? "bg-indigo-100 text-indigo-800" : "bg-slate-200 text-slate-700";
+    return active
+      ? "border border-[var(--ops-border-soft)] bg-[var(--ripnel-accent-soft)] text-[var(--ripnel-accent-hover)]"
+      : "border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]";
   }
 
   function statusBadgeClass(active: boolean) {
@@ -808,278 +811,281 @@ export default function AdminCrudPage() {
   }
 
   return (
-    <div className="space-y-8 p-8">
-      <header className="space-y-2">
-        <h1 className="text-3xl font-bold text-slate-900">Roles y usuarios</h1>
-        <p className="max-w-3xl text-sm text-slate-600">
-          Esta pantalla ya trabaja contra backend. Los usuarios se inactivan, no se eliminan
-          fisicamente. La asignacion de sedes vive aqui para dejar lista la base operativa del
-          equipo.
-        </p>
+    <div className="space-y-6 p-4 md:p-6">
+      <header className="space-y-1">
+        <h1 className="text-2xl font-semibold text-[var(--ops-text)]">Roles y usuarios</h1>
+        <p className="text-sm text-[var(--ops-text-muted)]">Gestión de accesos y equipo operativo.</p>
       </header>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-sm text-slate-500">Usuarios</div>
-          <div className="mt-2 text-3xl font-semibold text-slate-900">{users.length}</div>
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-4 py-3">
+          <div className="text-xs text-[var(--ops-text-muted)]">Usuarios</div>
+          <div className="mt-1 text-2xl font-semibold text-[var(--ops-text)]">{users.length}</div>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-sm text-slate-500">Usuarios activos</div>
-          <div className="mt-2 text-3xl font-semibold text-emerald-700">
+        <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-4 py-3">
+          <div className="text-xs text-[var(--ops-text-muted)]">Activos</div>
+          <div className="mt-1 text-2xl font-semibold text-emerald-700">
             {users.filter((user) => user.active).length}
           </div>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-sm text-slate-500">Roles</div>
-          <div className="mt-2 text-3xl font-semibold text-indigo-700">{roles.length}</div>
+        <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-4 py-3">
+          <div className="text-xs text-[var(--ops-text-muted)]">Roles</div>
+          <div className="mt-1 text-2xl font-semibold text-[var(--ops-text)]">{roles.length}</div>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-sm text-slate-500">Sedes activas</div>
-          <div className="mt-2 text-3xl font-semibold text-slate-900">
-            {availableLocations.length}
-          </div>
+        <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-4 py-3">
+          <div className="text-xs text-[var(--ops-text-muted)]">Sedes activas</div>
+          <div className="mt-1 text-2xl font-semibold text-[var(--ops-text)]">{availableLocations.length}</div>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="text-sm text-slate-500">Permisos base</div>
-          <div className="mt-2 text-3xl font-semibold text-violet-700">
-            {availablePermissions.length}
-          </div>
+        <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-4 py-3">
+          <div className="text-xs text-[var(--ops-text-muted)]">Permisos</div>
+          <div className="mt-1 text-2xl font-semibold text-[var(--ops-text)]">{availablePermissions.length}</div>
         </div>
       </section>
 
-      <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-slate-900">Usuarios</h2>
-            <p className="text-sm text-slate-500">CRUD por backend con rol, estado y sedes.</p>
-          </div>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <input
-              type="text"
-              value={userQuery}
-              onChange={(event) => setUserQuery(event.target.value)}
-              placeholder="Buscar por nombre, usuario, email o rol"
-              className="min-w-72 rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
-            />
-            <button
-              type="button"
-              onClick={() => openUserForm()}
-              className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
-            >
-              Nuevo usuario
-            </button>
-          </div>
+      <div className="ops-surface rounded-xl border p-2">
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveSection("users")}
+            className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+              activeSection === "users"
+                ? "bg-[var(--ripnel-accent)] text-white"
+                : "text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
+            }`}
+          >
+            Usuarios
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection("roles")}
+            className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+              activeSection === "roles"
+                ? "bg-[var(--ripnel-accent)] text-white"
+                : "text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
+            }`}
+          >
+            Roles
+          </button>
         </div>
+      </div>
 
-        {usersError && (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {usersError}
-          </div>
-        )}
-
-        <div className="overflow-hidden rounded-2xl border border-slate-200">
-          {loadingUsers ? (
-            <div className="px-4 py-6 text-sm text-slate-500">Cargando usuarios...</div>
-          ) : filteredUsers.length === 0 ? (
-            <div className="px-4 py-6 text-sm text-slate-500">
-              No hay usuarios para los filtros actuales.
+      {activeSection === "users" ? (
+        <section className="space-y-4 rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <h2 className="text-lg font-semibold text-[var(--ops-text)]">Usuarios</h2>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                type="text"
+                value={userQuery}
+                onChange={(event) => setUserQuery(event.target.value)}
+                placeholder="Buscar por nombre, usuario, email o rol"
+                className="min-w-72 rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-2 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)]"
+              />
+              <button
+                type="button"
+                onClick={() => openUserForm()}
+                className="rounded-xl bg-[var(--ripnel-accent)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)]"
+              >
+                Nuevo usuario
+              </button>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium text-slate-600">Usuario</th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-600">Rol</th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-600">Estado</th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-600">Actualizado</th>
-                    <th className="px-4 py-3 text-right font-medium text-slate-600">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 bg-white">
-                  {filteredUsers.map((user) => {
-                    const roleName =
-                      user.role_name ||
-                      roles.find((role) => role.role_id === user.role_id)?.name ||
-                      "Sin rol";
+          </div>
 
-                    return (
-                      <tr key={user.user_id}>
+          {usersError && (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm text-rose-700">
+              {usersError}
+            </div>
+          )}
+
+          <div className="overflow-hidden rounded-xl border border-[var(--ops-border-strong)]">
+            {loadingUsers ? (
+              <div className="px-4 py-6 text-sm text-[var(--ops-text-muted)]">Cargando usuarios...</div>
+            ) : filteredUsers.length === 0 ? (
+              <div className="px-4 py-6 text-sm text-[var(--ops-text-muted)]">No hay usuarios para este filtro.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-[var(--ops-border-strong)] text-sm">
+                  <thead className="bg-[var(--ops-surface-muted)]">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left font-medium text-[var(--ops-text-muted)]">Usuario</th>
+                      <th className="px-4 py-2.5 text-left font-medium text-[var(--ops-text-muted)]">Rol</th>
+                      <th className="px-4 py-2.5 text-left font-medium text-[var(--ops-text-muted)]">Estado</th>
+                      <th className="px-4 py-2.5 text-left font-medium text-[var(--ops-text-muted)]">Actualizado</th>
+                      <th className="px-4 py-2.5 text-right font-medium text-[var(--ops-text-muted)]">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-field)]">
+                    {filteredUsers.map((user) => {
+                      const roleName =
+                        user.role_name || roles.find((role) => role.role_id === user.role_id)?.name || "Sin rol";
+
+                      return (
+                        <tr key={user.user_id}>
+                          <td className="px-4 py-3 align-top">
+                            <div className="font-medium text-[var(--ops-text)]">{user.full_name}</div>
+                            <div className="text-[var(--ops-text-muted)]">@{user.username}</div>
+                            {user.email && <div className="text-[var(--ops-text-muted)]">{user.email}</div>}
+                          </td>
+                          <td className="px-4 py-3 align-top">
+                            <span className="inline-flex rounded-full border border-[var(--ops-border-soft)] bg-[var(--ripnel-accent-soft)] px-2.5 py-1 text-xs font-medium text-[var(--ripnel-accent-hover)]">
+                              {roleName}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 align-top">
+                            <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusBadgeClass(user.active)}`}>
+                              {user.active ? "Activo" : "Inactivo"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 align-top text-[var(--ops-text-muted)]">
+                            {new Date(user.updated_at).toLocaleString("es-PE")}
+                          </td>
+                          <td className="px-4 py-3 align-top">
+                            <div className="flex flex-wrap justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openLocationsModal(user)}
+                                className="rounded-lg border border-[var(--ops-border-strong)] px-3 py-1.5 text-xs font-medium text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
+                              >
+                                Sedes
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openUserForm(user)}
+                                className="rounded-lg border border-[var(--ops-border-strong)] px-3 py-1.5 text-xs font-medium text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
+                              >
+                                Editar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => toggleUserActive(user)}
+                                className="rounded-lg border border-[var(--ops-border-soft)] px-3 py-1.5 text-xs font-medium text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface-muted)]"
+                              >
+                                {user.active ? "Inactivar" : "Activar"}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </section>
+      ) : (
+        <section className="space-y-4 rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <h2 className="text-lg font-semibold text-[var(--ops-text)]">Roles</h2>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                type="text"
+                value={roleQuery}
+                onChange={(event) => setRoleQuery(event.target.value)}
+                placeholder="Buscar por nombre o descripción"
+                className="min-w-72 rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-2 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)]"
+              />
+              <button
+                type="button"
+                onClick={() => openRoleForm()}
+                className="rounded-xl bg-[var(--ripnel-accent)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)]"
+              >
+                Nuevo rol
+              </button>
+            </div>
+          </div>
+
+          {rolesError && (
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm text-rose-700">
+              {rolesError}
+            </div>
+          )}
+
+          {permissionsError && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+              {permissionsError}
+            </div>
+          )}
+
+          <div className="overflow-hidden rounded-xl border border-[var(--ops-border-strong)]">
+            {loadingRoles ? (
+              <div className="px-4 py-6 text-sm text-[var(--ops-text-muted)]">Cargando roles...</div>
+            ) : filteredRoles.length === 0 ? (
+              <div className="px-4 py-6 text-sm text-[var(--ops-text-muted)]">No hay roles para este filtro.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-[var(--ops-border-strong)] text-sm">
+                  <thead className="bg-[var(--ops-surface-muted)]">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left font-medium text-[var(--ops-text-muted)]">Rol</th>
+                      <th className="px-4 py-2.5 text-left font-medium text-[var(--ops-text-muted)]">Descripción</th>
+                      <th className="px-4 py-2.5 text-left font-medium text-[var(--ops-text-muted)]">Permisos</th>
+                      <th className="px-4 py-2.5 text-left font-medium text-[var(--ops-text-muted)]">Estado</th>
+                      <th className="px-4 py-2.5 text-left font-medium text-[var(--ops-text-muted)]">Actualizado</th>
+                      <th className="px-4 py-2.5 text-right font-medium text-[var(--ops-text-muted)]">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-field)]">
+                    {filteredRoles.map((role) => (
+                      <tr key={role.role_id}>
                         <td className="px-4 py-3 align-top">
-                          <div className="font-medium text-slate-900">{user.full_name}</div>
-                          <div className="text-slate-500">@{user.username}</div>
-                          {user.email && <div className="text-slate-400">{user.email}</div>}
-                        </td>
-                        <td className="px-4 py-3 align-top">
-                          <span className="inline-flex rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-medium text-indigo-800">
-                            {roleName}
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${roleBadgeClass(role.active)}`}>
+                            {role.name}
                           </span>
                         </td>
+                        <td className="px-4 py-3 align-top text-[var(--ops-text-muted)]">{role.description || "-"}</td>
                         <td className="px-4 py-3 align-top">
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusBadgeClass(user.active)}`}
-                          >
-                            {user.active ? "Activo" : "Inactivo"}
+                          {role.permissions.length === 0 ? (
+                            <span className="text-[var(--ops-text-muted)]">Sin permisos</span>
+                          ) : (
+                            <div className="flex max-w-xl flex-wrap gap-2">
+                              {role.permissions.map((permission) => (
+                                <span
+                                  key={`${role.role_id}-${permission.permission_id}`}
+                                  className="inline-flex rounded-full border border-[var(--ops-border-soft)] bg-[var(--ripnel-accent-soft)] px-2.5 py-1 text-xs font-medium text-[var(--ripnel-accent-hover)]"
+                                  title={permission.description || permission.key}
+                                >
+                                  {permission.key}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 align-top">
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusBadgeClass(role.active)}`}>
+                            {role.active ? "Activo" : "Inactivo"}
                           </span>
                         </td>
-                        <td className="px-4 py-3 align-top text-slate-500">
-                          {new Date(user.updated_at).toLocaleString("es-PE")}
+                        <td className="px-4 py-3 align-top text-[var(--ops-text-muted)]">
+                          {new Date(role.updated_at).toLocaleString("es-PE")}
                         </td>
                         <td className="px-4 py-3 align-top">
                           <div className="flex flex-wrap justify-end gap-2">
                             <button
                               type="button"
-                              onClick={() => openLocationsModal(user)}
-                              className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-                            >
-                              Sedes
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openUserForm(user)}
-                              className="rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-medium text-indigo-700 transition hover:bg-indigo-50"
+                              onClick={() => openRoleForm(role)}
+                              className="rounded-lg border border-[var(--ops-border-strong)] px-3 py-1.5 text-xs font-medium text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
                             >
                               Editar
                             </button>
                             <button
                               type="button"
-                              onClick={() => toggleUserActive(user)}
-                              className="rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-50"
+                              onClick={() => toggleRoleActive(role)}
+                              className="rounded-lg border border-[var(--ops-border-soft)] px-3 py-1.5 text-xs font-medium text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface-muted)]"
                             >
-                              {user.active ? "Inactivar" : "Activar"}
+                              {role.active ? "Inactivar" : "Activar"}
                             </button>
                           </div>
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="space-y-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-slate-900">Roles</h2>
-            <p className="text-sm text-slate-500">
-              Los permisos se administran por rol y luego se heredan al usuario durante la sesion.
-            </p>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <input
-              type="text"
-              value={roleQuery}
-              onChange={(event) => setRoleQuery(event.target.value)}
-              placeholder="Buscar por nombre o descripcion"
-              className="min-w-72 rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
-            />
-            <button
-              type="button"
-              onClick={() => openRoleForm()}
-              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-500"
-            >
-              Nuevo rol
-            </button>
-          </div>
-        </div>
-
-        {rolesError && (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {rolesError}
-          </div>
-        )}
-
-        {permissionsError && (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            {permissionsError}
-          </div>
-        )}
-
-        <div className="overflow-hidden rounded-2xl border border-slate-200">
-          {loadingRoles ? (
-            <div className="px-4 py-6 text-sm text-slate-500">Cargando roles...</div>
-          ) : filteredRoles.length === 0 ? (
-            <div className="px-4 py-6 text-sm text-slate-500">
-              No hay roles para los filtros actuales.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium text-slate-600">Rol</th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-600">Descripcion</th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-600">Permisos</th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-600">Estado</th>
-                    <th className="px-4 py-3 text-left font-medium text-slate-600">Actualizado</th>
-                    <th className="px-4 py-3 text-right font-medium text-slate-600">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 bg-white">
-                  {filteredRoles.map((role) => (
-                    <tr key={role.role_id}>
-                      <td className="px-4 py-3 align-top">
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${roleBadgeClass(role.active)}`}>
-                          {role.name}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 align-top text-slate-600">{role.description || "-"}</td>
-                      <td className="px-4 py-3 align-top">
-                        {role.permissions.length === 0 ? (
-                          <span className="text-slate-400">Sin permisos</span>
-                        ) : (
-                          <div className="flex max-w-xl flex-wrap gap-2">
-                            {role.permissions.map((permission) => (
-                              <span
-                                key={`${role.role_id}-${permission.permission_id}`}
-                                className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700"
-                                title={permission.description || permission.key}
-                              >
-                                {permission.key}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusBadgeClass(role.active)}`}
-                        >
-                          {role.active ? "Activo" : "Inactivo"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 align-top text-slate-500">
-                        {new Date(role.updated_at).toLocaleString("es-PE")}
-                      </td>
-                      <td className="px-4 py-3 align-top">
-                        <div className="flex flex-wrap justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => openRoleForm(role)}
-                            className="rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-medium text-indigo-700 transition hover:bg-indigo-50"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => toggleRoleActive(role)}
-                            className="rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-50"
-                          >
-                            {role.active ? "Inactivar" : "Activar"}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </section>
+        </section>
+      )}
 
       {locationsError && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -1088,32 +1094,32 @@ export default function AdminCrudPage() {
       )}
 
       {showUserForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
-            <h3 className="text-xl font-semibold text-slate-900">
+        <div className="ops-overlay-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="ops-overlay-panel w-full max-w-lg rounded-2xl p-5">
+            <h3 className="text-xl font-semibold text-[var(--ops-text)]">
               {editingUserId ? "Editar usuario" : "Nuevo usuario"}
             </h3>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-[var(--ops-text-muted)]">
               {editingUserId
-                ? "Actualiza nombre, usuario, correo opcional y rol del usuario."
-                : "La clave temporal se genera como usuario + 123 mientras se define el flujo de cambio de contraseña."}
+                ? "Actualiza la información del usuario."
+                : "Registro de usuario."}
             </p>
 
             <form className="mt-6 space-y-4" onSubmit={submitUserForm}>
               <label className="block space-y-1">
-                <span className="text-sm font-medium text-slate-700">Nombre completo</span>
+                <span className="text-sm font-medium text-[var(--ops-text)]">Nombre completo</span>
                 <input
                   required
                   value={userForm.full_name}
                   onChange={(event) =>
                     setUserForm((current) => ({ ...current, full_name: event.target.value }))
                   }
-                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
+                  className="w-full rounded-xl border border-[var(--ops-border-strong)] px-4 py-2.5 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)]"
                 />
               </label>
 
               <label className="block space-y-1">
-                <span className="text-sm font-medium text-slate-700">Usuario</span>
+                <span className="text-sm font-medium text-[var(--ops-text)]">Usuario</span>
                 <input
                   required
                   autoCapitalize="none"
@@ -1122,30 +1128,30 @@ export default function AdminCrudPage() {
                   onChange={(event) =>
                     setUserForm((current) => ({ ...current, username: event.target.value }))
                   }
-                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
+                  className="w-full rounded-xl border border-[var(--ops-border-strong)] px-4 py-2.5 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)]"
                 />
               </label>
 
               <label className="block space-y-1">
-                <span className="text-sm font-medium text-slate-700">Email opcional</span>
+                <span className="text-sm font-medium text-[var(--ops-text)]">Email opcional</span>
                 <input
                   type="email"
                   value={userForm.email}
                   onChange={(event) =>
                     setUserForm((current) => ({ ...current, email: event.target.value }))
                   }
-                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
+                  className="w-full rounded-xl border border-[var(--ops-border-strong)] px-4 py-2.5 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)]"
                 />
               </label>
 
               <label className="block space-y-1">
-                <span className="text-sm font-medium text-slate-700">Rol</span>
+                <span className="text-sm font-medium text-[var(--ops-text)]">Rol</span>
                 <select
                   value={userForm.role_id}
                   onChange={(event) =>
                     setUserForm((current) => ({ ...current, role_id: event.target.value }))
                   }
-                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
+                  className="w-full rounded-xl border border-[var(--ops-border-strong)] px-4 py-2.5 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)]"
                 >
                   <option value="">Sin rol</option>
                   {roles.map((role) => (
@@ -1156,16 +1162,16 @@ export default function AdminCrudPage() {
                 </select>
               </label>
 
-              <label className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
+              <label className="flex items-center gap-3 rounded-2xl border border-[var(--ops-border-strong)] px-4 py-3">
                 <input
                   type="checkbox"
                   checked={userForm.active}
                   onChange={(event) =>
                     setUserForm((current) => ({ ...current, active: event.target.checked }))
                   }
-                  className="h-4 w-4 rounded border-slate-300"
+                  className="h-4 w-4 rounded border-[var(--ops-border-strong)]"
                 />
-                <span className="text-sm text-slate-700">Usuario activo</span>
+                <span className="text-sm text-[var(--ops-text)]">Usuario activo</span>
               </label>
 
               <div className="flex justify-end gap-3 pt-2">
@@ -1173,14 +1179,14 @@ export default function AdminCrudPage() {
                   type="button"
                   onClick={closeUserForm}
                   disabled={savingUser}
-                  className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-xl border border-[var(--ops-border-strong)] px-4 py-2 text-sm font-medium text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={savingUser}
-                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-xl bg-[var(--ripnel-accent)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {savingUser ? "Guardando..." : "Guardar usuario"}
                 </button>
@@ -1191,13 +1197,13 @@ export default function AdminCrudPage() {
       )}
 
       {showRoleForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
-            <div className="border-b border-slate-200 px-6 py-5">
-            <h3 className="text-xl font-semibold text-slate-900">
+        <div className="ops-overlay-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="ops-overlay-panel flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl">
+            <div className="border-b border-[var(--ops-border-strong)] px-6 py-5">
+            <h3 className="text-xl font-semibold text-[var(--ops-text)]">
               {editingRoleId ? "Editar rol" : "Nuevo rol"}
             </h3>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-[var(--ops-text-muted)]">
               Los permisos se asignan al rol, no al usuario individual.
             </p>
             </div>
@@ -1207,39 +1213,39 @@ export default function AdminCrudPage() {
                 <div className="grid gap-4 xl:grid-cols-[0.78fr_1.22fr]">
                   <div className="space-y-4">
                     <label className="block space-y-1">
-                      <span className="text-sm font-medium text-slate-700">Nombre</span>
+                      <span className="text-sm font-medium text-[var(--ops-text)]">Nombre</span>
                       <input
                         required
                         value={roleForm.name}
                         onChange={(event) =>
                           setRoleForm((current) => ({ ...current, name: event.target.value }))
                         }
-                        className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
+                        className="w-full rounded-xl border border-[var(--ops-border-strong)] px-4 py-2.5 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)]"
                       />
                     </label>
 
                     <label className="block space-y-1">
-                      <span className="text-sm font-medium text-slate-700">Descripcion</span>
+                      <span className="text-sm font-medium text-[var(--ops-text)]">Descripcion</span>
                       <textarea
                         value={roleForm.description}
                         onChange={(event) =>
                           setRoleForm((current) => ({ ...current, description: event.target.value }))
                         }
                         rows={6}
-                        className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500"
+                        className="w-full rounded-xl border border-[var(--ops-border-strong)] px-4 py-2.5 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)]"
                       />
                     </label>
 
-                    <label className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3">
+                    <label className="flex items-center gap-3 rounded-2xl border border-[var(--ops-border-strong)] px-4 py-3">
                       <input
                         type="checkbox"
                         checked={roleForm.active}
                         onChange={(event) =>
                           setRoleForm((current) => ({ ...current, active: event.target.checked }))
                         }
-                        className="h-4 w-4 rounded border-slate-300"
+                        className="h-4 w-4 rounded border-[var(--ops-border-strong)]"
                       />
-                      <span className="text-sm text-slate-700">Rol activo</span>
+                      <span className="text-sm text-[var(--ops-text)]">Rol activo</span>
                     </label>
                   </div>
 
@@ -1263,19 +1269,19 @@ export default function AdminCrudPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+              <div className="flex justify-end gap-3 border-t border-[var(--ops-border-strong)] px-6 py-4">
                 <button
                   type="button"
                   onClick={closeRoleForm}
                   disabled={savingRole}
-                  className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-xl border border-[var(--ops-border-strong)] px-4 py-2 text-sm font-medium text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={savingRole}
-                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-xl bg-[var(--ripnel-accent)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {savingRole ? "Guardando..." : "Guardar rol"}
                 </button>
@@ -1286,12 +1292,12 @@ export default function AdminCrudPage() {
       )}
 
       {locationsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl">
+        <div className="ops-overlay-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="ops-overlay-panel w-full max-w-2xl rounded-2xl p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className="text-xl font-semibold text-slate-900">Sedes por usuario</h3>
-                <p className="mt-1 text-sm text-slate-500">
+                <h3 className="text-xl font-semibold text-[var(--ops-text)]">Sedes por usuario</h3>
+                <p className="mt-1 text-sm text-[var(--ops-text-muted)]">
                   {locationsUser
                     ? `Asignaciones operativas para ${locationsUser.full_name}.`
                     : "Configura las sedes del usuario."}
@@ -1300,7 +1306,7 @@ export default function AdminCrudPage() {
               <button
                 type="button"
                 onClick={closeLocationsModal}
-                className="rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-50"
+                className="rounded-xl border border-[var(--ops-border-strong)] px-3 py-2 text-sm text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
               >
                 Cerrar
               </button>
@@ -1312,15 +1318,15 @@ export default function AdminCrudPage() {
               </div>
             )}
 
-            <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+            <div className="mt-6 overflow-hidden rounded-2xl border border-[var(--ops-border-strong)]">
               {loadingUserLocations || loadingLocations ? (
-                <div className="px-4 py-6 text-sm text-slate-500">Cargando sedes...</div>
+                <div className="px-4 py-6 text-sm text-[var(--ops-text-muted)]">Cargando sedes...</div>
               ) : availableLocations.length === 0 ? (
-                <div className="px-4 py-6 text-sm text-slate-500">
+                <div className="px-4 py-6 text-sm text-[var(--ops-text-muted)]">
                   No hay sedes activas disponibles.
                 </div>
               ) : (
-                <div className="divide-y divide-slate-200">
+                <div className="divide-y divide-[var(--ops-border-strong)]">
                   {availableLocations.map((location) => {
                     const checked = selectedLocationIds.includes(location.location_id);
                     const isDefault = defaultLocationId === location.location_id;
@@ -1335,13 +1341,13 @@ export default function AdminCrudPage() {
                             type="checkbox"
                             checked={checked}
                             onChange={() => toggleLocation(location.location_id)}
-                            className="mt-1 h-4 w-4 rounded border-slate-300"
+                            className="mt-1 h-4 w-4 rounded border-[var(--ops-border-strong)]"
                           />
                           <span>
-                            <span className="block font-medium text-slate-900">
+                            <span className="block font-medium text-[var(--ops-text)]">
                               {location.name} ({location.code})
                             </span>
-                            <span className="block text-sm text-slate-500">
+                            <span className="block text-sm text-[var(--ops-text-muted)]">
                               {location.type}
                               {location.address ? ` - ${location.address}` : ""}
                             </span>
@@ -1349,7 +1355,7 @@ export default function AdminCrudPage() {
                         </label>
 
                         <label
-                          className={`inline-flex items-center gap-2 text-sm ${checked ? "text-slate-700" : "text-slate-400"}`}
+                          className={`inline-flex items-center gap-2 text-sm ${checked ? "text-[var(--ops-text)]" : "text-[var(--ops-text-muted)]"}`}
                         >
                           <input
                             type="radio"
@@ -1357,7 +1363,7 @@ export default function AdminCrudPage() {
                             checked={isDefault}
                             disabled={!checked}
                             onChange={() => setDefaultLocationId(location.location_id)}
-                            className="h-4 w-4 border-slate-300"
+                            className="h-4 w-4 border-[var(--ops-border-strong)]"
                           />
                           Sede default
                         </label>
@@ -1373,7 +1379,7 @@ export default function AdminCrudPage() {
                 type="button"
                 onClick={closeLocationsModal}
                 disabled={savingUserLocations}
-                className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-xl border border-[var(--ops-border-strong)] px-4 py-2 text-sm font-medium text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Cancelar
               </button>
@@ -1392,3 +1398,4 @@ export default function AdminCrudPage() {
     </div>
   );
 }
+

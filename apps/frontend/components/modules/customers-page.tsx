@@ -2,17 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import {
-  ArrowDownUp,
-  ArrowUp,
-  ArrowDown,
-  PencilLine,
-  Plus,
-  RefreshCw,
-  Check,
-  X,
-  Trash2,
-} from "lucide-react";
+import { ArrowDown, ArrowUp, PencilLine, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { apiFetch, buildApiUrl, unwrapApiData } from "@/lib/api";
 
 type Customer = {
@@ -32,20 +22,7 @@ type Customer = {
   updated_at: string;
 };
 
-type EditState = {
-  document_type: string;
-  document_number: string;
-  full_name: string;
-  business_name: string;
-  commercial_name: string;
-  email: string;
-  phone: string;
-  customer_type: string;
-  active: boolean;
-  notes: string;
-};
-
-type CreateState = {
+type CustomerFormState = {
   document_type: string;
   document_number: string;
   full_name: string;
@@ -78,7 +55,7 @@ const DOC_RULES: Record<string, { label: string; regex: RegExp }> = {
   passport: { label: "Pasaporte", regex: /^[A-Za-z0-9]{6,15}$/ },
 };
 
-const EMPTY_FORM: CreateState = {
+const EMPTY_FORM: CustomerFormState = {
   document_type: "none",
   document_number: "",
   full_name: "",
@@ -108,19 +85,22 @@ function trimOrNull(value: string) {
   return normalized.length ? normalized : null;
 }
 
-function validateCustomerInput(input: Pick<CreateState, "document_type" | "document_number" | "full_name" | "business_name" | "commercial_name">) {
+function validateCustomerInput(
+  input: Pick<
+    CustomerFormState,
+    "document_type" | "document_number" | "full_name" | "business_name" | "commercial_name"
+  >
+) {
   const nameIsMissing =
-    !input.full_name.trim() &&
-    !input.business_name.trim() &&
-    !input.commercial_name.trim();
+    !input.full_name.trim() && !input.business_name.trim() && !input.commercial_name.trim();
 
   if (nameIsMissing) {
-    return "Ingresa al menos un nombre: nombre completo, razón social o nombre comercial.";
+    return "Ingresa al menos un nombre.";
   }
 
   if (input.document_type === "none") {
     if (input.document_number.trim()) {
-      return "Si el tipo de documento es sin documento, el número debe ir vacío.";
+      return "Si el tipo es sin documento, el número debe ir vacío.";
     }
     return null;
   }
@@ -136,7 +116,7 @@ function validateCustomerInput(input: Pick<CreateState, "document_type" | "docum
       : input.document_number.trim();
 
   if (!normalizedNumber) {
-    return "Número de documento obligatorio para el tipo seleccionado.";
+    return "Número de documento obligatorio.";
   }
 
   if (!rule.regex.test(normalizedNumber)) {
@@ -146,7 +126,7 @@ function validateCustomerInput(input: Pick<CreateState, "document_type" | "docum
   return null;
 }
 
-function buildCustomerPayload(input: CreateState) {
+function buildCustomerPayload(input: CustomerFormState) {
   const normalizedDocumentNumber =
     input.document_type === "none"
       ? null
@@ -168,19 +148,38 @@ function buildCustomerPayload(input: CreateState) {
   };
 }
 
+function toFormState(c: Customer): CustomerFormState {
+  return {
+    document_type: c.document_type,
+    document_number: c.document_number || "",
+    full_name: c.full_name || "",
+    business_name: c.business_name || "",
+    commercial_name: c.commercial_name || "",
+    email: c.email || "",
+    phone: c.phone || "",
+    customer_type: c.customer_type,
+    active: c.active,
+    notes: c.notes || "",
+  };
+}
+
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [docFilter, setDocFilter] = useState<string>("all");
   const [sort, setSort] = useState<"desc" | "asc">("desc");
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editState, setEditState] = useState<EditState | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [createState, setCreateState] = useState<CreateState>(EMPTY_FORM);
+  const [activeTab, setActiveTab] = useState<"list" | "create">("list");
+
+  const [createState, setCreateState] = useState<CustomerFormState>(EMPTY_FORM);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [editState, setEditState] = useState<CustomerFormState>(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -200,8 +199,8 @@ export default function CustomersPage() {
       const payload = await apiFetch<{ ok: boolean; data: Customer[] } | Customer[]>(
         `/api/customers?${params.toString()}`,
         {
-        signal: ctrl.signal,
-        cache: "no-store",
+          signal: ctrl.signal,
+          cache: "no-store",
         }
       );
 
@@ -219,32 +218,20 @@ export default function CustomersPage() {
     fetchCustomers(docFilter, sort);
   }, [docFilter, sort]);
 
-  function startEdit(c: Customer) {
-    setEditingId(c.customer_id);
+  function openEditModal(customer: Customer) {
+    setEditingCustomer(customer);
+    setEditState(toFormState(customer));
     setSaveError(null);
-    setEditState({
-      document_type: c.document_type,
-      document_number: c.document_number || "",
-      full_name: c.full_name || "",
-      business_name: c.business_name || "",
-      commercial_name: c.commercial_name || "",
-      email: c.email || "",
-      phone: c.phone || "",
-      customer_type: c.customer_type,
-      active: c.active,
-      notes: c.notes || "",
-    });
   }
 
-  function cancelEdit() {
-    setEditingId(null);
-    setEditState(null);
+  function closeEditModal() {
+    setEditingCustomer(null);
+    setEditState(EMPTY_FORM);
     setSaveError(null);
   }
 
   async function createCustomer() {
     setCreateError(null);
-
     const validationError = validateCustomerInput(createState);
     if (validationError) {
       setCreateError(validationError);
@@ -252,7 +239,6 @@ export default function CustomersPage() {
     }
 
     setCreating(true);
-
     try {
       const res = await fetch(buildApiUrl("/api/customers"), {
         method: "POST",
@@ -261,19 +247,48 @@ export default function CustomersPage() {
       });
 
       const payload = await res.json();
+      if (!res.ok) throw new Error(payload.message || "Error al crear cliente");
 
-      if (!res.ok) {
-        throw new Error(payload.message || "Error al crear cliente");
-      }
-
-      setCustomers((prev) =>
-        sort === "desc" ? [payload.data, ...prev] : [...prev, payload.data]
-      );
+      setCustomers((prev) => (sort === "desc" ? [payload.data, ...prev] : [...prev, payload.data]));
       setCreateState(EMPTY_FORM);
+      setActiveTab("list");
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : "Error al crear cliente");
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function saveEdit() {
+    if (!editingCustomer) return;
+
+    const validationError = validateCustomerInput(editState);
+    if (validationError) {
+      setSaveError(validationError);
+      return;
+    }
+
+    setSaving(true);
+    setSaveError(null);
+
+    try {
+      const res = await fetch(buildApiUrl(`/api/customers/${editingCustomer.customer_id}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildCustomerPayload(editState)),
+      });
+
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.message || "Error al guardar");
+
+      setCustomers((prev) =>
+        prev.map((c) => (c.customer_id === editingCustomer.customer_id ? payload.data : c))
+      );
+      closeEditModal();
+    } catch (err: unknown) {
+      setSaveError(err instanceof Error ? err.message : "Error al guardar");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -287,68 +302,18 @@ export default function CustomersPage() {
 
     setDeletingId(customerId);
     setSaveError(null);
-    setCreateError(null);
 
     try {
-      const res = await fetch(buildApiUrl(`/api/customers/${customerId}`), {
-        method: "DELETE",
-      });
-
+      const res = await fetch(buildApiUrl(`/api/customers/${customerId}`), { method: "DELETE" });
       const payload = await res.json();
-
-      if (!res.ok) {
-        throw new Error(payload.message || "Error al eliminar cliente");
-      }
+      if (!res.ok) throw new Error(payload.message || "Error al eliminar cliente");
 
       setCustomers((prev) => prev.filter((c) => c.customer_id !== customerId));
-
-      if (editingId === customerId) {
-        cancelEdit();
-      }
+      if (editingCustomer?.customer_id === customerId) closeEditModal();
     } catch (err: unknown) {
       setSaveError(err instanceof Error ? err.message : "Error al eliminar cliente");
     } finally {
       setDeletingId(null);
-    }
-  }
-
-  async function saveEdit(customerId: string) {
-    if (!editState) return;
-
-    const validationError = validateCustomerInput(editState);
-    if (validationError) {
-      setSaveError(validationError);
-      return;
-    }
-
-    setSaving(true);
-    setSaveError(null);
-
-    try {
-      const res = await fetch(
-        buildApiUrl(`/api/customers/${customerId}`),
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(buildCustomerPayload(editState)),
-        }
-      );
-
-      const payload = await res.json();
-
-      if (!res.ok) {
-        throw new Error(payload.message || "Error al guardar");
-      }
-
-      setCustomers((prev) =>
-        prev.map((c) => (c.customer_id === customerId ? payload.data : c))
-      );
-      setEditingId(null);
-      setEditState(null);
-    } catch (err: unknown) {
-      setSaveError(err instanceof Error ? err.message : "Error al guardar");
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -364,488 +329,433 @@ export default function CustomersPage() {
   const isEmpty = !loading && !error && customers.length === 0;
 
   return (
-    <div className="flex flex-col gap-4 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Clientes</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
-            Listado de clientes registrados
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/clientes/dashboards"
-            className="flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm text-blue-700 transition-colors hover:bg-blue-100"
-          >
-            Dashboards BI
-          </Link>
-          <button
-            onClick={() => fetchCustomers(docFilter, sort)}
-            disabled={loading}
-            className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-          >
-            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-            Actualizar
-          </button>
-        </div>
-      </div>
+    <section className="ops-page min-h-screen p-4 md:p-5">
+      <div className="mx-auto flex max-w-7xl flex-col gap-4">
+        <header className="space-y-1">
+          <h1 className="ops-title text-2xl font-semibold">Clientes</h1>
+          <p className="ops-text-muted text-sm">Gestión operativa de clientes.</p>
+        </header>
 
-      {/* Filters */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-1 rounded-md border border-gray-200 bg-white p-1">
-          {docFilterOptions.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setDocFilter(opt.value)}
-              className={`rounded px-3 py-1 text-sm font-medium transition-colors ${
-                docFilter === opt.value
-                  ? "bg-gray-900 text-white"
-                  : "text-gray-600 hover:bg-gray-100"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+        <div className="ops-surface rounded-2xl border p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-1 rounded-lg border border-[var(--ops-border-strong)] p-1">
+              <button
+                type="button"
+                onClick={() => setActiveTab("list")}
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                  activeTab === "list"
+                    ? "bg-[var(--ripnel-accent)] text-white"
+                    : "text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
+                }`}
+              >
+                Listado
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("create")}
+                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                  activeTab === "create"
+                    ? "bg-[var(--ripnel-accent)] text-white"
+                    : "text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
+                }`}
+              >
+                Nuevo cliente
+              </button>
+            </div>
 
-        <button
-          onClick={() => setSort((s) => (s === "desc" ? "asc" : "desc"))}
-          className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-        >
-          {sort === "desc" ? (
-            <ArrowDown size={14} />
-          ) : (
-            <ArrowUp size={14} />
-          )}
-          Fecha {sort === "desc" ? "más reciente" : "más antigua"}
-        </button>
-
-        <span className="ml-auto text-xs text-gray-400">
-          {loading ? "Cargando..." : `${customers.length} cliente${customers.length !== 1 ? "s" : ""}`}
-        </span>
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      {/* Save error */}
-      {saveError && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {saveError}
-        </div>
-      )}
-
-      {/* Create error */}
-      {createError && (
-        <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {createError}
-        </div>
-      )}
-
-      {/* Create form */}
-      <div className="rounded-lg border border-gray-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-gray-900">Nuevo cliente</h2>
-        <p className="mt-1 text-xs text-gray-500">Alta directa en ERP, sin vincular a ventas por ahora.</p>
-
-        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-          <select
-            className="rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
-            value={createState.document_type}
-            onChange={(e) =>
-              setCreateState((s) => ({
-                ...s,
-                document_type: e.target.value,
-                document_number: e.target.value === "none" ? "" : s.document_number,
-              }))
-            }
-          >
-            <option value="none">Sin documento</option>
-            <option value="dni">DNI</option>
-            <option value="ruc">RUC</option>
-            <option value="ce">CE</option>
-            <option value="passport">Pasaporte</option>
-          </select>
-
-          <input
-            className="rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none disabled:bg-gray-100"
-            placeholder="Número de documento"
-            value={createState.document_number}
-            disabled={createState.document_type === "none"}
-            onChange={(e) =>
-              setCreateState((s) => ({ ...s, document_number: e.target.value }))
-            }
-          />
-
-          <select
-            className="rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
-            value={createState.customer_type}
-            onChange={(e) =>
-              setCreateState((s) => ({ ...s, customer_type: e.target.value }))
-            }
-          >
-            <option value="retail">Retail</option>
-            <option value="wholesale">Mayorista</option>
-          </select>
-
-          <input
-            className="rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
-            placeholder="Nombre completo"
-            value={createState.full_name}
-            onChange={(e) =>
-              setCreateState((s) => ({ ...s, full_name: e.target.value }))
-            }
-          />
-
-          <input
-            className="rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
-            placeholder="Razón social"
-            value={createState.business_name}
-            onChange={(e) =>
-              setCreateState((s) => ({ ...s, business_name: e.target.value }))
-            }
-          />
-
-          <input
-            className="rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
-            placeholder="Nombre comercial"
-            value={createState.commercial_name}
-            onChange={(e) =>
-              setCreateState((s) => ({ ...s, commercial_name: e.target.value }))
-            }
-          />
-
-          <input
-            type="email"
-            className="rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
-            placeholder="email@ejemplo.com"
-            value={createState.email}
-            onChange={(e) =>
-              setCreateState((s) => ({ ...s, email: e.target.value }))
-            }
-          />
-
-          <input
-            className="rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
-            placeholder="999 000 000"
-            value={createState.phone}
-            onChange={(e) =>
-              setCreateState((s) => ({ ...s, phone: e.target.value }))
-            }
-          />
-
-          <input
-            className="rounded border border-gray-300 px-2.5 py-2 text-sm focus:border-blue-500 focus:outline-none"
-            placeholder="Notas internas"
-            value={createState.notes}
-            onChange={(e) =>
-              setCreateState((s) => ({ ...s, notes: e.target.value }))
-            }
-          />
+            <div className="flex items-center gap-2">
+              <Link
+                href="/clientes/dashboards"
+                className="sales-chip sales-chip-interactive rounded-md px-3 py-1.5 text-xs font-semibold"
+              >
+                Dashboards BI
+              </Link>
+              <button
+                type="button"
+                onClick={() => fetchCustomers(docFilter, sort)}
+                disabled={loading}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-1.5 text-xs font-semibold text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+                Actualizar
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            onClick={() =>
-              setCreateState((s) => ({ ...s, active: !s.active }))
-            }
-            className={`inline-flex items-center rounded px-2.5 py-1 text-xs font-medium transition-colors ${
-              createState.active
-                ? "bg-green-100 text-green-700 hover:bg-green-200"
-                : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-            }`}
-          >
-            {createState.active ? "Activo" : "Inactivo"}
-          </button>
+        {error ? (
+          <div className="rounded-md border border-red-300 bg-red-100/70 px-3 py-2 text-sm text-red-700">{error}</div>
+        ) : null}
 
-          <button
-            onClick={() => setCreateState(EMPTY_FORM)}
-            disabled={creating}
-            className="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-          >
-            <X size={12} />
-            Limpiar
-          </button>
+        {saveError ? (
+          <div className="rounded-md border border-red-300 bg-red-100/70 px-3 py-2 text-sm text-red-700">{saveError}</div>
+        ) : null}
 
-          <button
-            onClick={createCustomer}
-            disabled={creating}
-            className="inline-flex items-center gap-1 rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            <Plus size={12} />
-            {creating ? "Creando..." : "Crear cliente"}
-          </button>
-        </div>
-      </div>
+        {activeTab === "list" ? (
+          <div className="ops-surface rounded-2xl border">
+            <div className="border-b border-[var(--ops-border-strong)] p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-1 rounded-md border border-[var(--ops-border-strong)] bg-[var(--ops-field)] p-1">
+                  {docFilterOptions.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setDocFilter(opt.value)}
+                      className={`cursor-pointer rounded px-2.5 py-1 text-xs font-semibold transition ${
+                        docFilter === opt.value
+                          ? "bg-[var(--ripnel-accent)] text-white"
+                          : "text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
-        <table className="w-full text-sm">
-          <thead className="border-b border-gray-200 bg-gray-50">
-            <tr>
-              <th className="px-3 py-2.5 text-left font-medium text-gray-600 whitespace-nowrap">Código</th>
-              <th className="px-3 py-2.5 text-left font-medium text-gray-600 whitespace-nowrap">Tipo doc.</th>
-              <th className="px-3 py-2.5 text-left font-medium text-gray-600 whitespace-nowrap">N° documento</th>
-              <th className="px-3 py-2.5 text-left font-medium text-gray-600 whitespace-nowrap">Nombre / Razón social</th>
-              <th className="px-3 py-2.5 text-left font-medium text-gray-600 whitespace-nowrap">Email</th>
-              <th className="px-3 py-2.5 text-left font-medium text-gray-600 whitespace-nowrap">Teléfono</th>
-              <th className="px-3 py-2.5 text-left font-medium text-gray-600 whitespace-nowrap">Tipo</th>
-              <th className="px-3 py-2.5 text-left font-medium text-gray-600 whitespace-nowrap">Estado</th>
-              <th className="px-3 py-2.5 text-left font-medium text-gray-600 whitespace-nowrap">
-                <span className="flex items-center gap-1">
-                  <ArrowDownUp size={12} /> Ingreso
+                <button
+                  type="button"
+                  onClick={() => setSort((s) => (s === "desc" ? "asc" : "desc"))}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-1.5 text-xs font-semibold text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
+                >
+                  {sort === "desc" ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
+                  Fecha {sort === "desc" ? "más reciente" : "más antigua"}
+                </button>
+
+                <span className="ml-auto text-xs text-[var(--ops-text-muted)]">
+                  {loading ? "Cargando..." : `${customers.length} cliente${customers.length !== 1 ? "s" : ""}`}
                 </span>
-              </th>
-              <th className="px-3 py-2.5 text-right font-medium text-gray-600 whitespace-nowrap">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {loading && (
-              <tr>
-                <td colSpan={10} className="px-3 py-8 text-center text-gray-400">
-                  Cargando clientes...
-                </td>
-              </tr>
-            )}
-            {isEmpty && (
-              <tr>
-                <td colSpan={10} className="px-3 py-8 text-center text-gray-400">
-                  No hay clientes registrados con este filtro.
-                </td>
-              </tr>
-            )}
-            {!loading &&
-              customers.map((c) => {
-                const isEditing = editingId === c.customer_id;
+              </div>
+            </div>
 
-                return (
-                  <tr
-                    key={c.customer_id}
-                    className={`transition-colors ${isEditing ? "bg-blue-50" : "hover:bg-gray-50"}`}
-                  >
-                    {/* Código */}
-                    <td className="px-3 py-2 text-gray-500 font-mono text-xs whitespace-nowrap">
-                      {c.internal_code || "—"}
-                    </td>
-
-                    {/* Tipo doc */}
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <span className="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-700">
-                        {DOC_TYPE_LABELS[c.document_type] ?? c.document_type}
-                      </span>
-                    </td>
-
-                    {/* N° documento */}
-                    <td className="px-3 py-2 text-gray-700 font-mono text-xs whitespace-nowrap">
-                      {isEditing ? (
-                        <div className="flex items-center gap-1">
-                          <select
-                            className="rounded border border-gray-300 px-1.5 py-1 text-xs focus:border-blue-500 focus:outline-none"
-                            value={editState!.document_type}
-                            onChange={(e) =>
-                              setEditState((s) =>
-                                s
-                                  ? {
-                                      ...s,
-                                      document_type: e.target.value,
-                                      document_number: e.target.value === "none" ? "" : s.document_number,
-                                    }
-                                  : s
-                              )
-                            }
-                          >
-                            <option value="none">Sin doc.</option>
-                            <option value="dni">DNI</option>
-                            <option value="ruc">RUC</option>
-                            <option value="ce">CE</option>
-                            <option value="passport">Pasaporte</option>
-                          </select>
-
-                          <input
-                            className="w-28 rounded border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none disabled:bg-gray-100"
-                            placeholder="N°"
-                            disabled={editState!.document_type === "none"}
-                            value={editState!.document_number}
-                            onChange={(e) =>
-                              setEditState((s) => s && { ...s, document_number: e.target.value })
-                            }
-                          />
-                        </div>
-                      ) : (
-                        c.document_number || "—"
-                      )}
-                    </td>
-
-                    {/* Nombre */}
-                    <td className="px-3 py-2 min-w-40">
-                      {isEditing ? (
-                        <div className="flex flex-col gap-1">
-                          <input
-                            className="w-full rounded border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none"
-                            placeholder="Nombre completo"
-                            value={editState!.full_name}
-                            onChange={(e) =>
-                              setEditState((s) => s && { ...s, full_name: e.target.value })
-                            }
-                          />
-                          <input
-                            className="w-full rounded border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none"
-                            placeholder="Razón social"
-                            value={editState!.business_name}
-                            onChange={(e) =>
-                              setEditState((s) => s && { ...s, business_name: e.target.value })
-                            }
-                          />
-                        </div>
-                      ) : (
-                        <span className="text-gray-900">{buildDisplayName(c)}</span>
-                      )}
-                    </td>
-
-                    {/* Email */}
-                    <td className="px-3 py-2 min-w-35">
-                      {isEditing ? (
-                        <input
-                          type="email"
-                          className="w-full rounded border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none"
-                          placeholder="email@ejemplo.com"
-                          value={editState!.email}
-                          onChange={(e) =>
-                            setEditState((s) => s && { ...s, email: e.target.value })
-                          }
-                        />
-                      ) : (
-                        <span className="text-gray-600">{c.email || "—"}</span>
-                      )}
-                    </td>
-
-                    {/* Teléfono */}
-                    <td className="px-3 py-2 min-w-28">
-                      {isEditing ? (
-                        <input
-                          className="w-full rounded border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none"
-                          placeholder="999 000 000"
-                          value={editState!.phone}
-                          onChange={(e) =>
-                            setEditState((s) => s && { ...s, phone: e.target.value })
-                          }
-                        />
-                      ) : (
-                        <span className="text-gray-600">{c.phone || "—"}</span>
-                      )}
-                    </td>
-
-                    {/* Tipo cliente */}
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {isEditing ? (
-                        <select
-                          className="rounded border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none"
-                          value={editState!.customer_type}
-                          onChange={(e) =>
-                            setEditState((s) => s && { ...s, customer_type: e.target.value })
-                          }
-                        >
-                          <option value="retail">Retail</option>
-                          <option value="wholesale">Mayorista</option>
-                        </select>
-                      ) : (
-                        <span
-                          className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${
-                            c.customer_type === "wholesale"
-                              ? "bg-purple-100 text-purple-700"
-                              : "bg-sky-100 text-sky-700"
-                          }`}
-                        >
-                          {CUSTOMER_TYPE_LABELS[c.customer_type] ?? c.customer_type}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Estado */}
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      {isEditing ? (
-                        <button
-                          onClick={() =>
-                            setEditState((s) => s && { ...s, active: !s.active })
-                          }
-                          className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium transition-colors ${
-                            editState!.active
-                              ? "bg-green-100 text-green-700 hover:bg-green-200"
-                              : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                          }`}
-                        >
-                          {editState!.active ? "Activo" : "Inactivo"}
-                        </button>
-                      ) : (
-                        <span
-                          className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium ${
-                            c.active
-                              ? "bg-green-100 text-green-700"
-                              : "bg-gray-100 text-gray-400"
-                          }`}
-                        >
-                          {c.active ? "Activo" : "Inactivo"}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Fecha ingreso */}
-                    <td className="px-3 py-2 text-gray-500 text-xs whitespace-nowrap">
-                      {formatDate(c.created_at)}
-                    </td>
-
-                    {/* Acciones */}
-                    <td className="px-3 py-2 text-right whitespace-nowrap">
-                      {isEditing ? (
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => saveEdit(c.customer_id)}
-                            disabled={saving}
-                            className="inline-flex items-center gap-1 rounded bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                          >
-                            <Check size={12} />
-                            {saving ? "Guardando..." : "Guardar"}
-                          </button>
-                          <button
-                            onClick={cancelEdit}
-                            disabled={saving}
-                            className="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                          >
-                            <X size={12} />
-                            Cancelar
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => startEdit(c)}
-                          className="inline-flex items-center gap-1 rounded border border-gray-200 bg-white px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
-                        >
-                          <PencilLine size={12} />
-                          Editar
-                        </button>
-                      )}
-
-                      {!isEditing && (
-                        <button
-                          onClick={() => deleteCustomer(c.customer_id)}
-                          disabled={deletingId === c.customer_id}
-                          className="ml-1 inline-flex items-center gap-1 rounded border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
-                        >
-                          <Trash2 size={12} />
-                          {deletingId === c.customer_id ? "Eliminando..." : "Eliminar"}
-                        </button>
-                      )}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)]">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ops-text-muted)]">Código</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ops-text-muted)]">Tipo doc.</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ops-text-muted)]">N° documento</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ops-text-muted)]">Cliente</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ops-text-muted)]">Email</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ops-text-muted)]">Teléfono</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ops-text-muted)]">Tipo</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ops-text-muted)]">Estado</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ops-text-muted)]">Ingreso</th>
+                    <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ops-text-muted)]">Acciones</th>
                   </tr>
-                );
-              })}
-          </tbody>
-        </table>
+                </thead>
+                <tbody className="divide-y divide-[var(--ops-border-soft)]">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={10} className="px-3 py-6 text-center text-sm text-[var(--ops-text-muted)]">
+                        Cargando clientes...
+                      </td>
+                    </tr>
+                  ) : null}
+
+                  {isEmpty ? (
+                    <tr>
+                      <td colSpan={10} className="px-3 py-6 text-center text-sm text-[var(--ops-text-muted)]">
+                        No hay clientes registrados con este filtro.
+                      </td>
+                    </tr>
+                  ) : null}
+
+                  {!loading &&
+                    customers.map((c) => (
+                      <tr key={c.customer_id} className="hover:bg-[var(--ops-surface-muted)]/60">
+                        <td className="px-3 py-2 font-mono text-xs text-[var(--ops-text-muted)]">{c.internal_code || "—"}</td>
+                        <td className="px-3 py-2">
+                          <span className="sales-chip rounded px-1.5 py-0.5 text-[11px] font-semibold">
+                            {DOC_TYPE_LABELS[c.document_type] ?? c.document_type}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 font-mono text-xs text-[var(--ops-text)]">{c.document_number || "—"}</td>
+                        <td className="px-3 py-2 text-[var(--ops-text)]">{buildDisplayName(c)}</td>
+                        <td className="px-3 py-2 text-[var(--ops-text-muted)]">{c.email || "—"}</td>
+                        <td className="px-3 py-2 text-[var(--ops-text-muted)]">{c.phone || "—"}</td>
+                        <td className="px-3 py-2">
+                          <span
+                            className={`sales-chip rounded px-1.5 py-0.5 text-[11px] font-semibold ${
+                              c.customer_type === "wholesale" ? "sales-chip-accent" : "sales-chip-neutral"
+                            }`}
+                          >
+                            {CUSTOMER_TYPE_LABELS[c.customer_type] ?? c.customer_type}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          <span
+                            className={`sales-chip rounded px-1.5 py-0.5 text-[11px] font-semibold ${
+                              c.active ? "sales-chip-success" : "sales-chip-neutral"
+                            }`}
+                          >
+                            {c.active ? "Activo" : "Inactivo"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-xs text-[var(--ops-text-muted)]">{formatDate(c.created_at)}</td>
+                        <td className="px-3 py-2 text-right">
+                          <div className="inline-flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(c)}
+                              className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-2.5 py-1 text-xs font-semibold text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
+                            >
+                              <PencilLine size={12} />
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deleteCustomer(c.customer_id)}
+                              disabled={deletingId === c.customer_id}
+                              className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[var(--ops-border-soft)] bg-transparent px-2.5 py-1 text-xs font-semibold text-rose-600 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              <Trash2 size={12} />
+                              {deletingId === c.customer_id ? "Eliminando..." : "Eliminar"}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="ops-surface rounded-2xl border p-4">
+            {createError ? (
+              <div className="mb-3 rounded-md border border-red-300 bg-red-100/70 px-3 py-2 text-sm text-red-700">
+                {createError}
+              </div>
+            ) : null}
+
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+              <select
+                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
+                value={createState.document_type}
+                onChange={(e) =>
+                  setCreateState((s) => ({
+                    ...s,
+                    document_type: e.target.value,
+                    document_number: e.target.value === "none" ? "" : s.document_number,
+                  }))
+                }
+              >
+                <option value="none">Sin documento</option>
+                <option value="dni">DNI</option>
+                <option value="ruc">RUC</option>
+                <option value="ce">CE</option>
+                <option value="passport">Pasaporte</option>
+              </select>
+              <input
+                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                placeholder="Número de documento"
+                value={createState.document_number}
+                disabled={createState.document_type === "none"}
+                onChange={(e) => setCreateState((s) => ({ ...s, document_number: e.target.value }))}
+              />
+              <select
+                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
+                value={createState.customer_type}
+                onChange={(e) => setCreateState((s) => ({ ...s, customer_type: e.target.value }))}
+              >
+                <option value="retail">Retail</option>
+                <option value="wholesale">Mayorista</option>
+              </select>
+              <input
+                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
+                placeholder="Nombre completo"
+                value={createState.full_name}
+                onChange={(e) => setCreateState((s) => ({ ...s, full_name: e.target.value }))}
+              />
+              <input
+                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
+                placeholder="Razón social"
+                value={createState.business_name}
+                onChange={(e) => setCreateState((s) => ({ ...s, business_name: e.target.value }))}
+              />
+              <input
+                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
+                placeholder="Nombre comercial"
+                value={createState.commercial_name}
+                onChange={(e) => setCreateState((s) => ({ ...s, commercial_name: e.target.value }))}
+              />
+              <input
+                type="email"
+                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
+                placeholder="email@ejemplo.com"
+                value={createState.email}
+                onChange={(e) => setCreateState((s) => ({ ...s, email: e.target.value }))}
+              />
+              <input
+                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
+                placeholder="999 000 000"
+                value={createState.phone}
+                onChange={(e) => setCreateState((s) => ({ ...s, phone: e.target.value }))}
+              />
+              <input
+                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
+                placeholder="Notas"
+                value={createState.notes}
+                onChange={(e) => setCreateState((s) => ({ ...s, notes: e.target.value }))}
+              />
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCreateState((s) => ({ ...s, active: !s.active }))}
+                className={`sales-chip rounded-md px-2.5 py-1 text-xs font-semibold ${
+                  createState.active ? "sales-chip-success" : "sales-chip-neutral"
+                }`}
+              >
+                {createState.active ? "Activo" : "Inactivo"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreateState(EMPTY_FORM)}
+                disabled={creating}
+                className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-1.5 text-xs font-semibold text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <X size={12} />
+                Limpiar
+              </button>
+              <button
+                type="button"
+                onClick={createCustomer}
+                disabled={creating}
+                className="inline-flex cursor-pointer items-center gap-1 rounded-md bg-[var(--ripnel-accent)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Plus size={12} />
+                {creating ? "Creando..." : "Crear cliente"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+
+      {editingCustomer ? (
+        <div className="ops-overlay-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="ops-overlay-panel w-full max-w-2xl rounded-2xl p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-[var(--ops-text)]">Editar cliente</h3>
+              <button
+                type="button"
+                onClick={closeEditModal}
+                className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-2.5 py-1 text-xs font-semibold text-[var(--ops-text)]"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            {saveError ? (
+              <div className="mb-3 rounded-md border border-red-300 bg-red-100/70 px-3 py-2 text-sm text-red-700">
+                {saveError}
+              </div>
+            ) : null}
+
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              <select
+                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
+                value={editState.document_type}
+                onChange={(e) =>
+                  setEditState((s) => ({
+                    ...s,
+                    document_type: e.target.value,
+                    document_number: e.target.value === "none" ? "" : s.document_number,
+                  }))
+                }
+              >
+                <option value="none">Sin documento</option>
+                <option value="dni">DNI</option>
+                <option value="ruc">RUC</option>
+                <option value="ce">CE</option>
+                <option value="passport">Pasaporte</option>
+              </select>
+              <input
+                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                placeholder="Número"
+                value={editState.document_number}
+                disabled={editState.document_type === "none"}
+                onChange={(e) => setEditState((s) => ({ ...s, document_number: e.target.value }))}
+              />
+              <input
+                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
+                placeholder="Nombre completo"
+                value={editState.full_name}
+                onChange={(e) => setEditState((s) => ({ ...s, full_name: e.target.value }))}
+              />
+              <input
+                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
+                placeholder="Razón social"
+                value={editState.business_name}
+                onChange={(e) => setEditState((s) => ({ ...s, business_name: e.target.value }))}
+              />
+              <input
+                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
+                placeholder="Nombre comercial"
+                value={editState.commercial_name}
+                onChange={(e) => setEditState((s) => ({ ...s, commercial_name: e.target.value }))}
+              />
+              <select
+                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
+                value={editState.customer_type}
+                onChange={(e) => setEditState((s) => ({ ...s, customer_type: e.target.value }))}
+              >
+                <option value="retail">Retail</option>
+                <option value="wholesale">Mayorista</option>
+              </select>
+              <input
+                type="email"
+                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
+                placeholder="Email"
+                value={editState.email}
+                onChange={(e) => setEditState((s) => ({ ...s, email: e.target.value }))}
+              />
+              <input
+                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
+                placeholder="Teléfono"
+                value={editState.phone}
+                onChange={(e) => setEditState((s) => ({ ...s, phone: e.target.value }))}
+              />
+              <input
+                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none md:col-span-2"
+                placeholder="Notas"
+                value={editState.notes}
+                onChange={(e) => setEditState((s) => ({ ...s, notes: e.target.value }))}
+              />
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setEditState((s) => ({ ...s, active: !s.active }))}
+                className={`sales-chip rounded-md px-2.5 py-1 text-xs font-semibold ${
+                  editState.active ? "sales-chip-success" : "sales-chip-neutral"
+                }`}
+              >
+                {editState.active ? "Activo" : "Inactivo"}
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={closeEditModal}
+                  disabled={saving}
+                  className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-1.5 text-xs font-semibold text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={saveEdit}
+                  disabled={saving}
+                  className="inline-flex cursor-pointer items-center gap-1 rounded-md bg-[var(--ripnel-accent)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {saving ? "Guardando..." : "Guardar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </section>
   );
 }

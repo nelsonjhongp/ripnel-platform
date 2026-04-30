@@ -27,22 +27,13 @@ type LocationItem = {
 
 type FormState = {
   name: string;
-  code: string;
   type: LocationItem["type"];
   address: string;
   active: boolean;
 };
 
-const locationTypePrefixes: Record<LocationItem["type"], string> = {
-  store: "TD",
-  warehouse: "ALM",
-  workshop: "TLL",
-  third_party: "TER",
-};
-
 const initialFormState: FormState = {
   name: "",
-  code: "",
   type: "store",
   address: "",
   active: true,
@@ -50,14 +41,14 @@ const initialFormState: FormState = {
 
 const locationTypeOptions = [
   { value: "store", label: "Tienda" },
-  { value: "warehouse", label: "Almacen" },
+  { value: "warehouse", label: "Almacén" },
   { value: "workshop", label: "Taller" },
   { value: "third_party", label: "Tercero" },
 ] as const;
 
 const locationTypeLabels: Record<LocationItem["type"], string> = {
   store: "Tienda",
-  warehouse: "Almacen",
+  warehouse: "Almacén",
   workshop: "Taller",
   third_party: "Tercero",
 };
@@ -66,35 +57,6 @@ function typeIcon(type: LocationItem["type"]) {
   if (type === "store") return Store;
   if (type === "warehouse") return Warehouse;
   return Building2;
-}
-
-function buildLocationCodePreview(name: string, type: LocationItem["type"]) {
-  const prefix = locationTypePrefixes[type] || "LOC";
-
-  const cleanedName = name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9\s-]/g, " ")
-    .trim()
-    .toUpperCase();
-
-  const tokens = cleanedName
-    .split(/\s+/)
-    .filter(Boolean)
-    .filter(
-      (token) =>
-        !["TIENDA", "ALMACEN", "TALLER", "TERCERO", "TERCEROS"].includes(token)
-    );
-
-  const sourceTokens = tokens.length ? tokens : cleanedName.split(/\s+/).filter(Boolean);
-
-  const suffix = sourceTokens
-    .slice(0, 2)
-    .map((token, index) => token.slice(0, index === 0 ? 4 : 3))
-    .join("")
-    .slice(0, 6);
-
-  return suffix ? `${prefix}-${suffix}` : prefix;
 }
 
 export default function LocationsPage() {
@@ -108,12 +70,6 @@ export default function LocationsPage() {
   const [typeFilter, setTypeFilter] = useState<"all" | LocationItem["type"]>("all");
   const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
   const [formState, setFormState] = useState<FormState>(initialFormState);
-  const [manualCodeEnabled, setManualCodeEnabled] = useState(false);
-
-  const generatedCode = useMemo(
-    () => buildLocationCodePreview(formState.name, formState.type),
-    [formState.name, formState.type]
-  );
 
   async function loadLocations() {
     setLoading(true);
@@ -132,9 +88,7 @@ export default function LocationsPage() {
       setLocations(payload.data || []);
     } catch (requestError) {
       setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "No se pudo cargar ubicaciones"
+        requestError instanceof Error ? requestError.message : "No se pudo cargar ubicaciones"
       );
     } finally {
       setLoading(false);
@@ -145,20 +99,10 @@ export default function LocationsPage() {
     loadLocations();
   }, []);
 
-  useEffect(() => {
-    if (!manualCodeEnabled && !editingLocationId) {
-      setFormState((current) =>
-        current.code === generatedCode ? current : { ...current, code: generatedCode }
-      );
-    }
-  }, [generatedCode, manualCodeEnabled, editingLocationId]);
-
   const activeCount = locations.filter((location) => location.active).length;
   const inactiveCount = locations.length - activeCount;
   const storeCount = locations.filter((location) => location.type === "store").length;
-  const warehouseCount = locations.filter(
-    (location) => location.type === "warehouse"
-  ).length;
+  const warehouseCount = locations.filter((location) => location.type === "warehouse").length;
 
   const filteredLocations = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -170,13 +114,9 @@ export default function LocationsPage() {
         (statusFilter === "inactive" && !location.active);
       const matchesType = typeFilter === "all" || location.type === typeFilter;
 
-      if (!matchesStatus || !matchesType) {
-        return false;
-      }
+      if (!matchesStatus || !matchesType) return false;
 
-      if (!normalizedSearch) {
-        return true;
-      }
+      if (!normalizedSearch) return true;
 
       return [location.name, location.code, location.address, locationTypeLabels[location.type]]
         .filter((value) => value !== null && value !== undefined)
@@ -187,7 +127,6 @@ export default function LocationsPage() {
   function resetForm() {
     setEditingLocationId(null);
     setFormState(initialFormState);
-    setManualCodeEnabled(false);
   }
 
   function updateLocationInList(nextLocation: LocationItem) {
@@ -202,12 +141,10 @@ export default function LocationsPage() {
     setEditingLocationId(location.location_id);
     setFormState({
       name: location.name,
-      code: location.code || "",
       type: location.type,
       address: location.address || "",
       active: location.active,
     });
-    setManualCodeEnabled(false);
     setError(null);
     setSuccessMessage(null);
   }
@@ -222,35 +159,24 @@ export default function LocationsPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          active: !location.active,
-        }),
+        body: JSON.stringify({ active: !location.active }),
       });
       const payload = await response.json();
 
       if (!response.ok) {
-        throw new Error(payload.message || "No se pudo actualizar la ubicacion");
+        throw new Error(payload.message || "No se pudo actualizar la ubicación");
       }
 
       updateLocationInList(payload.data);
 
       if (editingLocationId === location.location_id) {
-        setFormState((current) => ({
-          ...current,
-          active: payload.data.active,
-        }));
+        setFormState((current) => ({ ...current, active: payload.data.active }));
       }
 
-      setSuccessMessage(
-        payload.data.active
-          ? "Ubicacion activada correctamente."
-          : "Ubicacion inactivada correctamente."
-      );
+      setSuccessMessage(payload.data.active ? "Ubicación activada." : "Ubicación inactivada.");
     } catch (requestError) {
       setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "No se pudo actualizar la ubicacion"
+        requestError instanceof Error ? requestError.message : "No se pudo actualizar la ubicación"
       );
     }
   }
@@ -264,14 +190,10 @@ export default function LocationsPage() {
     try {
       const isEditing = Boolean(editingLocationId);
       const response = await fetch(
-        buildApiUrl(
-          isEditing ? `/api/locations/${editingLocationId}` : "/api/locations"
-        ),
+        buildApiUrl(isEditing ? `/api/locations/${editingLocationId}` : "/api/locations"),
         {
           method: isEditing ? "PATCH" : "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
             isEditing
               ? {
@@ -280,9 +202,11 @@ export default function LocationsPage() {
                   active: formState.active,
                 }
               : {
-                  ...formState,
-                  code: manualCodeEnabled ? formState.code.trim() || null : null,
+                  name: formState.name,
+                  type: formState.type,
+                  code: null,
                   address: formState.address.trim() || null,
+                  active: formState.active,
                 }
           ),
         }
@@ -293,18 +217,16 @@ export default function LocationsPage() {
       if (!response.ok) {
         throw new Error(
           payload.message ||
-            (isEditing ? "No se pudo actualizar la ubicacion" : "No se pudo crear la ubicacion")
+            (isEditing ? "No se pudo actualizar la ubicación" : "No se pudo crear la ubicación")
         );
       }
 
       if (isEditing) {
         updateLocationInList(payload.data);
-        setSuccessMessage("Ubicacion actualizada correctamente.");
+        setSuccessMessage("Ubicación actualizada.");
       } else {
         setLocations((current) => [payload.data, ...current]);
-        setSuccessMessage(
-          `Ubicacion creada correctamente con codigo ${payload.data.code}.`
-        );
+        setSuccessMessage("Ubicación creada.");
       }
 
       resetForm();
@@ -313,8 +235,8 @@ export default function LocationsPage() {
         requestError instanceof Error
           ? requestError.message
           : editingLocationId
-          ? "No se pudo actualizar la ubicacion"
-          : "No se pudo crear la ubicacion"
+          ? "No se pudo actualizar la ubicación"
+          : "No se pudo crear la ubicación"
       );
     } finally {
       setSubmitting(false);
@@ -322,156 +244,130 @@ export default function LocationsPage() {
   }
 
   return (
-    <section className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_45%,#eef2ff_100%)] p-4 md:p-5">
+    <section className="ops-page min-h-screen p-4 md:p-5">
       <div className="mx-auto flex max-w-7xl flex-col gap-5">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)] md:p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-violet-500">
-                Administracion
-              </p>
-              <h1 className="mt-2 text-2xl font-semibold text-slate-950">
-                Ubicaciones
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                Modulo operativo conectado al backend. Desde aqui puedes listar,
-                crear, editar de forma segura y activar o inactivar sedes reales.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={loadLocations}
-              className="inline-flex items-center gap-2 self-start rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Recargar
-            </button>
+        <header className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="ops-title text-2xl font-semibold">Ubicaciones</h1>
+            <p className="ops-text-muted text-sm">Gestión de sedes operativas.</p>
           </div>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
-            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Ubicaciones activas
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">
-                {activeCount}
-              </p>
-            </article>
-            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Tiendas
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">
-                {storeCount}
-              </p>
-            </article>
-            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Almacenes
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">
-                {warehouseCount}
-              </p>
-            </article>
-            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4 md:col-span-3">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="relative w-full max-w-md">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Buscar por nombre, codigo, direccion o tipo"
-                    className="w-full rounded-2xl border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-violet-400"
-                  />
-                </div>
+          <button
+            type="button"
+            onClick={loadLocations}
+            className="inline-flex items-center gap-2 rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3.5 py-2 text-sm font-semibold text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Recargar
+          </button>
+        </header>
 
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setStatusFilter("all")}
-                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                      statusFilter === "all"
-                        ? "bg-slate-900 text-white"
-                        : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    Todos ({locations.length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStatusFilter("active")}
-                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                      statusFilter === "active"
-                        ? "bg-emerald-600 text-white"
-                        : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    Activas ({activeCount})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStatusFilter("inactive")}
-                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                      statusFilter === "inactive"
-                        ? "bg-slate-600 text-white"
-                        : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    Inactivas ({inactiveCount})
-                  </button>
-                </div>
+        <div className="ops-surface rounded-2xl border p-4">
+          <div className="grid gap-2 md:grid-cols-3">
+            <article className="ops-surface-muted rounded-xl border border-[var(--ops-border-strong)] px-3 py-2.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">Activas</p>
+              <p className="mt-1 text-xl font-semibold text-[var(--ops-text)]">{activeCount}</p>
+            </article>
+            <article className="ops-surface-muted rounded-xl border border-[var(--ops-border-strong)] px-3 py-2.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">Tiendas</p>
+              <p className="mt-1 text-xl font-semibold text-[var(--ops-text)]">{storeCount}</p>
+            </article>
+            <article className="ops-surface-muted rounded-xl border border-[var(--ops-border-strong)] px-3 py-2.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">Almacenes</p>
+              <p className="mt-1 text-xl font-semibold text-[var(--ops-text)]">{warehouseCount}</p>
+            </article>
+          </div>
+
+          <div className="mt-3 rounded-xl border border-[var(--ops-border-strong)] p-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="relative w-full max-w-md">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Buscar por nombre, código, dirección o tipo"
+                  className="w-full rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] py-2 pl-9 pr-3 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)]"
+                />
               </div>
 
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => setTypeFilter("all")}
+                  onClick={() => setStatusFilter("all")}
                   className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                    typeFilter === "all"
-                      ? "bg-violet-600 text-white"
-                      : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                    statusFilter === "all"
+                      ? "bg-[var(--ripnel-accent)] text-white"
+                      : "border border-[var(--ops-border-strong)] bg-[var(--ops-field)] text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
                   }`}
                 >
-                  Todos los tipos
+                  Todos ({locations.length})
                 </button>
-                {locationTypeOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setTypeFilter(option.value)}
-                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                      typeFilter === option.value
-                        ? "bg-violet-600 text-white"
-                        : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter("active")}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    statusFilter === "active"
+                      ? "bg-emerald-600 text-white"
+                      : "border border-[var(--ops-border-strong)] bg-[var(--ops-field)] text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
+                  }`}
+                >
+                  Activas ({activeCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter("inactive")}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    statusFilter === "inactive"
+                      ? "bg-slate-700 text-white"
+                      : "border border-[var(--ops-border-strong)] bg-[var(--ops-field)] text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
+                  }`}
+                >
+                  Inactivas ({inactiveCount})
+                </button>
               </div>
-            </article>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setTypeFilter("all")}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                  typeFilter === "all"
+                    ? "bg-[var(--ripnel-accent)] text-white"
+                    : "border border-[var(--ops-border-strong)] bg-[var(--ops-field)] text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
+                }`}
+              >
+                Todos los tipos
+              </button>
+              {locationTypeOptions.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setTypeFilter(option.value)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    typeFilter === option.value
+                      ? "bg-[var(--ripnel-accent)] text-white"
+                      : "border border-[var(--ops-border-strong)] bg-[var(--ops-field)] text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         <div className="grid gap-5 xl:grid-cols-[1.2fr_0.9fr]">
-          <article className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)] md:p-6">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                  Tabla base
-                </p>
-                <h2 className="mt-1 text-xl font-semibold text-slate-950">
-                  Lista de ubicaciones
-                </h2>
-              </div>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+          <article className="ops-surface rounded-2xl border p-5">
+            <div className="flex items-center justify-between border-b border-[var(--ops-border-strong)] pb-3">
+              <h2 className="text-xl font-semibold text-[var(--ops-text)]">Lista de ubicaciones</h2>
+              <span className="ops-metric-pill rounded-full px-3 py-1 text-xs font-semibold">
                 {filteredLocations.length} visibles
               </span>
             </div>
 
             {loading ? (
-              <div className="flex min-h-56 items-center justify-center text-slate-500">
+              <div className="flex min-h-56 items-center justify-center text-[var(--ops-text-muted)]">
                 <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
                 Cargando ubicaciones...
               </div>
@@ -483,43 +379,41 @@ export default function LocationsPage() {
                   return (
                     <div
                       key={location.location_id}
-                      className={`rounded-2xl border border-slate-200 p-4 transition hover:border-slate-300 ${
-                        location.active ? "" : "bg-slate-50/80 opacity-80"
+                      className={`rounded-xl border border-[var(--ops-border-strong)] p-4 transition hover:bg-[var(--ops-surface-muted)] ${
+                        location.active ? "" : "opacity-80"
                       }`}
                     >
                       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div className="flex items-start gap-3">
-                          <div className="rounded-2xl bg-violet-50 p-3 text-violet-700">
-                            <Icon className="h-5 w-5" />
+                          <div className="rounded-xl bg-[var(--ripnel-accent-soft)] p-2.5 text-[var(--ripnel-accent-hover)]">
+                            <Icon className="h-4.5 w-4.5" />
                           </div>
+
                           <div>
                             <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="text-base font-semibold text-slate-900">
-                                {location.name}
-                              </h3>
-                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                              <h3 className="text-base font-semibold text-[var(--ops-text)]">{location.name}</h3>
+                              <span className="sales-chip sales-chip-neutral rounded-full px-2.5 py-1 text-xs font-semibold">
                                 {locationTypeLabels[location.type]}
                               </span>
                               <span
-                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                  location.active
-                                    ? "bg-emerald-100 text-emerald-700"
-                                    : "bg-slate-200 text-slate-600"
+                                className={`sales-chip rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                  location.active ? "sales-chip-success" : "sales-chip-neutral"
                                 }`}
                               >
                                 {location.active ? "Activa" : "Inactiva"}
                               </span>
                             </div>
-                            <p className="mt-1 text-sm text-slate-500">
-                              {location.code || "Sin codigo"}
-                              {location.address ? ` - ${location.address}` : ""}
+
+                            <p className="mt-1 text-sm text-[var(--ops-text-muted)]">
+                              {location.code || "Sin código"}
+                              {location.address ? ` · ${location.address}` : ""}
                             </p>
 
-                            <div className="mt-3 flex flex-wrap gap-2">
+                            <div className="mt-2.5 flex flex-wrap gap-2">
                               <button
                                 type="button"
                                 onClick={() => handleEdit(location)}
-                                className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                                className="inline-flex items-center gap-1 rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-1 text-xs font-semibold text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
                               >
                                 <PencilLine className="h-3.5 w-3.5" />
                                 Editar
@@ -527,9 +421,9 @@ export default function LocationsPage() {
                               <button
                                 type="button"
                                 onClick={() => handleToggleActive(location)}
-                                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
                                   location.active
-                                    ? "bg-slate-900 text-white hover:bg-slate-800"
+                                    ? "border border-[var(--ops-border-strong)] bg-[var(--ops-field)] text-[var(--ops-text)] hover:bg-[var(--ops-surface-muted)]"
                                     : "bg-emerald-600 text-white hover:bg-emerald-700"
                                 }`}
                               >
@@ -539,7 +433,7 @@ export default function LocationsPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 text-sm text-slate-400">
+                        <div className="flex items-center gap-2 text-sm text-[var(--ops-text-muted)]">
                           <MapPin className="h-4 w-4" />
                           {new Date(location.created_at).toLocaleDateString("es-PE")}
                         </div>
@@ -549,39 +443,24 @@ export default function LocationsPage() {
                 })}
               </div>
             ) : (
-              <div className="mt-4 rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-                <h3 className="text-lg font-semibold text-slate-900">
-                  {locations.length ? "No hay resultados para este filtro" : "Aun no hay ubicaciones"}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-slate-500">
-                  {locations.length
-                    ? "Prueba otro texto de busqueda o cambia los filtros de estado y tipo."
-                    : "Puedes comenzar creando la primera tienda o almacen desde el formulario lateral."}
-                </p>
+              <div className="ops-empty-state-compact mt-4 rounded-xl p-8 text-center text-sm">
+                {locations.length
+                  ? "No hay resultados para este filtro."
+                  : "Aún no hay ubicaciones registradas."}
               </div>
             )}
           </article>
 
-          <article className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)] md:p-6">
-            <div className="border-b border-slate-200 pb-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                {editingLocationId ? "Edicion segura" : "Nuevo registro"}
-              </p>
-              <h2 className="mt-1 text-xl font-semibold text-slate-950">
-                {editingLocationId ? "Editar ubicacion" : "Crear ubicacion"}
+          <article className="ops-surface rounded-2xl border p-5">
+            <div className="border-b border-[var(--ops-border-strong)] pb-3">
+              <h2 className="text-xl font-semibold text-[var(--ops-text)]">
+                {editingLocationId ? "Editar ubicación" : "Crear ubicación"}
               </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                {editingLocationId
-                  ? "Solo se habilitan nombre, direccion y estado. Codigo y tipo quedan bloqueados."
-                  : "Base minima para administrar sedes sin salir del estilo actual del panel."}
-              </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+            <form onSubmit={handleSubmit} className="mt-4 space-y-4">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-slate-700">
-                  Nombre
-                </label>
+                <label className="text-sm font-medium text-[var(--ops-text)]">Nombre</label>
                 <input
                   value={formState.name}
                   onChange={(event) =>
@@ -591,89 +470,34 @@ export default function LocationsPage() {
                     }))
                   }
                   placeholder="Tienda Centro"
-                  className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-violet-400"
+                  className="w-full rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-2.5 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)]"
                   required
                 />
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between gap-3">
-                    <label className="text-sm font-medium text-slate-700">
-                      Codigo
-                    </label>
-                    {!editingLocationId ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setManualCodeEnabled((current) => {
-                            const next = !current;
-
-                            if (!next) {
-                              setFormState((state) => ({
-                                ...state,
-                                code: generatedCode,
-                              }));
-                            }
-
-                            return next;
-                          });
-                        }}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 transition hover:text-indigo-700"
-                      >
-                        {manualCodeEnabled ? "Manual" : "Automatico"}
-                      </button>
-                    ) : null}
-                  </div>
-                  <input
-                    value={formState.code}
-                    onChange={(event) =>
-                      setFormState((current) => ({
-                        ...current,
-                        code: event.target.value,
-                      }))
-                    }
-                    placeholder="TD-CEN"
-                    disabled={editingLocationId !== null || !manualCodeEnabled}
-                    className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-violet-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-                  />
-                  <p className="text-xs leading-5 text-slate-500">
-                    {editingLocationId
-                      ? "El codigo queda bloqueado en edicion para mantener estabilidad operativa."
-                      : manualCodeEnabled
-                      ? "Puedes editar el codigo manualmente. Si repites uno existente, el backend lo rechazara."
-                      : `Vista previa autogenerada: ${generatedCode}. Si ya existe, el backend creara una variante unica.`}
-                  </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium text-slate-700">
-                    Tipo
-                  </label>
-                  <select
-                    value={formState.type}
-                    onChange={(event) =>
-                      setFormState((current) => ({
-                        ...current,
-                        type: event.target.value as LocationItem["type"],
-                      }))
-                    }
-                    disabled={editingLocationId !== null}
-                    className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-violet-400 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
-                  >
-                    {locationTypeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-[var(--ops-text)]">Tipo</label>
+                <select
+                  value={formState.type}
+                  onChange={(event) =>
+                    setFormState((current) => ({
+                      ...current,
+                      type: event.target.value as LocationItem["type"],
+                    }))
+                  }
+                  disabled={editingLocationId !== null}
+                  className="w-full rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-2.5 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {locationTypeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-slate-700">
-                  Direccion
-                </label>
+                <label className="text-sm font-medium text-[var(--ops-text)]">Dirección</label>
                 <input
                   value={formState.address}
                   onChange={(event) =>
@@ -683,11 +507,11 @@ export default function LocationsPage() {
                     }))
                   }
                   placeholder="Av. Ejemplo 123, Lima"
-                  className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-violet-400"
+                  className="w-full rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-2.5 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)]"
                 />
               </div>
 
-              <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
+              <label className="flex items-center gap-3 rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-3 py-2.5 text-sm text-[var(--ops-text)]">
                 <input
                   type="checkbox"
                   checked={formState.active}
@@ -697,19 +521,17 @@ export default function LocationsPage() {
                       active: event.target.checked,
                     }))
                   }
-                  className="h-4 w-4 rounded border-slate-300"
+                  className="h-4 w-4 rounded border-[var(--ops-border-strong)]"
                 />
-                {editingLocationId ? "Mantener ubicacion activa" : "Crear como ubicacion activa"}
+                {editingLocationId ? "Ubicación activa" : "Crear como ubicación activa"}
               </label>
 
               {error ? (
-                <div className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {error}
-                </div>
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
               ) : null}
 
               {successMessage ? (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
                   {successMessage}
                 </div>
               ) : null}
@@ -718,7 +540,7 @@ export default function LocationsPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--ripnel-accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {submitting ? (
                     <>
@@ -733,7 +555,7 @@ export default function LocationsPage() {
                   ) : (
                     <>
                       <Plus className="h-4 w-4" />
-                      Crear ubicacion
+                      Crear ubicación
                     </>
                   )}
                 </button>
@@ -742,9 +564,9 @@ export default function LocationsPage() {
                   <button
                     type="button"
                     onClick={resetForm}
-                    className="inline-flex w-full items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                    className="inline-flex w-full items-center justify-center rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-4 py-2.5 text-sm font-semibold text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
                   >
-                    Cancelar edicion
+                    Cancelar
                   </button>
                 ) : null}
               </div>
