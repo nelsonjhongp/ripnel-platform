@@ -6,6 +6,7 @@ const {
   findSellableVariants,
   findActiveWholesaleMinQtyRule,
   findAllSales,
+  findCustomerBiAnalytics,
   findSaleById,
   findSaleDetailsBySaleId,
   findSalePaymentsBySaleId,
@@ -301,6 +302,41 @@ function normalizeReceiptQueueLimit(value, fallback = 50) {
   const parsed = normalizePositiveInteger(value);
   if (!parsed) return fallback;
   return Math.min(parsed, 200);
+}
+
+function normalizeSalesPage(value) {
+  const parsed = normalizePositiveInteger(value);
+  return parsed || 1;
+}
+
+function normalizeSalesPageSize(value, fallback = 25) {
+  const parsed = normalizePositiveInteger(value);
+  if (!parsed) return fallback;
+  return Math.min(parsed, 100);
+}
+
+function normalizeSalesCursor(value) {
+  const normalized = normalizeText(value);
+  if (!normalized) return null;
+
+  try {
+    const raw = Buffer.from(normalized, 'base64url').toString('utf8');
+    const parsed = JSON.parse(raw);
+    const saleId = normalizeUuid(parsed && parsed.sale_id);
+    const sortDate = normalizeText(parsed && parsed.sort_date);
+
+    if (!saleId || !sortDate || Number.isNaN(Date.parse(sortDate))) {
+      throw new Error('Invalid cursor payload');
+    }
+
+    return {
+      saleId,
+      sortDate,
+      raw: normalized,
+    };
+  } catch (error) {
+    throw new AppError('Invalid cursor value', 400);
+  }
 }
 
 function round2(value) {
@@ -1371,14 +1407,35 @@ async function getPosContext(input = {}) {
 async function listSales(input = {}) {
   const status = normalizeText(input.status);
   const q = normalizeText(input.q);
+  const customerQ = normalizeText(input.customer_q);
+  const userQ = normalizeText(input.user_q);
+  const cashStatus = normalizeText(input.cash_status);
+  const documentType = normalizeText(input.document_type);
+  const receiptStatus = normalizeText(input.receipt_status);
   const dateFrom = normalizeDate(input.date_from);
   const dateTo = normalizeDate(input.date_to);
-  const limit = Math.min(normalizePositiveInteger(input.limit) || 25, 100);
-  const offset = normalizeNonNegativeInteger(input.offset) || 0;
+  const page = normalizeSalesPage(input.page);
+  const pageSize = normalizeSalesPageSize(input.page_size, 25);
+  const cursor = normalizeSalesCursor(input.cursor);
   const { location } = await resolveOperatingContext(input.user_id);
 
   if (status && !['draft', 'confirmed', 'cancelled'].includes(status)) {
     throw new AppError('Invalid status value', 400);
+  }
+
+  if (cashStatus && !['open', 'closed', 'missing'].includes(cashStatus)) {
+    throw new AppError('Invalid cash_status value', 400);
+  }
+
+  if (documentType && !['none', 'proforma', 'boleta', 'factura'].includes(documentType)) {
+    throw new AppError('Invalid document_type value', 400);
+  }
+
+  if (
+    receiptStatus &&
+    !['open', 'missing', 'pending', 'error', 'accepted', 'rejected', 'all'].includes(receiptStatus)
+  ) {
+    throw new AppError('Invalid receipt_status value', 400);
   }
 
   if (input.date_from !== undefined && input.date_from !== null && !dateFrom) {
@@ -1396,8 +1453,16 @@ async function listSales(input = {}) {
   const salesPage = await findAllSales({
     status,
     q,
+    customerQ,
+    userQ,
+    cashStatus,
+    documentType,
+    receiptStatus,
     dateFrom,
     dateTo,
+    page,
+    pageSize,
+    cursor,
     locationId: location.location_id,
     limit,
     offset,
@@ -1425,6 +1490,33 @@ async function listReceiptQueue(input = {}) {
   return findReceiptQueue({
     locationId: location.location_id,
     status: queueStatus,
+    limit,
+  });
+}
+
+async function getCustomerAnalytics(input = {}) {
+  const dateFrom = normalizeDate(input.date_from);
+  const dateTo = normalizeDate(input.date_to);
+  const limit = normalizeReceiptQueueLimit(input.limit, 8);
+
+  if (input.date_from !== undefined && input.date_from !== null && !dateFrom) {
+    throw new AppError('Invalid date_from value', 400);
+  }
+
+  if (input.date_to !== undefined && input.date_to !== null && !dateTo) {
+    throw new AppError('Invalid date_to value', 400);
+  }
+
+  if (dateFrom && dateTo && dateFrom > dateTo) {
+    throw new AppError('date_from cannot be greater than date_to', 400);
+  }
+
+  const { location } = await resolveOperatingContext(input.user_id);
+
+  return findCustomerBiAnalytics({
+    locationId: location.location_id,
+    dateFrom,
+    dateTo,
     limit,
   });
 }
@@ -1794,6 +1886,7 @@ module.exports = {
   listSellableVariants,
   listSales,
   listReceiptQueue,
+  getCustomerAnalytics,
   getSale,
   createSale,
   retrySaleReceipt,

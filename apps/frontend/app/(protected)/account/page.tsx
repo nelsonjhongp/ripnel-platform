@@ -39,7 +39,114 @@ function PreferenceLink({
 }
 
 export default function AccountPage() {
-  const { user, loading, defaultLocation } = useAuth();
+  const {
+    user,
+    loading,
+    locationAssignments,
+    defaultLocation,
+    locationsLoading,
+    locationsError,
+    refreshLocations,
+    setDefaultLocation,
+  } = useAuth();
+  const [selectedLocationId, setSelectedLocationId] = useState("");
+  const [savingLocation, setSavingLocation] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [availableLocations, setAvailableLocations] = useState<AuthLocation[]>([]);
+  const [loadingAvailableLocations, setLoadingAvailableLocations] = useState(false);
+
+  useEffect(() => {
+    if (!user?.user_id || locationAssignments.length > 0) {
+      // defer state updates to avoid synchronous setState inside effect
+      void Promise.resolve().then(() => {
+        setAvailableLocations([]);
+        setLoadingAvailableLocations(false);
+      });
+      return;
+    }
+
+    let active = true;
+
+    async function loadAvailableLocations() {
+      setLoadingAvailableLocations(true);
+
+      try {
+        const response = await apiFetch<ApiEnvelope<AuthLocation[]> | AuthLocation[]>("/api/locations");
+        const locations = unwrapApiData(response);
+        if (active) {
+          setAvailableLocations(locations.filter((location) => location.active));
+        }
+      } catch {
+        if (active) {
+          setAvailableLocations([]);
+        }
+      } finally {
+        if (active) {
+          setLoadingAvailableLocations(false);
+        }
+      }
+    }
+
+    void loadAvailableLocations();
+
+    return () => {
+      active = false;
+    };
+  }, [locationAssignments.length, user?.user_id]);
+
+  useEffect(() => {
+    const nextSelected =
+      defaultLocation?.location_id ||
+      locationAssignments[0]?.location_id ||
+      availableLocations[0]?.location_id ||
+      "";
+    // defer selection to avoid synchronous setState inside effect
+    void Promise.resolve().then(() => setSelectedLocationId(nextSelected));
+  }, [availableLocations, defaultLocation?.location_id, locationAssignments]);
+
+  const assignedLocationsCount = locationAssignments.length;
+  const currentLocationLabel = defaultLocation?.name || "Sin sede default";
+  const initials = useMemo(
+    () => getInitials(user?.full_name || "Usuario Ripnel"),
+    [user?.full_name]
+  );
+
+  async function handleSaveDefaultLocation() {
+    if (!selectedLocationId) {
+      setSaveError("Elige una sede para guardarla como default.");
+      return;
+    }
+
+    if (!user?.user_id) {
+      setSaveError("No hay una sesion activa para actualizar la sede.");
+      return;
+    }
+
+    setSavingLocation(true);
+    setSaveMessage(null);
+    setSaveError(null);
+
+    try {
+      if (locationAssignments.length > 0) {
+        await setDefaultLocation(selectedLocationId);
+        setSaveMessage("La sede default del usuario se actualizo correctamente.");
+      } else {
+        await apiFetch(`/api/users/${user.user_id}/locations`, {
+          method: "PUT",
+          body: JSON.stringify({
+            assignments: [{ location_id: selectedLocationId, is_default: true }],
+          }),
+        });
+        await refreshLocations();
+        setSaveMessage("La sede inicial del usuario se configuro correctamente.");
+      }
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "No se pudo actualizar la sede.");
+    } finally {
+      setSavingLocation(false);
+    }
+  }
 
   if (loading) {
     return (

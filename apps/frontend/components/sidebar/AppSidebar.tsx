@@ -112,6 +112,7 @@ const sidebarGroups: SidebarGroup[] = [
       { title: "Variantes", url: "/productos/variantes" },
     ],
   },
+  /*
   {
     title: "Precios",
     icon: ReceiptText,
@@ -134,6 +135,7 @@ const sidebarGroups: SidebarGroup[] = [
       { title: "Recepciones pendientes", url: "/transferencias/recepciones-pendientes" },
     ],
   },
+  */
   {
     title: "Administracion",
     icon: Settings,
@@ -352,21 +354,17 @@ export function AppSidebar({
         }
       })
       .filter((group) => {
-      if (group.title === "Transferencias") {
-        return transferCapabilities.visible && group.items.length > 0
-      }
+        if (group.permission && !has(group.permission)) return false
 
-      if (group.permission && !has(group.permission)) return false
+        if (group.onlyForRoles && user?.role_name && !group.onlyForRoles.includes(user.role_name)) {
+          return false
+        }
 
-      if (group.onlyForRoles && user?.role_name && !group.onlyForRoles.includes(user.role_name)) {
-        return false
-      }
+        if (group.excludeRoles && user?.role_name && group.excludeRoles.includes(user.role_name)) {
+          return false
+        }
 
-      if (group.excludeRoles && user?.role_name && group.excludeRoles.includes(user.role_name)) {
-        return false
-      }
-
-      return group.items.length > 0
+        return group.items.length > 0
       })
   }, [loading, has, transferCapabilities, user?.role_name])
 

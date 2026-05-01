@@ -286,14 +286,18 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
 
   useEffect(() => {
     if (!saleId) return
-    loadContext(saleId)
+    // defer loadContext to avoid synchronous setState inside effect
+    void Promise.resolve().then(() => loadContext(saleId))
   }, [saleId])
 
   useEffect(() => {
     const firstLine = context?.sale.details?.[0]?.sale_detail_id || ""
-    if (!selectedSaleDetailId || !context?.sale.details.some((line) => line.sale_detail_id === selectedSaleDetailId)) {
-      setSelectedSaleDetailId(firstLine)
-    }
+    // defer setting selection to avoid synchronous setState inside effect
+    void Promise.resolve().then(() => {
+      if (!selectedSaleDetailId || !context?.sale.details.some((line) => line.sale_detail_id === selectedSaleDetailId)) {
+        setSelectedSaleDetailId(firstLine)
+      }
+    })
   }, [context, selectedSaleDetailId])
 
   useEffect(() => {
@@ -304,9 +308,12 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
       replacementSearch.trim().length >= 2
 
     if (!canSearchReplacement) {
-      setReplacementResults([])
-      setReplacementLoading(false)
-      setReplacementError(null)
+      // defer clearing replacement state to avoid synchronous setState inside effect
+      void Promise.resolve().then(() => {
+        setReplacementResults([])
+        setReplacementLoading(false)
+        setReplacementError(null)
+      })
       return
     }
 

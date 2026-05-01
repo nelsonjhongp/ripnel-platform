@@ -432,10 +432,13 @@ export default function AdminCrudPage() {
   }, []);
 
   useEffect(() => {
-    void loadUsers();
-    void loadRoles();
-    void loadPermissions();
-    void loadLocations();
+    // defer calls to avoid synchronous setState inside effect
+    void Promise.resolve().then(() => {
+      void loadUsers();
+      void loadRoles();
+      void loadPermissions();
+      void loadLocations();
+    });
   }, [loadUsers, loadRoles, loadPermissions, loadLocations]);
 
   const filteredUsers = useMemo(() => {

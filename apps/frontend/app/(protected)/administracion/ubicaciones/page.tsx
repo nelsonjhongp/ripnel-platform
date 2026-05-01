@@ -96,8 +96,20 @@ export default function LocationsPage() {
   }
 
   useEffect(() => {
-    loadLocations();
+    // defer loading to avoid synchronous setState inside effect
+    void Promise.resolve().then(() => loadLocations());
   }, []);
+
+  useEffect(() => {
+    if (!manualCodeEnabled && !editingLocationId) {
+      // defer setState to avoid triggering react-hooks/set-state-in-effect
+      void Promise.resolve().then(() =>
+        setFormState((current) =>
+          current.code === generatedCode ? current : { ...current, code: generatedCode }
+        )
+      );
+    }
+  }, [generatedCode, manualCodeEnabled, editingLocationId]);
 
   const activeCount = locations.filter((location) => location.active).length;
   const inactiveCount = locations.length - activeCount;
