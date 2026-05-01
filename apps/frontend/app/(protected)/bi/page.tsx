@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { BarChart3, ExternalLink, LayoutPanelTop, RefreshCw, Users } from "lucide-react"
+import { BarChart3, LayoutPanelTop, RefreshCw, Users } from "lucide-react"
 import {
   Area,
   AreaChart,
@@ -17,6 +17,7 @@ import {
 } from "recharts"
 
 import { InlineStatusCard } from "@/components/feedback/status-page"
+import NativeBiCharts from "@/components/bi/native-bi-charts"
 import { ApiError, apiFetch } from "@/lib/api"
 
 type BiView = {
@@ -51,12 +52,7 @@ type CustomerAnalyticsResponse = {
   }>
 }
 
-const LEGACY_POWERBI_URLS = [
-  "https://app.powerbi.com/view?r=eyJrIjoiNTAzYzYyMWItYWVhYS00NGU2LTlkZTAtNWEwYmM4YWQ3ZTFjIiwidCI6ImM0YTY2YzM0LTJiYjctNDUxZi04YmUxLWIyYzI2YTQzMDE1OCIsImMiOjR9&pageName=1dcfa977e20667420a1d",
-  "https://app.powerbi.com/view?r=eyJrIjoiNTAzYzYyMWItYWVhYS00NGU2LTlkZTAtNWEwYmM4YWQ3ZTFjIiwidCI6ImM0YTY2YzM0LTJiYjctNDUxZi04YmUxLWIyYzI2YTQzMDE1OCIsImMiOjR9&pageName=cb1fc32f622a7fef7b7e",
-  "https://app.powerbi.com/view?r=eyJrIjoiNTAzYzYyMWItYWVhYS00NGU2LTlkZTAtNWEwYmM4YWQ3ZTFjIiwidCI6ImM0YTY2YzM0LTJiYjctNDUxZi04YmUxLWIyYzI2YTQzMDE1OCIsImMiOjR9&pageName=9dae452bb92dc0fa9378",
-  "https://app.powerbi.com/view?r=eyJrIjoiNTAzYzYyMWItYWVhYS00NGU2LTlkZTAtNWEwYmM4YWQ3ZTFjIiwidCI6ImM0YTY2YzM0LTJiYjctNDUxZi04YmUxLWIyYzI2YTQzMDE1OCIsImMiOjR9&pageName=19c1667e8492e8c19e40",
-]
+// Power BI references removed — dashboards migrated to native charts
 
 const WEEKDAY_LABELS: Record<number, string> = {
   1: "Lun",
@@ -68,18 +64,7 @@ const WEEKDAY_LABELS: Record<number, string> = {
   7: "Dom",
 }
 
-function withEmbedOptions(rawUrl: string) {
-  if (!rawUrl) return ""
-
-  const nextUrl = new URL(rawUrl)
-  nextUrl.searchParams.set("navContentPaneEnabled", "false")
-  nextUrl.searchParams.set("filterPaneEnabled", "false")
-  nextUrl.searchParams.set("actionBarEnabled", "false")
-  nextUrl.searchParams.set("chromeless", "1")
-  nextUrl.searchParams.set("pageView", "fitToWidth")
-  nextUrl.searchParams.set("zoom", "125")
-  return nextUrl.toString()
-}
+// External embed helper removed — no Power BI embedding in this page anymore
 
 function formatMoney(value: number) {
   return `S/. ${Number(value || 0).toFixed(2)}`
@@ -123,37 +108,37 @@ export default function BusinessIntelligencePage() {
       {
         id: "operacion-1",
         title: "Tablero BI 1",
-        description: "Vista Power BI heredada para seguimiento comercial externo.",
+        description: "Migrado a graficas nativas.",
         category: "Operacion",
-        embedUrl: process.env.NEXT_PUBLIC_POWERBI_DASHBOARD_1_URL || LEGACY_POWERBI_URLS[0],
+        embedUrl: "",
       },
       {
         id: "operacion-2",
         title: "Tablero BI 2",
-        description: "Lectura extendida para analisis fuera de la portada operativa.",
+        description: "Migrado a graficas nativas.",
         category: "Operacion",
-        embedUrl: process.env.NEXT_PUBLIC_POWERBI_DASHBOARD_2_URL || LEGACY_POWERBI_URLS[1],
+        embedUrl: "",
       },
       {
         id: "operacion-3",
         title: "Tablero BI 3",
-        description: "Vista Power BI adicional para seguimiento comercial por fuera del ERP.",
+        description: "Migrado a graficas nativas.",
         category: "Operacion",
-        embedUrl: process.env.NEXT_PUBLIC_POWERBI_DASHBOARD_3_URL || LEGACY_POWERBI_URLS[2],
+        embedUrl: "",
       },
       {
         id: "operacion-4",
         title: "Tablero BI 4",
-        description: "Vista Power BI heredada para profundizar en analitica operativa.",
+        description: "Migrado a graficas nativas.",
         category: "Operacion",
-        embedUrl: process.env.NEXT_PUBLIC_POWERBI_DASHBOARD_4_URL || LEGACY_POWERBI_URLS[3],
+        embedUrl: "",
       },
       {
         id: "clientes",
         title: "Clientes",
         description: "Adquisicion, fidelizacion y analitica comercial de clientes.",
         category: "Clientes",
-        embedUrl: process.env.NEXT_PUBLIC_CUSTOMERS_POWERBI_EMBED_URL || "",
+        embedUrl: "",
       },
     ],
     []
@@ -271,13 +256,10 @@ export default function BusinessIntelligencePage() {
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
                 BI y analitica
               </p>
-              <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">
-                Power BI separado de la operacion
-              </h1>
+              <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">Analítica y visualizaciones</h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-                Esta vista concentra dashboards externos para analisis profundo. El dashboard del
-                ERP queda reservado para la operacion diaria de la sede y aqui puedes elegir que
-                tablero BI abrir.
+                Esta vista agrupa analíticas y visualizaciones. El dashboard del ERP se reserva
+                para la operación diaria; aquí puedes seleccionar vistas y comparar información.
               </p>
             </div>
 
@@ -289,17 +271,7 @@ export default function BusinessIntelligencePage() {
                 <LayoutPanelTop className="h-4 w-4" />
                 Volver al dashboard
               </Link>
-              {selectedView?.embedUrl && !isCustomersView ? (
-                <a
-                  href={selectedView.embedUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Abrir en Power BI
-                </a>
-              ) : null}
+              {/* External Power BI links removed — dashboards migrated to native charts */}
             </div>
           </div>
         </header>
@@ -312,9 +284,9 @@ export default function BusinessIntelligencePage() {
                 <h2 className="text-lg font-semibold text-slate-900">Selecciona una vista BI</h2>
               </div>
               <div className="mt-4 space-y-3">
-                {views.map((view) => {
+                  {views.map((view) => {
                   const isActive = selectedView?.id === view.id
-                  const isConfigured = view.id === "clientes" ? true : Boolean(view.embedUrl)
+                  const isConfigured = view.id === "clientes" || view.id.startsWith("operacion-") ? true : Boolean(view.embedUrl)
 
                   return (
                     <button
@@ -564,36 +536,29 @@ export default function BusinessIntelligencePage() {
                         className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-40 bg-white"
                         aria-hidden="true"
                       />
-                      {selectedView.embedUrl ? (
-                        <iframe
-                          title={selectedView.title}
-                          src={withEmbedOptions(selectedView.embedUrl)}
-                          className="pointer-events-none h-[58vh] w-full -translate-y-8"
-                          loading="lazy"
-                          allowFullScreen
-                        />
-                      ) : (
-                        <div className="flex h-[58vh] items-center justify-center px-6 text-center">
-                          <div className="max-w-lg space-y-3">
-                            <p className="text-lg font-semibold text-slate-900">
-                              Esta vista aun no tiene URL embebida configurada
-                            </p>
-                            <p className="text-sm leading-6 text-slate-600">
-                              Configura la variable publica correspondiente en apps/frontend/.env.local
-                              para publicar el dashboard real dentro de esta pantalla.
-                            </p>
+                      <div className="h-[58vh] w-full">
+                        {selectedView.id?.startsWith("operacion-") ? (
+                          <NativeBiCharts viewId={selectedView.id} />
+                        ) : (
+                          <div className="flex h-full items-center justify-center px-6 text-center">
+                            <div className="max-w-lg space-y-3">
+                              <p className="text-lg font-semibold text-slate-900">Vista no disponible</p>
+                              <p className="text-sm leading-6 text-slate-600">
+                                Esta vista fue migrada a graficas nativas o no requiere un embed externo.
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   )}
                 </>
               ) : (
-                <div className="flex h-[58vh] items-center justify-center text-center">
+                    <div className="flex h-[58vh] items-center justify-center text-center">
                   <div className="max-w-lg space-y-3">
                     <p className="text-lg font-semibold text-slate-900">No hay vistas BI disponibles</p>
                     <p className="text-sm leading-6 text-slate-600">
-                      Agrega al menos una URL de Power BI para usar este modulo de analitica.
+                      No se encontraron vistas disponibles. Selecciona una vista en el panel izquierdo.
                     </p>
                   </div>
                 </div>

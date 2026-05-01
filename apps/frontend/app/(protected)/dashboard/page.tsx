@@ -802,8 +802,9 @@ export default function DashboardPage() {
 
         {shortcutItems.length > 0 ? <HomeQuickActions items={shortcutItems} /> : null}
 
-        <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-          <div className="space-y-5">
+        <div className="grid gap-5 items-start md:grid-cols-2 md:grid-rows-2 lg:grid-cols-[1.2fr_0.8fr]">
+          {/* Top-left: Ventas */}
+          <div>
             {salesToday ? (
               <HomeSectionCard eyebrow="Ventas" title="Flujo comercial de la sede activa">
                 <div className="mt-5 grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
@@ -851,18 +852,68 @@ export default function DashboardPage() {
                 </div>
               </HomeSectionCard>
             ) : null}
+          </div>
 
-            {cash && !cash.sales_summary?.consistency.is_consistent ? (
-              <InlineStatusCard
-                title="Caja con diferencia pendiente"
-                description={`Ventas y pagos no cierran exactamente hoy. La diferencia actual es ${formatCurrency(
-                  cash.sales_summary?.consistency.difference
-                )}. Conviene revisar antes de tomar el cierre como referencia final.`}
-                tone="warning"
-                icon={<Wallet className="h-5 w-5" />}
-              />
+          {/* Top-right: Comprobantes */}
+          <div>
+            {receipts ? (
+              <HomeSectionCard eyebrow="Comprobantes" title="Cola operativa">
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="sales-panel-muted rounded-xl p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Open</p>
+                    <p className="mt-2 text-2xl font-bold text-slate-900">{receipts.open_count || 0}</p>
+                  </div>
+                  <div className="sales-panel-muted rounded-xl p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Missing</p>
+                    <p className="mt-2 text-2xl font-bold text-slate-900">{receipts.missing_count || 0}</p>
+                  </div>
+                  <div className="sales-panel-muted rounded-xl p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Error</p>
+                    <p className="mt-2 text-2xl font-bold text-slate-900">{receipts.error_count || 0}</p>
+                  </div>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {(receipts.latest || []).length > 0 ? (
+                    receipts.latest?.map((item) => (
+                      <Link
+                        key={`${item.sale_id}-${item.queue_status}`}
+                        href={`/purchase-system/${item.sale_id}`}
+                        className="sales-panel-muted block rounded-xl px-4 py-3 transition hover:opacity-90"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">
+                              {item.sale_number || "Sin correlativo"}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {item.customer_name_text || "Cliente general"} · {item.document_type}
+                            </p>
+                          </div>
+                          <span
+                            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${queueTone(
+                              item.queue_status
+                            )}`}
+                          >
+                            {item.queue_status}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-600">
+                          {formatCurrency(item.total_amount)} · {formatDateTime(item.queued_at)}
+                        </p>
+                      </Link>
+                    ))
+                  ) : (
+                    <p className="sales-panel-muted rounded-xl px-4 py-6 text-sm text-[var(--ops-text-muted)]">
+                      No hay comprobantes abiertos en este momento.
+                    </p>
+                  )}
+                </div>
+              </HomeSectionCard>
             ) : null}
+          </div>
 
+          {/* Bottom-left: Caja */}
+          <div>
             {cash ? (
               <HomeSectionCard eyebrow="Caja" title="Estado y consistencia operativa">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -948,62 +999,8 @@ export default function DashboardPage() {
             ) : null}
           </div>
 
-          <div className="space-y-5">
-            {receipts ? (
-              <HomeSectionCard eyebrow="Comprobantes" title="Cola operativa">
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <div className="sales-panel-muted rounded-xl p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Open</p>
-                    <p className="mt-2 text-2xl font-bold text-slate-900">{receipts.open_count || 0}</p>
-                  </div>
-                  <div className="sales-panel-muted rounded-xl p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Missing</p>
-                    <p className="mt-2 text-2xl font-bold text-slate-900">{receipts.missing_count || 0}</p>
-                  </div>
-                  <div className="sales-panel-muted rounded-xl p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Error</p>
-                    <p className="mt-2 text-2xl font-bold text-slate-900">{receipts.error_count || 0}</p>
-                  </div>
-                </div>
-                <div className="mt-4 space-y-3">
-                  {(receipts.latest || []).length > 0 ? (
-                    receipts.latest?.map((item) => (
-                      <Link
-                        key={`${item.sale_id}-${item.queue_status}`}
-                        href={`/purchase-system/${item.sale_id}`}
-                        className="sales-panel-muted block rounded-xl px-4 py-3 transition hover:opacity-90"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold text-slate-900">
-                              {item.sale_number || "Sin correlativo"}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {item.customer_name_text || "Cliente general"} · {item.document_type}
-                            </p>
-                          </div>
-                          <span
-                            className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${queueTone(
-                              item.queue_status
-                            )}`}
-                          >
-                            {item.queue_status}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-sm text-slate-600">
-                          {formatCurrency(item.total_amount)} · {formatDateTime(item.queued_at)}
-                        </p>
-                      </Link>
-                    ))
-                  ) : (
-                    <p className="sales-panel-muted rounded-xl px-4 py-6 text-sm text-[var(--ops-text-muted)]">
-                      No hay comprobantes abiertos en este momento.
-                    </p>
-                  )}
-                </div>
-              </HomeSectionCard>
-            ) : null}
-
+          {/* Bottom-right: Postventa o Inventario */}
+          <div>
             {postsales ? (
               <HomeSectionCard eyebrow="Postventa" title="Ventas recientes con seguimiento">
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -1040,8 +1037,7 @@ export default function DashboardPage() {
                               {item.sale_number || "Sin correlativo"}
                             </p>
                             <p className="text-xs text-slate-500">
-                              {item.customer_name_text || "Cliente general"} ·{" "}
-                              {formatCurrency(item.total_amount)}
+                              {item.customer_name_text || "Cliente general"} · {formatCurrency(item.total_amount)}
                             </p>
                           </div>
                           <span
@@ -1066,13 +1062,10 @@ export default function DashboardPage() {
                   )}
                 </div>
               </HomeSectionCard>
-            ) : null}
-
-            {inventory ? (
+            ) : inventory ? (
               <HomeSectionCard eyebrow="Inventario" title="Inventario critico">
                 <p className="mt-2 text-sm text-[var(--ops-text-muted)]">
-                  Se consideran criticas las variantes con stock `0` o menor/igual a{" "}
-                  {inventory.low_stock_threshold || 0}.
+                  Se consideran criticas las variantes con stock `0` o menor/igual a {inventory.low_stock_threshold || 0}.
                 </p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div className="sales-panel-muted rounded-xl p-4">
