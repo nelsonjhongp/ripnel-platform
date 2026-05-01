@@ -315,7 +315,8 @@ export default function DashboardPage() {
   }
 
   useEffect(() => {
-    loadDashboard()
+    // defer loadDashboard to avoid synchronous setState inside effect
+    void Promise.resolve().then(() => loadDashboard())
   }, [])
 
   const alerts = useMemo(() => {

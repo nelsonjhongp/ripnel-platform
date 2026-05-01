@@ -3,6 +3,7 @@ const {
   listSellableVariants,
   listSales,
   listReceiptQueue,
+  getCustomerAnalytics,
   getSale,
   createSale,
   retrySaleReceipt,
@@ -40,10 +41,16 @@ async function getSales(req, res, next) {
       user_id: req.auth?.sub,
       status: req.query.status,
       q: req.query.q,
+      customer_q: req.query.customer_q,
+      user_q: req.query.user_q,
+      cash_status: req.query.cash_status,
+      document_type: req.query.document_type,
+      receipt_status: req.query.receipt_status,
       date_from: req.query.date_from,
       date_to: req.query.date_to,
-      limit: req.query.limit,
-      offset: req.query.offset,
+      page: req.query.page,
+      page_size: req.query.page_size,
+      cursor: req.query.cursor,
     });
     return res.json(sales);
   } catch (error) {
@@ -59,6 +66,20 @@ async function getReceiptQueue(req, res, next) {
       limit: req.query.limit,
     });
     return res.json(receipts);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function getCustomersAnalytics(req, res, next) {
+  try {
+    const analytics = await getCustomerAnalytics({
+      user_id: req.auth?.sub,
+      date_from: req.query.date_from,
+      date_to: req.query.date_to,
+      limit: req.query.limit,
+    });
+    return res.json(analytics);
   } catch (error) {
     return next(error);
   }
@@ -145,6 +166,7 @@ module.exports = {
   getSellableVariants,
   getSales,
   getReceiptQueue,
+  getCustomersAnalytics,
   getSaleById,
   postSale,
   postRetrySaleReceipt,

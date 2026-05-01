@@ -2,8 +2,9 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import { ArrowLeft, CreditCard, ReceiptText, User } from "lucide-react"
+import { ArrowLeft, CreditCard, ReceiptText, RotateCcw, User } from "lucide-react"
 
+import { useAuth } from "@/components/auth/AuthProvider"
 import { PermissionGuard } from "@/components/auth/PermissionGuard"
 import {
   ErrorPage,
@@ -56,6 +57,34 @@ type SaleDetail = {
     reference: string | null
     paid_at: string
   }>
+  receipt: {
+    sales_receipt_id: string
+    sunat_status: string | null
+    sunat_code: string | null
+    sunat_message: string | null
+    pdf_url: string | null
+    issued_at: string | null
+  } | null
+}
+
+const RECEIPT_STYLES: Record<string, string> = {
+  accepted: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  pending: "border-amber-200 bg-amber-50 text-amber-700",
+  error: "border-rose-200 bg-rose-50 text-rose-700",
+  rejected: "border-rose-200 bg-rose-50 text-rose-700",
+  missing: "border-slate-200 bg-slate-100 text-slate-700",
+  unknown: "border-slate-200 bg-slate-100 text-slate-700",
+  not_applicable: "border-slate-200 bg-slate-100 text-slate-500",
+}
+
+const RECEIPT_LABELS: Record<string, string> = {
+  accepted: "Aceptado",
+  pending: "Pendiente",
+  error: "Error",
+  rejected: "Rechazado",
+  missing: "Sin emitir",
+  unknown: "Sin estado",
+  not_applicable: "No aplica",
 }
 
 function round2(value: number) {
@@ -78,10 +107,29 @@ function resolveSaleDocumentPath(sale: SaleDetail) {
   return null
 }
 
+function isReceiptDocument(documentType: string) {
+  return documentType === "boleta" || documentType === "factura"
+}
+
+function resolveReceiptStatus(sale: SaleDetail) {
+  if (!isReceiptDocument(sale.document_type)) {
+    return "not_applicable"
+  }
+
+  if (!sale.receipt) {
+    return "missing"
+  }
+
+  return sale.receipt.sunat_status || "unknown"
+}
+
 export default function SaleDetailPage({ params }: { params: Promise<{ saleId: string }> }) {
+  const { has } = useAuth()
   const [sale, setSale] = useState<SaleDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  const [retryingReceipt, setRetryingReceipt] = useState(false)
+  const [retryMessage, setRetryMessage] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -187,6 +235,40 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
         ? "Abrir comprobante PDF"
         : "Sin documento PDF"
 
+  const receiptStatus = resolveReceiptStatus(sale)
+  const canRetryReceipt =
+    has("sales.pos") &&
+    sale.status === "confirmed" &&
+    isReceiptDocument(sale.document_type) &&
+    ["missing", "pending", "error", "unknown"].includes(receiptStatus)
+
+  async function handleRetryReceipt() {
+    if (!canRetryReceipt || !sale) {
+      return
+    }
+
+    const saleId = sale.sale_id
+
+    setRetryingReceipt(true)
+    setRetryMessage(null)
+
+    try {
+      const refreshed = await apiFetch<SaleDetail>(`/api/sales/${saleId}/retry-receipt`, {
+        method: "POST",
+      })
+      setSale(refreshed)
+      setRetryMessage("Se ejecuto el reintento de emision del comprobante.")
+    } catch (retryError) {
+      setRetryMessage(
+        retryError instanceof ApiError
+          ? retryError.message || "No se pudo reintentar la emision del comprobante."
+          : "No se pudo reintentar la emision del comprobante."
+      )
+    } finally {
+      setRetryingReceipt(false)
+    }
+  }
+
   return (
     <PermissionGuard permission="sales.pos">
       <section className="sales-page min-h-screen px-4 py-6 md:px-8">
@@ -235,6 +317,49 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
               )
             }
           />
+
+          <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-500">Estado de comprobante</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span
+                    className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                      RECEIPT_STYLES[receiptStatus] || "border-slate-200 bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    {RECEIPT_LABELS[receiptStatus] || receiptStatus}
+                  </span>
+                  {sale.receipt?.sunat_code ? (
+                    <span className="text-xs text-slate-500">Codigo: {sale.receipt.sunat_code}</span>
+                  ) : null}
+                </div>
+                {sale.receipt?.sunat_message ? (
+                  <p className="mt-2 text-sm text-slate-600">{sale.receipt.sunat_message}</p>
+                ) : (
+                  <p className="mt-2 text-sm text-slate-600">
+                    {receiptStatus === "not_applicable"
+                      ? "Esta venta no requiere emision SUNAT."
+                      : "Aun no hay respuesta final del comprobante para esta venta."}
+                  </p>
+                )}
+              </div>
+
+              {canRetryReceipt ? (
+                <button
+                  type="button"
+                  onClick={handleRetryReceipt}
+                  disabled={retryingReceipt}
+                  className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  {retryingReceipt ? "Reintentando..." : "Reemitir comprobante"}
+                </button>
+              ) : null}
+            </div>
+
+            {retryMessage ? <p className="mt-3 text-sm text-slate-600">{retryMessage}</p> : null}
+          </article>
 
           {consistency && !consistency.headerMatches && (
             <InlineStatusCard
