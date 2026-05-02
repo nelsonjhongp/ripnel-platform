@@ -100,17 +100,6 @@ export default function LocationsPage() {
     void Promise.resolve().then(() => loadLocations());
   }, []);
 
-  useEffect(() => {
-    if (!manualCodeEnabled && !editingLocationId) {
-      // defer setState to avoid triggering react-hooks/set-state-in-effect
-      void Promise.resolve().then(() =>
-        setFormState((current) =>
-          current.code === generatedCode ? current : { ...current, code: generatedCode }
-        )
-      );
-    }
-  }, [generatedCode, manualCodeEnabled, editingLocationId]);
-
   const activeCount = locations.filter((location) => location.active).length;
   const inactiveCount = locations.length - activeCount;
   const storeCount = locations.filter((location) => location.type === "store").length;
