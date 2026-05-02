@@ -17,7 +17,7 @@ import {
 } from "lucide-react"
 
 import { useAuth } from "@/components/auth/AuthProvider"
-import { ErrorPage, InlineStatusCard, LoadingPage } from "@/components/feedback/status-page"
+import { ErrorPage, LoadingPage } from "@/components/feedback/status-page"
 import { HomeQuickActions } from "@/components/home/home-quick-actions"
 import { HomeSectionCard } from "@/components/home/home-section-card"
 import { useSidebarTopbarActions } from "@/components/sidebar"

@@ -1,5 +1,5 @@
 const express = require('express');
-const { requireAuth, requireSelfOrPermission } = require('../../middlewares/auth');
+const { requireAuth, requirePermission, requireSelfOrPermission } = require('../../middlewares/auth');
 const {
   getUsers,
   postUser,
@@ -10,8 +10,8 @@ const {
 
 const router = express.Router();
 
-router.get('/', getUsers);
-router.post('/', postUser);
+router.get('/', requireAuth, requirePermission('admin.manage'), getUsers);
+router.post('/', requireAuth, requirePermission('admin.manage'), postUser);
 router.get(
   '/:userId/locations',
   requireAuth,
@@ -24,6 +24,6 @@ router.put(
   requireSelfOrPermission('admin.manage'),
   putUserLocationsByUserId
 );
-router.patch('/:userId', patchUserById);
+router.patch('/:userId', requireAuth, requirePermission('admin.manage'), patchUserById);
 
 module.exports = router;
