@@ -25,6 +25,18 @@ function requireAuth(req, _res, next) {
   }
 
   req.auth = result.payload;
+  if (req.auth?.must_change_password) {
+    const allowedDuringPasswordChange = [
+      ['GET', '/api/auth/me'],
+      ['POST', '/api/auth/change-password'],
+      ['POST', '/api/auth/logout'],
+    ].some(([method, path]) => req.method === method && req.originalUrl.split('?')[0] === path);
+
+    if (!allowedDuringPasswordChange) {
+      return next(new AppError('Password change required', 403, { code: 'PASSWORD_CHANGE_REQUIRED' }));
+    }
+  }
+
   return next();
 }
 

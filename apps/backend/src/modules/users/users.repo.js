@@ -10,6 +10,8 @@ async function findAllUsers(executor = query) {
        u.role_id,
        r.name as role_name,
        u.active,
+       u.must_change_password,
+       u.password_changed_at,
        u.created_at,
        u.updated_at
      from users u
@@ -30,6 +32,8 @@ async function findUserById(userId, executor = query) {
        u.role_id,
        r.name as role_name,
        u.active,
+       u.must_change_password,
+       u.password_changed_at,
        u.created_at,
        u.updated_at
      from users u
@@ -51,6 +55,8 @@ async function findUserByEmail(email, executor = query) {
        u.role_id,
        r.name as role_name,
        u.active,
+       u.must_change_password,
+       u.password_changed_at,
        u.created_at,
        u.updated_at
      from users u
@@ -63,14 +69,32 @@ async function findUserByEmail(email, executor = query) {
 }
 
 async function insertUser(
-  { full_name, username, email, temporary_password, role_id, active },
+  { full_name, username, email, temporary_password, role_id, active, must_change_password },
   executor = query
 ) {
   const result = await executor(
-    `insert into users (full_name, username, email, password_hash, role_id, active)
-     values ($1, $2, $3, crypt($4, gen_salt('bf')), $5, $6)
-     returning user_id, full_name, username, email, role_id, active, created_at, updated_at`,
-    [full_name, username, email, temporary_password, role_id, active]
+    `insert into users (
+       full_name,
+       username,
+       email,
+       password_hash,
+       role_id,
+       active,
+       must_change_password
+     )
+     values ($1, $2, $3, crypt($4, gen_salt('bf')), $5, $6, $7)
+     returning
+       user_id,
+       full_name,
+       username,
+       email,
+       role_id,
+       active,
+       must_change_password,
+       password_changed_at,
+       created_at,
+       updated_at`,
+    [full_name, username, email, temporary_password, role_id, active, must_change_password]
   );
 
   return result.rows[0] || null;
@@ -90,7 +114,17 @@ async function updateUser(
        active = $6,
        updated_at = current_timestamp
      where user_id = $1
-     returning user_id, full_name, username, email, role_id, active, created_at, updated_at`,
+     returning
+       user_id,
+       full_name,
+       username,
+       email,
+       role_id,
+       active,
+       must_change_password,
+       password_changed_at,
+       created_at,
+       updated_at`,
     [userId, full_name, username, email, role_id, active]
   );
 
