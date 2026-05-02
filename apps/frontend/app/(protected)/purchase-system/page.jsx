@@ -3049,21 +3049,34 @@ export default function NuevaVentaPage() {
                                     key={payment.id}
                                     className="grid gap-2 px-3 py-2.5 text-sm md:grid-cols-[minmax(0,1fr)_112px_minmax(0,1fr)] md:items-center"
                                   >
-                                    <Info className="h-3.5 w-3.5" />
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent side="bottom" sideOffset={8}>
-                                  Disponible desde Detalle de venta para cada item.
-                                </TooltipContent>
-                              </Tooltip>
+                                    <div className="flex items-center gap-2 font-medium text-[var(--ops-text)]">
+                                      <PaymentMethodIcon className="h-4 w-4 text-[var(--ripnel-accent)]" />
+                                      {getPaymentMethodLabel(payment.method)}
+                                    </div>
+                                    <span className="font-medium text-[var(--ops-text)]">
+                                      S/. {formatMoney(parseAmountInput(payment.amount) || 0)}
+                                    </span>
+                                    <span className="truncate text-[var(--ops-text-muted)]">
+                                      {trimOrNull(payment.reference) || "Sin referencia"}
+                                    </span>
+                                  </div>
+                                )
+                              })}
                             </div>
-                            <span className="font-semibold text-slate-700">
-                              Descuento aplicado: S/. {formatMoney(totals.saleDiscountAmount)}
-                            </span>
-                          </div>
-                        </div>
-                      ) : null}
+                          ) : null}
+                        </section>
+                      </div>
+                    </article>
 
+                    <article
+                      className={`sales-panel rounded-xl p-4 shadow-sm xl:order-6 xl:sticky xl:top-20 xl:self-start ${
+                        activeStage === "summary" ? "" : "hidden"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Receipt className="h-4 w-4 text-[var(--ripnel-accent)]" />
+                        <h2 className="text-base font-semibold text-[var(--ops-text)]">Totales</h2>
+                      </div>
                       <div className="mt-4 space-y-2 text-sm">
                         <div
                           className={`rounded-2xl border px-3 py-2 ${
