@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { ComponentType } from "react";
-import { CheckCircle2, ChevronRight, Palette, Store } from "lucide-react";
+import { CheckCircle2, ChevronRight, KeyRound, Palette, Store } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   AccountPageFrame,
@@ -191,6 +191,12 @@ export default function AccountPage() {
           title="Sede operativa"
           description={defaultLocation?.name || "Elegir sede default"}
           icon={Store}
+        />
+        <PreferenceLink
+          href="/account/seguridad"
+          title="Seguridad"
+          description="Cambiar contrasena"
+          icon={KeyRound}
         />
         <PreferenceLink
           href="/account/apariencia"

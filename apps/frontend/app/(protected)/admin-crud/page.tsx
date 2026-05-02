@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { buildApiUrl } from "@/lib/api";
+import { Pagination } from "@/components/ui/pagination";
 
 type ApiResponse<T> = {
   ok: boolean;
@@ -33,6 +34,7 @@ type User = {
   role_id: string | null;
   role_name?: string | null;
   active: boolean;
+  must_change_password?: boolean;
   created_at: string;
   updated_at: string;
   temporary_password?: string;
@@ -65,6 +67,8 @@ type UserFormState = {
   email: string;
   role_id: string;
   active: boolean;
+  location_ids: string[];
+  default_location_id: string;
 };
 
 type RoleFormState = {
@@ -111,7 +115,11 @@ const emptyUserForm: UserFormState = {
   email: "",
   role_id: "",
   active: true,
+  location_ids: [],
+  default_location_id: "",
 };
+
+const USERS_PAGE_SIZE = 10;
 
 const emptyRoleForm: RoleFormState = {
   name: "",
@@ -352,6 +360,7 @@ export default function AdminCrudPage() {
   const [userQuery, setUserQuery] = useState("");
   const [roleQuery, setRoleQuery] = useState("");
   const [activeSection, setActiveSection] = useState<"users" | "roles">("users");
+  const [userPage, setUserPage] = useState(1);
 
   const [showUserForm, setShowUserForm] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -457,6 +466,19 @@ export default function AdminCrudPage() {
     });
   }, [userQuery, users, roles]);
 
+  const totalUserPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PAGE_SIZE));
+  const safeUserPage = Math.min(userPage, totalUserPages);
+  const paginatedUsers = filteredUsers.slice(
+    (safeUserPage - 1) * USERS_PAGE_SIZE,
+    safeUserPage * USERS_PAGE_SIZE
+  );
+  const userRangeStart = filteredUsers.length === 0 ? 0 : (safeUserPage - 1) * USERS_PAGE_SIZE + 1;
+  const userRangeEnd = Math.min(filteredUsers.length, safeUserPage * USERS_PAGE_SIZE);
+
+  useEffect(() => {
+    setUserPage(1);
+  }, [userQuery]);
+
   const filteredRoles = useMemo(() => {
     const query = roleQuery.trim().toLowerCase();
 
@@ -554,6 +576,8 @@ export default function AdminCrudPage() {
         email: user.email || "",
         role_id: user.role_id || "",
         active: user.active,
+        location_ids: [],
+        default_location_id: "",
       });
     } else {
       setEditingUserId(null);
@@ -588,14 +612,33 @@ export default function AdminCrudPage() {
           body: JSON.stringify(payload),
         });
       } else {
+        if (!userForm.role_id) {
+          throw new Error("Elige un rol para crear el usuario.");
+        }
+
+        if (userForm.location_ids.length === 0) {
+          throw new Error("Asigna al menos una sede al usuario.");
+        }
+
+        if (!userForm.default_location_id) {
+          throw new Error("Elige una sede default para el usuario.");
+        }
+
         const createdUser = await requestJson<User>("/api/users", {
           method: "POST",
-          body: JSON.stringify(payload),
+          body: JSON.stringify({
+            ...payload,
+            role_id: userForm.role_id,
+            assignments: userForm.location_ids.map((location_id) => ({
+              location_id,
+              is_default: userForm.default_location_id === location_id,
+            })),
+          }),
         });
 
         if (createdUser.temporary_password) {
           window.alert(
-            `Usuario creado. Clave temporal para ${createdUser.username}: ${createdUser.temporary_password}`
+            `Usuario creado.\nUsuario: ${createdUser.username}\nClave temporal: ${createdUser.temporary_password}\n\nEntrega esta clave al usuario para su primer ingreso.`
           );
         }
       }
@@ -607,6 +650,36 @@ export default function AdminCrudPage() {
     } finally {
       setSavingUser(false);
     }
+  }
+
+  function toggleUserFormLocation(locationId: string) {
+    setUserForm((current) => {
+      const isSelected = current.location_ids.includes(locationId);
+      const nextLocationIds = isSelected
+        ? current.location_ids.filter((value) => value !== locationId)
+        : [...current.location_ids, locationId];
+      const nextDefaultLocationId = isSelected
+        ? current.default_location_id === locationId
+          ? nextLocationIds[0] || ""
+          : current.default_location_id
+        : current.default_location_id || locationId;
+
+      return {
+        ...current,
+        location_ids: nextLocationIds,
+        default_location_id: nextDefaultLocationId,
+      };
+    });
+  }
+
+  function chooseUserFormDefaultLocation(locationId: string) {
+    setUserForm((current) => ({
+      ...current,
+      location_ids: current.location_ids.includes(locationId)
+        ? current.location_ids
+        : [...current.location_ids, locationId],
+      default_location_id: locationId,
+    }));
   }
 
   async function toggleUserActive(user: User) {
@@ -918,7 +991,7 @@ export default function AdminCrudPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-field)]">
-                    {filteredUsers.map((user) => {
+                    {paginatedUsers.map((user) => {
                       const roleName =
                         user.role_name || roles.find((role) => role.role_id === user.role_id)?.name || "Sin rol";
 
@@ -938,6 +1011,11 @@ export default function AdminCrudPage() {
                             <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusBadgeClass(user.active)}`}>
                               {user.active ? "Activo" : "Inactivo"}
                             </span>
+                            {user.must_change_password ? (
+                              <span className="mt-1.5 inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+                                Clave pendiente
+                              </span>
+                            ) : null}
                           </td>
                           <td className="px-4 py-3 align-top text-[var(--ops-text-muted)]">
                             {new Date(user.updated_at).toLocaleString("es-PE")}
@@ -975,6 +1053,18 @@ export default function AdminCrudPage() {
               </div>
             )}
           </div>
+          {!loadingUsers && filteredUsers.length > 0 ? (
+            <div className="flex flex-col gap-3 border-t border-[var(--ops-border-strong)] pt-3 md:flex-row md:items-center md:justify-between">
+              <div className="text-xs font-medium text-[var(--ops-text-muted)]">
+                {userRangeStart}-{userRangeEnd} de {filteredUsers.length}
+              </div>
+              <Pagination
+                page={safeUserPage}
+                totalPages={totalUserPages}
+                onPageChange={setUserPage}
+              />
+            </div>
+          ) : null}
         </section>
       ) : (
         <section className="space-y-4 rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] p-4">
@@ -1098,7 +1188,7 @@ export default function AdminCrudPage() {
 
       {showUserForm && (
         <div className="ops-overlay-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="ops-overlay-panel w-full max-w-lg rounded-2xl p-5">
+          <div className="ops-overlay-panel max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl p-5">
             <h3 className="text-xl font-semibold text-[var(--ops-text)]">
               {editingUserId ? "Editar usuario" : "Nuevo usuario"}
             </h3>
@@ -1150,11 +1240,12 @@ export default function AdminCrudPage() {
               <label className="block space-y-1">
                 <span className="text-sm font-medium text-[var(--ops-text)]">Rol</span>
                 <select
+                  required={!editingUserId}
                   value={userForm.role_id}
                   onChange={(event) =>
                     setUserForm((current) => ({ ...current, role_id: event.target.value }))
                   }
-                  className="w-full rounded-xl border border-[var(--ops-border-strong)] px-4 py-2.5 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)]"
+                  className="w-full cursor-pointer rounded-xl border border-[var(--ops-border-strong)] px-4 py-2.5 text-sm text-[var(--ops-text)] outline-none transition hover:border-[var(--ops-border-soft)] focus:border-[var(--ripnel-accent)]"
                 >
                   <option value="">Sin rol</option>
                   {roles.map((role) => (
@@ -1164,6 +1255,84 @@ export default function AdminCrudPage() {
                   ))}
                 </select>
               </label>
+
+              {!editingUserId ? (
+                <div className="space-y-2 rounded-2xl border border-[var(--ops-border-strong)] p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium text-[var(--ops-text)]">Sedes</div>
+                      <div className="text-xs text-[var(--ops-text-muted)]">
+                        Elige acceso y sede default.
+                      </div>
+                    </div>
+                    <div className="rounded-full border border-[var(--ops-border-strong)] px-2.5 py-1 text-xs font-medium text-[var(--ops-text-muted)]">
+                      {userForm.location_ids.length}
+                    </div>
+                  </div>
+
+                  {loadingLocations ? (
+                    <div className="rounded-xl bg-[var(--ops-field)] px-3 py-3 text-sm text-[var(--ops-text-muted)]">
+                      Cargando sedes...
+                    </div>
+                  ) : locationsError ? (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800">
+                      {locationsError}
+                    </div>
+                  ) : availableLocations.length === 0 ? (
+                    <div className="rounded-xl bg-[var(--ops-field)] px-3 py-3 text-sm text-[var(--ops-text-muted)]">
+                      No hay sedes activas disponibles.
+                    </div>
+                  ) : (
+                    <div className="max-h-56 divide-y divide-[var(--ops-border-strong)] overflow-y-auto rounded-xl border border-[var(--ops-border-strong)]">
+                      {availableLocations.map((location) => {
+                        const checked = userForm.location_ids.includes(location.location_id);
+                        const isDefault = userForm.default_location_id === location.location_id;
+
+                        return (
+                          <div
+                            key={location.location_id}
+                            className="flex flex-col gap-2 px-3 py-3 md:flex-row md:items-center md:justify-between"
+                          >
+                            <label className="flex cursor-pointer items-start gap-3">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleUserFormLocation(location.location_id)}
+                                className="mt-1 h-4 w-4 rounded border-[var(--ops-border-strong)]"
+                              />
+                              <span>
+                                <span className="block text-sm font-medium text-[var(--ops-text)]">
+                                  {location.name} ({location.code})
+                                </span>
+                                <span className="block text-xs text-[var(--ops-text-muted)]">
+                                  {location.type}
+                                  {location.address ? ` - ${location.address}` : ""}
+                                </span>
+                              </span>
+                            </label>
+
+                            <label
+                              className={`inline-flex cursor-pointer items-center gap-2 text-sm ${
+                                checked ? "text-[var(--ops-text)]" : "text-[var(--ops-text-muted)]"
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="new-user-default-location"
+                                checked={isDefault}
+                                disabled={!checked}
+                                onChange={() => chooseUserFormDefaultLocation(location.location_id)}
+                                className="h-4 w-4 border-[var(--ops-border-strong)] disabled:cursor-not-allowed"
+                              />
+                              Default
+                            </label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : null}
 
               <label className="flex items-center gap-3 rounded-2xl border border-[var(--ops-border-strong)] px-4 py-3">
                 <input
