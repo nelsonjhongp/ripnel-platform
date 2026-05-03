@@ -4,6 +4,8 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { LoaderCircle, PencilLine, Plus, RefreshCw, Search } from "lucide-react";
 import { buildApiUrl } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type OptionItem = {
   [key: string]: unknown;
@@ -354,114 +356,76 @@ export function StylesPage({
   }
 
   return (
-    <section className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_45%,#eef2ff_100%)] p-4 md:p-5">
+    <section className="ops-page min-h-screen p-4 md:p-5">
       <div className="mx-auto flex max-w-7xl flex-col gap-5">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)] md:p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-violet-500">
+        <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--ripnel-accent-hover)]">
                 Productos
               </p>
-              <h1 className="mt-2 text-2xl font-semibold text-slate-950">
+              <h1 className="ops-title mt-1 text-2xl font-semibold">
                 Estilos de producto
               </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                Aqui registras solo el style base. El siguiente paso natural es
-                completar tallas, colores y combinaciones desde Variantes.
-              </p>
-            </div>
+          </div>
 
-            <button
-              type="button"
-              onClick={loadData}
-              className="inline-flex items-center gap-2 self-start rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-            >
+          <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={loadData}>
               <RefreshCw className="h-4 w-4" />
-              Recargar
-            </button>
-          </div>
+              Actualizar
+          </Button>
+        </header>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
-            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Styles activos
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">{activeCount}</p>
-            </article>
-            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Total de styles
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">{styles.length}</p>
-            </article>
-            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4 md:col-span-2">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="relative w-full max-w-md">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Buscar por style, codigo o catalogos"
-                    className="w-full rounded-2xl border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-violet-400"
-                  />
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setStatusFilter("all")}
-                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                      statusFilter === "all"
-                        ? "bg-slate-900 text-white"
-                        : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    Todos ({styles.length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStatusFilter("active")}
-                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                      statusFilter === "active"
-                        ? "bg-emerald-600 text-white"
-                        : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    Activos ({activeCount})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStatusFilter("inactive")}
-                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                      statusFilter === "inactive"
-                        ? "bg-slate-600 text-white"
-                        : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    Inactivos ({inactiveCount})
-                  </button>
-                </div>
-              </div>
-            </article>
-          </div>
+        <div className="flex flex-wrap gap-2 border-t border-[color:var(--ops-border-soft)] pt-4">
+          <span className="ops-metric-pill inline-flex rounded-full px-3 py-1 text-xs font-semibold">
+            {styles.length} styles
+          </span>
+          <span className="ops-metric-pill inline-flex rounded-full px-3 py-1 text-xs font-semibold">
+            {activeCount} activos
+          </span>
+          <span className="ops-metric-pill inline-flex rounded-full px-3 py-1 text-xs font-semibold">
+            Siguiente paso: Variantes
+          </span>
         </div>
 
         <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-          <article className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)] md:p-6">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+          <article className="ops-surface rounded-3xl border p-4 md:p-5">
+            <div className="flex items-center justify-between border-b border-[color:var(--ops-border-soft)] pb-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                  Tabla base
+                <p className="ops-text-muted text-[11px] font-semibold uppercase tracking-[0.18em]">
+                  Styles base
                 </p>
-                <h2 className="mt-1 text-xl font-semibold text-slate-950">Lista de styles</h2>
+                <h2 className="ops-title mt-1 text-lg font-semibold">Lista de styles</h2>
               </div>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+              <span className="ops-metric-pill inline-flex rounded-full px-3 py-1 text-xs font-semibold">
                 {filteredStyles.length} visibles
               </span>
             </div>
 
+            <div className="mt-4 flex flex-col gap-3 border-b border-[color:var(--ops-border-soft)] pb-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="relative w-full max-w-md">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
+                <Input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Buscar por style, codigo o catalogos"
+                  className="ops-surface h-10 rounded-2xl border pl-9"
+                />
+              </div>
+
+              <select
+                value={statusFilter}
+                onChange={(event) =>
+                  setStatusFilter(event.target.value as "all" | "active" | "inactive")
+                }
+                className="ops-surface h-10 cursor-pointer rounded-2xl border px-3 text-sm outline-none"
+              >
+                <option value="all">Todos ({styles.length})</option>
+                <option value="active">Activos ({activeCount})</option>
+                <option value="inactive">Inactivos ({inactiveCount})</option>
+              </select>
+            </div>
+
             {loading ? (
-              <div className="flex min-h-56 items-center justify-center text-slate-500">
+              <div className="ops-text-muted flex min-h-56 items-center justify-center">
                 <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
                 Cargando styles...
               </div>
@@ -470,16 +434,16 @@ export function StylesPage({
                 {filteredStyles.map((style) => (
                   <div
                     key={style.style_id}
-                    className={`rounded-2xl border border-slate-200 p-4 transition hover:border-slate-300 ${
-                      style.active ? "" : "bg-slate-50/80 opacity-80"
+                    className={`ops-surface-muted rounded-2xl border p-4 transition hover:border-[color:var(--ripnel-accent)] ${
+                      style.active ? "" : "opacity-80"
                     }`}
                   >
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-base font-semibold text-slate-900">{style.name}</h3>
+                          <h3 className="ops-title text-base font-semibold">{style.name}</h3>
                           {style.style_code ? (
-                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                            <span className="ops-metric-pill rounded-full px-2.5 py-1 text-xs font-semibold">
                               {style.style_code}
                             </span>
                           ) : null}
@@ -494,75 +458,73 @@ export function StylesPage({
                           </span>
                         </div>
 
-                        <div className="mt-2 grid gap-2 text-sm text-slate-500 md:grid-cols-2">
+                        <div className="ops-text-muted mt-2 grid gap-2 text-sm md:grid-cols-2">
                           <p>
-                            <span className="font-medium text-slate-700">Tipo:</span>{" "}
+                            <span className="font-medium text-[var(--ops-text)]">Tipo:</span>{" "}
                             {style.garment_type_name}
                           </p>
                           <p>
-                            <span className="font-medium text-slate-700">Tela:</span>{" "}
+                            <span className="font-medium text-[var(--ops-text)]">Tela:</span>{" "}
                             {style.fabric_name || "-"}
                           </p>
                           <p>
-                            <span className="font-medium text-slate-700">Detalle:</span>{" "}
+                            <span className="font-medium text-[var(--ops-text)]">Detalle:</span>{" "}
                             {style.fabric_detail_name || "-"}
                           </p>
                           <p>
-                            <span className="font-medium text-slate-700">Target:</span>{" "}
+                            <span className="font-medium text-[var(--ops-text)]">Target:</span>{" "}
                             {style.target_name || "-"}
                           </p>
                           <p>
-                            <span className="font-medium text-slate-700">
+                            <span className="font-medium text-[var(--ops-text)]">
                               Configurado en variantes:
                             </span>{" "}
                             {style.size_codes.length} tallas
                           </p>
                           <p>
-                            <span className="font-medium text-slate-700">Colores:</span>{" "}
+                            <span className="font-medium text-[var(--ops-text)]">Colores:</span>{" "}
                             {style.color_codes.length}
                           </p>
                         </div>
 
                         {style.description ? (
-                          <p className="mt-2 text-sm text-slate-500">{style.description}</p>
+                          <p className="ops-text-muted mt-2 text-sm">{style.description}</p>
                         ) : null}
 
                         <div className="mt-3 flex flex-wrap gap-2">
-                          <button
+                          <Button
                             type="button"
                             onClick={() => handleEdit(style)}
-                            className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                            variant="outline"
+                            size="xs"
+                            className="rounded-full"
                           >
                             <PencilLine className="h-3.5 w-3.5" />
                             Editar
-                          </button>
-                          <Link
-                            href={`/productos/variantes?style_id=${encodeURIComponent(style.style_id)}`}
-                            className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
-                          >
-                            Variantes
-                          </Link>
-                          <Link
-                            href={`/precios/crear-y-editar-precio?style_id=${encodeURIComponent(style.style_id)}`}
-                            className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
-                          >
-                            Precios
-                          </Link>
-                          <button
+                          </Button>
+                          <Button asChild variant="outline" size="xs" className="rounded-full">
+                            <Link href={`/productos/variantes?style_id=${encodeURIComponent(style.style_id)}`}>
+                              Variantes
+                            </Link>
+                          </Button>
+                          <Button asChild variant="outline" size="xs" className="rounded-full">
+                            <Link href={`/precios/crear-y-editar-precio?style_id=${encodeURIComponent(style.style_id)}`}>
+                              Precios
+                            </Link>
+                          </Button>
+                          <Button
                             type="button"
                             onClick={() => handleToggleActive(style)}
-                            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                              style.active
-                                ? "bg-slate-900 text-white hover:bg-slate-800"
-                                : "bg-emerald-600 text-white hover:bg-emerald-700"
-                            }`}
+                            variant={style.active ? "outline" : "accent"}
+                            size="xs"
+                            className="rounded-full"
                           >
                             {style.active ? "Inactivar" : "Activar"}
-                          </button>
+                          </Button>
                         </div>
                       </div>
 
-                      <div className="text-sm text-slate-400">
+                      <div className="ops-text-muted text-sm">
                         {new Date(style.created_at).toLocaleDateString("es-PE")}
                       </div>
                     </div>
@@ -570,11 +532,11 @@ export function StylesPage({
                 ))}
               </div>
             ) : (
-              <div className="mt-4 rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-                <h3 className="text-lg font-semibold text-slate-900">
+              <div className="ops-empty-state-compact mt-4 rounded-3xl p-8 text-center">
+                <h3 className="ops-title text-lg font-semibold">
                   {styles.length ? "No hay resultados para este filtro" : "Aun no hay styles"}
                 </h3>
-                <p className="mt-2 text-sm leading-6 text-slate-500">
+                <p className="ops-text-muted mt-2 text-sm leading-6">
                   {styles.length
                     ? "Prueba con otro texto de busqueda o cambia el filtro de estado."
                     : "Primero cierra catalogos y luego registra styles base desde este modulo."}
@@ -583,15 +545,15 @@ export function StylesPage({
             )}
           </article>
 
-          <article className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)] md:p-6">
-            <div className="border-b border-slate-200 pb-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+          <article className="ops-surface rounded-3xl border p-4 md:p-5">
+            <div className="border-b border-[color:var(--ops-border-soft)] pb-3">
+              <p className="ops-text-muted text-[11px] font-semibold uppercase tracking-[0.18em]">
                 {editingStyleId ? "Edicion segura" : "Nuevo registro"}
               </p>
-              <h2 className="mt-1 text-xl font-semibold text-slate-950">
+              <h2 className="ops-title mt-1 text-lg font-semibold">
                 {editingStyleId ? "Editar style" : "Crear style"}
               </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-500">
+              <p className="ops-text-muted mt-2 text-sm leading-6">
                 {editingStyleId
                   ? "Solo se habilitan name, description, target y estado. Los campos identitarios quedan bloqueados."
                   : "Registra el producto base y deja la configuracion operativa para Variantes y Precios."}
@@ -599,7 +561,7 @@ export function StylesPage({
             </div>
 
             {lastCreatedStyle ? (
-              <div className="mt-5 rounded-3xl border border-emerald-200 bg-emerald-50 p-4">
+              <div className="mt-5 rounded-3xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/30">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
                   Siguiente paso
                 </p>
