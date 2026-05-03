@@ -12,12 +12,9 @@ import {
   CircleUserRound,
   House,
   LayoutDashboard,
-  Palette,
   ReceiptText,
   RotateCcw,
-  Ruler,
   Settings,
-  Shirt,
   ShoppingBag,
   ShoppingCart,
   Store,
@@ -41,10 +38,17 @@ import {
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { resolveTransferCapabilities } from "@/lib/capabilities"
+import {
+  catalogPageDefinitions,
+  getCatalogRoute,
+  productMasterLinks,
+  productMasterSummaryLink,
+} from "@/lib/product-master-metadata"
 
 type SidebarItem = {
   title: string
   url: string
+  icon?: React.ComponentType<{ className?: string }>
   onlyForRoles?: string[]
   excludeRoles?: string[]
 }
@@ -101,40 +105,34 @@ const sidebarGroups: SidebarGroup[] = [
     ],
   },
   {
+    title: "Catalogos",
+    icon: Warehouse,
+    permission: "catalogs.manage",
+    excludeRoles: SELLER_FOCUSED_ROLES,
+    items: [
+      {
+        title: productMasterSummaryLink.label,
+        url: productMasterSummaryLink.href,
+        icon: productMasterSummaryLink.icon,
+      },
+      ...catalogPageDefinitions.map((definition) => ({
+        title: definition.label,
+        url: getCatalogRoute(definition.slug),
+        icon: definition.icon,
+      })),
+    ],
+  },
+  {
     title: "Productos",
     icon: ShoppingBag,
     permission: "products.manage",
     excludeRoles: SELLER_FOCUSED_ROLES,
-    items: [
-      { title: "Resumen", url: "/productos" },
-      { title: "Estilos", url: "/productos/estilos" },
-      { title: "Variantes", url: "/productos/variantes" },
-    ],
+    items: productMasterLinks.map((link) => ({
+      title: link.label,
+      url: link.href,
+      icon: link.icon,
+    })),
   },
-  /*
-  {
-    title: "Precios",
-    icon: ReceiptText,
-    permission: "prices.manage",
-    excludeRoles: SELLER_FOCUSED_ROLES,
-    items: [
-      { title: "Listado de precios", url: "/precios/listado-de-precios" },
-      { title: "Crear y editar precio", url: "/precios/crear-y-editar-precio" },
-      { title: "Regla mayorista", url: "/precios/regla-mayorista" },
-    ],
-  },
-  {
-    title: "Transferencias",
-    icon: ArrowRightLeft,
-    permission: "transfers.manage",
-    excludeRoles: SELLER_FOCUSED_ROLES,
-    items: [
-      { title: "Listado de transferencias", url: "/transferencias/listado-de-transferencias" },
-      { title: "Crear transferencia", url: "/transferencias/crear-transferencia" },
-      { title: "Recepciones pendientes", url: "/transferencias/recepciones-pendientes" },
-    ],
-  },
-  */
   {
     title: "Administracion",
     icon: Settings,
@@ -157,29 +155,7 @@ const sidebarGroups: SidebarGroup[] = [
     excludeRoles: SELLER_FOCUSED_ROLES,
     items: [{ title: "BI", url: "/bi" }],
   },
-  {
-    title: "Catalogos",
-    icon: Warehouse,
-    permission: "catalogs.manage",
-    excludeRoles: SELLER_FOCUSED_ROLES,
-    items: [
-      { title: "Tallas", url: "/catalogos/tallas" },
-      { title: "Colores", url: "/catalogos/colores" },
-      { title: "Tipo de prenda", url: "/catalogos/tipo-prenda" },
-      { title: "Telas", url: "/catalogos/telas" },
-      { title: "Detalle de tela", url: "/catalogos/detalle-de-tela" },
-      { title: "Targets", url: "/catalogos/targets" },
-    ],
-  },
 ]
-
-const catalogIcons = {
-  Tallas: Ruler,
-  Colores: Palette,
-  "Tipo de prenda": Shirt,
-  Telas: Shirt,
-  "Detalle de tela": Shirt,
-}
 
 const inventoryIcons = {
   "Stock actual": Warehouse,
@@ -203,8 +179,8 @@ function SidebarLink({
     <Link
       href={href}
       className={cn(
-        "flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium text-sidebar-foreground transition hover:bg-sidebar-accent",
-        active && "bg-sidebar-accent text-sidebar-foreground"
+        "flex cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium text-sidebar-foreground transition hover:bg-sidebar-accent",
+        active && "bg-sidebar-accent text-sidebar-foreground ring-1 ring-sidebar-border/70"
       )}
     >
       {Icon ? <Icon className="h-4 w-4 text-sidebar-foreground/65" /> : <span className="h-4 w-4" />}
@@ -271,11 +247,10 @@ function SidebarGroupSection({
           <div className="space-y-0.5 pl-2">
             {visibleItems.map((item) => {
               const IconComponent =
-                title === "Catalogos"
-                  ? catalogIcons[item.title as keyof typeof catalogIcons]
-                  : title === "Inventario"
+                item.icon ||
+                (title === "Inventario"
                     ? inventoryIcons[item.title as keyof typeof inventoryIcons]
-                    : undefined
+                    : undefined)
 
               return (
                 <SidebarLink
@@ -427,13 +402,13 @@ export function AppSidebar({
                   </p>
                 </div>
               </div>
-                <button
-                  type="button"
-                  onClick={() => router.push("/account")}
-                  className="inline-flex h-7 w-7 items-center justify-center rounded-full text-sidebar-foreground/65 transition hover:bg-background/70 hover:text-sidebar-foreground"
-                  aria-label="Gestionar sede"
-                >
-                  <Settings className="h-4 w-4" />
+              <button
+                type="button"
+                onClick={() => router.push("/account")}
+                className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-sidebar-foreground/65 transition hover:bg-background/70 hover:text-sidebar-foreground"
+                aria-label="Gestionar sede"
+              >
+                <Settings className="h-4 w-4" />
               </button>
             </div>
           </div>

@@ -8,6 +8,7 @@ import { AppSidebar } from "./AppSidebar"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth/AuthProvider"
+import { resolveProductMasterRouteTitle } from "@/lib/product-master-metadata"
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -60,6 +61,11 @@ export function SidebarShell({
 
   const resolvedTitle = React.useMemo(() => {
     if (title) return title
+
+    const masterProductTitle = resolveProductMasterRouteTitle(pathname)
+    if (masterProductTitle) {
+      return masterProductTitle
+    }
 
     const routeTitles: Record<string, string> = {
       "/sidebar": "Panel del usuario",

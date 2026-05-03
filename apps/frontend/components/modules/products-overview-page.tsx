@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { buildApiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Tooltip,
   TooltipContent,
@@ -109,7 +111,7 @@ function ActionIcon({
       href={href}
       aria-label={label}
       title={label}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950"
+      className="ops-surface inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border text-[var(--ops-text-muted)] transition hover:border-[color:var(--ripnel-accent)] hover:text-[var(--ops-text)]"
     >
       {children}
     </Link>
@@ -130,7 +132,7 @@ function InfoHint({
           <button
             type="button"
             aria-label={label}
-            className="inline-flex h-5 w-5 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+            className="inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-full text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)]"
           >
             <Info className="h-3.5 w-3.5" />
           </button>
@@ -247,56 +249,48 @@ export function ProductsOverviewPage() {
   }, [filterMode, products, search]);
 
   return (
-    <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f8fafc_28%,#ffffff_68%,#eef2ff_100%)] p-4 md:p-5">
+    <section className="ops-page min-h-screen p-4 md:p-5">
       <div className="mx-auto flex max-w-7xl flex-col gap-4">
-        <header className="rounded-[28px] border border-slate-200 bg-white/95 px-5 py-4 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)] backdrop-blur md:px-6">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-violet-500">
-                Productos
-              </p>
-              <h1 className="mt-1 text-2xl font-semibold text-slate-950">
-                Resumen de productos
-              </h1>
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
-                <span>
-                  <span className="font-semibold text-slate-700">{products.length}</span> styles
-                </span>
-                <span>
-                  <span className="font-semibold text-emerald-700">{metrics.readyCount}</span> listos
-                </span>
-                <span>
-                  <span className="font-semibold text-amber-700">{metrics.attentionCount}</span> por completar
-                </span>
-                <span>
-                  <span className="font-semibold text-sky-700">{metrics.noStockCount}</span> sin stock
-                </span>
-                <span>
-                  <span className="font-semibold text-slate-700">{metrics.inactiveCount}</span> inactivos
-                </span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={loadProducts}
-              className="inline-flex items-center gap-2 self-start rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Recargar
-            </button>
+        <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--ripnel-accent-hover)]">
+              Productos
+            </p>
+            <h1 className="ops-title mt-1 text-2xl font-semibold">
+              Maestro de producto
+            </h1>
           </div>
+
+          <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={loadProducts}>
+            <RefreshCw className="h-4 w-4" />
+            Actualizar
+          </Button>
         </header>
 
-        <article className="rounded-[28px] border border-slate-200 bg-white/95 px-5 py-4 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)] backdrop-blur md:px-6">
-          <div className="flex flex-col gap-3 border-b border-slate-200 pb-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                Vista operativa
+        <div className="flex flex-wrap gap-2 border-t border-[color:var(--ops-border-soft)] pt-4">
+          <span className="ops-metric-pill inline-flex rounded-full px-3 py-1 text-xs font-semibold">
+            {products.length} styles
+          </span>
+          <span className="ops-metric-pill inline-flex rounded-full px-3 py-1 text-xs font-semibold">
+            {metrics.readyCount} listos
+          </span>
+          <span className="ops-metric-pill inline-flex rounded-full px-3 py-1 text-xs font-semibold">
+            {metrics.attentionCount} por completar
+          </span>
+          <span className="ops-metric-pill inline-flex rounded-full px-3 py-1 text-xs font-semibold">
+            {metrics.noStockCount} sin stock
+          </span>
+        </div>
+
+        <article className="ops-surface rounded-3xl border p-4 md:p-5">
+          <div className="flex flex-col gap-3 border-b border-[color:var(--ops-border-soft)] pb-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <p className="ops-text-muted text-[11px] font-semibold uppercase tracking-[0.18em]">
+                Vista general
               </p>
               <div className="mt-1 flex items-center gap-2">
-                <h2 className="text-lg font-semibold text-slate-950">
-                  Seguimiento de productos
+                <h2 className="ops-title text-lg font-semibold">
+                  Seguimiento del flujo
                 </h2>
                 <InfoHint
                   label="Informacion sobre productos y variantes"
@@ -307,23 +301,23 @@ export function ProductsOverviewPage() {
 
             <div className="flex flex-col gap-2 lg:items-end">
               <label className="relative w-full min-w-[260px] max-w-md">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
+                <Input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Buscar por codigo, nombre o tipo"
-                  className="w-full rounded-2xl border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm outline-none transition focus:border-violet-400"
+                  className="ops-surface h-10 rounded-2xl border pl-9"
                 />
               </label>
 
               <div className="flex items-center gap-2 text-sm">
-                <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+                <span className="ops-text-muted text-xs font-medium uppercase tracking-[0.18em]">
                   Filtro
                 </span>
                 <select
                   value={filterMode}
                   onChange={(event) => setFilterMode(event.target.value as FilterMode)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 outline-none transition focus:border-violet-400"
+                  className="ops-surface h-10 cursor-pointer rounded-2xl border px-3 text-sm outline-none"
                 >
                   <option value="all">Todos</option>
                   <option value="attention">Por completar</option>
@@ -335,19 +329,19 @@ export function ProductsOverviewPage() {
           </div>
 
           {error ? (
-            <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
               {error}
             </div>
           ) : null}
 
           {loading ? (
-            <div className="flex min-h-40 items-center justify-center text-slate-500">
+            <div className="ops-text-muted flex min-h-40 items-center justify-center">
               <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
               Cargando productos...
             </div>
           ) : filteredProducts.length ? (
-            <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200">
-              <div className="hidden grid-cols-[minmax(0,2fr)_0.95fr_1.5fr_0.8fr_0.8fr_1fr_112px] gap-3 bg-slate-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 lg:grid">
+            <div className="mt-3 overflow-hidden rounded-2xl border border-[color:var(--ops-border-soft)]">
+              <div className="hidden grid-cols-[minmax(0,2fr)_0.95fr_1.5fr_0.8fr_0.8fr_1fr_112px] gap-3 bg-[var(--ops-surface-muted)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)] lg:grid">
                 <div>Producto</div>
                 <div>Codigo</div>
                 <div>Tallas</div>
@@ -357,7 +351,7 @@ export function ProductsOverviewPage() {
                 <div className="text-right">Acciones</div>
               </div>
 
-              <div className="divide-y divide-slate-200">
+              <div className="divide-y divide-[color:var(--ops-border-soft)]">
                 {filteredProducts.map((product) => {
                   const statusMeta = STATUS_META[product.status];
                   const visibleSizeCodes = getVisibleSizeCodes(product.size_codes || []);
@@ -369,15 +363,15 @@ export function ProductsOverviewPage() {
                   return (
                     <article
                       key={product.style_id}
-                      className="bg-white px-4 py-2.5 transition hover:bg-slate-50/80"
+                      className="px-4 py-2.5 transition hover:bg-[var(--ops-surface-muted)]"
                     >
                       <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_0.95fr_1.5fr_0.8fr_0.8fr_1fr_112px] lg:items-center">
                         <div className="min-w-0">
-                          <h3 className="truncate text-sm font-semibold text-slate-950">
+                          <h3 className="ops-title truncate text-sm font-semibold">
                             {product.name}
                           </h3>
 
-                          <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-slate-500 lg:hidden">
+                          <div className="ops-text-muted mt-1 flex flex-wrap gap-2 text-[11px] lg:hidden">
                             <span>{product.garment_type_name}</span>
                             {product.configured_color_count > 0 ? (
                               <span>{product.configured_color_count} colores</span>
@@ -386,16 +380,16 @@ export function ProductsOverviewPage() {
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 text-sm lg:block">
-                          <div className="lg:hidden text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          <div className="ops-text-muted lg:hidden text-[11px] font-semibold uppercase tracking-[0.18em]">
                             Codigo
                           </div>
-                          <p className="font-semibold text-slate-700">
+                          <p className="font-semibold text-[var(--ops-text)]">
                             {product.style_code || "-"}
                           </p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 text-sm lg:block lg:text-sm">
-                          <div className="lg:hidden text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          <div className="ops-text-muted lg:hidden text-[11px] font-semibold uppercase tracking-[0.18em]">
                             Tallas
                           </div>
                           <div className="flex flex-wrap gap-1">
@@ -404,19 +398,19 @@ export function ProductsOverviewPage() {
                                 {visibleSizeCodes.map((sizeCode) => (
                                   <span
                                     key={`${product.style_id}-${sizeCode}`}
-                                    className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700"
+                                    className="ops-metric-pill rounded-full px-2 py-0.5 text-[11px] font-semibold"
                                   >
                                     {sizeCode}
                                   </span>
                                 ))}
                                 {extraSizesCount > 0 ? (
-                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+                                  <span className="ops-metric-pill rounded-full px-2 py-0.5 text-[11px] font-semibold">
                                     +{extraSizesCount}
                                   </span>
                                 ) : null}
                               </>
                             ) : (
-                              <span className="text-sm font-semibold text-slate-900">
+                              <span className="ops-title text-sm font-semibold">
                                 {product.configured_size_count}
                               </span>
                             )}
@@ -424,23 +418,23 @@ export function ProductsOverviewPage() {
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 text-sm lg:block">
-                          <div className="lg:hidden text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          <div className="ops-text-muted lg:hidden text-[11px] font-semibold uppercase tracking-[0.18em]">
                             Colores
                           </div>
-                          <p className="font-semibold text-slate-900">
+                          <p className="ops-title font-semibold">
                             {product.configured_color_count}
                           </p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 text-sm lg:block">
-                          <div className="lg:hidden text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          <div className="ops-text-muted lg:hidden text-[11px] font-semibold uppercase tracking-[0.18em]">
                             Stock
                           </div>
-                          <p className="font-semibold text-slate-900">{product.total_stock_qty}</p>
+                          <p className="ops-title font-semibold">{product.total_stock_qty}</p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 text-sm lg:block">
-                          <div className="lg:hidden text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          <div className="ops-text-muted lg:hidden text-[11px] font-semibold uppercase tracking-[0.18em]">
                             Estado
                           </div>
                           <div className="flex flex-wrap items-center gap-1.5">
@@ -453,12 +447,12 @@ export function ProductsOverviewPage() {
                               {statusMeta.label}
                             </span>
                             {product.missing_wholesale_size_count > 0 ? (
-                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
                                 May.
                               </span>
                             ) : null}
                             {product.warnings.stock_without_retail_price ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700">
+                              <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
                                 <CircleAlert className="h-3 w-3" />
                                 Stock sin retail
                               </span>
@@ -499,11 +493,11 @@ export function ProductsOverviewPage() {
               </div>
             </div>
           ) : (
-            <div className="mt-4 rounded-[24px] border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-              <h3 className="text-lg font-semibold text-slate-950">
+            <div className="ops-empty-state-compact mt-4 rounded-[24px] p-8 text-center">
+              <h3 className="ops-title text-lg font-semibold">
                 {products.length ? "No hay styles para este filtro" : "Aun no hay styles"}
               </h3>
-              <p className="mt-2 text-sm leading-6 text-slate-500">
+              <p className="ops-text-muted mt-2 text-sm leading-6">
                 {products.length
                   ? "Prueba otra busqueda o cambia el filtro."
                   : "Primero registra un style base y luego completa variantes y precios."}

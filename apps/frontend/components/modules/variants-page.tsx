@@ -13,6 +13,8 @@ import {
   Shirt,
 } from "lucide-react";
 import { buildApiUrl } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type StyleItem = {
   style_id: string;
@@ -606,82 +608,60 @@ export function VariantsPage({
   }
 
   return (
-    <section className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_45%,#eef2ff_100%)] p-4 md:p-5">
+    <section className="ops-page min-h-screen p-4 md:p-5">
       <div className="mx-auto flex max-w-7xl flex-col gap-5">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)] md:p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-violet-500">
+        <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--ripnel-accent-hover)]">
                 Productos
               </p>
-              <h1 className="mt-2 text-2xl font-semibold text-slate-950">
+              <h1 className="ops-title mt-1 text-2xl font-semibold">
                 Variantes de producto
               </h1>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-                Configura tallas y colores permitidos sobre un style existente y
-                genera las variantes faltantes en lote. SKU se crea ahora; barcode
-                queda pendiente para una etapa posterior.
-              </p>
-            </div>
+          </div>
 
-            <button
-              type="button"
-              onClick={loadBaseData}
-              className="inline-flex items-center gap-2 self-start rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-            >
+          <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={loadBaseData}>
               <RefreshCw className="h-4 w-4" />
-              Recargar
-            </button>
-          </div>
+              Actualizar
+          </Button>
+        </header>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
-            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Styles disponibles
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">{styles.length}</p>
-            </article>
-            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Variantes potenciales
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">{totalVariants}</p>
-            </article>
-            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Faltantes del style
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">
-                {selectedSnapshot?.summary.missing_count ?? 0}
-              </p>
-            </article>
-          </div>
+        <div className="flex flex-wrap gap-2 border-t border-[color:var(--ops-border-soft)] pt-4">
+          <span className="ops-metric-pill inline-flex rounded-full px-3 py-1 text-xs font-semibold">
+            {styles.length} styles disponibles
+          </span>
+          <span className="ops-metric-pill inline-flex rounded-full px-3 py-1 text-xs font-semibold">
+            {totalVariants} variantes potenciales
+          </span>
+          <span className="ops-metric-pill inline-flex rounded-full px-3 py-1 text-xs font-semibold">
+            {selectedSnapshot?.summary.missing_count ?? 0} faltantes del style
+          </span>
         </div>
 
         <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-          <article className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)] md:p-6">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+          <article className="ops-surface rounded-3xl border p-4 md:p-5">
+            <div className="flex items-center justify-between border-b border-[color:var(--ops-border-soft)] pb-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                <p className="ops-text-muted text-[11px] font-semibold uppercase tracking-[0.18em]">
                   Styles base
                 </p>
-                <h2 className="mt-1 text-xl font-semibold text-slate-950">
+                <h2 className="ops-title mt-1 text-lg font-semibold">
                   Seleccionar style
                 </h2>
               </div>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+              <span className="ops-metric-pill inline-flex rounded-full px-3 py-1 text-xs font-semibold">
                 {filteredStyles.length} visibles
               </span>
             </div>
 
             <div className="mt-4 space-y-3">
-              <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
-                <Search className="h-4 w-4 text-slate-400" />
-                <input
+              <label className="ops-surface-muted flex items-center gap-2 rounded-2xl border px-3 py-2.5 text-sm text-[var(--ops-text-muted)]">
+                <Search className="h-4 w-4 text-[var(--ops-text-muted)]" />
+                <Input
                   value={styleSearch}
                   onChange={(event) => setStyleSearch(event.target.value)}
                   placeholder="Buscar por codigo, nombre o tela"
-                  className="w-full bg-transparent outline-none placeholder:text-slate-400"
+                  className="h-auto border-0 bg-transparent px-0 py-0 shadow-none focus-visible:ring-0"
                 />
               </label>
 
@@ -700,11 +680,11 @@ export function VariantsPage({
                       onClick={() => setStyleStatusFilter(option.key as StatusFilter)}
                       className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                         isActive
-                          ? "bg-slate-900 text-white"
-                          : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
-                      }`}
-                    >
-                      {option.label} ({option.count})
+                        ? "bg-slate-900 text-white"
+                        : "border border-[color:var(--ops-border-soft)] bg-[var(--ops-surface)] text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
+                    }`}
+                  >
+                    {option.label} ({option.count})
                     </button>
                   );
                 })}
@@ -712,7 +692,7 @@ export function VariantsPage({
             </div>
 
             {loading ? (
-              <div className="flex min-h-56 items-center justify-center text-slate-500">
+              <div className="ops-text-muted flex min-h-56 items-center justify-center">
                 <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
                 Cargando styles...
               </div>
@@ -731,16 +711,16 @@ export function VariantsPage({
                       }}
                       className={`w-full rounded-2xl border p-4 text-left transition ${
                         isSelected
-                          ? "border-indigo-300 bg-indigo-50"
-                          : "border-slate-200 hover:border-slate-300"
+                          ? "border-[color:var(--ripnel-accent)] bg-[var(--ripnel-accent-soft)]"
+                          : "border-[color:var(--ops-border-soft)] hover:border-[color:var(--ripnel-accent)]"
                       } ${style.active ? "" : "opacity-70"}`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-semibold text-slate-900">{style.name}</p>
+                            <p className="ops-title text-sm font-semibold">{style.name}</p>
                             {style.style_code ? (
-                              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
+                              <span className="ops-surface rounded-full border border-[color:var(--ops-border-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--ops-text-muted)]">
                                 {style.style_code}
                               </span>
                             ) : null}
@@ -752,15 +732,15 @@ export function VariantsPage({
                               {getStatusLabel(style.status)}
                             </span>
                           </div>
-                          <p className="mt-2 text-sm text-slate-500">
+                          <p className="ops-text-muted mt-2 text-sm">
                             {style.garment_type_name}
                             {style.fabric_name ? ` - ${style.fabric_name}` : ""}
                           </p>
-                          <p className="mt-2 text-xs text-slate-500">
+                          <p className="ops-text-muted mt-2 text-xs">
                             Configuracion actual: {style.configured_size_count} tallas /{" "}
                             {style.configured_color_count} colores
                           </p>
-                          <p className="mt-1 text-xs text-slate-500">
+                          <p className="ops-text-muted mt-1 text-xs">
                             Variantes {style.variant_count}/{style.expected_variant_count} ·
                             retail {style.retail_sizes_covered_count}/{style.configured_size_count}
                           </p>
@@ -781,38 +761,38 @@ export function VariantsPage({
                 })}
               </div>
             ) : (
-              <div className="mt-4 rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-                <h3 className="text-lg font-semibold text-slate-900">
+              <div className="ops-empty-state-compact mt-4 rounded-3xl p-8 text-center">
+                <h3 className="ops-title text-lg font-semibold">
                   No hay styles para este filtro
                 </h3>
-                <p className="mt-2 text-sm leading-6 text-slate-500">
+                <p className="ops-text-muted mt-2 text-sm leading-6">
                   Ajusta la busqueda o el estado para ver otros styles base.
                 </p>
               </div>
             )}
           </article>
 
-          <article className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)] md:p-6">
+          <article className="ops-surface rounded-3xl border p-4 md:p-5">
             {loadingSelected ? (
-              <div className="flex min-h-56 items-center justify-center text-slate-500">
+              <div className="ops-text-muted flex min-h-56 items-center justify-center">
                 <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
                 Cargando configuracion...
               </div>
             ) : selectedSnapshot ? (
               <div className="space-y-5">
                 <div
-                  className={`rounded-3xl border border-slate-200 bg-slate-50 p-4 ${
+                  className={`ops-surface-muted rounded-3xl border p-4 ${
                     selectedSnapshot.style.active ? "" : "opacity-75"
                   }`}
                 >
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="text-xl font-semibold text-slate-950">
+                        <h2 className="ops-title text-xl font-semibold">
                           {selectedSnapshot.style.name}
                         </h2>
                         {selectedSnapshot.style.style_code ? (
-                          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+                          <span className="ops-surface rounded-full border border-[color:var(--ops-border-soft)] px-3 py-1 text-xs font-semibold text-[var(--ops-text-muted)]">
                             {selectedSnapshot.style.style_code}
                           </span>
                         ) : null}
@@ -835,33 +815,33 @@ export function VariantsPage({
                           {selectedSnapshot.style.active ? "Activo" : "Inactivo"}
                         </span>
                       </div>
-                      <div className="mt-3 grid gap-2 text-sm text-slate-500 md:grid-cols-2">
+                      <div className="ops-text-muted mt-3 grid gap-2 text-sm md:grid-cols-2">
                         <p>
-                          <span className="font-medium text-slate-700">Tipo:</span>{" "}
+                          <span className="font-medium text-[var(--ops-text)]">Tipo:</span>{" "}
                           {selectedSnapshot.style.garment_type_name}
                         </p>
                         <p>
-                          <span className="font-medium text-slate-700">Tela:</span>{" "}
+                          <span className="font-medium text-[var(--ops-text)]">Tela:</span>{" "}
                           {selectedSnapshot.style.fabric_name || "-"}
                         </p>
                         <p>
-                          <span className="font-medium text-slate-700">Target:</span>{" "}
+                          <span className="font-medium text-[var(--ops-text)]">Target:</span>{" "}
                           {selectedSnapshot.style.target_name || "-"}
                         </p>
                         <p>
-                          <span className="font-medium text-slate-700">Variantes:</span>{" "}
+                          <span className="font-medium text-[var(--ops-text)]">Variantes:</span>{" "}
                           {selectedSnapshot.summary.existing_count} /{" "}
                           {selectedSnapshot.summary.total_possible}
                         </p>
                         {selectedProduct ? (
                           <>
                             <p>
-                              <span className="font-medium text-slate-700">Retail:</span>{" "}
+                              <span className="font-medium text-[var(--ops-text)]">Retail:</span>{" "}
                               {selectedProduct.retail_sizes_covered_count} /{" "}
                               {selectedProduct.configured_size_count}
                             </p>
                             <p>
-                              <span className="font-medium text-slate-700">Mayorista:</span>{" "}
+                              <span className="font-medium text-[var(--ops-text)]">Mayorista:</span>{" "}
                               {selectedProduct.wholesale_sizes_covered_count} /{" "}
                               {selectedProduct.configured_size_count}
                             </p>
@@ -874,41 +854,41 @@ export function VariantsPage({
                 </div>
 
                 {selectedProduct ? (
-                  <div className="rounded-3xl border border-slate-200 bg-white p-4">
+                  <div className="ops-surface rounded-3xl border p-4">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div className="space-y-3">
                         <div className="grid gap-3 md:grid-cols-4">
-                          <article className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          <article className="ops-surface-muted rounded-2xl border p-3">
+                            <p className="ops-text-muted text-[11px] font-semibold uppercase tracking-[0.18em]">
                               Retail
                             </p>
-                            <p className="mt-1 text-lg font-semibold text-slate-900">
+                            <p className="ops-title mt-1 text-lg font-semibold">
                               {selectedProduct.retail_sizes_covered_count}/
                               {selectedProduct.configured_size_count}
                             </p>
                           </article>
-                          <article className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          <article className="ops-surface-muted rounded-2xl border p-3">
+                            <p className="ops-text-muted text-[11px] font-semibold uppercase tracking-[0.18em]">
                               Mayorista
                             </p>
-                            <p className="mt-1 text-lg font-semibold text-slate-900">
+                            <p className="ops-title mt-1 text-lg font-semibold">
                               {selectedProduct.wholesale_sizes_covered_count}/
                               {selectedProduct.configured_size_count}
                             </p>
                           </article>
-                          <article className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          <article className="ops-surface-muted rounded-2xl border p-3">
+                            <p className="ops-text-muted text-[11px] font-semibold uppercase tracking-[0.18em]">
                               Stock
                             </p>
-                            <p className="mt-1 text-lg font-semibold text-slate-900">
+                            <p className="ops-title mt-1 text-lg font-semibold">
                               {selectedProduct.total_stock_qty}
                             </p>
                           </article>
-                          <article className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          <article className="ops-surface-muted rounded-2xl border p-3">
+                            <p className="ops-text-muted text-[11px] font-semibold uppercase tracking-[0.18em]">
                               Siguiente paso
                             </p>
-                            <p className="mt-1 text-sm font-semibold text-slate-900">
+                            <p className="ops-title mt-1 text-sm font-semibold">
                               {selectedProduct.next_step_label}
                             </p>
                           </article>
