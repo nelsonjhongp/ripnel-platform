@@ -15,6 +15,27 @@ const {
 
 const CODE_MAX_LENGTH = 10;
 
+function getEntityLabel(config) {
+  return config.entityLabel || config.label || 'registro';
+}
+
+function buildDuplicateCatalogMessage(config, error) {
+  const entityLabel = getEntityLabel(config);
+  const constraint = String(error?.constraint || '');
+
+  if (constraint.includes('_code_')) {
+    return `Ya existe un ${entityLabel} con ese codigo`;
+  }
+
+  if (constraint.includes('_name_')) {
+    return `Ya existe un ${entityLabel} con ese nombre`;
+  }
+
+  return config.hasCode
+    ? `Ya existe un ${entityLabel} con ese nombre o codigo`
+    : `Ya existe un ${entityLabel} con ese nombre`;
+}
+
 function normalizeBoolean(value, defaultValue = true) {
   return typeof value === 'boolean' ? value : defaultValue;
 }
@@ -32,7 +53,7 @@ function normalizeOptionalNumber(value, defaultValue = 0) {
   const parsed = Number(value);
 
   if (!Number.isFinite(parsed)) {
-    throw new AppError('Numeric value is invalid', 400);
+    throw new AppError('El valor numerico no es valido', 400);
   }
 
   return parsed;
@@ -46,7 +67,7 @@ function normalizeHex(value) {
   }
 
   if (!/^#[0-9a-fA-F]{6}$/.test(trimmed)) {
-    throw new AppError('Color hex is invalid', 400);
+    throw new AppError('El color hex no es valido', 400);
   }
 
   return trimmed.toUpperCase();
@@ -56,7 +77,7 @@ async function listCatalogItems(catalogKey) {
   const config = getCatalogConfig(catalogKey);
 
   if (!config) {
-    throw new AppError('Catalog is invalid', 404);
+    throw new AppError('El catalogo no es valido', 404);
   }
 
   return findAllCatalogItems(config);
@@ -67,7 +88,7 @@ function normalizeCatalogPayload(config, input) {
   const active = normalizeBoolean(input.active, true);
 
   if (!name) {
-    throw new AppError(`${config.label} name is required`, 400);
+    throw new AppError(`El nombre de ${getEntityLabel(config)} es obligatorio`, 400);
   }
 
   if (config.key === 'sizes') {
@@ -107,7 +128,7 @@ async function createCatalogItem(catalogKey, input) {
   const config = getCatalogConfig(catalogKey);
 
   if (!config) {
-    throw new AppError('Catalog is invalid', 404);
+    throw new AppError('El catalogo no es valido', 404);
   }
 
   const payload = normalizeCatalogPayload(config, input);
@@ -126,7 +147,7 @@ async function createCatalogItem(catalogKey, input) {
     return await insertCatalogItem(config, payload);
   } catch (error) {
     if (error.code === '23505') {
-      throw new AppError(`${config.label} already exists`, 409);
+      throw new AppError(buildDuplicateCatalogMessage(config, error), 409);
     }
 
     throw error;
@@ -138,7 +159,7 @@ function normalizeCatalogPatchPayload(config, existingItem, input) {
   const hasRestrictedFields = restrictedFields.some((field) => field in input);
 
   if (hasRestrictedFields) {
-    throw new AppError(`${config.label} code cannot be updated`, 400);
+    throw new AppError(`El codigo de ${getEntityLabel(config)} no se puede actualizar`, 400);
   }
 
   const payload = {};
@@ -147,7 +168,7 @@ function normalizeCatalogPatchPayload(config, existingItem, input) {
     const name = input.name?.trim();
 
     if (!name) {
-      throw new AppError(`${config.label} name is required`, 400);
+      throw new AppError(`El nombre de ${getEntityLabel(config)} es obligatorio`, 400);
     }
 
     payload.name = name;
@@ -167,14 +188,14 @@ function normalizeCatalogPatchPayload(config, existingItem, input) {
 
   if (config.editableFields.includes('active') && 'active' in input) {
     if (typeof input.active !== 'boolean') {
-      throw new AppError(`${config.label} active state is invalid`, 400);
+      throw new AppError(`El estado de ${getEntityLabel(config)} no es valido`, 400);
     }
 
     payload.active = input.active;
   }
 
   if (!Object.keys(payload).length) {
-    throw new AppError(`No editable fields were provided for ${config.label}`, 400);
+    throw new AppError(`No se enviaron campos editables para ${getEntityLabel(config)}`, 400);
   }
 
   return payload;
@@ -184,19 +205,19 @@ async function updateCatalogItemById(catalogKey, itemId, input) {
   const config = getCatalogConfig(catalogKey);
 
   if (!config) {
-    throw new AppError('Catalog is invalid', 404);
+    throw new AppError('El catalogo no es valido', 404);
   }
 
   const normalizedItemId = String(itemId || '').trim();
 
   if (!normalizedItemId) {
-    throw new AppError(`${config.label} id is required`, 400);
+    throw new AppError(`El id de ${getEntityLabel(config)} es obligatorio`, 400);
   }
 
   const existingItem = await findCatalogItemById(config, normalizedItemId);
 
   if (!existingItem) {
-    throw new AppError(`${config.label} not found`, 404);
+    throw new AppError(`No se encontro ${getEntityLabel(config)}`, 404);
   }
 
   const payload = normalizeCatalogPatchPayload(config, existingItem, input);
@@ -205,7 +226,7 @@ async function updateCatalogItemById(catalogKey, itemId, input) {
     return await updateCatalogItem(config, normalizedItemId, payload);
   } catch (error) {
     if (error.code === '23505') {
-      throw new AppError(`${config.label} already exists`, 409);
+      throw new AppError(buildDuplicateCatalogMessage(config, error), 409);
     }
 
     throw error;

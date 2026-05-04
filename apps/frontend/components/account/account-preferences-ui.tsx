@@ -46,24 +46,17 @@ export function AccountPageFrame({
   backHref,
   backLabel,
   title,
-  description,
   children,
 }: {
   backHref?: string;
   backLabel?: string;
   title: string;
-  description?: string;
   children: ReactNode;
 }) {
   return (
     <section className="ops-page min-h-screen px-4 py-6 md:px-8">
       <div className="mx-auto max-w-[688px] space-y-6">
-        <SettingsPageHeader
-          backHref={backHref}
-          backLabel={backLabel}
-          title={title}
-          description={description}
-        />
+        <SettingsPageHeader backHref={backHref} backLabel={backLabel} title={title} />
 
         {children}
       </div>
@@ -75,12 +68,10 @@ export function SettingsPageHeader({
   backHref,
   backLabel,
   title,
-  description,
 }: {
   backHref?: string;
   backLabel?: string;
   title: string;
-  description?: string;
 }) {
   return (
     <header className="space-y-4">
@@ -98,9 +89,6 @@ export function SettingsPageHeader({
         <h1 className="scroll-m-20 text-2xl leading-8 font-semibold tracking-[-0.025em] text-[var(--ops-text)]">
           {title}
         </h1>
-        {description ? (
-          <p className="text-sm leading-5 text-[var(--ops-text-muted)]">{description}</p>
-        ) : null}
       </div>
     </header>
   );

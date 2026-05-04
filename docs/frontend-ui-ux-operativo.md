@@ -2,6 +2,8 @@
 
 Guia breve para futuras interfaces operativas de RIPNEL.
 
+Este documento complementa a `docs/frontend-page-standard.md`. No redefine la estructura base del `page header`; solo agrega criterios operativos de densidad, ayuda contextual y anti-patrones.
+
 ## Cuando usar ayudas contextuales
 
 - Evitar texto explicativo permanente cuando la pantalla ya se entiende por jerarquia visual.
@@ -25,6 +27,7 @@ Guia breve para futuras interfaces operativas de RIPNEL.
   - estados que pueden explicarse mejor con iconos o color semantico;
   - lugares donde conviene colapsar detalle.
 - Cuando una observacion se repita en varias pantallas, convertirla en criterio de interfaz y no dejarla solo como comentario puntual.
+- Cuando una observacion nazca en un modulo puntual, como un listado concreto, convertirla en regla general solo si resuelve una familia de pantallas parecida.
 
 ## Criterios de densidad para modulos ERP
 
@@ -54,9 +57,25 @@ Guia breve para futuras interfaces operativas de RIPNEL.
 - Detalle expandible solo cuando agregue contexto real.
 - Copy corto, operativo y consistente con el lenguaje ERP del proyecto.
 
+## Cuando un resumen si aporta
+
+Un resumen compacto si aporta cuando:
+
+- adelanta una prioridad;
+- muestra un agregado que no se ve facil en filas;
+- compara estados o volumenes relevantes;
+- evita abrir varias paginas o recorrer toda la tabla.
+
+Un resumen sobra cuando:
+
+- repite el mismo total que ya muestra la paginacion;
+- reexpresa un filtro activo;
+- vuelve a contar una sola categoria evidente del listado;
+- no cambia ninguna decision operativa.
+
 ## Patron compacto derivado de inicio
 
-- Header corto como texto; no usar hero-card si no agrega una decision operativa.
+- Header corto como texto; seguir `docs/frontend-page-standard.md` para su composicion y no usar hero-card si no agrega una decision operativa.
 - Priorizar acciones urgentes o recurrentes en topbar o en una fila superior compacta.
 - Mantener pendientes, accesos rapidos y metricas como secciones ligeras; no deben vivir en paneles pesados por defecto.
 - Agrupar metricas cerca de la decision o del bloque que representan; evitar dispersarlas en muchas tarjetas.
@@ -70,6 +89,9 @@ Guia breve para futuras interfaces operativas de RIPNEL.
 - Subtitulos que solo repiten el nombre de la seccion.
 - Bloques altos para datos que caben en una fila compacta.
 - Acciones urgentes escondidas dentro del scroll cuando podrian vivir arriba.
+- Boton de `refresh` ocupando el lugar de un filtro principal cuando podria vivir como accion secundaria del header.
+- Conteo repetido a la vez en pills, franja de filtros y pie de tabla.
+- Estados demasiado saturados en tema oscuro para valores estables que no requieren accion.
 
 ## Patron para cuenta y configuracion operativa
 

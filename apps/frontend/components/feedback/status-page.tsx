@@ -145,6 +145,12 @@ export function LoadingPage({
   );
 }
 
+export function ProtectedLoadingPage(
+  props: Omit<Parameters<typeof LoadingPage>[0], "variant">
+) {
+  return <LoadingPage variant="ops" {...props} />;
+}
+
 export function NotFoundPage({ variant = "default" }: { variant?: StatusVariant }) {
   return (
     <StatusPage
@@ -157,6 +163,10 @@ export function NotFoundPage({ variant = "default" }: { variant?: StatusVariant 
       secondaryAction={{ href: "/purchase-system", label: "Abrir nueva venta" }}
     />
   );
+}
+
+export function ProtectedNotFoundPage() {
+  return <NotFoundPage variant="ops" />;
 }
 
 export function ForbiddenPage({ variant = "default" }: { variant?: StatusVariant }) {
@@ -172,6 +182,10 @@ export function ForbiddenPage({ variant = "default" }: { variant?: StatusVariant
       secondaryAction={{ href: "/account", label: "Ver mi cuenta" }}
     />
   );
+}
+
+export function ProtectedForbiddenPage() {
+  return <ForbiddenPage variant="ops" />;
 }
 
 export function ErrorPage({
@@ -195,6 +209,12 @@ export function ErrorPage({
       secondaryAction={{ href: "/transaction-history", label: "Ir al historial" }}
     />
   );
+}
+
+export function ProtectedErrorPage(
+  props: Omit<Parameters<typeof ErrorPage>[0], "variant">
+) {
+  return <ErrorPage variant="ops" {...props} />;
 }
 
 export function InlineStatusCard({
