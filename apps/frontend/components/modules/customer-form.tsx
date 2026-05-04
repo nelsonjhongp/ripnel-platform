@@ -1,6 +1,6 @@
 "use client"
 
-import type { ReactNode } from "react"
+import React, { type ReactNode } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -165,9 +165,9 @@ export function toFormState(customer: CustomerRecord): CustomerFormState {
   }
 }
 
-function FieldLabel({ children }: { children: ReactNode }) {
+function FieldLabel({ children, htmlFor }: { children: ReactNode; htmlFor?: string }) {
   return (
-    <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+    <label htmlFor={htmlFor} className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
       {children}
     </label>
   )
@@ -196,6 +196,16 @@ export function CustomerForm({
   mode = "create",
   className,
 }: CustomerFormProps) {
+  const docTypeId = React.useId()
+  const docNumberId = React.useId()
+  const fullNameId = React.useId()
+  const businessNameId = React.useId()
+  const commercialNameId = React.useId()
+  const customerTypeId = React.useId()
+  const emailId = React.useId()
+  const phoneId = React.useId()
+  const notesId = React.useId()
+
   function patch(next: Partial<CustomerFormState>) {
     onChange({ ...state, ...next })
   }
@@ -203,15 +213,16 @@ export function CustomerForm({
   return (
     <div className={cn("space-y-5", className)}>
       {error ? (
-        <div className="rounded-xl border border-rose-300 bg-rose-100/70 px-3 py-2 text-sm text-rose-700">
+        <div role="alert" aria-live="polite" className="rounded-xl border border-rose-300 bg-rose-100/70 px-3 py-2 text-sm text-rose-700">
           {error}
         </div>
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <FieldLabel>Tipo de documento</FieldLabel>
+          <FieldLabel htmlFor={docTypeId}>Tipo de documento</FieldLabel>
           <select
+            id={docTypeId}
             value={state.document_type}
             onChange={(event) =>
               patch({
@@ -219,7 +230,7 @@ export function CustomerForm({
                 document_number: event.target.value === "none" ? "" : state.document_number,
               })
             }
-            className="sales-field h-10 w-full rounded-lg px-3 text-sm outline-none"
+            className="sales-field h-10 w-full rounded-lg px-3 text-sm outline-none bg-[var(--ops-field)]"
           >
             <option value="none">Sin documento</option>
             <option value="dni">DNI</option>
@@ -230,52 +241,57 @@ export function CustomerForm({
         </div>
 
         <div>
-          <FieldLabel>Número de documento</FieldLabel>
+          <FieldLabel htmlFor={docNumberId}>Número de documento</FieldLabel>
           <Input
+            id={docNumberId}
             value={state.document_number}
             disabled={state.document_type === "none"}
             onChange={(event) => patch({ document_number: event.target.value })}
-            placeholder="Número de documento"
+            placeholder="Número de documento…"
             className="sales-field h-10 rounded-lg border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 text-sm text-[var(--ops-text)]"
           />
         </div>
 
         <div>
-          <FieldLabel>Nombre completo</FieldLabel>
+          <FieldLabel htmlFor={fullNameId}>Nombre completo</FieldLabel>
           <Input
+            id={fullNameId}
             value={state.full_name}
             onChange={(event) => patch({ full_name: event.target.value })}
-            placeholder="Nombre completo"
+            placeholder="Nombre completo…"
             className="sales-field h-10 rounded-lg border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 text-sm text-[var(--ops-text)]"
           />
         </div>
 
         <div>
-          <FieldLabel>Razón social</FieldLabel>
+          <FieldLabel htmlFor={businessNameId}>Razón social</FieldLabel>
           <Input
+            id={businessNameId}
             value={state.business_name}
             onChange={(event) => patch({ business_name: event.target.value })}
-            placeholder="Razón social"
+            placeholder="Razón social…"
             className="sales-field h-10 rounded-lg border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 text-sm text-[var(--ops-text)]"
           />
         </div>
 
         <div>
-          <FieldLabel>Nombre comercial</FieldLabel>
+          <FieldLabel htmlFor={commercialNameId}>Nombre comercial</FieldLabel>
           <Input
+            id={commercialNameId}
             value={state.commercial_name}
             onChange={(event) => patch({ commercial_name: event.target.value })}
-            placeholder="Nombre comercial"
+            placeholder="Nombre comercial…"
             className="sales-field h-10 rounded-lg border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 text-sm text-[var(--ops-text)]"
           />
         </div>
 
         <div>
-          <FieldLabel>Tipo de cliente</FieldLabel>
+          <FieldLabel htmlFor={customerTypeId}>Tipo de cliente</FieldLabel>
           <select
+            id={customerTypeId}
             value={state.customer_type}
             onChange={(event) => patch({ customer_type: event.target.value })}
-            className="sales-field h-10 w-full rounded-lg px-3 text-sm outline-none"
+            className="sales-field h-10 w-full rounded-lg px-3 text-sm outline-none bg-[var(--ops-field)]"
           >
             <option value="retail">Retail</option>
             <option value="wholesale">Mayorista</option>
@@ -283,34 +299,39 @@ export function CustomerForm({
         </div>
 
         <div>
-          <FieldLabel>Email</FieldLabel>
+          <FieldLabel htmlFor={emailId}>Email</FieldLabel>
           <Input
+            id={emailId}
             type="email"
             value={state.email}
             onChange={(event) => patch({ email: event.target.value })}
             placeholder="email@ejemplo.com"
+            spellCheck={false}
             className="sales-field h-10 rounded-lg border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 text-sm text-[var(--ops-text)]"
           />
         </div>
 
         <div>
-          <FieldLabel>Teléfono</FieldLabel>
+          <FieldLabel htmlFor={phoneId}>Teléfono</FieldLabel>
           <Input
+            id={phoneId}
+            type="tel"
             value={state.phone}
             onChange={(event) => patch({ phone: event.target.value })}
-            placeholder="999 000 000"
+            placeholder="999 000 000…"
             className="sales-field h-10 rounded-lg border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 text-sm text-[var(--ops-text)]"
           />
         </div>
 
         <div className="md:col-span-2">
-          <FieldLabel>Notas</FieldLabel>
+          <FieldLabel htmlFor={notesId}>Notas</FieldLabel>
           <textarea
+            id={notesId}
             value={state.notes}
             onChange={(event) => patch({ notes: event.target.value })}
             rows={4}
-            placeholder="Notas operativas"
-            className="sales-field min-h-28 w-full rounded-lg px-3 py-2.5 text-sm outline-none"
+            placeholder="Notas operativas…"
+            className="sales-field min-h-28 w-full rounded-lg px-3 py-2.5 text-sm outline-none bg-[var(--ops-field)]"
           />
         </div>
       </div>

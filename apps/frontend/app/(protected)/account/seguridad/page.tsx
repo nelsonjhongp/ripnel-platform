@@ -138,12 +138,12 @@ export default function AccountSecurityPage() {
           </label>
 
           {error ? (
-            <div className="border-t border-[var(--ops-border-strong)] px-4 py-3 text-sm text-rose-500">
+            <div role="alert" aria-live="polite" className="border-t border-[var(--ops-border-strong)] px-4 py-3 text-sm text-rose-500">
               {error}
             </div>
           ) : null}
           {message ? (
-            <div className="border-t border-[var(--ops-border-strong)] px-4 py-3 text-sm text-emerald-500">
+            <div role="status" aria-live="polite" className="border-t border-[var(--ops-border-strong)] px-4 py-3 text-sm text-emerald-500">
               {message}
             </div>
           ) : null}

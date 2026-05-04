@@ -230,8 +230,8 @@ export default function KardexPage() {
             </div>
           </div>
 
-          {error ? (
-            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+{error ? (
+            <div role="alert" aria-live="polite" className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {error}
             </div>
           ) : null}

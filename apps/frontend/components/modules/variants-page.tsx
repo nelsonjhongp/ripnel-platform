@@ -1117,8 +1117,8 @@ export function VariantsPage({
                 <form onSubmit={handleSaveConfig} className="space-y-5">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-3">
-                      <label className="text-sm font-medium text-slate-700">Tallas</label>
-                      <span className="text-xs text-slate-500">Obligatorio</span>
+                      <label className="text-sm font-semibold text-[var(--ops-text)]">Tallas</label>
+                      <span className="text-xs text-[var(--ops-text-muted)]">Obligatorio</span>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                       {visibleSizes.map((size) => (
@@ -1126,7 +1126,7 @@ export function VariantsPage({
                           key={size.size_id}
                           className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-sm ${
                             size.active
-                              ? "border-slate-200 bg-slate-50 text-slate-700"
+                              ? "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text)]"
                               : "border-amber-200 bg-amber-50 text-amber-700"
                           }`}
                         >
@@ -1139,7 +1139,7 @@ export function VariantsPage({
                                 sizeIds: toggleValue(current.sizeIds, size.size_id),
                               }))
                             }
-                            className="h-4 w-4 rounded border-slate-300"
+                            className="h-4 w-4 rounded border-[var(--ops-border-strong)]"
                           />
                           <span>
                             {size.code} - {size.name}
@@ -1152,8 +1152,8 @@ export function VariantsPage({
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-3">
-                      <label className="text-sm font-medium text-slate-700">Colores</label>
-                      <span className="text-xs text-slate-500">
+                      <label className="text-sm font-semibold text-[var(--ops-text)]">Colores</label>
+                      <span className="text-xs text-[var(--ops-text-muted)]">
                         Si no eliges uno, se usara UNICO
                       </span>
                     </div>
@@ -1163,7 +1163,7 @@ export function VariantsPage({
                           key={color.color_id}
                           className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-sm ${
                             color.active
-                              ? "border-slate-200 bg-slate-50 text-slate-700"
+                              ? "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text)]"
                               : "border-amber-200 bg-amber-50 text-amber-700"
                           }`}
                         >
@@ -1176,10 +1176,10 @@ export function VariantsPage({
                                 colorIds: toggleValue(current.colorIds, color.color_id),
                               }))
                             }
-                            className="h-4 w-4 rounded border-slate-300"
+                            className="h-4 w-4 rounded border-[var(--ops-border-strong)]"
                           />
                           <span
-                            className="inline-block h-3.5 w-3.5 rounded-full border border-slate-300"
+                            className="inline-block h-3.5 w-3.5 rounded-full border border-[var(--ops-border-strong)]"
                             style={{
                               backgroundColor: color.hex || "#ffffff",
                             }}
@@ -1221,13 +1221,13 @@ export function VariantsPage({
                   </div>
 
                   {error ? (
-                    <div className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    <div role="alert" aria-live="polite" className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                       {error}
                     </div>
                   ) : null}
 
                   {successMessage ? (
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                    <div role="status" aria-live="polite" className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
                       {successMessage}
                     </div>
                   ) : null}

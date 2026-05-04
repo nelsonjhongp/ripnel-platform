@@ -211,7 +211,7 @@ export default function CajaPage() {
             </header>
 
             {error ? (
-              <div className="sales-chip sales-chip-danger flex items-center gap-3 rounded-xl px-4 py-3 text-sm">
+              <div role="alert" aria-live="polite" className="sales-chip sales-chip-danger flex items-center gap-3 rounded-xl px-4 py-3 text-sm">
                 <X className="h-4 w-4 shrink-0" />
                 {error}
                 <button

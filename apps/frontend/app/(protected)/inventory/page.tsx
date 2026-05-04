@@ -265,13 +265,14 @@ export default function InventoryPage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                <label htmlFor="location-filter" className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                   Ubicacion
                 </label>
                 <select
+                  id="location-filter"
                   value={locationFilter}
                   onChange={(event) => setLocationFilter(event.target.value)}
-                  className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none transition hover:bg-[var(--ops-surface-muted)]"
+                  className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none transition hover:bg-[var(--ops-surface-muted)] bg-[var(--ops-surface)]"
                 >
                   <option value="all">Todas</option>
                   {locationOptions.map((location) => (
@@ -303,7 +304,7 @@ export default function InventoryPage() {
             </div>
 
             {error ? (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+              <div role="alert" aria-live="polite" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
                 {error}
               </div>
             ) : null}
