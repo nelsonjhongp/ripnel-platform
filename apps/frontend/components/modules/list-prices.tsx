@@ -13,7 +13,7 @@ import {
   RefreshCw,
   Search,
 } from "lucide-react";
-import { buildApiUrl } from "@/lib/api";
+import { ApiEnvelope, apiFetch, buildApiUrl, unwrapApiData } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
   Collapsible,
@@ -108,6 +108,10 @@ type WorkspaceSize = {
 type ProductWorkspace = {
   product: ProductSummary;
   configured_sizes: WorkspaceSize[];
+};
+
+type ProductsResponse = {
+  items: ProductSummary[];
 };
 
 type PriceCoverageGap = {
@@ -354,21 +358,12 @@ function PriceCoverageBanner({
 }
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(buildApiUrl(path), {
+  const payload = await apiFetch<T | ApiEnvelope<T>>(path, {
     cache: "no-store",
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
   });
-  const payload = await response.json();
 
-  if (!response.ok) {
-    throw new Error(payload.message || "No se pudo completar la solicitud");
-  }
-
-  return payload.data;
+  return unwrapApiData(payload);
 }
 
 function groupPriceRows(rows: PriceRow[]) {
@@ -804,14 +799,18 @@ function PriceEditorView({ initialStyleId }: { initialStyleId?: string | null })
     setError(null);
 
     try {
-      const data = await requestJson<ProductSummary[]>("/api/products");
-      setProducts(data || []);
+      const data = await requestJson<ProductsResponse>("/api/products?page=1&page_size=50");
+      const productItems = data?.items || [];
+      setProducts(productItems);
 
-      if (data.length) {
+      if (productItems.length) {
         const preferredStyle =
-          initialStyleId && data.find((product) => product.style_id === initialStyleId)?.style_id;
+          initialStyleId &&
+          productItems.find((product) => product.style_id === initialStyleId)?.style_id;
 
-        setSelectedStyleId((current) => current || preferredStyle || data[0].style_id);
+        setSelectedStyleId(
+          (current) => current || preferredStyle || productItems[0].style_id
+        );
       }
     } catch (requestError) {
       setError(

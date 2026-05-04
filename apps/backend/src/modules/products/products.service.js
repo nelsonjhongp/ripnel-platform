@@ -5,6 +5,19 @@ const {
   findProductWorkspaceSizes,
   findProductWorkspaceColors,
 } = require('./products.repo');
+const {
+  findUserLocationsByUserId,
+  findDefaultLocationByUserId,
+} = require('../users/users.repo');
+
+const DEFAULT_PAGE_SIZE = 10;
+const MAX_PAGE_SIZE = 50;
+const FILTER_MODES = new Set(['all', 'attention', 'ready', 'inactive']);
+
+function normalizeUuid(value) {
+  const normalizedValue = String(value || '').trim();
+  return normalizedValue || null;
+}
 
 function normalizeCount(value) {
   const numericValue = Number(value || 0);
@@ -18,6 +31,34 @@ function normalizeAmount(value) {
 
   const numericValue = Number(value);
   return Number.isFinite(numericValue) ? numericValue : null;
+}
+
+function normalizePage(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || numericValue < 1) {
+    return 1;
+  }
+
+  return Math.floor(numericValue);
+}
+
+function normalizePageSize(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue) || numericValue < 1) {
+    return DEFAULT_PAGE_SIZE;
+  }
+
+  return Math.min(MAX_PAGE_SIZE, Math.floor(numericValue));
+}
+
+function normalizeFilterMode(value) {
+  const normalizedValue = String(value || 'all').trim().toLowerCase();
+  return FILTER_MODES.has(normalizedValue) ? normalizedValue : 'all';
+}
+
+function normalizeQuery(value) {
+  const normalizedValue = String(value || '').trim();
+  return normalizedValue || null;
 }
 
 function resolveProductStatus(summary) {
@@ -86,6 +127,14 @@ function resolveNextStep(status) {
   };
 }
 
+function mapSizeStock(entry) {
+  return {
+    size_id: entry && entry.size_id ? String(entry.size_id) : '',
+    size_code: entry && entry.size_code ? String(entry.size_code) : '',
+    qty: normalizeCount(entry && entry.qty),
+  };
+}
+
 function decorateProductSummary(row) {
   const configuredSizeCount = normalizeCount(row.configured_size_count);
   const configuredColorCount = normalizeCount(row.configured_color_count);
@@ -132,6 +181,7 @@ function decorateProductSummary(row) {
     size_codes: Array.isArray(row.size_codes)
       ? row.size_codes.map((value) => String(value)).filter(Boolean)
       : [],
+    size_stock: Array.isArray(row.size_stock) ? row.size_stock.map(mapSizeStock) : [],
     configured_size_count: configuredSizeCount,
     configured_color_count: configuredColorCount,
     expected_variant_count: expectedVariantCount,
@@ -159,6 +209,76 @@ function decorateProductSummary(row) {
   };
 }
 
+function matchesFilterMode(product, filterMode) {
+  if (filterMode === 'attention') {
+    return (
+      product.status === 'draft' ||
+      product.status === 'pending_variants' ||
+      product.status === 'pending_prices' ||
+      product.warnings.stock_without_retail_price
+    );
+  }
+
+  if (filterMode === 'ready') {
+    return product.status === 'ready' || product.status === 'ready_no_stock';
+  }
+
+  if (filterMode === 'inactive') {
+    return product.status === 'inactive';
+  }
+
+  return true;
+}
+
+function mapActiveLocation(location) {
+  if (!location) {
+    return null;
+  }
+
+  return {
+    location_id: location.location_id,
+    name: location.name,
+    code: location.code,
+    type: location.type,
+    address: location.address,
+    active: location.active,
+  };
+}
+
+async function resolveActiveLocationForUser(userId, requestedLocationId) {
+  const normalizedUserId = normalizeUuid(userId);
+  const normalizedRequestedLocationId = normalizeUuid(requestedLocationId);
+
+  if (!normalizedUserId) {
+    throw new AppError('Not authenticated', 401);
+  }
+
+  const assignments = await findUserLocationsByUserId(normalizedUserId);
+
+  if (!assignments.length) {
+    throw new AppError('User has no assigned locations', 403);
+  }
+
+  if (normalizedRequestedLocationId) {
+    const matchingAssignment = assignments.find(
+      (assignment) => assignment.location_id === normalizedRequestedLocationId
+    );
+
+    if (!matchingAssignment) {
+      throw new AppError('Requested location is not assigned to the user', 403);
+    }
+
+    return mapActiveLocation(matchingAssignment);
+  }
+
+  const defaultLocation = await findDefaultLocationByUserId(normalizedUserId);
+  if (defaultLocation) {
+    return mapActiveLocation(defaultLocation);
+  }
+
+  return mapActiveLocation(assignments[0]);
+}
+
 function mapWorkspaceSize(row) {
   return {
     size_id: row.size_id,
@@ -177,9 +297,35 @@ function mapWorkspaceSize(row) {
   };
 }
 
-async function listProducts() {
-  const rows = await findProductSummaries();
-  return rows.map(decorateProductSummary);
+async function listProducts(input = {}) {
+  const page = normalizePage(input.page);
+  const pageSize = normalizePageSize(input.pageSize);
+  const filterMode = normalizeFilterMode(input.filterMode);
+  const searchQuery = normalizeQuery(input.query);
+  const activeLocation = await resolveActiveLocationForUser(input.userId, input.locationId);
+  const rows = await findProductSummaries({
+    locationId: activeLocation ? activeLocation.location_id : null,
+    query: searchQuery,
+  });
+  const decoratedRows = rows.map(decorateProductSummary).filter((row) =>
+    matchesFilterMode(row, filterMode)
+  );
+  const totalItems = decoratedRows.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const items = decoratedRows.slice(startIndex, startIndex + pageSize);
+
+  return {
+    items,
+    active_location: activeLocation,
+    pagination: {
+      page: safePage,
+      page_size: pageSize,
+      total_items: totalItems,
+      total_pages: totalPages,
+    },
+  };
 }
 
 async function getProductWorkspace(styleId) {

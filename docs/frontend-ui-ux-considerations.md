@@ -2,6 +2,8 @@
 
 Guia rapida para decisiones visuales y de experiencia en RIPNEL.
 
+Este documento complementa a `docs/frontend-page-standard.md`. Cuando haya reglas sobre estructura de pagina, header principal o composicion de modulos, manda `frontend-page-standard.md`.
+
 ## Principios base
 
 - No explicar lo obvio: si el titulo, label o accion ya comunican la idea, no agregar parrafo descriptivo.
@@ -38,10 +40,11 @@ Guia rapida para decisiones visuales y de experiencia en RIPNEL.
 
 ## Copy
 
-- El header puede tener una linea breve solo si orienta la pantalla.
+- El header principal de pagina no debe llevar descripcion visible; para estructura de header, seguir `docs/frontend-page-standard.md`.
 - Las secciones no necesitan descripcion si sus filas ya explican el contenido.
 - Los detalles de fila se reservan para aclaraciones utiles, como el uso operativo de un campo.
 - Evitar frases tipo "Datos principales..." o "Configura aspectos..." cuando no agregan informacion nueva.
+- No duplicar la misma senal en `KPI + filtros + rango + tabla`; si la pantalla ya comunica el dato, no volver a narrarlo.
 
 ## Densidad y jerarquia
 
@@ -53,6 +56,7 @@ Guia rapida para decisiones visuales y de experiencia en RIPNEL.
 - Si una descripcion no cambia una decision o no evita un error, debe salir.
 - Evitar panel dentro de panel salvo que exista una razon operativa clara.
 - Cuando una accion es urgente o recurrente, evaluar primero topbar o franja superior antes que otro bloque dentro del contenido.
+- Si la tabla ya expresa una cantidad por paginacion o rango visible, no elevar ese mismo numero a un KPI salvo que resuma otra lectura.
 
 ## Tokens visuales
 

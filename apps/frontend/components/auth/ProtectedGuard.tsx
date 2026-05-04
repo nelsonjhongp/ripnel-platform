@@ -3,7 +3,7 @@
 import React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "./AuthProvider";
-import { LoadingPage } from "@/components/feedback/status-page";
+import { ProtectedLoadingPage } from "@/components/feedback/status-page";
 
 export function ProtectedGuard({ children }: { children: React.ReactNode }) {
   const { loading, user, sessionExpired } = useAuth();
@@ -29,7 +29,7 @@ export function ProtectedGuard({ children }: { children: React.ReactNode }) {
   }, [loading, user, router, pathname, sessionExpired]);
 
   if (loading) {
-    return <LoadingPage title="Validando sesión" description="Estamos confirmando tu acceso antes de abrir el módulo." />;
+    return <ProtectedLoadingPage title="Validando sesión" description="Estamos confirmando tu acceso antes de abrir el módulo." />;
   }
 
   if (!user) return null;

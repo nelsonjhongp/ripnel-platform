@@ -1,0 +1,1330 @@
+"use client";
+
+import Link from "next/link";
+import { Dialog as DialogPrimitive } from "radix-ui";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  Check,
+  ChevronDown,
+  LoaderCircle,
+  PencilLine,
+  Save,
+  ShoppingBag,
+  Sparkles,
+  X,
+} from "lucide-react";
+import { ApiEnvelope, apiFetch, unwrapApiData } from "@/lib/api";
+import { catalogPageBySlug, type CatalogFieldConfig } from "@/lib/product-master-metadata";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+
+type CatalogItem = {
+  [key: string]: unknown;
+  active?: boolean;
+  code?: string | null;
+  name?: string | null;
+  hex?: string | null;
+  sort_order?: number | null;
+};
+
+type CreatedStyle = {
+  style_id: string;
+  style_code: string | null;
+  name: string;
+};
+
+type ExistingStyle = {
+  style_id: string;
+  name: string;
+  style_code: string | null;
+};
+
+type FormState = {
+  name: string;
+  garment_type_id: string;
+  fabric_id: string;
+  fabric_detail_id: string;
+  target_id: string;
+  description: string;
+  size_ids: string[];
+  color_ids: string[];
+};
+
+type NameMode = "auto" | "manual";
+
+type CatalogPanelKey =
+  | "garmentTypes"
+  | "fabrics"
+  | "fabricDetails"
+  | "targets"
+  | "sizes"
+  | "colors";
+
+type CatalogPanelState = {
+  key: CatalogPanelKey;
+  values: Record<string, string>;
+} | null;
+
+type ConfirmationSummary = {
+  name: string;
+  garmentType: string;
+  fabric: string;
+  fabricDetail: string;
+  target: string;
+  description: string;
+  sizes: string[];
+  colors: Array<{ label: string; hex?: string | null }>;
+};
+
+type CatalogPanelDefinition = {
+  key: CatalogPanelKey;
+  slug: keyof typeof catalogPageBySlug;
+  title: string;
+  endpoint: string;
+  idKeys: string[];
+  multiSelect?: boolean;
+  colorMode?: boolean;
+};
+
+const initialFormState: FormState = {
+  name: "",
+  garment_type_id: "",
+  fabric_id: "",
+  fabric_detail_id: "",
+  target_id: "",
+  description: "",
+  size_ids: [],
+  color_ids: [],
+};
+
+const catalogPanelDefinitions: Record<CatalogPanelKey, CatalogPanelDefinition> = {
+  garmentTypes: {
+    key: "garmentTypes",
+    slug: "tipo-prenda",
+    title: "Nuevo tipo de prenda",
+    endpoint: "/api/garment-types",
+    idKeys: ["garment_type_id"],
+  },
+  fabrics: {
+    key: "fabrics",
+    slug: "telas",
+    title: "Nueva tela",
+    endpoint: "/api/fabrics",
+    idKeys: ["fabric_id"],
+  },
+  fabricDetails: {
+    key: "fabricDetails",
+    slug: "detalle-de-tela",
+    title: "Nuevo detalle de tela",
+    endpoint: "/api/fabric-details",
+    idKeys: ["fabric_detail_id"],
+  },
+  targets: {
+    key: "targets",
+    slug: "targets",
+    title: "Nuevo target",
+    endpoint: "/api/targets",
+    idKeys: ["target_id"],
+  },
+  sizes: {
+    key: "sizes",
+    slug: "tallas",
+    title: "Nueva talla",
+    endpoint: "/api/sizes",
+    idKeys: ["size_id"],
+    multiSelect: true,
+  },
+  colors: {
+    key: "colors",
+    slug: "colores",
+    title: "Nuevo color",
+    endpoint: "/api/colors",
+    idKeys: ["color_id"],
+    multiSelect: true,
+    colorMode: true,
+  },
+};
+
+function getItemId(item: CatalogItem, keys: string[]) {
+  for (const key of keys) {
+    const value = item[key];
+    if (value) {
+      return String(value);
+    }
+  }
+
+  return "";
+}
+
+function getCatalogItemLabel(item: CatalogItem) {
+  if (item.code) {
+    return `${item.code} - ${item.name || ""}`;
+  }
+
+  return String(item.name || "");
+}
+
+function getCatalogItemName(item: CatalogItem) {
+  return String(item.name || "");
+}
+
+function getSizeLabel(item: CatalogItem) {
+  return String(item.code || item.name || "");
+}
+
+function sortSizes(items: CatalogItem[]) {
+  return [...items].sort((left, right) => {
+    const leftOrder = Number(left.sort_order ?? 0);
+    const rightOrder = Number(right.sort_order ?? 0);
+
+    if (leftOrder !== rightOrder) {
+      return leftOrder - rightOrder;
+    }
+
+    return getSizeLabel(left).localeCompare(getSizeLabel(right));
+  });
+}
+
+function toggleId(ids: string[], id: string) {
+  return ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id];
+}
+
+function buildAutoName(parts: Array<string | null | undefined>) {
+  return parts
+    .map((part) => String(part || "").trim())
+    .filter(Boolean)
+    .join(" ");
+}
+
+function buildCatalogInitialValues(fields: CatalogFieldConfig[]) {
+  return Object.fromEntries(fields.map((field) => [field.key, ""])) as Record<string, string>;
+}
+
+function normalizeComparableText(value: string | null | undefined) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function orderCatalogFields(fields: CatalogFieldConfig[]) {
+  return [...fields].sort((left, right) => {
+    if (left.key === "name") {
+      return -1;
+    }
+
+    if (right.key === "name") {
+      return 1;
+    }
+
+    if (left.key === "code") {
+      return 1;
+    }
+
+    if (right.key === "code") {
+      return -1;
+    }
+
+    return 0;
+  });
+}
+
+async function requestData<T>(path: string, init?: RequestInit): Promise<T> {
+  const payload = await apiFetch<T | ApiEnvelope<T>>(path, {
+    cache: "no-store",
+    ...init,
+  });
+
+  return unwrapApiData(payload);
+}
+
+function FieldLabel({
+  children,
+  onCreate,
+}: {
+  children: React.ReactNode;
+  onCreate: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <label className="text-sm font-semibold text-[var(--ops-text)]">{children}</label>
+      <button
+        type="button"
+        onClick={onCreate}
+        className="cursor-pointer text-xs font-semibold text-[var(--ripnel-accent-hover)] transition hover:text-[var(--ripnel-accent)]"
+      >
+        Crear nuevo
+      </button>
+    </div>
+  );
+}
+
+function SelectedChip({
+  label,
+  onRemove,
+  hex,
+}: {
+  label: string;
+  onRemove: () => void;
+  hex?: string | null;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onRemove}
+      className="ops-metric-pill inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold transition hover:border-[color:var(--ripnel-accent)]"
+    >
+      <X className="h-3 w-3" />
+      {hex ? (
+        <span
+          className="h-3 w-3 rounded-full border border-[color:var(--ops-border-soft)]"
+          style={{ backgroundColor: hex }}
+        />
+      ) : null}
+      {label}
+    </button>
+  );
+}
+
+function MultiSelectCatalog({
+  label,
+  items,
+  selectedIds,
+  idKeys,
+  placeholder,
+  onToggle,
+  onCreate,
+  colorMode = false,
+}: {
+  label: string;
+  items: CatalogItem[];
+  selectedIds: string[];
+  idKeys: string[];
+  placeholder: string;
+  onToggle: (id: string) => void;
+  onCreate: () => void;
+  colorMode?: boolean;
+}) {
+  const selectedItems = items.filter((item) => selectedIds.includes(getItemId(item, idKeys)));
+  const triggerLabel = selectedIds.length
+    ? `${selectedIds.length} ${label.toLowerCase()} seleccionadas`
+    : placeholder;
+
+  return (
+    <section className="space-y-2">
+      <FieldLabel onCreate={onCreate}>{label}</FieldLabel>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="ops-surface flex h-10 w-full cursor-pointer items-center justify-between rounded-lg border px-3 text-left text-sm outline-none transition hover:bg-[var(--ops-surface-muted)] focus-visible:ring-2 focus-visible:ring-[color:color-mix(in_srgb,var(--ripnel-accent)_24%,transparent)]"
+          >
+            <span className={selectedIds.length ? "text-[var(--ops-text)]" : "text-[var(--ops-text-muted)]"}>
+              {triggerLabel}
+            </span>
+            <ChevronDown className="h-4 w-4 text-[var(--ops-text-muted)]" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="max-h-72 w-72 overflow-y-auto">
+          {items.map((item) => {
+            const id = getItemId(item, idKeys);
+            const checked = selectedIds.includes(id);
+
+            return (
+              <DropdownMenuCheckboxItem
+                key={id}
+                checked={checked}
+                onCheckedChange={() => onToggle(id)}
+                onSelect={(event) => event.preventDefault()}
+                className="cursor-pointer gap-2"
+              >
+                {colorMode ? (
+                  <span
+                    className="h-3.5 w-3.5 rounded-full border border-[color:var(--ops-border-soft)]"
+                    style={{ backgroundColor: item.hex || "#ffffff" }}
+                  />
+                ) : null}
+                <span>{colorMode ? getCatalogItemLabel(item) : getSizeLabel(item)}</span>
+              </DropdownMenuCheckboxItem>
+            );
+          })}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <div className="flex min-h-8 flex-wrap gap-1.5">
+        {selectedItems.length ? (
+          selectedItems.map((item) => {
+            const id = getItemId(item, idKeys);
+            return (
+              <SelectedChip
+                key={id}
+                label={colorMode ? getCatalogItemLabel(item) : getSizeLabel(item)}
+                hex={colorMode ? item.hex : null}
+                onRemove={() => onToggle(id)}
+              />
+            );
+          })
+        ) : (
+          <span className="text-xs text-[var(--ops-text-muted)]">
+            {colorMode ? "Sin colores: se usara UNICO si aplica." : "Selecciona al menos una talla."}
+          </span>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function ConfirmationDialog({
+  open,
+  onOpenChange,
+  summary,
+  submitting,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  summary: ConfirmationSummary | null;
+  submitting: boolean;
+  onConfirm: () => Promise<void>;
+}) {
+  if (!summary) {
+    return null;
+  }
+
+  return (
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/15 backdrop-blur-[2px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
+        <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,720px)] -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-5 shadow-xl outline-none data-open:animate-in data-open:zoom-in-95 data-closed:animate-out data-closed:zoom-out-95">
+          <div className="flex items-start justify-between gap-4 border-b border-[var(--ops-border-soft)] pb-4">
+            <div className="space-y-1">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--ripnel-accent-hover)]">
+                Confirmacion
+              </p>
+              <DialogPrimitive.Title className="text-xl font-semibold text-[var(--ops-text)]">
+                Revisar nuevo producto
+              </DialogPrimitive.Title>
+            </div>
+            <DialogPrimitive.Close asChild>
+              <Button type="button" variant="ghost" size="icon-sm" className="rounded-full">
+                <X className="h-4 w-4" />
+              </Button>
+            </DialogPrimitive.Close>
+          </div>
+
+          <div className="mt-4 space-y-4">
+            <div className="rounded-2xl border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
+                Nombre final
+              </p>
+              <p className="mt-2 text-lg font-semibold text-[var(--ops-text)]">{summary.name}</p>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-2xl border border-[var(--ops-border-soft)] px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
+                  Configuracion base
+                </p>
+                <div className="mt-3 space-y-2 text-sm text-[var(--ops-text)]">
+                  <p>Tipo: {summary.garmentType}</p>
+                  <p>Tela: {summary.fabric}</p>
+                  <p>Detalle: {summary.fabricDetail}</p>
+                  <p>Target: {summary.target}</p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[var(--ops-border-soft)] px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
+                  Configuracion comercial
+                </p>
+                <div className="mt-3 space-y-3 text-sm text-[var(--ops-text)]">
+                  <div>
+                    <p className="font-medium">Tallas</p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {summary.sizes.map((size) => (
+                        <span key={size} className="ops-metric-pill rounded-full px-2 py-0.5 text-[11px] font-semibold">
+                          {size}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="font-medium">Colores</p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {summary.colors.length ? (
+                        summary.colors.map((color) => (
+                          <span
+                            key={color.label}
+                            className="ops-metric-pill inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                          >
+                            {color.hex ? (
+                              <span
+                                className="h-3 w-3 rounded-full border border-[color:var(--ops-border-soft)]"
+                                style={{ backgroundColor: color.hex }}
+                              />
+                            ) : null}
+                            {color.label}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-[var(--ops-text-muted)]">UNICO si aplica</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {summary.description ? (
+              <div className="rounded-2xl border border-[var(--ops-border-soft)] px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
+                  Descripcion
+                </p>
+                <p className="mt-2 text-sm text-[var(--ops-text)]">{summary.description}</p>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <DialogPrimitive.Close asChild>
+              <Button type="button" variant="outline" className="rounded-full">
+                Cancelar
+              </Button>
+            </DialogPrimitive.Close>
+            <Button type="button" variant="accent" className="rounded-full" disabled={submitting} onClick={() => void onConfirm()}>
+              {submitting ? (
+                <>
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                  Creando...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4" />
+                  Confirmar creacion
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
+  );
+}
+
+export function ProductCreatePage() {
+  const [formState, setFormState] = useState<FormState>(initialFormState);
+  const [nameMode, setNameMode] = useState<NameMode>("auto");
+  const [garmentTypes, setGarmentTypes] = useState<CatalogItem[]>([]);
+  const [fabrics, setFabrics] = useState<CatalogItem[]>([]);
+  const [fabricDetails, setFabricDetails] = useState<CatalogItem[]>([]);
+  const [targets, setTargets] = useState<CatalogItem[]>([]);
+  const [sizes, setSizes] = useState<CatalogItem[]>([]);
+  const [colors, setColors] = useState<CatalogItem[]>([]);
+  const [existingStyles, setExistingStyles] = useState<ExistingStyle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [catalogSubmitting, setCatalogSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [createdStyle, setCreatedStyle] = useState<CreatedStyle | null>(null);
+  const [catalogPanel, setCatalogPanel] = useState<CatalogPanelState>(null);
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
+  const [pendingConfirmation, setPendingConfirmation] = useState<ConfirmationSummary | null>(null);
+
+  async function loadOptions() {
+    const [
+      garmentTypesData,
+      fabricsData,
+      fabricDetailsData,
+      targetsData,
+      sizesData,
+      colorsData,
+      stylesData,
+    ] = await Promise.all([
+      requestData<CatalogItem[]>("/api/garment-types"),
+      requestData<CatalogItem[]>("/api/fabrics"),
+      requestData<CatalogItem[]>("/api/fabric-details"),
+      requestData<CatalogItem[]>("/api/targets"),
+      requestData<CatalogItem[]>("/api/sizes"),
+      requestData<CatalogItem[]>("/api/colors"),
+      requestData<ExistingStyle[]>("/api/styles"),
+    ]);
+
+    setGarmentTypes(garmentTypesData.filter((item) => item.active !== false));
+    setFabrics(fabricsData.filter((item) => item.active !== false));
+    setFabricDetails(fabricDetailsData.filter((item) => item.active !== false));
+    setTargets(targetsData.filter((item) => item.active !== false));
+    setSizes(sortSizes(sizesData.filter((item) => item.active !== false)));
+    setColors(colorsData.filter((item) => item.active !== false));
+    setExistingStyles(stylesData);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        await loadOptions();
+      } catch (requestError) {
+        if (!cancelled) {
+          setError(
+            requestError instanceof Error
+              ? `No se pudo cargar catalogos: ${requestError.message}`
+              : "No se pudo cargar catalogos para crear el producto"
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedGarmentType = useMemo(
+    () => garmentTypes.find((item) => getItemId(item, ["garment_type_id"]) === formState.garment_type_id) || null,
+    [formState.garment_type_id, garmentTypes]
+  );
+  const selectedFabric = useMemo(
+    () => fabrics.find((item) => getItemId(item, ["fabric_id"]) === formState.fabric_id) || null,
+    [fabrics, formState.fabric_id]
+  );
+  const selectedFabricDetail = useMemo(
+    () =>
+      fabricDetails.find((item) => getItemId(item, ["fabric_detail_id"]) === formState.fabric_detail_id) || null,
+    [fabricDetails, formState.fabric_detail_id]
+  );
+  const selectedTarget = useMemo(
+    () => targets.find((item) => getItemId(item, ["target_id"]) === formState.target_id) || null,
+    [formState.target_id, targets]
+  );
+
+  useEffect(() => {
+    if (!targets.length || formState.target_id) {
+      return;
+    }
+
+    const mujerTarget = targets.find((item) => String(item.name || "").trim().toLowerCase() === "mujer");
+    if (mujerTarget) {
+      setFormState((current) => ({
+        ...current,
+        target_id: getItemId(mujerTarget, ["target_id"]),
+      }));
+    }
+  }, [formState.target_id, targets]);
+
+  useEffect(() => {
+    if (nameMode !== "auto") {
+      return;
+    }
+
+    const nextName = buildAutoName([
+      getCatalogItemName(selectedGarmentType || {}),
+      getCatalogItemName(selectedFabric || {}),
+      getCatalogItemName(selectedFabricDetail || {}),
+    ]);
+
+    setFormState((current) => ({
+      ...current,
+      name: nextName,
+    }));
+  }, [nameMode, selectedFabric, selectedFabricDetail, selectedGarmentType]);
+
+  const confirmationSummary = useMemo<ConfirmationSummary | null>(() => {
+    if (!formState.name.trim() || !formState.garment_type_id || !formState.size_ids.length) {
+      return null;
+    }
+
+    const sizeLabels = sizes
+      .filter((item) => formState.size_ids.includes(getItemId(item, ["size_id"])))
+      .map((item) => getSizeLabel(item));
+    const colorItems = colors.filter((item) => formState.color_ids.includes(getItemId(item, ["color_id"])));
+
+    return {
+      name: formState.name.trim(),
+      garmentType: getCatalogItemName(selectedGarmentType || {}) || "-",
+      fabric: getCatalogItemName(selectedFabric || {}) || "Sin tela",
+      fabricDetail: getCatalogItemName(selectedFabricDetail || {}) || "Sin detalle",
+      target: getCatalogItemName(selectedTarget || {}) || "Sin target",
+      description: formState.description.trim(),
+      sizes: sizeLabels,
+      colors: colorItems.map((item) => ({
+        label: getCatalogItemLabel(item),
+        hex: item.hex,
+      })),
+    };
+  }, [
+    colors,
+    formState.color_ids,
+    formState.description,
+    formState.garment_type_id,
+    formState.name,
+    formState.size_ids,
+    selectedFabric,
+    selectedFabricDetail,
+    selectedGarmentType,
+    selectedTarget,
+    sizes,
+  ]);
+
+  const normalizedCurrentName = normalizeComparableText(formState.name);
+  const duplicatedStyle = useMemo(
+    () =>
+      existingStyles.find(
+        (style) => normalizeComparableText(style.name) === normalizedCurrentName
+      ) || null,
+    [existingStyles, normalizedCurrentName]
+  );
+
+  async function handleCreateProduct() {
+    setSubmitting(true);
+    setError(null);
+    setCreatedStyle(null);
+
+    try {
+      const style = await requestData<CreatedStyle>("/api/styles", {
+        method: "POST",
+        body: JSON.stringify({
+          name: formState.name.trim(),
+          garment_type_id: formState.garment_type_id,
+          fabric_id: formState.fabric_id || null,
+          fabric_detail_id: formState.fabric_detail_id || null,
+          target_id: formState.target_id || null,
+          description: formState.description.trim() || null,
+          active: true,
+        }),
+      });
+
+      await requestData(`/api/variants/styles/${style.style_id}/config`, {
+        method: "PUT",
+        body: JSON.stringify({
+          size_ids: formState.size_ids,
+          color_ids: formState.color_ids,
+        }),
+      });
+
+      await requestData(`/api/variants/styles/${style.style_id}/generate`, {
+        method: "POST",
+      });
+
+      setCreatedStyle(style);
+      setFormState(initialFormState);
+      setNameMode("auto");
+      setPendingConfirmation(null);
+      setConfirmationOpen(false);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo crear el producto"
+      );
+      setConfirmationOpen(false);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  event.preventDefault();
+  setError(null);
+
+  if (duplicatedStyle) {
+    setError("Ya existe un style con ese nombre. Ajusta el nombre antes de crear.");
+    return;
+  }
+
+  if (!confirmationSummary) {
+    return;
+  }
+
+    setPendingConfirmation(confirmationSummary);
+    setConfirmationOpen(true);
+  }
+
+  function openCatalogPanel(key: CatalogPanelKey) {
+    const definition = catalogPanelDefinitions[key];
+    const metadata = catalogPageBySlug[definition.slug];
+
+    setCatalogError(null);
+    setCatalogPanel({
+      key,
+      values: buildCatalogInitialValues(metadata.fields),
+    });
+  }
+
+  async function refreshCatalogByKey(key: CatalogPanelKey) {
+    const definition = catalogPanelDefinitions[key];
+    const items = await requestData<CatalogItem[]>(definition.endpoint);
+    const filteredItems = items.filter((item) => item.active !== false);
+
+    if (key === "garmentTypes") {
+      setGarmentTypes(filteredItems);
+      return filteredItems;
+    }
+
+    if (key === "fabrics") {
+      setFabrics(filteredItems);
+      return filteredItems;
+    }
+
+    if (key === "fabricDetails") {
+      setFabricDetails(filteredItems);
+      return filteredItems;
+    }
+
+    if (key === "targets") {
+      setTargets(filteredItems);
+      return filteredItems;
+    }
+
+    if (key === "sizes") {
+      const ordered = sortSizes(filteredItems);
+      setSizes(ordered);
+      return ordered;
+    }
+
+    setColors(filteredItems);
+    return filteredItems;
+  }
+
+async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
+  event.preventDefault();
+  if (!catalogPanel) {
+    return;
+  }
+
+  if (hasCatalogNameDuplicate) {
+    setCatalogError("Ya existe un registro con ese nombre.");
+    return;
+  }
+
+  const definition = catalogPanelDefinitions[catalogPanel.key];
+  setCatalogSubmitting(true);
+    setCatalogError(null);
+
+    try {
+      const createdItem = await requestData<CatalogItem>(definition.endpoint, {
+        method: "POST",
+        body: JSON.stringify(
+          Object.fromEntries(
+            Object.entries(catalogPanel.values).map(([key, value]) => [key, value.trim()])
+          )
+        ),
+      });
+
+      await refreshCatalogByKey(catalogPanel.key);
+      const createdId = getItemId(createdItem, definition.idKeys);
+
+      setFormState((current) => {
+        if (definition.key === "garmentTypes") {
+          return { ...current, garment_type_id: createdId };
+        }
+        if (definition.key === "fabrics") {
+          return { ...current, fabric_id: createdId };
+        }
+        if (definition.key === "fabricDetails") {
+          return { ...current, fabric_detail_id: createdId };
+        }
+        if (definition.key === "targets") {
+          return { ...current, target_id: createdId };
+        }
+        if (definition.key === "sizes") {
+          return { ...current, size_ids: toggleId(current.size_ids, createdId) };
+        }
+        return { ...current, color_ids: toggleId(current.color_ids, createdId) };
+      });
+
+      setCatalogPanel(null);
+    } catch (requestError) {
+      setCatalogError(
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo crear el registro"
+      );
+    } finally {
+      setCatalogSubmitting(false);
+    }
+  }
+
+  const activeCatalogDefinition = catalogPanel
+    ? catalogPanelDefinitions[catalogPanel.key]
+    : null;
+  const activeCatalogMetadata = activeCatalogDefinition
+    ? catalogPageBySlug[activeCatalogDefinition.slug]
+    : null;
+  const activeCatalogItems = useMemo(() => {
+    if (!catalogPanel) {
+      return [];
+    }
+
+    if (catalogPanel.key === "garmentTypes") {
+      return garmentTypes;
+    }
+
+    if (catalogPanel.key === "fabrics") {
+      return fabrics;
+    }
+
+    if (catalogPanel.key === "fabricDetails") {
+      return fabricDetails;
+    }
+
+    if (catalogPanel.key === "targets") {
+      return targets;
+    }
+
+    if (catalogPanel.key === "sizes") {
+      return sizes;
+    }
+
+    return colors;
+  }, [catalogPanel, colors, fabricDetails, fabrics, garmentTypes, sizes, targets]);
+  const normalizedCatalogName = normalizeComparableText(catalogPanel?.values.name || "");
+  const hasCatalogNameDuplicate = useMemo(() => {
+    if (!catalogPanel || !normalizedCatalogName || catalogPanel.key === "sizes") {
+      return false;
+    }
+
+    return activeCatalogItems.some(
+      (item) => normalizeComparableText(String(item.name || "")) === normalizedCatalogName
+    );
+  }, [activeCatalogItems, catalogPanel, normalizedCatalogName]);
+
+  return (
+    <>
+      <section className="ops-page min-h-screen p-4 md:p-5">
+        <div className="mx-auto flex max-w-5xl flex-col gap-4">
+          <header className="flex flex-col gap-3 border-b border-[color:var(--ops-border-soft)] pb-4 md:flex-row md:items-end md:justify-between">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--ripnel-accent-hover)]">
+                Productos
+              </p>
+              <h1 className="ops-title mt-1 text-2xl font-semibold">Nuevo producto</h1>
+            </div>
+
+            <Button asChild variant="outline" size="sm" className="rounded-lg">
+              <Link href="/productos">Ver resumen</Link>
+            </Button>
+          </header>
+
+          {error ? (
+            <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
+              {error}
+            </div>
+          ) : null}
+
+          {createdStyle ? (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
+                    {createdStyle.name}
+                  </p>
+                  <p className="mt-1 text-xs text-emerald-800 dark:text-emerald-300">
+                    Codigo {createdStyle.style_code || "-"}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button asChild variant="outline" size="sm" className="rounded-lg">
+                    <Link href={`/productos/variantes?style_id=${encodeURIComponent(createdStyle.style_id)}`}>
+                      Variantes
+                    </Link>
+                  </Button>
+                  <Button asChild variant="accent" size="sm" className="rounded-lg">
+                    <Link href={`/precios/crear-y-editar-precio?style_id=${encodeURIComponent(createdStyle.style_id)}`}>
+                      Precios
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="border-b border-[color:var(--ops-border-soft)] pb-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-[var(--ops-text)]">Nombre</label>
+                  <div className="relative">
+                    <Input
+                      value={formState.name}
+                      onChange={(event) =>
+                        setFormState((current) => ({ ...current, name: event.target.value }))
+                      }
+                      placeholder="Se completara automaticamente"
+                      className={cn(
+                        "ops-surface h-10 rounded-lg border pr-11",
+                        nameMode === "auto" && "bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]"
+                      )}
+                      required
+                      readOnly={nameMode === "auto"}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setNameMode("manual")}
+                      className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-[var(--ops-border-soft)] bg-[var(--ops-surface)] text-[var(--ops-text-muted)] transition hover:border-[color:var(--ripnel-accent)] hover:text-[var(--ops-text)]"
+                      aria-label="Editar nombre"
+                    >
+                      <PencilLine className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="text-[var(--ops-text-muted)]">
+                      El codigo se genera automaticamente al crear.
+                    </span>
+                    {duplicatedStyle ? (
+                      <span className="font-medium text-amber-700">
+                        Ya existe un style con este nombre.
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <FieldLabel onCreate={() => openCatalogPanel("garmentTypes")}>Tipo de prenda</FieldLabel>
+                  <select
+                    value={formState.garment_type_id}
+                    onChange={(event) =>
+                      setFormState((current) => ({
+                        ...current,
+                        garment_type_id: event.target.value,
+                      }))
+                    }
+                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none"
+                    required
+                  >
+                    <option value="">Seleccionar</option>
+                    {garmentTypes.map((item) => {
+                      const id = getItemId(item, ["garment_type_id"]);
+                      return (
+                        <option key={id} value={id}>
+                          {getCatalogItemLabel(item)}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <FieldLabel onCreate={() => openCatalogPanel("fabrics")}>Tela</FieldLabel>
+                  <select
+                    value={formState.fabric_id}
+                    onChange={(event) =>
+                      setFormState((current) => ({ ...current, fabric_id: event.target.value }))
+                    }
+                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none"
+                  >
+                    <option value="">Sin tela</option>
+                    {fabrics.map((item) => {
+                      const id = getItemId(item, ["fabric_id"]);
+                      return (
+                        <option key={id} value={id}>
+                          {getCatalogItemLabel(item)}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <FieldLabel onCreate={() => openCatalogPanel("fabricDetails")}>Detalle</FieldLabel>
+                  <select
+                    value={formState.fabric_detail_id}
+                    onChange={(event) =>
+                      setFormState((current) => ({
+                        ...current,
+                        fabric_detail_id: event.target.value,
+                      }))
+                    }
+                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none"
+                  >
+                    <option value="">Sin detalle</option>
+                    {fabricDetails.map((item) => {
+                      const id = getItemId(item, ["fabric_detail_id"]);
+                      return (
+                        <option key={id} value={id}>
+                          {getCatalogItemLabel(item)}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <FieldLabel onCreate={() => openCatalogPanel("targets")}>Target</FieldLabel>
+                  <select
+                    value={formState.target_id}
+                    onChange={(event) =>
+                      setFormState((current) => ({ ...current, target_id: event.target.value }))
+                    }
+                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none"
+                  >
+                    <option value="">Sin target</option>
+                    {targets.map((item) => {
+                      const id = getItemId(item, ["target_id"]);
+                      return (
+                        <option key={id} value={id}>
+                          {getCatalogItemName(item)}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-[var(--ops-text)]">Descripcion</label>
+                  <Input
+                    value={formState.description}
+                    onChange={(event) =>
+                      setFormState((current) => ({
+                        ...current,
+                        description: event.target.value,
+                      }))
+                    }
+                    placeholder="Opcional"
+                    className="ops-surface h-10 rounded-lg border"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <MultiSelectCatalog
+                label="Tallas"
+                items={sizes}
+                selectedIds={formState.size_ids}
+                idKeys={["size_id"]}
+                placeholder="Seleccionar tallas"
+                onCreate={() => openCatalogPanel("sizes")}
+                onToggle={(id) =>
+                  setFormState((current) => ({
+                    ...current,
+                    size_ids: toggleId(current.size_ids, id),
+                  }))
+                }
+              />
+
+              <MultiSelectCatalog
+                label="Colores"
+                items={colors}
+                selectedIds={formState.color_ids}
+                idKeys={["color_id"]}
+                placeholder="Seleccionar colores"
+                colorMode
+                onCreate={() => openCatalogPanel("colors")}
+                onToggle={(id) =>
+                  setFormState((current) => ({
+                    ...current,
+                    color_ids: toggleId(current.color_ids, id),
+                  }))
+                }
+              />
+            </div>
+
+            <div className="flex flex-col gap-3 border-t border-[color:var(--ops-border-soft)] pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--ops-text-muted)]">
+                <span>{loading ? "Cargando catalogos..." : `${formState.size_ids.length} tallas seleccionadas`}</span>
+                <span>·</span>
+                <span>{`${formState.color_ids.length} colores seleccionados`}</span>
+              </div>
+              <Button
+                type="submit"
+                variant="accent"
+                className="rounded-lg"
+                disabled={
+                  loading ||
+                  submitting ||
+                  !formState.size_ids.length ||
+                  !formState.name.trim() ||
+                  !formState.garment_type_id ||
+                  Boolean(duplicatedStyle)
+                }
+              >
+                <Save className="h-4 w-4" />
+                Crear producto
+              </Button>
+            </div>
+          </form>
+
+          {!loading && !sizes.length ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
+              Carga tallas en catalogos antes de crear productos.
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      <Sheet
+        open={Boolean(catalogPanel)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCatalogPanel(null);
+            setCatalogError(null);
+          }
+        }}
+      >
+        <SheetContent side="right" className="w-full border-l border-[var(--ops-border-strong)] bg-[var(--ops-surface)] sm:max-w-xl">
+          {catalogPanel && activeCatalogDefinition && activeCatalogMetadata ? (
+            <>
+              <SheetHeader className="border-b border-[var(--ops-border-soft)]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--ripnel-accent-hover)]">
+                  Catalogo rapido
+                </p>
+                <SheetTitle className="text-xl font-semibold text-[var(--ops-text)]">
+                  {activeCatalogDefinition.title}
+                </SheetTitle>
+                <SheetDescription className="text-sm text-[var(--ops-text-muted)]">
+                  Completa el alta sin salir del borrador actual del producto.
+                </SheetDescription>
+              </SheetHeader>
+
+              <form onSubmit={handleCatalogCreate} className="flex h-full flex-col">
+                <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+                  <div className="rounded-2xl border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-4 py-3">
+                    <div className="flex items-start gap-3">
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--ops-border-soft)] bg-[var(--ops-surface)] text-[var(--ripnel-accent-hover)]">
+                        <ShoppingBag className="h-4 w-4" />
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--ops-text)]">
+                          {activeCatalogMetadata.label}
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-[var(--ops-text-muted)]">
+                          {activeCatalogMetadata.createDescription}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {orderCatalogFields(activeCatalogMetadata.fields).map((field) => {
+                    const value = catalogPanel.values[field.key] || "";
+
+                    return (
+                      <div key={field.key} className="space-y-1.5">
+                        <label className="text-sm font-semibold text-[var(--ops-text)]">
+                          {field.label}
+                        </label>
+                        {field.type === "textarea" ? (
+                          <textarea
+                            value={value}
+                            onChange={(event) =>
+                              setCatalogPanel((current) =>
+                                current
+                                  ? {
+                                      ...current,
+                                      values: {
+                                        ...current.values,
+                                        [field.key]: event.target.value,
+                                      },
+                                    }
+                                  : current
+                              )
+                            }
+                            placeholder={field.placeholder}
+                            className="ops-surface min-h-24 w-full rounded-lg border px-3 py-2.5 text-sm outline-none"
+                          />
+                        ) : (
+                          <Input
+                            type={field.type === "number" ? "number" : "text"}
+                            value={value}
+                            onChange={(event) =>
+                              setCatalogPanel((current) =>
+                                current
+                                  ? {
+                                      ...current,
+                                      values: {
+                                        ...current.values,
+                                        [field.key]: event.target.value,
+                                      },
+                                    }
+                                  : current
+                              )
+                            }
+                            placeholder={field.placeholder}
+                            className="h-10 rounded-lg"
+                          />
+                        )}
+                        {field.helper ? (
+                          <p className="text-xs text-[var(--ops-text-muted)]">{field.helper}</p>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+
+                  {catalogError ? (
+                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                      {catalogError}
+                    </div>
+                  ) : null}
+
+                  {hasCatalogNameDuplicate ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                      Ya existe un registro con ese nombre. Cambia el nombre antes de guardar.
+                    </div>
+                  ) : null}
+                </div>
+
+                <SheetFooter className="border-t border-[var(--ops-border-soft)] bg-[var(--ops-surface)]">
+                  <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <Button type="button" variant="outline" className="rounded-full" onClick={() => setCatalogPanel(null)}>
+                      Volver
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant="accent"
+                      className="rounded-full"
+                      disabled={catalogSubmitting || hasCatalogNameDuplicate}
+                    >
+                      {catalogSubmitting ? (
+                        <>
+                          <LoaderCircle className="h-4 w-4 animate-spin" />
+                          Guardando...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="h-4 w-4" />
+                          Guardar y volver
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </SheetFooter>
+              </form>
+            </>
+          ) : null}
+        </SheetContent>
+      </Sheet>
+
+      <ConfirmationDialog
+        open={confirmationOpen}
+        onOpenChange={setConfirmationOpen}
+        summary={pendingConfirmation}
+        submitting={submitting}
+        onConfirm={handleCreateProduct}
+      />
+    </>
+  );
+}
