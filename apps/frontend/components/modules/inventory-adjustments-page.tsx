@@ -2,17 +2,27 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
-  Boxes,
-  ClipboardList,
   Eye,
   LoaderCircle,
   MapPin,
   PackagePlus,
+  RefreshCw,
+  RotateCcw,
   Search,
   SquareCheckBig,
   Trash2,
   X,
 } from "lucide-react";
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/ui/pagination";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { buildApiUrl } from "@/lib/api";
 
 type ApiResponse<T> = {
@@ -168,6 +178,7 @@ export function InventoryAdjustmentsPage() {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | AdjustmentStatus>("all");
   const [locationFilter, setLocationFilter] = useState("all");
+  const [page, setPage] = useState(1);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [savingAdjustment, setSavingAdjustment] = useState(false);
@@ -302,6 +313,10 @@ export function InventoryAdjustmentsPage() {
     });
   }, [adjustments, locationFilter, query, statusFilter]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [query, statusFilter, locationFilter]);
+
   const totals = useMemo(() => {
     return {
       total: adjustments.length,
@@ -310,6 +325,22 @@ export function InventoryAdjustmentsPage() {
         .length,
     };
   }, [adjustments]);
+  const totalPages = Math.max(1, Math.ceil(filteredAdjustments.length / 10));
+  const safePage = Math.min(page, totalPages);
+  const pageStart = (safePage - 1) * 10;
+  const paginatedAdjustments = filteredAdjustments.slice(pageStart, pageStart + 10);
+  const visibleFrom = filteredAdjustments.length ? pageStart + 1 : 0;
+  const visibleTo = filteredAdjustments.length
+    ? Math.min(pageStart + 10, filteredAdjustments.length)
+    : 0;
+  const hasActiveFilters =
+    Boolean(query.trim()) || statusFilter !== "all" || locationFilter !== "all";
+
+  useEffect(() => {
+    if (page !== safePage) {
+      setPage(safePage);
+    }
+  }, [page, safePage]);
 
   const filteredVariantResults = useMemo(() => {
     return variantResults.filter(
@@ -522,224 +553,227 @@ export function InventoryAdjustmentsPage() {
   }
 
   return (
-    <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
-      <div className="mx-auto max-w-7xl space-y-5">
-        <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
-          <p className="text-xs uppercase tracking-wide text-violet-600">
-            Apertura y regularizacion
-          </p>
-          <div className="mt-1 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 md:text-3xl">
-                Apertura y ajustes
-              </h1>
-              <p className="mt-1 text-sm text-slate-600">
-                Crea borradores de conteo, confirma ajustes y deja trazabilidad
-                real en inventario y kardex.
-              </p>
+    <TooltipProvider delayDuration={120}>
+      <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
+        <div className="mx-auto flex max-w-[1180px] flex-col gap-4">
+          <PosHeader
+            eyebrow="Apertura y regularizacion"
+            title="Ajustes de inventario"
+            actions={
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => {
+                    void loadAdjustments();
+                    void loadLocations();
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Actualizar
+                </Button>
+                <Button
+                  type="button"
+                  variant="accent"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={openCreateModal}
+                >
+                  <PackagePlus className="h-4 w-4" />
+                  Nuevo ajuste
+                </Button>
+              </div>
+            }
+          />
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="ops-metric-pill inline-flex rounded-full px-3 py-2 text-sm font-semibold">
+              Total: {totals.total}
+            </span>
+            <span className="ops-metric-pill inline-flex rounded-full px-3 py-2 text-sm font-semibold">
+              Borradores: {totals.drafts}
+            </span>
+            <span className="ops-metric-pill inline-flex rounded-full px-3 py-2 text-sm font-semibold">
+              Confirmados: {totals.confirmed}
+            </span>
+          </div>
+
+          <div className="space-y-4 border-t border-[var(--ops-border-strong)] pt-4">
+            <div className="grid gap-2.5 lg:grid-cols-[1.4fr_0.9fr_0.8fr_auto] lg:items-end">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
+                <Input
+                  type="text"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Buscar por numero, sede, motivo o usuario"
+                  className="ops-surface h-10 rounded-lg border py-2 pl-9 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                  Sede
+                </label>
+                <select
+                  value={locationFilter}
+                  onChange={(event) => setLocationFilter(event.target.value)}
+                  className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none transition hover:bg-[var(--ops-surface-muted)]"
+                >
+                  <option value="all">Todas</option>
+                  {locations.map((location) => (
+                    <option key={location.location_id} value={location.location_id}>
+                      {location.code} - {location.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                  Estado
+                </label>
+                <select
+                  value={statusFilter}
+                  onChange={(event) =>
+                    setStatusFilter(event.target.value as "all" | AdjustmentStatus)
+                  }
+                  className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none transition hover:bg-[var(--ops-surface-muted)]"
+                >
+                  <option value="all">Todos</option>
+                  <option value="draft">Borrador</option>
+                  <option value="confirmed">Confirmado</option>
+                  <option value="cancelled">Cancelado</option>
+                </select>
+              </div>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    className="h-10 w-10 self-start rounded-lg lg:self-end"
+                    onClick={() => {
+                      setQuery("");
+                      setStatusFilter("all");
+                      setLocationFilter("all");
+                    }}
+                    disabled={!hasActiveFilters}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Limpiar filtros</TooltipContent>
+              </Tooltip>
             </div>
 
-            <button
-              type="button"
-              onClick={openCreateModal}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-            >
-              <PackagePlus className="h-4 w-4" />
-              Nuevo ajuste
-            </button>
-          </div>
-        </header>
+            {error ? (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {error}
+              </div>
+            ) : null}
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-wide text-slate-500">
-              Total ajustes
-            </p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">{totals.total}</p>
-          </article>
-          <article className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-wide text-amber-700">
-              Borradores
-            </p>
-            <p className="mt-2 text-2xl font-bold text-amber-800">{totals.drafts}</p>
-          </article>
-          <article className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-wide text-emerald-700">
-              Confirmados
-            </p>
-            <p className="mt-2 text-2xl font-bold text-emerald-800">{totals.confirmed}</p>
-          </article>
-        </div>
+            {notice ? (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                {notice}
+              </div>
+            ) : null}
 
-        <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
-          <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-center">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar por numero, sede, motivo o usuario"
-                className="w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+            <div className="overflow-x-auto">
+              <div className="min-w-[980px] border-y border-[var(--ops-border-strong)]">
+                <div className="grid grid-cols-[1fr_1fr_0.8fr_1fr_90px_1fr_130px] gap-3 bg-[var(--ops-surface-muted)] px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                  <span>Numero</span>
+                  <span>Sede</span>
+                  <span>Estado</span>
+                  <span>Motivo</span>
+                  <span className="text-right">Lineas</span>
+                  <span>Creado</span>
+                  <span className="text-right">Acciones</span>
+                </div>
+
+                <div className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                  {loadingAdjustments || loadingLocations ? (
+                    <div className="ops-text-muted flex min-h-56 items-center justify-center px-4 py-10 text-sm">
+                      <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
+                      Cargando ajustes...
+                    </div>
+                  ) : paginatedAdjustments.length ? (
+                    paginatedAdjustments.map((adjustment) => (
+                      <article
+                        key={adjustment.adjustment_id}
+                        className="grid grid-cols-[1fr_1fr_0.8fr_1fr_90px_1fr_130px] gap-3 px-4 py-[var(--ops-row-py)] transition-colors hover:bg-[var(--ops-surface-muted)]"
+                      >
+                        <div className="text-sm font-semibold text-[var(--ops-text)]">
+                          {adjustment.adjustment_number}
+                        </div>
+                        <div className="text-sm text-[var(--ops-text)]">
+                          <span className="inline-flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />
+                            {adjustment.location_name}
+                          </span>
+                          <p className="text-[11px] text-[var(--ops-text-muted)]">{adjustment.location_code}</p>
+                        </div>
+                        <div>
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusClasses(
+                              adjustment.status
+                            )}`}
+                          >
+                            {formatStatus(adjustment.status)}
+                          </span>
+                        </div>
+                        <div className="truncate text-sm text-[var(--ops-text)]">
+                          {adjustment.reason || "Sin motivo"}
+                        </div>
+                        <div className="text-right text-sm font-semibold text-[var(--ops-text)]">
+                          {adjustment.line_count}
+                        </div>
+                        <div className="text-sm text-[var(--ops-text)]">
+                          {formatDateTime(adjustment.created_at)}
+                          <p className="text-[11px] text-[var(--ops-text-muted)]">
+                            {adjustment.created_by_name || "Sistema"}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="rounded-full"
+                            onClick={() => void openDetail(adjustment.adjustment_id)}
+                          >
+                            <Eye className="h-4 w-4" />
+                            Ver detalle
+                          </Button>
+                        </div>
+                      </article>
+                    ))
+                  ) : (
+                    <div className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                      No hay ajustes para los filtros actuales.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between">
+              <span className="ops-secondary-text text-[var(--ops-text-muted)]">
+                {filteredAdjustments.length
+                  ? `${visibleFrom}-${visibleTo} de ${filteredAdjustments.length}`
+                  : "0 resultados"}
+              </span>
+              <Pagination
+                page={safePage}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                className="self-end md:self-auto"
               />
             </div>
-
-            <select
-              value={locationFilter}
-              onChange={(event) => setLocationFilter(event.target.value)}
-              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-            >
-              <option value="all">Todas las sedes</option>
-              {locations.map((location) => (
-                <option key={location.location_id} value={location.location_id}>
-                  {location.code} - {location.name}
-                </option>
-              ))}
-            </select>
-
-            <div className="flex flex-wrap gap-2">
-              {(["all", "draft", "confirmed", "cancelled"] as const).map((status) => (
-                <button
-                  key={status}
-                  type="button"
-                  onClick={() => setStatusFilter(status)}
-                  className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
-                    statusFilter === status
-                      ? "border-violet-400 bg-violet-100 text-violet-700"
-                      : "border-slate-300 bg-white text-slate-700 hover:border-slate-400"
-                  }`}
-                >
-                  {status === "all" ? "Todos" : formatStatus(status)}
-                </button>
-              ))}
-            </div>
           </div>
-
-          {error ? (
-            <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {error}
-            </div>
-          ) : null}
-
-          {notice ? (
-            <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-              {notice}
-            </div>
-          ) : null}
-
-          {loadingAdjustments || loadingLocations ? (
-            <div className="mt-5 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-sm text-slate-500">
-              <LoaderCircle className="h-4 w-4 animate-spin" />
-              Cargando ajustes...
-            </div>
-          ) : (
-            <div className="mt-5 overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Numero
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Sede
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Estado
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Motivo
-                    </th>
-                    <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Lineas
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Creado
-                    </th>
-                    <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Acciones
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 bg-white">
-                  {filteredAdjustments.map((adjustment) => (
-                    <tr key={adjustment.adjustment_id} className="hover:bg-slate-50">
-                      <td className="px-3 py-3 text-sm font-semibold text-slate-900">
-                        {adjustment.adjustment_number}
-                      </td>
-                      <td className="px-3 py-3 text-sm text-slate-600">
-                        <span className="inline-flex items-center gap-2">
-                          <MapPin className="h-4 w-4 text-violet-500" />
-                          {adjustment.location_name}
-                        </span>
-                        <p className="text-xs text-slate-500">{adjustment.location_code}</p>
-                      </td>
-                      <td className="px-3 py-3 text-sm">
-                        <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusClasses(
-                            adjustment.status
-                          )}`}
-                        >
-                          {formatStatus(adjustment.status)}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-sm text-slate-600">
-                        {adjustment.reason || "Sin motivo"}
-                      </td>
-                      <td className="px-3 py-3 text-right text-sm font-semibold text-slate-800">
-                        {adjustment.line_count}
-                      </td>
-                      <td className="px-3 py-3 text-sm text-slate-600">
-                        {formatDateTime(adjustment.created_at)}
-                        <p className="text-xs text-slate-500">
-                          {adjustment.created_by_name || "Sistema"}
-                        </p>
-                      </td>
-                      <td className="px-3 py-3 text-right text-sm">
-                        <button
-                          type="button"
-                          onClick={() => void openDetail(adjustment.adjustment_id)}
-                          className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
-                        >
-                          <Eye className="h-4 w-4" />
-                          Ver detalle
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {!loadingAdjustments && !filteredAdjustments.length ? (
-            <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-              No hay ajustes para los filtros actuales.
-            </div>
-          ) : null}
-        </article>
-
-        <div className="grid gap-4 xl:grid-cols-2">
-          <article className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
-            <p className="flex items-center gap-2 text-sm font-semibold text-violet-700">
-              <Boxes className="h-4 w-4" />
-              Apertura inicial
-            </p>
-            <p className="mt-2 text-sm text-violet-800">
-              Si una variante existe pero aun no tuvo stock en una sede, aqui se
-              puede registrar el conteo inicial con <code>system_qty = 0</code>.
-            </p>
-          </article>
-
-          <article className="rounded-2xl border border-slate-200 bg-white p-4">
-            <p className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-              <ClipboardList className="h-4 w-4" />
-              Regla operativa
-            </p>
-            <p className="mt-2 text-sm text-slate-600">
-              Guardar un borrador no toca stock. El cambio recien impacta
-              inventario y kardex cuando el ajuste se confirma.
-            </p>
-          </article>
         </div>
 
         {createOpen ? (
@@ -1179,7 +1213,7 @@ export function InventoryAdjustmentsPage() {
             </div>
           </div>
         ) : null}
-      </div>
     </section>
+    </TooltipProvider>
   );
 }

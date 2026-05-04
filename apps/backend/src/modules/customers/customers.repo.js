@@ -16,10 +16,12 @@ async function findAllCustomers({ documentType, sort, q }) {
       `(
         COALESCE(c.internal_code, '') ILIKE $${index}
         OR
-        c.full_name ILIKE $${index}
+        COALESCE(c.full_name, '') ILIKE $${index}
         OR COALESCE(c.business_name, '') ILIKE $${index}
         OR COALESCE(c.commercial_name, '') ILIKE $${index}
         OR COALESCE(c.document_number, '') ILIKE $${index}
+        OR COALESCE(c.email, '') ILIKE $${index}
+        OR COALESCE(c.phone, '') ILIKE $${index}
       )`
     );
   }

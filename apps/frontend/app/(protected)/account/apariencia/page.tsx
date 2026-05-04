@@ -29,7 +29,6 @@ export default function AccountAppearancePage() {
       backHref="/account"
       backLabel="Volver a perfil"
       title="Apariencia"
-      description="Tema visual."
     >
       <PanelSection title="Apariencia" icon={Palette}>
         <SelectRow

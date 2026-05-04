@@ -2,7 +2,14 @@ const { listProducts, getProductWorkspace } = require('./products.service');
 
 async function getProducts(req, res, next) {
   try {
-    const products = await listProducts();
+    const products = await listProducts({
+      userId: req.auth?.sub,
+      locationId: req.query?.location_id,
+      page: req.query?.page,
+      pageSize: req.query?.page_size,
+      query: req.query?.q,
+      filterMode: req.query?.filter_mode,
+    });
     res.json({ ok: true, data: products });
   } catch (error) {
     next(error);

@@ -18,11 +18,11 @@ import {
 import { useAuth } from "@/components/auth/AuthProvider"
 import { PermissionGuard } from "@/components/auth/PermissionGuard"
 import {
-  ErrorPage,
-  ForbiddenPage,
+  ProtectedErrorPage,
+  ProtectedForbiddenPage,
   InlineStatusCard,
-  LoadingPage,
-  NotFoundPage,
+  ProtectedLoadingPage,
+  ProtectedNotFoundPage,
 } from "@/components/feedback/status-page"
 import { ApiError, apiFetch } from "@/lib/api"
 
@@ -455,7 +455,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
 
   if (loading) {
     return (
-      <LoadingPage
+      <ProtectedLoadingPage
         title="Cargando contexto de postventa"
         description="Estamos recuperando la venta, sus pagos, caja y trazabilidad interna."
       />
@@ -463,16 +463,16 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
   }
 
   if (error instanceof ApiError && error.status === 404) {
-    return <NotFoundPage />
+    return <ProtectedNotFoundPage />
   }
 
   if (error instanceof ApiError && error.status === 403) {
-    return <ForbiddenPage />
+    return <ProtectedForbiddenPage />
   }
 
   if (error || !context) {
     return (
-      <ErrorPage
+      <ProtectedErrorPage
         title="No pudimos abrir la postventa"
         description={error?.message || "La venta solicitada no está disponible para esta sede."}
       />

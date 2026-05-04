@@ -60,7 +60,6 @@ export default function AccountPage() {
       backHref="/inicio"
       backLabel="Volver al inicio"
       title="Perfil"
-      description="Cuenta y preferencias."
     >
       <PanelSection title="Informacion del usuario">
         <ValueRow label="Nombre" value={user.full_name} />

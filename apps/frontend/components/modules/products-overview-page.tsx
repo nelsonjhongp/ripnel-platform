@@ -1,28 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
   CircleAlert,
   Eye,
-  Info,
   LoaderCircle,
   PencilLine,
+  Plus,
   ReceiptText,
   RefreshCw,
   Search,
   Shapes,
 } from "lucide-react";
-import { buildApiUrl } from "@/lib/api";
+import { ApiEnvelope, apiFetch, unwrapApiData } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/ui/pagination";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 type ProductStatus =
   | "inactive"
@@ -31,6 +33,12 @@ type ProductStatus =
   | "pending_prices"
   | "ready_no_stock"
   | "ready";
+
+type ProductSizeStock = {
+  size_id: string;
+  size_code: string;
+  qty: number;
+};
 
 type ProductSummary = {
   style_id: string;
@@ -43,6 +51,7 @@ type ProductSummary = {
   target_name: string | null;
   configured_size_count: number;
   size_codes: string[];
+  size_stock: ProductSizeStock[];
   configured_color_count: number;
   expected_variant_count: number;
   variant_count: number;
@@ -61,6 +70,26 @@ type ProductSummary = {
 };
 
 type FilterMode = "all" | "attention" | "ready" | "inactive";
+
+type ActiveLocation = {
+  location_id: string;
+  name: string;
+  code: string | null;
+  type: string;
+  address: string | null;
+  active: boolean;
+};
+
+type ProductsResponse = {
+  items: ProductSummary[];
+  active_location: ActiveLocation | null;
+  pagination: {
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+  };
+};
 
 const STATUS_META: Record<ProductStatus, { label: string; className: string }> = {
   inactive: {
@@ -89,8 +118,10 @@ const STATUS_META: Record<ProductStatus, { label: string; className: string }> =
   },
 };
 
-function getVisibleSizeCodes(sizeCodes: string[]) {
-  return sizeCodes.slice(0, 4);
+const PAGE_SIZE = 10;
+
+function getVisibleSizeStock(sizeStock: ProductSizeStock[]) {
+  return sizeStock.slice(0, 4);
 }
 
 function buildStyleHref(path: string, styleId: string) {
@@ -118,55 +149,76 @@ function ActionIcon({
   );
 }
 
-function InfoHint({
-  content,
-  label,
-}: {
-  content: string;
-  label: string;
-}) {
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            aria-label={label}
-            className="inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-full text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)]"
-          >
-            <Info className="h-3.5 w-3.5" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="top" sideOffset={8} className="max-w-72 text-left leading-5">
-          {content}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
+function formatExtraSizes(extraSizes: ProductSizeStock[]) {
+  return extraSizes.map((size) => `${size.size_code}: ${size.qty}`).join(" · ");
 }
 
 export function ProductsOverviewPage() {
-  const [products, setProducts] = useState<ProductSummary[]>([]);
+  const { defaultLocation, locationAssignments, locationsLoading } = useAuth();
+  const [response, setResponse] = useState<ProductsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
+  const [page, setPage] = useState(1);
+  const [selectedLocationId, setSelectedLocationId] = useState("");
+  const deferredSearch = useDeferredValue(search.trim());
 
-  async function loadProducts() {
+  useEffect(() => {
+    if (!locationAssignments.length) {
+      return;
+    }
+
+    const hasCurrentSelection = locationAssignments.some(
+      (assignment) => assignment.location_id === selectedLocationId
+    );
+
+    if (hasCurrentSelection) {
+      return;
+    }
+
+    const nextLocationId =
+      defaultLocation?.location_id || locationAssignments[0]?.location_id || "";
+
+    if (nextLocationId) {
+      setSelectedLocationId(nextLocationId);
+    }
+  }, [defaultLocation?.location_id, locationAssignments, selectedLocationId]);
+
+  const loadProducts = useCallback(async () => {
+    if (!selectedLocationId) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(buildApiUrl("/api/products"), {
-        cache: "no-store",
+      const params = new URLSearchParams({
+        page: String(page),
+        page_size: String(PAGE_SIZE),
+        filter_mode: filterMode,
+        location_id: selectedLocationId,
       });
-      const payload = await response.json();
 
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo cargar el resumen de productos");
+      if (deferredSearch) {
+        params.set("q", deferredSearch);
       }
 
-      setProducts(payload.data || []);
+      const apiResponse = await apiFetch<ApiEnvelope<ProductsResponse> | ProductsResponse>(
+        `/api/products?${params.toString()}`
+      );
+      const payload = unwrapApiData(apiResponse);
+
+      setResponse(payload);
+      if (payload.pagination?.page && payload.pagination.page !== page) {
+        setPage(payload.pagination.page);
+      }
+
+      if (!selectedLocationId && payload.active_location?.location_id) {
+        setSelectedLocationId(payload.active_location.location_id);
+      }
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -176,77 +228,17 @@ export function ProductsOverviewPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [deferredSearch, filterMode, page, selectedLocationId]);
 
   useEffect(() => {
-    loadProducts();
-  }, []);
+    void loadProducts();
+  }, [loadProducts]);
 
-  const metrics = useMemo(() => {
-    const readyCount = products.filter((product) => product.status === "ready").length;
-    const attentionCount = products.filter(
-      (product) =>
-        product.status === "draft" ||
-        product.status === "pending_variants" ||
-        product.status === "pending_prices" ||
-        product.warnings.stock_without_retail_price
-    ).length;
-    const noStockCount = products.filter(
-      (product) => product.status === "ready_no_stock"
-    ).length;
-    const inactiveCount = products.filter(
-      (product) => product.status === "inactive"
-    ).length;
-
-    return {
-      readyCount,
-      attentionCount,
-      noStockCount,
-      inactiveCount,
-    };
-  }, [products]);
-
-  const filteredProducts = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-
-    return products.filter((product) => {
-      if (filterMode === "attention") {
-        const requiresAttention =
-          product.status === "draft" ||
-          product.status === "pending_variants" ||
-          product.status === "pending_prices" ||
-          product.warnings.stock_without_retail_price;
-
-        if (!requiresAttention) {
-          return false;
-        }
-      }
-
-      if (filterMode === "ready") {
-        if (product.status !== "ready" && product.status !== "ready_no_stock") {
-          return false;
-        }
-      }
-
-      if (filterMode === "inactive" && product.status !== "inactive") {
-        return false;
-      }
-
-      if (!normalizedSearch) {
-        return true;
-      }
-
-      return [
-        product.name,
-        product.style_code,
-        product.garment_type_name,
-        product.fabric_name,
-        product.target_name,
-      ]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(normalizedSearch));
-    });
-  }, [filterMode, products, search]);
+  const products = useMemo(() => response?.items ?? [], [response?.items]);
+  const totalItems = response?.pagination.total_items || 0;
+  const totalPages = response?.pagination.total_pages || 1;
+  const visibleFrom = totalItems ? (page - 1) * PAGE_SIZE + 1 : 0;
+  const visibleTo = totalItems ? visibleFrom + products.length - 1 : 0;
 
   return (
     <section className="ops-page min-h-screen p-4 md:p-5">
@@ -261,71 +253,85 @@ export function ProductsOverviewPage() {
             </h1>
           </div>
 
-          <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={loadProducts}>
-            <RefreshCw className="h-4 w-4" />
-            Actualizar
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="accent" size="sm" className="rounded-lg">
+              <Link href="/productos/nuevo">
+                <Plus className="h-4 w-4" />
+                Nuevo
+              </Link>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-lg"
+              onClick={loadProducts}
+              disabled={loading || !selectedLocationId}
+            >
+              <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+              Actualizar
+            </Button>
+          </div>
         </header>
 
-        <div className="flex flex-wrap gap-2 border-t border-[color:var(--ops-border-soft)] pt-4">
-          <span className="ops-metric-pill inline-flex rounded-full px-3 py-1 text-xs font-semibold">
-            {products.length} styles
-          </span>
-          <span className="ops-metric-pill inline-flex rounded-full px-3 py-1 text-xs font-semibold">
-            {metrics.readyCount} listos
-          </span>
-          <span className="ops-metric-pill inline-flex rounded-full px-3 py-1 text-xs font-semibold">
-            {metrics.attentionCount} por completar
-          </span>
-          <span className="ops-metric-pill inline-flex rounded-full px-3 py-1 text-xs font-semibold">
-            {metrics.noStockCount} sin stock
-          </span>
-        </div>
+        <div className="space-y-3 border-t border-[color:var(--ops-border-soft)] pt-4">
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_180px_220px] xl:items-end">
+                <label className="relative w-full">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
+                  <Input
+                    value={search}
+                    onChange={(event) => {
+                      setSearch(event.target.value);
+                      setPage(1);
+                    }}
+                    placeholder="Buscar por codigo, nombre o tipo"
+                    className="ops-surface h-10 rounded-lg border pl-9"
+                  />
+                </label>
 
-        <article className="ops-surface rounded-3xl border p-4 md:p-5">
-          <div className="flex flex-col gap-3 border-b border-[color:var(--ops-border-soft)] pb-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="min-w-0">
-              <p className="ops-text-muted text-[11px] font-semibold uppercase tracking-[0.18em]">
-                Vista general
-              </p>
-              <div className="mt-1 flex items-center gap-2">
-                <h2 className="ops-title text-lg font-semibold">
-                  Seguimiento del flujo
-                </h2>
-                <InfoHint
-                  label="Informacion sobre productos y variantes"
-                  content="El nombre visible sale del producto creado en Estilos. Variantes significa combinaciones de talla y color generadas para ese producto, pero ese detalle no se muestra como columna aqui."
-                />
-              </div>
-            </div>
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                    Filtro
+                  </label>
+                  <select
+                    value={filterMode}
+                    onChange={(event) => {
+                      setFilterMode(event.target.value as FilterMode);
+                      setPage(1);
+                    }}
+                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none"
+                  >
+                    <option value="all">Todos</option>
+                    <option value="attention">Por completar</option>
+                    <option value="ready">Listos</option>
+                    <option value="inactive">Inactivos</option>
+                  </select>
+                </div>
 
-            <div className="flex flex-col gap-2 lg:items-end">
-              <label className="relative w-full min-w-[260px] max-w-md">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
-                <Input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Buscar por codigo, nombre o tipo"
-                  className="ops-surface h-10 rounded-2xl border pl-9"
-                />
-              </label>
-
-              <div className="flex items-center gap-2 text-sm">
-                <span className="ops-text-muted text-xs font-medium uppercase tracking-[0.18em]">
-                  Filtro
-                </span>
-                <select
-                  value={filterMode}
-                  onChange={(event) => setFilterMode(event.target.value as FilterMode)}
-                  className="ops-surface h-10 cursor-pointer rounded-2xl border px-3 text-sm outline-none"
-                >
-                  <option value="all">Todos</option>
-                  <option value="attention">Por completar</option>
-                  <option value="ready">Listos</option>
-                  <option value="inactive">Inactivos</option>
-                </select>
-              </div>
-            </div>
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                    Sede activa
+                  </label>
+                  <select
+                    value={selectedLocationId}
+                    onChange={(event) => {
+                      setSelectedLocationId(event.target.value);
+                      setPage(1);
+                    }}
+                    disabled={locationsLoading || !locationAssignments.length}
+                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {!locationAssignments.length ? (
+                      <option value="">Sin sedes asignadas</option>
+                    ) : null}
+                    {locationAssignments.map((assignment) => (
+                      <option key={assignment.location_id} value={assignment.location_id}>
+                        {assignment.location.name}
+                        {assignment.is_default ? " · Predeterminada" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
           </div>
 
           {error ? (
@@ -339,9 +345,16 @@ export function ProductsOverviewPage() {
               <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
               Cargando productos...
             </div>
-          ) : filteredProducts.length ? (
-            <div className="mt-3 overflow-hidden rounded-2xl border border-[color:var(--ops-border-soft)]">
-              <div className="hidden grid-cols-[minmax(0,2fr)_0.95fr_1.5fr_0.8fr_0.8fr_1fr_112px] gap-3 bg-[var(--ops-surface-muted)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)] lg:grid">
+          ) : !selectedLocationId && !locationAssignments.length ? (
+              <div className="ops-empty-state-compact mt-4 rounded-lg p-8 text-center">
+              <h3 className="ops-title text-lg font-semibold">No hay sede operativa</h3>
+              <p className="ops-text-muted mt-2 text-sm leading-6">
+                Asigna al menos una sede al usuario para ver stock por talla.
+              </p>
+            </div>
+          ) : products.length ? (
+            <div className="overflow-hidden rounded-lg border border-[color:var(--ops-border-soft)]">
+              <div className="hidden grid-cols-[minmax(0,2fr)_0.95fr_1.8fr_0.8fr_0.8fr_1fr_112px] gap-3 bg-[var(--ops-surface-muted)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)] lg:grid">
                 <div>Producto</div>
                 <div>Codigo</div>
                 <div>Tallas</div>
@@ -352,20 +365,17 @@ export function ProductsOverviewPage() {
               </div>
 
               <div className="divide-y divide-[color:var(--ops-border-soft)]">
-                {filteredProducts.map((product) => {
+                {products.map((product) => {
                   const statusMeta = STATUS_META[product.status];
-                  const visibleSizeCodes = getVisibleSizeCodes(product.size_codes || []);
-                  const extraSizesCount = Math.max(
-                    0,
-                    (product.size_codes || []).length - visibleSizeCodes.length
-                  );
+                  const visibleSizeStock = getVisibleSizeStock(product.size_stock || []);
+                  const extraSizes = (product.size_stock || []).slice(visibleSizeStock.length);
 
                   return (
                     <article
                       key={product.style_id}
                       className="px-4 py-2.5 transition hover:bg-[var(--ops-surface-muted)]"
                     >
-                      <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_0.95fr_1.5fr_0.8fr_0.8fr_1fr_112px] lg:items-center">
+                      <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_0.95fr_1.8fr_0.8fr_0.8fr_1fr_112px] lg:items-center">
                         <div className="min-w-0">
                           <h3 className="ops-title truncate text-sm font-semibold">
                             {product.name}
@@ -380,7 +390,7 @@ export function ProductsOverviewPage() {
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 text-sm lg:block">
-                          <div className="ops-text-muted lg:hidden text-[11px] font-semibold uppercase tracking-[0.18em]">
+                          <div className="ops-text-muted text-[11px] font-semibold uppercase tracking-[0.18em] lg:hidden">
                             Codigo
                           </div>
                           <p className="font-semibold text-[var(--ops-text)]">
@@ -388,37 +398,48 @@ export function ProductsOverviewPage() {
                           </p>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3 text-sm lg:block lg:text-sm">
-                          <div className="ops-text-muted lg:hidden text-[11px] font-semibold uppercase tracking-[0.18em]">
+                        <div className="grid grid-cols-2 gap-3 text-sm lg:block">
+                          <div className="ops-text-muted text-[11px] font-semibold uppercase tracking-[0.18em] lg:hidden">
                             Tallas
                           </div>
                           <div className="flex flex-wrap gap-1">
-                            {visibleSizeCodes.length ? (
+                            {visibleSizeStock.length ? (
                               <>
-                                {visibleSizeCodes.map((sizeCode) => (
+                                {visibleSizeStock.map((size) => (
                                   <span
-                                    key={`${product.style_id}-${sizeCode}`}
+                                    key={`${product.style_id}-${size.size_id}`}
                                     className="ops-metric-pill rounded-full px-2 py-0.5 text-[11px] font-semibold"
                                   >
-                                    {sizeCode}
+                                    {size.size_code}: {size.qty}
                                   </span>
                                 ))}
-                                {extraSizesCount > 0 ? (
-                                  <span className="ops-metric-pill rounded-full px-2 py-0.5 text-[11px] font-semibold">
-                                    +{extraSizesCount}
-                                  </span>
+                                {extraSizes.length > 0 ? (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="ops-metric-pill cursor-help rounded-full px-2 py-0.5 text-[11px] font-semibold">
+                                          +{extraSizes.length}
+                                        </span>
+                                      </TooltipTrigger>
+                                      <TooltipContent
+                                        side="top"
+                                        sideOffset={8}
+                                        className="max-w-64 text-left"
+                                      >
+                                        {formatExtraSizes(extraSizes)}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
                                 ) : null}
                               </>
                             ) : (
-                              <span className="ops-title text-sm font-semibold">
-                                {product.configured_size_count}
-                              </span>
+                              <span className="ops-text-muted text-sm">Sin tallas configuradas</span>
                             )}
                           </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 text-sm lg:block">
-                          <div className="ops-text-muted lg:hidden text-[11px] font-semibold uppercase tracking-[0.18em]">
+                          <div className="ops-text-muted text-[11px] font-semibold uppercase tracking-[0.18em] lg:hidden">
                             Colores
                           </div>
                           <p className="ops-title font-semibold">
@@ -427,14 +448,14 @@ export function ProductsOverviewPage() {
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 text-sm lg:block">
-                          <div className="ops-text-muted lg:hidden text-[11px] font-semibold uppercase tracking-[0.18em]">
+                          <div className="ops-text-muted text-[11px] font-semibold uppercase tracking-[0.18em] lg:hidden">
                             Stock
                           </div>
                           <p className="ops-title font-semibold">{product.total_stock_qty}</p>
                         </div>
 
                         <div className="grid grid-cols-2 gap-3 text-sm lg:block">
-                          <div className="ops-text-muted lg:hidden text-[11px] font-semibold uppercase tracking-[0.18em]">
+                          <div className="ops-text-muted text-[11px] font-semibold uppercase tracking-[0.18em] lg:hidden">
                             Estado
                           </div>
                           <div className="flex flex-wrap items-center gap-1.5">
@@ -493,18 +514,32 @@ export function ProductsOverviewPage() {
               </div>
             </div>
           ) : (
-            <div className="ops-empty-state-compact mt-4 rounded-[24px] p-8 text-center">
+            <div className="ops-empty-state-compact mt-4 rounded-lg p-8 text-center">
               <h3 className="ops-title text-lg font-semibold">
-                {products.length ? "No hay styles para este filtro" : "Aun no hay styles"}
+                {totalItems ? "No hay styles para este filtro" : "No hay productos en esta sede"}
               </h3>
               <p className="ops-text-muted mt-2 text-sm leading-6">
-                {products.length
-                  ? "Prueba otra busqueda o cambia el filtro."
-                  : "Primero registra un style base y luego completa variantes y precios."}
+                {totalItems
+                  ? "Prueba otra busqueda, sede o filtro."
+                  : "La sede activa no tiene productos para los criterios seleccionados."}
               </p>
             </div>
           )}
-        </article>
+
+          {!loading && totalItems ? (
+            <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between">
+              <span className="ops-secondary-text text-[var(--ops-text-muted)]">
+                {visibleFrom}-{visibleTo} de {totalItems}
+              </span>
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                className="self-end md:self-auto"
+              />
+            </div>
+          ) : null}
+        </div>
       </div>
     </section>
   );
