@@ -83,7 +83,6 @@ export default function AccountSecurityPage() {
       backHref={isRequired ? undefined : "/account"}
       backLabel={isRequired ? undefined : "Volver a perfil"}
       title="Seguridad"
-      description={isRequired ? "Actualiza tu contrasena para continuar." : "Contrasena de acceso."}
     >
       <PanelSection title="Contrasena" icon={KeyRound}>
         <form onSubmit={submitPassword}>

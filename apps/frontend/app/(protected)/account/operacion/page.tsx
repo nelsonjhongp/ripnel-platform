@@ -142,7 +142,6 @@ export default function AccountOperationPage() {
       backHref="/account"
       backLabel="Volver a perfil"
       title="Sede operativa"
-      description="Sede default."
     >
       <PanelSection title="Sede operativa" icon={Store}>
         {locationsLoading || loadingAvailableLocations ? (

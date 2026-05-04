@@ -3,6 +3,7 @@ import {
   Boxes,
   ChevronRight,
   Palette,
+  Plus,
   ReceiptText,
   Ruler,
   Shapes,
@@ -307,6 +308,13 @@ export const productMasterLinks: ProductMasterLink[] = [
     icon: Warehouse,
   },
   {
+    href: "/productos/nuevo",
+    label: "Nuevo",
+    shortDescription: "Alta rapida de style con tallas y colores iniciales.",
+    nextStepLabel: "Crear variantes y continuar con precios.",
+    icon: Plus,
+  },
+  {
     href: "/productos/estilos",
     label: "Estilos",
     shortDescription: "Alta y mantenimiento del style base.",
@@ -338,6 +346,7 @@ export function resolveProductMasterRouteTitle(pathname: string) {
 
   const matchedProductLink = productMasterLinks.find((link) => link.href === pathname)
   if (matchedProductLink) {
+    if (matchedProductLink.href === "/productos/nuevo") return "Nuevo producto"
     return matchedProductLink.label === "Resumen"
       ? "Maestro de producto"
       : `${matchedProductLink.label} de producto`
@@ -345,6 +354,7 @@ export function resolveProductMasterRouteTitle(pathname: string) {
 
   if (pathname.startsWith("/productos/")) {
     const slug = pathname.split("/")[2]
+    if (slug === "nuevo") return "Nuevo producto"
     if (slug === "estilos") return "Estilos de producto"
     if (slug === "variantes") return "Variantes de producto"
   }
