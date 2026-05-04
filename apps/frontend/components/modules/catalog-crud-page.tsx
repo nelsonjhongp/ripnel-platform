@@ -237,15 +237,16 @@ export function CatalogCrudPage({
             </div>
 
             <div>
-              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+              <label htmlFor="status-filter" className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                 Estado
               </label>
               <select
+                id="status-filter"
                 value={statusFilter}
                 onChange={(event) =>
                   setStatusFilter(event.target.value as "all" | "active" | "inactive")
                 }
-                className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none transition hover:bg-[var(--ops-surface-muted)]"
+                className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none transition hover:bg-[var(--ops-surface-muted)] bg-[var(--ops-surface)]"
               >
                 <option value="all">Todos</option>
                 <option value="active">Activos</option>
@@ -276,13 +277,13 @@ export function CatalogCrudPage({
           </div>
 
           {error ? (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+            <div role="alert" aria-live="polite" className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
               {error}
             </div>
           ) : null}
 
           {successMessage ? (
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
+            <div role="status" aria-live="polite" className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
               {successMessage}
             </div>
           ) : null}

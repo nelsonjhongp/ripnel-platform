@@ -290,16 +290,17 @@ export function ProductsOverviewPage() {
                 </label>
 
                 <div>
-                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                  <label htmlFor="filter-mode" className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                     Filtro
                   </label>
                   <select
+                    id="filter-mode"
                     value={filterMode}
                     onChange={(event) => {
                       setFilterMode(event.target.value as FilterMode);
                       setPage(1);
                     }}
-                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none"
+                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none bg-[var(--ops-surface)]"
                   >
                     <option value="all">Todos</option>
                     <option value="attention">Por completar</option>
@@ -309,17 +310,18 @@ export function ProductsOverviewPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                  <label htmlFor="location-select" className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                     Sede activa
                   </label>
                   <select
+                    id="location-select"
                     value={selectedLocationId}
                     onChange={(event) => {
                       setSelectedLocationId(event.target.value);
                       setPage(1);
                     }}
                     disabled={locationsLoading || !locationAssignments.length}
-                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-70"
+                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-70 bg-[var(--ops-surface)]"
                   >
                     {!locationAssignments.length ? (
                       <option value="">Sin sedes asignadas</option>
@@ -335,7 +337,7 @@ export function ProductsOverviewPage() {
           </div>
 
           {error ? (
-            <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
+            <div role="alert" aria-live="polite" className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
               {error}
             </div>
           ) : null}

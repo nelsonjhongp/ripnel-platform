@@ -477,8 +477,9 @@ export default function LocationsPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-[var(--ops-text)]">Tipo</label>
+                <label htmlFor="location-type" className="text-sm font-medium text-[var(--ops-text)]">Tipo</label>
                 <select
+                  id="location-type"
                   value={formState.type}
                   onChange={(event) =>
                     setFormState((current) => ({
@@ -528,11 +529,11 @@ export default function LocationsPage() {
               </label>
 
               {error ? (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+                <div role="alert" aria-live="polite" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
               ) : null}
 
               {successMessage ? (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                <div role="status" aria-live="polite" className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
                   {successMessage}
                 </div>
               ) : null}

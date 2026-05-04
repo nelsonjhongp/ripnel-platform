@@ -268,7 +268,7 @@ function PermissionSelector({
             Cargando permisos...
           </div>
         ) : error ? (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <div role="alert" aria-live="polite" className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
             {error}
           </div>
         ) : totalPermissions === 0 ? (
@@ -1237,15 +1237,16 @@ export default function AdminCrudPage() {
                 />
               </label>
 
-              <label className="block space-y-1">
+              <label htmlFor="role-select" className="block space-y-1">
                 <span className="text-sm font-medium text-[var(--ops-text)]">Rol</span>
                 <select
+                  id="role-select"
                   required={!editingUserId}
                   value={userForm.role_id}
                   onChange={(event) =>
                     setUserForm((current) => ({ ...current, role_id: event.target.value }))
                   }
-                  className="w-full cursor-pointer rounded-xl border border-[var(--ops-border-strong)] px-4 py-2.5 text-sm text-[var(--ops-text)] outline-none transition hover:border-[var(--ops-border-soft)] focus:border-[var(--ripnel-accent)]"
+                  className="w-full cursor-pointer rounded-xl border border-[var(--ops-border-strong)] px-4 py-2.5 text-sm text-[var(--ops-text)] outline-none transition hover:border-[var(--ops-border-soft)] focus:border-[var(--ripnel-accent)] bg-[var(--ops-field)]"
                 >
                   <option value="">Sin rol</option>
                   {roles.map((role) => (

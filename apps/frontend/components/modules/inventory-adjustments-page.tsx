@@ -614,13 +614,14 @@ export function InventoryAdjustmentsPage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                <label htmlFor="location-filter" className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                   Sede
                 </label>
                 <select
+                  id="location-filter"
                   value={locationFilter}
                   onChange={(event) => setLocationFilter(event.target.value)}
-                  className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none transition hover:bg-[var(--ops-surface-muted)]"
+                  className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none transition hover:bg-[var(--ops-surface-muted)] bg-[var(--ops-surface)]"
                 >
                   <option value="all">Todas</option>
                   {locations.map((location) => (
@@ -632,15 +633,16 @@ export function InventoryAdjustmentsPage() {
               </div>
 
               <div>
-                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                <label htmlFor="status-filter" className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                   Estado
                 </label>
                 <select
+                  id="status-filter"
                   value={statusFilter}
                   onChange={(event) =>
                     setStatusFilter(event.target.value as "all" | AdjustmentStatus)
                   }
-                  className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none transition hover:bg-[var(--ops-surface-muted)]"
+                  className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none transition hover:bg-[var(--ops-surface-muted)] bg-[var(--ops-surface)]"
                 >
                   <option value="all">Todos</option>
                   <option value="draft">Borrador</option>
@@ -671,13 +673,13 @@ export function InventoryAdjustmentsPage() {
             </div>
 
             {error ? (
-              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              <div role="alert" aria-live="polite" className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                 {error}
               </div>
             ) : null}
 
             {notice ? (
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+              <div role="status" aria-live="polite" className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
                 {notice}
               </div>
             ) : null}

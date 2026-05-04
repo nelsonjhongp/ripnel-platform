@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useId, useMemo, useState } from "react";
 import {
   Check,
   ChevronDown,
@@ -256,13 +256,15 @@ async function requestData<T>(path: string, init?: RequestInit): Promise<T> {
 function FieldLabel({
   children,
   onCreate,
+  htmlFor,
 }: {
   children: React.ReactNode;
   onCreate: () => void;
+  htmlFor?: string;
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <label className="text-sm font-semibold text-[var(--ops-text)]">{children}</label>
+      <label htmlFor={htmlFor} className="text-sm font-semibold text-[var(--ops-text)]">{children}</label>
       <button
         type="button"
         onClick={onCreate}
@@ -526,6 +528,12 @@ function ConfirmationDialog({
 }
 
 export function ProductCreatePage() {
+  const nameId = useId()
+  const garmentTypeId = useId()
+  const fabricId = useId()
+  const fabricDetailId = useId()
+  const targetId = useId()
+  const descriptionId = useId()
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [nameMode, setNameMode] = useState<NameMode>("auto");
   const [garmentTypes, setGarmentTypes] = useState<CatalogItem[]>([]);
@@ -931,7 +939,7 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
           </header>
 
           {error ? (
-            <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
+            <div role="alert" aria-live="polite" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
               {error}
             </div>
           ) : null}
@@ -967,14 +975,15 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
             <div className="border-b border-[color:var(--ops-border-soft)] pb-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-1.5">
-                  <label className="text-sm font-semibold text-[var(--ops-text)]">Nombre</label>
+                  <label htmlFor={nameId} className="text-sm font-semibold text-[var(--ops-text)]">Nombre</label>
                   <div className="relative">
                     <Input
+                      id={nameId}
                       value={formState.name}
                       onChange={(event) =>
                         setFormState((current) => ({ ...current, name: event.target.value }))
                       }
-                      placeholder="Se completara automaticamente"
+                      placeholder="Se completara automaticamente…"
                       className={cn(
                         "ops-surface h-10 rounded-lg border pr-11",
                         nameMode === "auto" && "bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]"
@@ -1004,8 +1013,9 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
                 </div>
 
                 <div className="space-y-1.5">
-                  <FieldLabel onCreate={() => openCatalogPanel("garmentTypes")}>Tipo de prenda</FieldLabel>
+                  <FieldLabel htmlFor={garmentTypeId} onCreate={() => openCatalogPanel("garmentTypes")}>Tipo de prenda</FieldLabel>
                   <select
+                    id={garmentTypeId}
                     value={formState.garment_type_id}
                     onChange={(event) =>
                       setFormState((current) => ({
@@ -1013,7 +1023,7 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
                         garment_type_id: event.target.value,
                       }))
                     }
-                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none"
+                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none bg-[var(--ops-surface)]"
                     required
                   >
                     <option value="">Seleccionar</option>
@@ -1029,13 +1039,14 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
                 </div>
 
                 <div className="space-y-1.5">
-                  <FieldLabel onCreate={() => openCatalogPanel("fabrics")}>Tela</FieldLabel>
+                  <FieldLabel htmlFor={fabricId} onCreate={() => openCatalogPanel("fabrics")}>Tela</FieldLabel>
                   <select
+                    id={fabricId}
                     value={formState.fabric_id}
                     onChange={(event) =>
                       setFormState((current) => ({ ...current, fabric_id: event.target.value }))
                     }
-                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none"
+                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none bg-[var(--ops-surface)]"
                   >
                     <option value="">Sin tela</option>
                     {fabrics.map((item) => {
@@ -1050,8 +1061,9 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
                 </div>
 
                 <div className="space-y-1.5">
-                  <FieldLabel onCreate={() => openCatalogPanel("fabricDetails")}>Detalle</FieldLabel>
+                  <FieldLabel htmlFor={fabricDetailId} onCreate={() => openCatalogPanel("fabricDetails")}>Detalle</FieldLabel>
                   <select
+                    id={fabricDetailId}
                     value={formState.fabric_detail_id}
                     onChange={(event) =>
                       setFormState((current) => ({
@@ -1059,7 +1071,7 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
                         fabric_detail_id: event.target.value,
                       }))
                     }
-                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none"
+                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none bg-[var(--ops-surface)]"
                   >
                     <option value="">Sin detalle</option>
                     {fabricDetails.map((item) => {
@@ -1074,13 +1086,14 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
                 </div>
 
                 <div className="space-y-1.5">
-                  <FieldLabel onCreate={() => openCatalogPanel("targets")}>Target</FieldLabel>
+                  <FieldLabel htmlFor={targetId} onCreate={() => openCatalogPanel("targets")}>Target</FieldLabel>
                   <select
+                    id={targetId}
                     value={formState.target_id}
                     onChange={(event) =>
                       setFormState((current) => ({ ...current, target_id: event.target.value }))
                     }
-                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none"
+                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none bg-[var(--ops-surface)]"
                   >
                     <option value="">Sin target</option>
                     {targets.map((item) => {
