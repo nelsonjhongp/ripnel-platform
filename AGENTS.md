@@ -29,6 +29,25 @@ When you need to understand the domain or schema, inspect these first:
 
 Do not invent tables or fields if the migration already defines them.
 
+## Design System
+
+Before working on UI/visual tasks, load the `frontend-design` skill. The design system is defined in:
+
+- **`DESIGN.md`** — Identity, color system, typography, tokens, components
+- **`docs/frontend-page-standard.md`** — Page composition, header, table patterns, pagination
+- **`docs/frontend-ui-ux-operativo.md`** — Operational UI criteria, density, anti-patterns
+
+For any visual or frontend work, invoke the skill first:
+```
+Use frontend-design skill for this task
+```
+
+When designing or reviewing UI, ensure alignment with:
+- `ops-*` tokens from `globals.css`
+- Violet accent `#b07ae4` as primary color
+- Poppins font
+- Compact ERP density over decorative layouts
+
 ## Architecture rules
 
 - Frontend must call backend APIs for ERP operations.
@@ -43,10 +62,19 @@ Do not invent tables or fields if the migration already defines them.
 
 - Next.js 16
 - React 19
+- TypeScript 5
 - Tailwind CSS 4
 - shadcn/ui
 - Radix UI primitives
 - lucide-react icons
+- `@tanstack/react-table` for tables
+- `recharts` for charts
+- `date-fns` for date utilities
+- `react-day-picker` for date pickers
+- `@dnd-kit/*` for drag-and-drop
+- `next-themes` for theme switching
+- `sonner` for toast notifications
+- `zod` for schema validation
 - `class-variance-authority`, `clsx`, `tailwind-merge`
 
 ## Frontend UI direction
@@ -87,15 +115,20 @@ Current mounted route groups in backend:
 - `GET|POST|PATCH /api/users/*`
 - `GET|POST|PATCH /api/roles/*`
 - `GET|POST|PATCH /api/locations/*`
-- `GET|POST /api/catalogs/*`
+- `GET|POST /api/catalogs/*` (mounted at `/api` prefix: `/api/sizes`, `/api/colors`, `/api/garment-types`, `/api/fabrics`, etc.)
 - `GET|POST|PATCH /api/styles/*`
 - `GET|POST|PATCH /api/variants/*`
 - `GET|POST|PATCH /api/prices/*`
+- `GET|POST|PATCH /api/pricing-rules/*`
 - `GET|POST /api/inventory/*`
 - `GET|POST /api/transfers/*`
 - `GET|POST|PATCH /api/customers/*`
-
-Do not assume a sales API exists yet just because the schema already contains sales tables.
+- `GET|POST /api/products/*`
+- `GET|POST /api/sales/*` (full POS: create sale, context, sellable variants, receipts, PDF)
+- `GET|POST|PATCH /api/postsales/*` (exchanges, cancellations)
+- `GET|POST|PATCH /api/cash/*` (cash register: open, close, history, admin control)
+- `GET /api/dashboard/*`
+- `GET /api/home/*`
 
 ## Current business modules visible in UI
 
@@ -112,10 +145,12 @@ Do not assume a sales API exists yet just because the schema already contains sa
 - Inventory
 - Kardex
 - Transferencias
-- `purchase-system`: existing sales UI flow, still mock/ecommerce-like in language
-- `transaction-history`: existing sales history UI, currently mock
-
-Treat `purchase-system` and `transaction-history` as transitional sales screens, not as fully integrated ERP flows.
+- Ventas (`purchase-system`): full POS flow with customer picker, variant search, mixed payments, discounts, document types, cash validation
+- Historial de ventas (`transaction-history`): sales list with real backend integration
+- Postventa: exchanges and cancellations
+- Caja: cash register open, close, history, and admin control
+- BI: business intelligence with native charts
+- Account: user security, appearance, and operation settings
 
 ## Domain notes
 
@@ -172,9 +207,9 @@ Frontend:
 
 Current recommended order:
 
-1. `Ventas MVP`: registro de venta end-to-end con backend real
-2. `Historial y detalle de ventas` despues del flujo base
-3. `Clientes` y su integracion operativa con ventas
-4. `Hardening` de auth, roles, permisos y user-locations
-5. `Precios`, `Inventory` y `Transferencias` como soporte del flujo comercial
-6. Ajustar placeholders o mocks restantes para que reflejen estado real del sistema
+1. `Hardening de ventas`: edge cases del POS (descuentos complejos, validaciones de stock, flujo de recibos)
+2. `Caja y cierres`: integracion completa de cash closing con ventas, arqueos y reportes
+3. `Reportes y BI`: expandir analytics mas alla del dashboard actual
+4. `Permisos granulares`: refinar permisos por ubicacion y rol en flujos criticos
+5. `Testing end-to-end`: flujos criticos (venta, caja, transferencias)
+6. `Optimizacion y pulido`: rendimiento, UX density, temas, carga de assets

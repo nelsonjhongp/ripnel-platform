@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { LoaderCircle, MapPin, RefreshCw, RotateCcw, Search } from "lucide-react";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { FilterDropdown } from "@/components/ui/filter-dropdown";
 import { Pagination } from "@/components/ui/pagination";
+import { InlineStatusCard } from "@/components/feedback/status-page";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   Tooltip,
@@ -13,6 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { buildApiUrl } from "@/lib/api";
 
 type InventoryItem = {
@@ -89,6 +91,49 @@ function buildGroupedRows(items: InventoryItem[]) {
   return Array.from(map.values()).map((row) => ({
     ...row,
   }));
+}
+
+function MetricPill({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string;
+  value: string | number;
+  tone?: "default" | "accent" | "warning";
+}) {
+  const toneClass =
+    tone === "accent"
+      ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))] text-[var(--ops-text)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--ripnel-accent)_14%,transparent)]"
+      : tone === "warning"
+        ? "border-[color:color-mix(in_srgb,#f59e0b_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
+        : "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text)]";
+  const labelClass =
+    tone === "accent"
+      ? "text-[color:color-mix(in_srgb,var(--ripnel-accent)_72%,var(--ops-text))]"
+      : tone === "warning"
+        ? "text-[color:color-mix(in_srgb,#f59e0b_82%,var(--ops-text))]"
+        : "text-[var(--ops-text-muted)]";
+  const valueClass =
+    tone === "accent"
+      ? "text-[var(--ops-text)]"
+      : tone === "warning"
+        ? "text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
+        : "text-[var(--ops-text)]";
+
+  return (
+    <div
+      className={cn(
+        "inline-flex items-center gap-2.5 rounded-full border px-3 py-2",
+        toneClass
+      )}
+    >
+      <span className={cn("text-[11px] font-semibold uppercase tracking-[0.16em]", labelClass)}>
+        {label}
+      </span>
+      <span className={cn("text-base font-semibold leading-none", valueClass)}>{value}</span>
+    </div>
+  );
 }
 
 export default function InventoryPage() {
@@ -213,7 +258,7 @@ export default function InventoryPage() {
   return (
     <TooltipProvider delayDuration={120}>
       <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
-        <div className="mx-auto flex max-w-[1180px] flex-col gap-4">
+        <div className="mx-auto max-w-[1180px] space-y-4">
           <PosHeader
             eyebrow="Control de stock"
             title="Inventario"
@@ -222,7 +267,7 @@ export default function InventoryPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="rounded-full"
+                className="rounded-lg"
                 onClick={loadInventory}
               >
                 <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
@@ -232,20 +277,14 @@ export default function InventoryPage() {
           />
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="ops-metric-pill inline-flex rounded-full px-3 py-2 text-sm font-semibold">
-              Productos visibles: {totals.uniqueProducts}
-            </span>
-            <span className="ops-metric-pill inline-flex rounded-full px-3 py-2 text-sm font-semibold">
-              Unidades visibles: {totals.totalUnits}
-            </span>
-            <span className="ops-metric-pill inline-flex rounded-full px-3 py-2 text-sm font-semibold">
-              Sedes visibles: {totals.uniqueLocations}
-            </span>
+            <MetricPill label="Productos" value={totals.uniqueProducts} />
+            <MetricPill label="Unidades" value={totals.totalUnits} tone="accent" />
+            <MetricPill label="Sedes" value={totals.uniqueLocations} />
           </div>
 
           <div className="space-y-4 border-t border-[var(--ops-border-strong)] pt-4">
             {coverageGaps.length > 0 ? (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
+              <div className="rounded-xl border border-[color:color-mix(in_srgb,#f59e0b_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] px-4 py-3 text-sm text-[color:color-mix(in_srgb,#f59e0b_82%,var(--ops-text))]">
                 Styles con stock sin precio comercial:{" "}
                 <span className="font-semibold">
                   {coverageGaps.map((gap) => gap.style_code).join(", ")}
@@ -254,33 +293,23 @@ export default function InventoryPage() {
             ) : null}
 
             <div className="grid gap-2.5 lg:grid-cols-[1.4fr_0.8fr_auto] lg:items-end">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
-                <Input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Buscar por producto, codigo o ubicacion"
-                  className="ops-surface h-10 rounded-lg border py-2 pl-9 text-sm"
-                />
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Buscar</label>
+                <div className="sales-field flex h-10 items-center gap-2 rounded-lg px-3 transition hover:bg-[var(--ops-surface-muted)]">
+                  <Search className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
+                  <input type="text" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por producto, SKU o tipo" className="h-full w-full bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]" />
+                </div>
               </div>
 
-              <div>
-                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  Ubicacion
-                </label>
-                <select
-                  value={locationFilter}
-                  onChange={(event) => setLocationFilter(event.target.value)}
-                  className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none transition hover:bg-[var(--ops-surface-muted)]"
-                >
-                  <option value="all">Todas</option>
-                  {locationOptions.map((location) => (
-                    <option key={location.code} value={location.code}>
-                      {location.code} - {location.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <FilterDropdown
+                label="Ubicacion"
+                value={locationFilter}
+                options={[
+                  { value: "all", label: "Todas" },
+                  ...locationOptions.map((location) => ({ value: location.code, label: `${location.code} - ${location.name}` })),
+                ]}
+                onChange={(v) => { setLocationFilter(v); setPage(1); }}
+              />
 
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -303,76 +332,79 @@ export default function InventoryPage() {
             </div>
 
             {error ? (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
-                {error}
-              </div>
+              <InlineStatusCard title="No pudimos cargar inventario" description={error} tone="danger" variant="ops" />
             ) : null}
 
             <div className="overflow-x-auto">
               <div className="min-w-[820px] border-y border-[var(--ops-border-strong)]">
-                <div className="grid grid-cols-[1.4fr_0.9fr_0.8fr_1fr_90px] gap-3 bg-[var(--ops-surface-muted)] px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  <span>Producto</span>
-                  <span>Codigo</span>
-                  <span>Variantes</span>
-                  <span>Ubicacion</span>
-                  <span className="text-right">Stock</span>
-                </div>
-
-                <div className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                  {loading ? (
-                    <div className="ops-text-muted flex min-h-56 items-center justify-center px-4 py-10 text-sm">
-                      <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
-                      Cargando inventario...
-                    </div>
-                  ) : paginatedRows.length ? (
-                    paginatedRows.map((row) => (
-                      <article
-                        key={row.rowKey}
-                        className="grid grid-cols-[1.4fr_0.9fr_0.8fr_1fr_90px] gap-3 px-4 py-[var(--ops-row-py)] transition-colors hover:bg-[var(--ops-surface-muted)]"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-[var(--ops-text)]">{row.styleName}</p>
-                          <div className="mt-1 flex items-center gap-2">
-                            <p className="truncate text-[11px] text-[var(--ops-text-muted)]">
-                              {row.garmentTypeName || "Sin tipo"}
-                            </p>
-                            {stylesWithoutCommercialPrice.has(row.styleCode) ? (
-                              <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
-                                Sin precio
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        <div className="text-sm font-semibold text-[var(--ops-text)]">
-                          {row.styleCode}
-                        </div>
-
-                        <div className="text-sm text-[var(--ops-text)]">
-                          {row.variantsCount}
-                        </div>
-
-                        <div className="flex items-center gap-2 text-sm text-[var(--ops-text)]">
-                          <MapPin className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />
-                          <span className="truncate">{row.locationName}</span>
-                        </div>
-
-                        <div className="text-right text-sm font-semibold text-[var(--ops-text)]">
-                          {row.totalQty}
-                        </div>
-                      </article>
-                    ))
-                  ) : (
-                    <div className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                      No se encontraron registros de inventario con los filtros actuales.
-                    </div>
-                  )}
-                </div>
+                <table className="w-full border-collapse">
+                  <thead className="bg-[var(--ops-surface-muted)]">
+                    <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                      <th className="px-4 py-3">Producto</th>
+                      <th className="px-4 py-3">Codigo</th>
+                      <th className="px-4 py-3">Variantes</th>
+                      <th className="px-4 py-3">Ubicacion</th>
+                      <th className="px-4 py-3 text-right">Stock</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                          <LoaderCircle className="mr-2 inline-block h-5 w-5 animate-spin" />
+                          Cargando inventario...
+                        </td>
+                      </tr>
+                    ) : paginatedRows.length ? (
+                      paginatedRows.map((row) => (
+                        <tr
+                          key={row.rowKey}
+                          className="transition hover:bg-[var(--ops-surface-muted)]"
+                        >
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <p className="truncate text-sm font-semibold text-[var(--ops-text)]">{row.styleName}</p>
+                            <div className="mt-1 flex items-center gap-2">
+                              <p className="truncate text-[11px] text-[var(--ops-text-muted)]">
+                                {row.garmentTypeName || "Sin tipo"}
+                              </p>
+                              {stylesWithoutCommercialPrice.has(row.styleCode) ? (
+                                <span className="inline-flex rounded-full border border-[color:color-mix(in_srgb,#f59e0b_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] px-2 py-0.5 text-[11px] font-semibold text-[color:color-mix(in_srgb,#f59e0b_72%,var(--ops-text))]">
+                                  Sin precio
+                                </span>
+                              ) : null}
+                            </div>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)] text-sm font-semibold text-[var(--ops-text)]">
+                            {row.styleCode}
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                            {row.variantsCount}
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />
+                              {row.locationName}
+                            </div>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)] text-right text-sm font-semibold text-[var(--ops-text)]">
+                            {row.totalQty}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                          No se encontraron registros de inventario con los filtros actuales.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
 
             <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between">
-              <span className="ops-secondary-text text-[var(--ops-text-muted)]">
+              <span className="text-sm text-[var(--ops-text-muted)]">
                 {filteredRows.length ? `${visibleFrom}-${visibleTo} de ${filteredRows.length}` : "0 resultados"}
               </span>
               <Pagination
