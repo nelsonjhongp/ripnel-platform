@@ -52,14 +52,14 @@ function getSetupStatus(total: number) {
     return {
       label: "Listo",
       className:
-        "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/70 dark:bg-emerald-950/30 dark:text-emerald-300",
+        "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]",
     }
   }
 
   return {
     label: "Pendiente",
     className:
-      "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-300",
+      "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]",
   }
 }
 
@@ -96,7 +96,7 @@ export function CatalogHubPage() {
           eyebrow="Catalogos"
           title="Catalogos maestros"
           actions={
-            <Button type="button" variant="outline" size="sm" className="rounded-full" onClick={loadHub}>
+            <Button type="button" variant="outline" size="sm" className="rounded-lg" onClick={loadHub}>
               <RefreshCw className={loading ? "animate-spin" : ""} />
               Actualizar
             </Button>
@@ -122,7 +122,7 @@ export function CatalogHubPage() {
               <Link
                 key={definition.slug}
                 href={getCatalogRoute(definition.slug)}
-                className={`group ops-surface-muted flex min-h-[108px] cursor-pointer items-center rounded-2xl border px-4 py-4 transition-[border-color,background-color,transform] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 ${definition.accentHoverClassName}`}
+                className={`group ops-surface-muted flex min-h-[88px] cursor-pointer items-center rounded-2xl border px-4 py-4 transition-[border-color,background-color,transform] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 ${definition.accentHoverClassName}`}
               >
                 <div className="flex w-full items-center gap-3">
                   <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border bg-[var(--ops-surface)] ${definition.accentRingClassName} ${definition.accentClassName}`}>

@@ -3,9 +3,6 @@
 import Link from "next/link"
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
-  ArrowDown,
-  ArrowUp,
-  ChevronDown,
   PencilLine,
   Plus,
   RefreshCw,
@@ -29,13 +26,7 @@ import {
   validateCustomerInput,
 } from "@/components/modules/customer-form"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { FilterDropdown } from "@/components/ui/filter-dropdown"
 import { Pagination } from "@/components/ui/pagination"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -221,7 +212,7 @@ export default function CustomersPage() {
   const sortOptions = [
     { value: "desc", label: "Más reciente" },
     { value: "asc", label: "Más antigua" },
-  ] as const
+  ]
 
   const totalPages = Math.max(1, Math.ceil(customers.length / PAGE_SIZE))
   const safeCurrentPage = Math.min(currentPage, totalPages)
@@ -307,82 +298,19 @@ export default function CustomersPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                    Tipo de documento
-                  </label>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        className="sales-field flex h-10 w-full cursor-pointer items-center gap-2 rounded-lg px-3 text-left text-sm text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
-                      >
-                        <span className="flex-1">
-                          {docFilterOptions.find((option) => option.value === docFilter)?.label || "Todos"}
-                        </span>
-                        <ChevronDown className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="start"
-                      sideOffset={8}
-                      className="min-w-[var(--radix-dropdown-menu-trigger-width)] border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1 text-[var(--ops-text)]"
-                    >
-                      <DropdownMenuRadioGroup value={docFilter} onValueChange={setDocFilter}>
-                        {docFilterOptions.map((option) => (
-                          <DropdownMenuRadioItem
-                            key={option.value}
-                            value={option.value}
-                            className="cursor-pointer rounded-md px-3 py-2 text-sm focus:bg-[var(--ops-surface-muted)] focus:text-[var(--ops-text)]"
-                          >
-                            {option.label}
-                          </DropdownMenuRadioItem>
-                        ))}
-                      </DropdownMenuRadioGroup>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                <FilterDropdown
+                  label="Tipo de documento"
+                  value={docFilter}
+                  options={docFilterOptions}
+                  onChange={setDocFilter}
+                />
 
-                <div>
-                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                    Orden
-                  </label>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        className="sales-field flex h-10 w-full cursor-pointer items-center gap-2 rounded-lg px-3 text-left text-sm text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
-                      >
-                        {sort === "desc" ? (
-                          <ArrowDown className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                        ) : (
-                          <ArrowUp className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                        )}
-                        <span className="flex-1">
-                          {sortOptions.find((option) => option.value === sort)?.label || "Más reciente"}
-                        </span>
-                        <ChevronDown className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="start"
-                      sideOffset={8}
-                      className="min-w-[var(--radix-dropdown-menu-trigger-width)] border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1 text-[var(--ops-text)]"
-                    >
-                      <DropdownMenuRadioGroup value={sort} onValueChange={(value) => setSort(value as "desc" | "asc")}>
-                        {sortOptions.map((option) => (
-                          <DropdownMenuRadioItem
-                            key={option.value}
-                            value={option.value}
-                            className="cursor-pointer rounded-md px-3 py-2 text-sm focus:bg-[var(--ops-surface-muted)] focus:text-[var(--ops-text)]"
-                          >
-                            {option.label}
-                          </DropdownMenuRadioItem>
-                        ))}
-                      </DropdownMenuRadioGroup>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                <FilterDropdown
+                  label="Orden"
+                  value={sort}
+                  options={sortOptions}
+                  onChange={(v) => setSort(v as "desc" | "asc")}
+                />
 
                 <Tooltip>
                   <TooltipTrigger asChild>

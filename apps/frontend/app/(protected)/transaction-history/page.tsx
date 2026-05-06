@@ -2,25 +2,14 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import {
-  ChevronDown,
-  Filter,
-  RotateCcw,
-  Search,
-} from "lucide-react"
+import { RotateCcw, Search } from "lucide-react"
 
 import { PermissionGuard } from "@/components/auth/PermissionGuard"
 import { InlineStatusCard } from "@/components/feedback/status-page"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Button } from "@/components/ui/button"
 import { DateFilterPicker } from "@/components/ui/date-filter-picker"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { FilterDropdown } from "@/components/ui/filter-dropdown"
 import { Pagination } from "@/components/ui/pagination"
 import {
   Tooltip,
@@ -59,13 +48,6 @@ type SalesPageResponse = {
 }
 
 const PAGE_SIZE = 10
-
-const STATUS_OPTIONS = [
-  { value: "all", label: "Todos" },
-  { value: "confirmed", label: "Confirmadas" },
-  { value: "draft", label: "Borradores" },
-  { value: "cancelled", label: "Anuladas" },
-]
 
 const STATUS_LABELS: Record<string, string> = {
   confirmed: "Confirmada",
@@ -246,13 +228,13 @@ export default function TransactionHistoryPage() {
   return (
     <PermissionGuard permission="sales.pos">
       <TooltipProvider delayDuration={120}>
-        <section className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
+        <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
           <div className="mx-auto max-w-[1180px] space-y-4">
             <PosHeader
               eyebrow="Operacion comercial"
               title="Historial de ventas"
               actions={
-                <Button asChild variant="outline" size="sm" className="rounded-full">
+                <Button asChild variant="outline" size="sm" className="rounded-lg">
                   <Link href="/postventa">Postventa</Link>
                 </Button>
               }
@@ -266,51 +248,32 @@ export default function TransactionHistoryPage() {
 
             <div className="space-y-4 border-t border-[var(--ops-border-strong)] pt-4">
               <div className="grid gap-2.5 lg:grid-cols-[1.45fr_0.84fr_0.84fr_0.84fr_auto] lg:items-end">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Buscar por nro. venta o cliente"
-                    className="sales-field h-10 w-full rounded-lg py-2 pl-9 pr-3 text-sm"
-                  />
-                </div>
-
                 <div>
                   <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                    Estado
+                    Buscar
                   </label>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        className="sales-field flex h-10 w-full cursor-pointer items-center gap-2 rounded-lg px-3 text-left text-sm text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
-                      >
-                        <Filter className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                        <span className="flex-1">{STATUS_OPTIONS.find((option) => option.value === status)?.label ?? "Todos"}</span>
-                        <ChevronDown className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="start"
-                      sideOffset={8}
-                      className="min-w-[var(--radix-dropdown-menu-trigger-width)] border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1 text-[var(--ops-text)]"
-                    >
-                      <DropdownMenuRadioGroup value={status} onValueChange={setStatus}>
-                        {STATUS_OPTIONS.map((option) => (
-                          <DropdownMenuRadioItem
-                            key={option.value}
-                            value={option.value}
-                            className="cursor-pointer rounded-md px-3 py-2 text-sm focus:bg-[var(--ops-surface-muted)] focus:text-[var(--ops-text)]"
-                          >
-                            {option.label}
-                          </DropdownMenuRadioItem>
-                        ))}
-                      </DropdownMenuRadioGroup>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <div className="sales-field flex h-10 items-center gap-2 rounded-lg px-3 transition hover:bg-[var(--ops-surface-muted)]">
+                    <Search className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
+                    <input
+                      type="text"
+                      value={search}
+                      onChange={(event) => setSearch(event.target.value)}
+                      placeholder="Buscar por nro. venta o cliente"
+                      className="h-full w-full bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
+                    />
+                  </div>
                 </div>
+
+                <FilterDropdown
+                  label="Estado"
+                  value={status}
+                  options={[
+                    { value: "all", label: "Todas" },
+                    { value: "completed", label: "Completadas" },
+                    { value: "cancelled", label: "Canceladas" },
+                  ]}
+                  onChange={setStatus}
+                />
 
                 <DateFilterPicker
                   label="Fecha desde"
@@ -349,115 +312,126 @@ export default function TransactionHistoryPage() {
 
               <div className="overflow-x-auto">
                 <div className="min-w-[980px] border-y border-[var(--ops-border-strong)]">
-                  <div className="sales-panel-muted grid grid-cols-[0.84fr_0.74fr_1fr_0.88fr_0.86fr_0.78fr_0.72fr_0.98fr] gap-x-2 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                    <span>Venta</span>
-                    <span>Fecha</span>
-                    <span>Cliente</span>
-                    <span>Vendedor</span>
-                    <span>Sede</span>
-                    <span>Estado</span>
-                    <span>Total</span>
-                    <span>Acciones</span>
-                  </div>
+                  <table className="w-full border-collapse">
+                    <thead className="bg-[var(--ops-surface-muted)]">
+                      <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                        <th className="px-4 py-3">Venta</th>
+                        <th className="px-4 py-3">Fecha</th>
+                        <th className="px-4 py-3">Cliente</th>
+                        <th className="px-4 py-3">Vendedor</th>
+                        <th className="px-4 py-3">Sede</th>
+                        <th className="px-4 py-3">Estado</th>
+                        <th className="px-4 py-3">Total</th>
+                        <th className="px-4 py-3 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                      {loading ? (
+                        <tr>
+                          <td colSpan={8} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                            Cargando ventas...
+                          </td>
+                        </tr>
+                      ) : error ? (
+                        <tr>
+                          <td colSpan={8} className="px-4 py-6">
+                            <InlineStatusCard
+                              title="No pudimos cargar el historial"
+                              description={error}
+                              tone="danger"
+                            />
+                          </td>
+                        </tr>
+                      ) : sales.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                            No se encontraron ventas con los filtros aplicados.
+                          </td>
+                        </tr>
+                      ) : (
+                        sales.map((sale) => (
+                          <tr
+                            key={sale.sale_id}
+                            className="transition hover:bg-[var(--ops-surface-muted)]"
+                          >
+                            <td className="px-4 py-[var(--ops-row-py)]">
+                              <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
+                                {sale.sale_number || "Sin correlativo"}
+                              </p>
+                              <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                                {sale.document_type}
+                              </p>
+                            </td>
 
-                  <div className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                    {loading ? (
-                      <div className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                        Cargando ventas...
-                      </div>
-                    ) : error ? (
-                      <div className="px-4 py-6">
-                        <InlineStatusCard
-                          title="No pudimos cargar el historial"
-                          description={error}
-                          tone="danger"
-                        />
-                      </div>
-                    ) : sales.length === 0 ? (
-                      <div className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                        No se encontraron ventas con los filtros aplicados.
-                      </div>
-                  ) : (
-                    sales.map((sale) => (
-                      <div
-                        key={sale.sale_id}
-                        className="grid grid-cols-[0.84fr_0.74fr_1fr_0.88fr_0.86fr_0.78fr_0.72fr_0.98fr] gap-x-2 px-4 py-[var(--ops-row-py)] transition hover:bg-[var(--ops-surface-muted)]"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                            {sale.sale_number || "Sin correlativo"}
-                          </p>
-                          <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ripnel-accent-hover)]">
-                            {sale.document_type}
-                          </p>
-                        </div>
+                            <td className="px-4 py-[var(--ops-row-py)] text-xs leading-5 text-[var(--ops-text-muted)]">
+                              {formatDateTime(sale.confirmed_at, sale.created_at)}
+                            </td>
 
-                        <div className="text-xs leading-5 text-[var(--ops-text-muted)]">
-                          {formatDateTime(sale.confirmed_at, sale.created_at)}
-                        </div>
+                            <td className="px-4 py-[var(--ops-row-py)]">
+                              <p className="text-sm font-medium leading-5 text-[var(--ops-text)]">
+                                {sale.customer_name_text || "Cliente general"}
+                              </p>
+                            </td>
 
-                          <div>
-                            <p className="text-sm font-medium leading-5 text-[var(--ops-text)]">
-                              {sale.customer_name_text || "Cliente general"}
-                            </p>
-                          </div>
+                            <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{sale.seller_name}</td>
 
-                          <div className="text-sm text-[var(--ops-text)]">{sale.seller_name}</div>
+                            <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{sale.location_name}</td>
 
-                          <div className="text-sm text-[var(--ops-text)]">{sale.location_name}</div>
-
-                          <div>
-                            <span
-                              className={`${STATUS_CLASSES[sale.status] || "sales-chip"} rounded-full px-2.5 py-1 text-xs font-semibold`}
-                            >
-                              {STATUS_LABELS[sale.status] || sale.status}
-                            </span>
-                          </div>
-
-                        <div>
-                          <p className="text-sm font-semibold text-[var(--ops-text)]">
-                            S/. {Number(sale.total_amount).toFixed(2)}
-                          </p>
-                          <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
-                            {sale.currency}
-                          </p>
-                        </div>
-
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                asChild
-                                variant="outline"
-                                size="sm"
-                                className="rounded-full px-3"
+                            <td className="px-4 py-[var(--ops-row-py)]">
+                              <span
+                                className={`${STATUS_CLASSES[sale.status] || "sales-chip"} rounded-full px-2.5 py-1 text-[11px] font-semibold`}
                               >
-                                <Link href={`/purchase-system/${sale.sale_id}`} aria-label="Ver venta">
-                                  Ver venta
-                                </Link>
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent side="top" sideOffset={8}>
-                              Ver venta
-                            </TooltipContent>
-                          </Tooltip>
-                          {sale.status === "confirmed" ? (
-                            <Button asChild variant="accent" size="sm" className="rounded-full px-3">
-                              <Link href={`/postventa/${sale.sale_id}`}>Postventa</Link>
-                            </Button>
-                          ) : (
-                            <span className="inline-block h-7 w-[5.25rem]" aria-hidden="true" />
-                          )}
-                        </div>
-                      </div>
-                    ))
-                    )}
-                  </div>
+                                {STATUS_LABELS[sale.status] || sale.status}
+                              </span>
+                            </td>
+
+                            <td className="px-4 py-[var(--ops-row-py)]">
+                              <p className="text-sm font-semibold text-[var(--ops-text)]">
+                                S/. {Number(sale.total_amount).toFixed(2)}
+                              </p>
+                              <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
+                                {sale.currency}
+                              </p>
+                            </td>
+
+                            <td className="px-4 py-[var(--ops-row-py)]">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      asChild
+                                      variant="outline"
+                                      size="sm"
+                                      className="rounded-lg px-3"
+                                    >
+                                      <Link href={`/purchase-system/${sale.sale_id}`} aria-label="Ver venta">
+                                        Ver venta
+                                      </Link>
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" sideOffset={8}>
+                                    Ver venta
+                                  </TooltipContent>
+                                </Tooltip>
+                                {sale.status === "confirmed" ? (
+                                  <Button asChild variant="accent" size="sm" className="rounded-lg px-3">
+                                    <Link href={`/postventa/${sale.sale_id}`}>Postventa</Link>
+                                  </Button>
+                                ) : (
+                                  <span className="inline-block h-7 w-[5.25rem]" aria-hidden="true" />
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
               <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between">
-                <span className="ops-secondary-text text-[var(--ops-text-muted)]">
+                <span className="text-sm text-[var(--ops-text-muted)]">
                   {totalResults === 0 ? "0 resultados" : `${firstVisible}-${lastVisible} de ${totalResults}`}
                 </span>
 

@@ -3,8 +3,6 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ChevronDown,
-  Filter,
   LoaderCircle,
   PencilLine,
   Plus,
@@ -14,14 +12,9 @@ import {
 } from "lucide-react";
 import { buildApiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { InlineStatusCard } from "@/components/feedback/status-page";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { FilterDropdown } from "@/components/ui/filter-dropdown";
 import { Input } from "@/components/ui/input";
 import { Pagination } from "@/components/ui/pagination";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
@@ -432,9 +425,6 @@ export function StylesPage({
     }
   }
 
-  const selectedStatusLabel =
-    STATUS_OPTIONS.find((option) => option.value === statusFilter)?.label ?? "Todos";
-
   return (
     <TooltipProvider delayDuration={120}>
       <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
@@ -444,21 +434,29 @@ export function StylesPage({
             title="Estilos de producto"
             actions={
               <>
-                <Button asChild variant="accent" size="sm" className="rounded-full">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      onClick={loadData}
+                      disabled={loading}
+                      aria-label="Actualizar estilos"
+                      className="rounded-lg"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={8}>
+                    Actualizar
+                  </TooltipContent>
+                </Tooltip>
+                <Button asChild variant="accent" size="sm" className="rounded-lg">
                   <Link href="/productos/nuevo">
                     <Plus className="h-4 w-4" />
                     Nuevo
                   </Link>
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="rounded-full"
-                  onClick={loadData}
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Actualizar
                 </Button>
               </>
             }
@@ -472,55 +470,28 @@ export function StylesPage({
 
           <div className="space-y-4 border-t border-[var(--ops-border-strong)] pt-4">
             <div className="grid gap-2.5 lg:grid-cols-[1.45fr_0.84fr_auto] lg:items-end">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
-                <Input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Buscar por style, codigo o catalogos"
-                  className="h-10 rounded-lg pl-9"
-                />
-              </div>
-
               <div>
                 <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  Estado
+                  Buscar
                 </label>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className="ops-surface flex h-10 w-full cursor-pointer items-center gap-2 rounded-lg border px-3 text-left text-sm text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
-                    >
-                      <Filter className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                      <span className="flex-1">{selectedStatusLabel}</span>
-                      <ChevronDown className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="start"
-                    sideOffset={8}
-                    className="min-w-[var(--radix-dropdown-menu-trigger-width)] border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1 text-[var(--ops-text)]"
-                  >
-                    <DropdownMenuRadioGroup
-                      value={statusFilter}
-                      onValueChange={(value) =>
-                        setStatusFilter(value as "all" | "active" | "inactive")
-                      }
-                    >
-                      {STATUS_OPTIONS.map((option) => (
-                        <DropdownMenuRadioItem
-                          key={option.value}
-                          value={option.value}
-                          className="cursor-pointer rounded-md px-3 py-2 text-sm focus:bg-[var(--ops-surface-muted)] focus:text-[var(--ops-text)]"
-                        >
-                          {option.label}
-                        </DropdownMenuRadioItem>
-                      ))}
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <div className="sales-field flex h-10 items-center gap-2 rounded-lg px-3 transition hover:bg-[var(--ops-surface-muted)]">
+                  <Search className="h-4 w-4 text-[var(--ops-text-muted)]" />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Buscar por style, código o catálogos"
+                    className="h-full w-full bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
+                  />
+                </div>
               </div>
+
+              <FilterDropdown
+                label="Estado"
+                value={statusFilter}
+                options={STATUS_OPTIONS}
+                onChange={(value) => setStatusFilter(value as "all" | "active" | "inactive")}
+              />
 
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -559,7 +530,7 @@ export function StylesPage({
                   {loading ? (
                     <div className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
                       <LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />
-                      Cargando styles...
+                      Cargando styles…
                     </div>
                   ) : paginatedStyles.length === 0 ? (
                     <div className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
@@ -581,7 +552,7 @@ export function StylesPage({
                             {style.name}
                           </p>
                           <div className="mt-1 flex items-center gap-2">
-                            <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--ripnel-accent-hover)]">
+                            <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                               {style.style_code || "Sin codigo"}
                             </span>
                             <span className="text-[11px] text-[var(--ops-text-muted)]">
@@ -616,12 +587,12 @@ export function StylesPage({
                         </div>
 
                         <div>
-                          <span
+                           <span
                             className={cn(
-                              "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold",
+                              "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold",
                               style.active
-                                ? "bg-emerald-100 text-emerald-700"
-                                : "bg-amber-100 text-amber-700"
+                                ? "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
+                                : "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]"
                             )}
                           >
                             {style.active ? "Activo" : "Inactivo"}
@@ -634,17 +605,17 @@ export function StylesPage({
                             onClick={() => handleEdit(style)}
                             variant="outline"
                             size="sm"
-                            className="rounded-full px-3"
+                            className="rounded-lg px-3"
                           >
                             <PencilLine className="h-3.5 w-3.5" />
                             Editar
                           </Button>
-                          <Button asChild variant="outline" size="sm" className="rounded-full px-3">
+                          <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
                             <Link href={`/productos/variantes?style_id=${encodeURIComponent(style.style_id)}`}>
                               Variantes
                             </Link>
                           </Button>
-                          <Button asChild variant="outline" size="sm" className="rounded-full px-3">
+                          <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
                             <Link href={`/precios/crear-y-editar-precio?style_id=${encodeURIComponent(style.style_id)}`}>
                               Precios
                             </Link>
@@ -654,7 +625,7 @@ export function StylesPage({
                             onClick={() => handleToggleActive(style)}
                             variant={style.active ? "outline" : "accent"}
                             size="sm"
-                            className="rounded-full px-3"
+                            className="rounded-lg px-3"
                           >
                             {style.active ? "Inactivar" : "Activar"}
                           </Button>
@@ -844,22 +815,18 @@ export function StylesPage({
                 </label>
 
                 {error ? (
-                  <div role="alert" aria-live="polite" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-                    {error}
-                  </div>
+                  <InlineStatusCard title="Error" description={error} tone="danger" variant="ops" />
                 ) : null}
 
                 {successMessage ? (
-                  <div role="status" aria-live="polite" className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                    {successMessage}
-                  </div>
+                  <InlineStatusCard title="Éxito" description={successMessage} tone="neutral" variant="ops" />
                 ) : null}
 
                 <div className="flex flex-wrap justify-end gap-2">
-                  <Button type="button" variant="outline" className="rounded-full" onClick={resetForm}>
+                  <Button type="button" variant="outline" className="rounded-lg" onClick={resetForm}>
                     Cancelar
                   </Button>
-                  <Button type="submit" variant="accent" className="rounded-full" disabled={submitting}>
+                  <Button type="submit" variant="accent" className="rounded-lg" disabled={submitting}>
                     {submitting ? (
                       <>
                         <LoaderCircle className="h-4 w-4 animate-spin" />

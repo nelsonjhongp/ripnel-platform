@@ -20,6 +20,7 @@ import {
 } from "@/components/feedback/status-page"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { ApiError, apiFetch } from "@/lib/api"
+import { cn } from "@/lib/utils"
 import {
   CashClosingDetail,
   formatAmount,
@@ -54,6 +55,49 @@ function HelpTooltip({ content }: { content: string }) {
         {content}
       </TooltipContent>
     </Tooltip>
+  )
+}
+
+function MetricPill({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string
+  value: string | number
+  tone?: "default" | "accent" | "warning"
+}) {
+  const toneClass =
+    tone === "accent"
+      ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))] text-[var(--ops-text)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--ripnel-accent)_14%,transparent)]"
+      : tone === "warning"
+        ? "border-[color:color-mix(in_srgb,#f59e0b_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
+        : "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text)]"
+  const labelClass =
+    tone === "accent"
+      ? "text-[color:color-mix(in_srgb,var(--ripnel-accent)_72%,var(--ops-text))]"
+      : tone === "warning"
+        ? "text-[color:color-mix(in_srgb,#f59e0b_82%,var(--ops-text))]"
+        : "text-[var(--ops-text-muted)]"
+  const valueClass =
+    tone === "accent"
+      ? "text-[var(--ops-text)]"
+      : tone === "warning"
+        ? "text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
+        : "text-[var(--ops-text)]"
+
+  return (
+    <div
+      className={cn(
+        "inline-flex items-center gap-2.5 rounded-full border px-3 py-2",
+        toneClass
+      )}
+    >
+      <span className={cn("text-[11px] font-semibold uppercase tracking-[0.16em]", labelClass)}>
+        {label}
+      </span>
+      <span className={cn("text-base font-semibold leading-none", valueClass)}>{value}</span>
+    </div>
   )
 }
 
@@ -166,14 +210,14 @@ export default function CashHistoryDetailPage({
               Volver al historial
             </Link>
 
-            <header className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
+            <header className="px-1 space-y-4">
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="text-xs uppercase tracking-wide text-[var(--ripnel-accent-hover)]">Detalle de caja</p>
                     <HelpTooltip content="Vista detallada de la sesión elegida, con auditoría, montos y consistencia del sistema." />
                   </div>
-                  <h1 className="mt-1 text-2xl font-semibold text-[var(--ops-text)] md:text-3xl">
+                  <h1 className="mt-1 text-2xl font-semibold text-[var(--ops-text)] md:text-[1.75rem]">
                     {closing.location_name} • {formatBusinessDate(closing.business_date)}
                   </h1>
                 </div>
@@ -186,31 +230,11 @@ export default function CashHistoryDetailPage({
               </div>
             </header>
 
-            <div className="grid gap-4 md:grid-cols-4">
-              <article className="ops-metric-pill rounded-xl p-4 shadow-sm">
-                <p className="text-xs uppercase tracking-wide text-[var(--ops-text-muted)]">Total caja</p>
-                <p className="mt-2 text-2xl font-bold text-[var(--ops-text)]">
-                  {formatAmount(closing.total_all)}
-                </p>
-              </article>
-              <article className="sales-chip sales-chip-accent rounded-xl p-4 shadow-sm">
-                <p className="text-xs uppercase tracking-wide">Ventas confirmadas</p>
-                <p className="mt-2 text-2xl font-bold">
-                  {closing.sales_summary.sale_count}
-                </p>
-              </article>
-              <article className="sales-panel-muted rounded-xl p-4 shadow-sm">
-                <p className="text-xs uppercase tracking-wide text-[var(--ops-text-muted)]">Apertura</p>
-                <p className="mt-2 text-sm font-semibold text-[var(--ops-text)]">
-                  {formatDateTime(closing.created_at)}
-                </p>
-              </article>
-              <article className="sales-panel-muted rounded-xl p-4 shadow-sm">
-                <p className="text-xs uppercase tracking-wide text-[var(--ops-text-muted)]">Cierre</p>
-                <p className="mt-2 text-sm font-semibold text-[var(--ops-text)]">
-                  {closing.closed_at ? formatDateTime(closing.closed_at) : "Pendiente"}
-                </p>
-              </article>
+            <div className="flex flex-wrap items-center gap-2">
+              <MetricPill label="Total caja" value={formatAmount(closing.total_all)} tone="accent" />
+              <MetricPill label="Ventas" value={closing.sales_summary.sale_count} tone="accent" />
+              <MetricPill label="Apertura" value={formatDateTime(closing.created_at)} />
+              <MetricPill label="Cierre" value={closing.closed_at ? formatDateTime(closing.closed_at) : "Pendiente"} />
             </div>
 
             <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
@@ -294,7 +318,7 @@ export default function CashHistoryDetailPage({
                 </div>
 
                 {closing.sales_summary.consistency.is_consistent ? (
-                  <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-600" />
+                  <CheckCircle2 className="h-6 w-6 shrink-0 text-[color:color-mix(in_srgb,#059669_80%,var(--ops-text))]" />
                 ) : null}
               </div>
 
