@@ -5,6 +5,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 import {
+  ArrowRightLeft,
   BarChart3,
   Banknote,
   ClipboardList,
@@ -94,6 +95,16 @@ const sidebarGroups: SidebarGroup[] = [
     ],
   },
   {
+    title: "Transferencias",
+    icon: ArrowRightLeft,
+    excludeRoles: SELLER_FOCUSED_ROLES,
+    items: [
+      { title: "Solicitar productos", url: "/transferencias/solicitar-productos" },
+      { title: "Listado de transferencias", url: "/transferencias/listado-de-transferencias" },
+      { title: "Recepciones pendientes", url: "/transferencias/recepciones-pendientes" },
+    ],
+  },
+  {
     title: "Inventario",
     icon: Boxes,
     permission: "inventory.view",
@@ -138,7 +149,8 @@ const sidebarGroups: SidebarGroup[] = [
     icon: Settings,
     permission: "admin.manage",
     items: [
-      { title: "Roles y usuarios", url: "/administracion/roles&usuarios" },
+      { title: "Usuarios", url: "/administracion/usuarios" },
+      { title: "Roles", url: "/administracion/roles" },
       { title: "Ubicaciones", url: "/administracion/ubicaciones" },
     ],
   },
