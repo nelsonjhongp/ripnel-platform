@@ -70,18 +70,21 @@ export function SidebarShell({
     const routeTitles: Record<string, string> = {
       "/sidebar": "Panel del usuario",
       "/account": "Perfil",
-      "/account/operacion": "Sede operativa",
-      "/account/apariencia": "Apariencia",
       "/inicio": "Inicio",
       "/dashboard": "Dashboard operativo",
       "/bi": "BI y analitica",
       "/account-mockup": "Cuenta mockup",
-      "/admin-crud": "Gestion de usuarios",
+      "/administracion/usuarios": "Usuarios",
+      "/administracion/roles": "Roles",
+      "/administracion/ubicaciones": "Ubicaciones",
       "/inventory": "Inventario",
       "/kardex": "Kardex",
       "/purchase-system": "Nueva venta",
       "/transaction-history": "Historial de ventas",
       "/postventa": "Postventa",
+      "/transferencias/listado-de-transferencias": "Transferencias",
+      "/transferencias/solicitar-productos": "Solicitar productos",
+      "/transferencias/recepciones-pendientes": "Recepciones pendientes",
     }
 
     if (routeTitles[pathname]) {
