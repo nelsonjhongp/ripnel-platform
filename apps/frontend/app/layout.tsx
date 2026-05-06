@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Poppins, Geist } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
-import { SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 
@@ -37,11 +36,9 @@ export default function RootLayout({
       lang="es"
       className={cn(poppins.className, "font-sans", geist.variable)}
     >
-      <body suppressHydrationWarning>
+<body suppressHydrationWarning>
         <AuthProvider>
-          <SidebarProvider>
-            <TooltipProvider>{children}</TooltipProvider>
-          </SidebarProvider>
+          <TooltipProvider>{children}</TooltipProvider>
         </AuthProvider>
       </body>
     </html>
