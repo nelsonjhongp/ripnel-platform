@@ -6,6 +6,7 @@ import { FormEvent, useEffect, useId, useMemo, useState } from "react";
 import {
   Check,
   ChevronDown,
+  Eye,
   LoaderCircle,
   PencilLine,
   Save,
@@ -24,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
   Sheet,
   SheetContent,
@@ -422,7 +424,7 @@ function ConfirmationDialog({
               </DialogPrimitive.Title>
             </div>
             <DialogPrimitive.Close asChild>
-              <Button type="button" variant="ghost" size="icon-sm" className="rounded-full">
+              <Button type="button" variant="ghost" size="icon-sm" className="rounded-lg">
                 <X className="h-4 w-4" />
               </Button>
             </DialogPrimitive.Close>
@@ -503,15 +505,15 @@ function ConfirmationDialog({
 
           <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <DialogPrimitive.Close asChild>
-              <Button type="button" variant="outline" className="rounded-full">
+              <Button type="button" variant="outline" className="rounded-lg">
                 Cancelar
               </Button>
             </DialogPrimitive.Close>
-            <Button type="button" variant="accent" className="rounded-full" disabled={submitting} onClick={() => void onConfirm()}>
+            <Button type="button" variant="accent" className="rounded-lg" disabled={submitting} onClick={() => void onConfirm()}>
               {submitting ? (
                 <>
                   <LoaderCircle className="h-4 w-4 animate-spin" />
-                  Creando...
+                  Creando…
                 </>
               ) : (
                 <>
@@ -755,6 +757,13 @@ export function ProductCreatePage() {
     }
   }
 
+  function openSummary() {
+    if (!confirmationSummary) return;
+    setError(null);
+    setPendingConfirmation(confirmationSummary);
+    setConfirmationOpen(true);
+  }
+
 function handleSubmit(event: FormEvent<HTMLFormElement>) {
   event.preventDefault();
   setError(null);
@@ -923,35 +932,32 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
 
   return (
     <>
-      <section className="ops-page min-h-screen p-4 md:p-5">
+      <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
         <div className="mx-auto flex max-w-5xl flex-col gap-4">
-          <header className="flex flex-col gap-3 border-b border-[color:var(--ops-border-soft)] pb-4 md:flex-row md:items-end md:justify-between">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--ripnel-accent-hover)]">
-                Productos
-              </p>
-              <h1 className="ops-title mt-1 text-2xl font-semibold">Nuevo producto</h1>
-            </div>
-
-            <Button asChild variant="outline" size="sm" className="rounded-lg">
-              <Link href="/productos">Ver resumen</Link>
-            </Button>
-          </header>
+          <PosHeader
+            eyebrow="Productos"
+            title="Nuevo producto"
+            actions={
+              <Button variant="accent" size="sm" className="rounded-lg px-3" onClick={openSummary}>
+                <Eye className="h-3.5 w-3.5" /> Ver resumen
+              </Button>
+            }
+          />
 
           {error ? (
-            <div role="alert" aria-live="polite" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
+            <div role="alert" aria-live="polite" className="rounded-lg border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-4 py-3 text-sm text-[color:color-mix(in_srgb,#be123c_74%,var(--ops-text))]">
               {error}
             </div>
           ) : null}
 
           {createdStyle ? (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/60 dark:bg-emerald-950/30">
+            <div className="rounded-lg border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] px-4 py-3">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
+                  <p className="text-sm font-semibold text-[color:color-mix(in_srgb,#047857_74%,var(--ops-text))]">
                     {createdStyle.name}
                   </p>
-                  <p className="mt-1 text-xs text-emerald-800 dark:text-emerald-300">
+                  <p className="mt-1 text-xs text-[color:color-mix(in_srgb,#047857_74%,var(--ops-text))]">
                     Codigo {createdStyle.style_code || "-"}
                   </p>
                 </div>
@@ -994,7 +1000,7 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
                     <button
                       type="button"
                       onClick={() => setNameMode("manual")}
-                      className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-[var(--ops-border-soft)] bg-[var(--ops-surface)] text-[var(--ops-text-muted)] transition hover:border-[color:var(--ripnel-accent)] hover:text-[var(--ops-text)]"
+                      className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-lg border border-[var(--ops-border-soft)] bg-[var(--ops-surface)] text-[var(--ops-text-muted)] transition hover:border-[color:var(--ripnel-accent)] hover:text-[var(--ops-text)]"
                       aria-label="Editar nombre"
                     >
                       <PencilLine className="h-3.5 w-3.5" />
@@ -1005,7 +1011,7 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
                       El codigo se genera automaticamente al crear.
                     </span>
                     {duplicatedStyle ? (
-                      <span className="font-medium text-amber-700">
+                      <span className="font-medium text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]">
                         Ya existe un style con este nombre.
                       </span>
                     ) : null}
@@ -1159,7 +1165,7 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
 
             <div className="flex flex-col gap-3 border-t border-[color:var(--ops-border-soft)] pt-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--ops-text-muted)]">
-                <span>{loading ? "Cargando catalogos..." : `${formState.size_ids.length} tallas seleccionadas`}</span>
+                <span>{loading ? "Cargando catalogos…" : `${formState.size_ids.length} tallas seleccionadas`}</span>
                 <span>·</span>
                 <span>{`${formState.color_ids.length} colores seleccionados`}</span>
               </div>
@@ -1183,7 +1189,7 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
           </form>
 
           {!loading && !sizes.length ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
+            <div className="rounded-lg border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] px-4 py-3 text-sm text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]">
               Carga tallas en catalogos antes de crear productos.
             </div>
           ) : null}
@@ -1288,13 +1294,13 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
                   })}
 
                   {catalogError ? (
-                    <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    <div className="rounded-lg border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-4 py-3 text-sm text-[color:color-mix(in_srgb,#be123c_74%,var(--ops-text))]">
                       {catalogError}
                     </div>
                   ) : null}
 
                   {hasCatalogNameDuplicate ? (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    <div className="rounded-lg border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] px-4 py-3 text-sm text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]">
                       Ya existe un registro con ese nombre. Cambia el nombre antes de guardar.
                     </div>
                   ) : null}
@@ -1302,19 +1308,19 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
 
                 <SheetFooter className="border-t border-[var(--ops-border-soft)] bg-[var(--ops-surface)]">
                   <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                    <Button type="button" variant="outline" className="rounded-full" onClick={() => setCatalogPanel(null)}>
+                    <Button type="button" variant="outline" className="rounded-lg" onClick={() => setCatalogPanel(null)}>
                       Volver
                     </Button>
                     <Button
                       type="submit"
                       variant="accent"
-                      className="rounded-full"
+                      className="rounded-lg"
                       disabled={catalogSubmitting || hasCatalogNameDuplicate}
                     >
                       {catalogSubmitting ? (
                         <>
                           <LoaderCircle className="h-4 w-4 animate-spin" />
-                          Guardando...
+                          Guardando…
                         </>
                       ) : (
                         <>

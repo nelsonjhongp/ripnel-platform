@@ -4,12 +4,24 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDownCircle,
   ArrowUpCircle,
-  ClipboardList,
   LoaderCircle,
+  RefreshCw,
+  RotateCcw,
   Search,
-  SlidersHorizontal,
 } from "lucide-react";
+import { InlineStatusCard } from "@/components/feedback/status-page";
 import { buildApiUrl } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
+import { Button } from "@/components/ui/button";
+import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { Pagination } from "@/components/ui/pagination";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type MovementType = "IN" | "OUT" | "ADJUST";
 
@@ -35,17 +47,9 @@ type KardexMovement = {
   created_at: string;
 };
 
-const TYPE_OPTIONS: Array<"ALL" | MovementType> = ["ALL", "IN", "OUT", "ADJUST"];
-
 function formatMovementTypeLabel(type: MovementType) {
-  if (type === "IN") {
-    return "Entrada";
-  }
-
-  if (type === "OUT") {
-    return "Salida";
-  }
-
+  if (type === "IN") return "Entrada";
+  if (type === "OUT") return "Salida";
   return "Ajuste";
 }
 
@@ -53,25 +57,60 @@ function formatReference(movement: KardexMovement) {
   if (movement.reference_type && movement.reference_id) {
     return `${movement.reference_type}:${movement.reference_id.slice(0, 8)}`;
   }
-
-  if (movement.reference_type) {
-    return movement.reference_type;
-  }
-
+  if (movement.reference_type) return movement.reference_type;
   return movement.reason || "Sin referencia";
 }
 
 function formatDateTime(value: string) {
   const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
+  if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("es-PE", {
     dateStyle: "short",
     timeStyle: "short",
   }).format(date);
+}
+
+function MetricPill({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string;
+  value: string | number;
+  tone?: "default" | "accent" | "warning";
+}) {
+  const toneClass =
+    tone === "accent"
+      ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))] text-[var(--ops-text)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--ripnel-accent)_14%,transparent)]"
+      : tone === "warning"
+        ? "border-[color:color-mix(in_srgb,#f59e0b_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
+        : "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text)]";
+  const labelClass =
+    tone === "accent"
+      ? "text-[color:color-mix(in_srgb,var(--ripnel-accent)_72%,var(--ops-text))]"
+      : tone === "warning"
+        ? "text-[color:color-mix(in_srgb,#f59e0b_82%,var(--ops-text))]"
+        : "text-[var(--ops-text-muted)]";
+  const valueClass =
+    tone === "accent"
+      ? "text-[var(--ops-text)]"
+      : tone === "warning"
+        ? "text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
+        : "text-[var(--ops-text)]";
+
+  return (
+    <div
+      className={cn(
+        "inline-flex items-center gap-2.5 rounded-full border px-3 py-2",
+        toneClass
+      )}
+    >
+      <span className={cn("text-[11px] font-semibold uppercase tracking-[0.16em]", labelClass)}>
+        {label}
+      </span>
+      <span className={cn("text-base font-semibold leading-none", valueClass)}>{value}</span>
+    </div>
+  );
 }
 
 export default function KardexPage() {
@@ -80,21 +119,19 @@ export default function KardexPage() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [movementType, setMovementType] = useState<"ALL" | MovementType>("ALL");
+  const [currentPage, setCurrentPage] = useState(1);
 
   async function loadKardex() {
     setLoading(true);
     setError(null);
-
     try {
       const response = await fetch(buildApiUrl("/api/inventory/kardex"), {
         cache: "no-store",
       });
       const payload = await response.json();
-
       if (!response.ok) {
         throw new Error(payload.message || "No se pudo cargar kardex");
       }
-
       setMovements(payload.data || []);
     } catch (requestError) {
       setError(
@@ -108,13 +145,11 @@ export default function KardexPage() {
   }
 
   useEffect(() => {
-    // defer loadKardex to avoid synchronous setState inside effect
     void Promise.resolve().then(() => loadKardex());
   }, []);
 
   const filteredMovements = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-
     return movements.filter((movement) => {
       const matchesType =
         movementType === "ALL" || movement.movement_type === movementType;
@@ -126,7 +161,6 @@ export default function KardexPage() {
         movement.style_code.toLowerCase().includes(normalizedQuery) ||
         movement.location_name.toLowerCase().includes(normalizedQuery) ||
         reference.includes(normalizedQuery);
-
       return matchesType && matchesQuery;
     });
   }, [movements, query, movementType]);
@@ -137,230 +171,237 @@ export default function KardexPage() {
         if (movement.quantity_effect > 0) {
           acc.entries += movement.quantity_effect;
         }
-
         if (movement.quantity_effect < 0) {
           acc.exits += Math.abs(movement.quantity_effect);
         }
-
         if (movement.movement_type === "ADJUST") {
           acc.adjustments += 1;
         }
-
         return acc;
       },
       { entries: 0, exits: 0, adjustments: 0 }
     );
   }, [filteredMovements]);
 
-  return (
-    <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_35%,#f8fafc_70%,#eef2ff_100%)] px-4 py-6 md:px-8">
-      <div className="mx-auto max-w-7xl space-y-5">
-        <header className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur md:p-6">
-          <p className="text-xs uppercase tracking-wide text-violet-600">
-            Trazabilidad de stock
-          </p>
-          <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">
-            Kardex
-          </h1>
-          <p className="mt-1 text-sm text-slate-600">
-            Consulta entradas, salidas y ajustes registrados en{" "}
-            <code>stock_movements</code> para auditoria y control operativo.
-          </p>
-        </header>
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredMovements.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedMovements = filteredMovements.slice(
+    (safePage - 1) * pageSize,
+    safePage * pageSize
+  );
+  const firstVisible = filteredMovements.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const lastVisible = Math.min(safePage * pageSize, filteredMovements.length);
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <article className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-wide text-emerald-700">
-              Entradas
-            </p>
-            <p className="mt-2 text-2xl font-bold text-emerald-800">
-              {totals.entries}
-            </p>
-          </article>
-          <article className="rounded-2xl border border-rose-200 bg-rose-50 p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-wide text-rose-700">
-              Salidas
-            </p>
-            <p className="mt-2 text-2xl font-bold text-rose-800">
-              {totals.exits}
-            </p>
-          </article>
-          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs uppercase tracking-wide text-slate-500">
-              Ajustes registrados
-            </p>
-            <p className="mt-2 text-2xl font-bold text-slate-900">
-              {totals.adjustments}
-            </p>
-          </article>
+  function handleFilterChange(fn: () => void) {
+    fn();
+    setCurrentPage(1);
+  }
+
+  const hasActiveFilters = query !== "" || movementType !== "ALL";
+
+  return (
+    <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
+      <div className="mx-auto max-w-[1180px] space-y-4">
+        <PosHeader
+          eyebrow="Trazabilidad de stock"
+          title="Kardex"
+          actions={
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={() => loadKardex()}
+                    disabled={loading}
+                    className="rounded-lg"
+                    aria-label="Actualizar kardex"
+                  >
+                    {loading ? (
+                      <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Actualizar kardex</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          }
+        />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <MetricPill label="Entradas" value={totals.entries} tone="accent" />
+          <MetricPill label="Salidas" value={totals.exits} tone="warning" />
+          <MetricPill label="Ajustes" value={totals.adjustments} />
         </div>
 
-        <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
-          <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar por SKU, style, producto, ubicacion o referencia"
-                className="w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-              />
+        <div className="space-y-4 border-t border-[var(--ops-border-strong)] pt-4">
+          <div className="grid gap-2.5 lg:grid-cols-[minmax(0,1.55fr)_0.92fr_auto] lg:items-end">
+            <div>
+              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                Buscar
+              </label>
+              <div className="sales-field flex h-10 items-center gap-2 rounded-lg px-3 transition hover:bg-[var(--ops-surface-muted)]">
+                <Search className="h-4 w-4 text-[var(--ops-text-muted)]" />
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => handleFilterChange(() => setQuery(e.target.value))}
+                  placeholder="Buscar por SKU, producto, ubicación o referencia"
+                  className="h-full w-full bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
+                />
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1 text-sm font-medium text-slate-600">
-                <SlidersHorizontal className="h-4 w-4" />
-                Tipo:
-              </span>
-              {TYPE_OPTIONS.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => setMovementType(option)}
-                  className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
-                    movementType === option
-                      ? "border-violet-400 bg-violet-100 text-violet-700"
-                      : "border-slate-300 bg-white text-slate-700 hover:border-slate-400"
-                  }`}
-                >
-                  {option === "ALL" ? "Todos" : formatMovementTypeLabel(option)}
-                </button>
-              ))}
-            </div>
+            <FilterDropdown
+              label="Tipo"
+              value={movementType}
+              options={[
+                { value: "ALL", label: "Todos" },
+                { value: "IN", label: "Entradas" },
+                { value: "OUT", label: "Salidas" },
+                { value: "ADJUST", label: "Ajustes" },
+              ]}
+              onChange={(v) => handleFilterChange(() => setMovementType(v as "ALL" | MovementType))}
+            />
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={() => handleFilterChange(() => {
+                      setQuery("");
+                      setMovementType("ALL");
+                    })}
+                    disabled={!hasActiveFilters}
+                    className="rounded-lg"
+                    aria-label="Limpiar filtros"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Limpiar filtros</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
 
-{error ? (
-            <div role="alert" aria-live="polite" className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {error}
-            </div>
+          {error ? (
+            <InlineStatusCard title="No pudimos cargar el kardex" description={error} tone="danger" variant="ops" />
           ) : null}
 
-          {loading ? (
-            <div className="mt-5 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-sm text-slate-500">
-              <LoaderCircle className="h-4 w-4 animate-spin" />
-              Cargando kardex...
-            </div>
-          ) : (
-            <div className="mt-5 overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Fecha
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      SKU
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Producto
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Ubicacion
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Tipo
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Referencia
-                    </th>
-                    <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Movimiento
-                    </th>
-                    <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Saldo
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      Usuario
-                    </th>
+          <div className="overflow-x-auto">
+            <div className="min-w-[1080px] border-y border-[var(--ops-border-strong)]">
+              <table className="w-full border-collapse">
+                <thead className="bg-[var(--ops-surface-muted)]">
+                  <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                    <th className="px-4 py-3">Fecha</th>
+                    <th className="px-4 py-3">SKU</th>
+                    <th className="px-4 py-3">Producto</th>
+                    <th className="px-4 py-3 hidden sm:table-cell">Ref.</th>
+                    <th className="px-4 py-3">Tipo</th>
+                    <th className="px-4 py-3 text-right">Cantidad</th>
+                    <th className="px-4 py-3">Ubicación</th>
+                    <th className="px-4 py-3">Usuario</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 bg-white">
-                  {filteredMovements.map((movement) => (
-                    <tr
-                      key={movement.movement_id}
-                      className="hover:bg-slate-50"
-                    >
-                      <td className="whitespace-nowrap px-3 py-3 text-sm text-slate-700">
-                        {formatDateTime(movement.created_at)}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-3 text-sm font-medium text-slate-700">
-                        {movement.sku}
-                      </td>
-                      <td className="px-3 py-3 text-sm">
-                        <p className="font-semibold text-slate-900">
-                          {movement.style_name}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {movement.style_code}
-                        </p>
-                      </td>
-                      <td className="px-3 py-3 text-sm text-slate-600">
-                        {movement.location_name}
-                      </td>
-                      <td className="px-3 py-3 text-sm">
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            movement.movement_type === "IN"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : movement.movement_type === "OUT"
-                              ? "bg-rose-100 text-rose-700"
-                              : "bg-amber-100 text-amber-700"
-                          }`}
-                        >
-                          {movement.movement_type === "IN" ? (
-                            <ArrowUpCircle className="h-3.5 w-3.5" />
-                          ) : null}
-                          {movement.movement_type === "OUT" ? (
-                            <ArrowDownCircle className="h-3.5 w-3.5" />
-                          ) : null}
-                          {formatMovementTypeLabel(movement.movement_type)}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-sm text-slate-600">
-                        {formatReference(movement)}
-                      </td>
-                      <td
-                        className={`px-3 py-3 text-right text-sm font-semibold ${
-                          movement.quantity_effect >= 0
-                            ? "text-emerald-700"
-                            : "text-rose-700"
-                        }`}
-                      >
-                        {movement.quantity_effect >= 0 ? "+" : ""}
-                        {movement.quantity_effect}
-                      </td>
-                      <td className="px-3 py-3 text-right text-sm font-semibold text-slate-800">
-                        {movement.balance_qty}
-                      </td>
-                      <td className="px-3 py-3 text-sm text-slate-600">
-                        {movement.created_by_name || "Sistema"}
+                <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                        <LoaderCircle className="mr-2 inline-block h-4 w-4 animate-spin" />
+                        Cargando kardex...
                       </td>
                     </tr>
-                  ))}
+                  ) : filteredMovements.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                        {movements.length === 0
+                          ? "No existen movimientos registrados."
+                          : "No existen movimientos para los filtros seleccionados."}
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedMovements.map((movement) => (
+                      <tr
+                        key={movement.movement_id}
+                        className="transition hover:bg-[var(--ops-surface-muted)]"
+                      >
+                        <td className="px-4 py-[var(--ops-row-py)] text-xs text-[var(--ops-text-muted)]">
+                          {formatDateTime(movement.created_at)}
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                          {movement.sku}
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] text-sm font-semibold text-[var(--ops-text)]">
+                          {movement.style_name}
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] text-xs text-[var(--ops-text-muted)] hidden sm:table-cell">
+                          {formatReference(movement)}
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)]">
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                              movement.movement_type === "IN" &&
+                                "border-[color:color-mix(in_srgb,#10b981_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_82%,var(--ops-text))]",
+                              movement.movement_type === "OUT" &&
+                                "border-[color:color-mix(in_srgb,#f59e0b_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] text-[color:color-mix(in_srgb,#d97706_72%,var(--ops-text))]",
+                              movement.movement_type === "ADJUST" &&
+                                "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text-muted)]"
+                            )}
+                          >
+                            {movement.movement_type === "IN" && (
+                              <ArrowUpCircle className="h-3 w-3" />
+                            )}
+                            {movement.movement_type === "OUT" && (
+                              <ArrowDownCircle className="h-3 w-3" />
+                            )}
+                            {formatMovementTypeLabel(movement.movement_type)}
+                          </span>
+                        </td>
+                        <td
+                          className={cn(
+                            "px-4 py-[var(--ops-row-py)] text-right text-sm font-semibold tabular-nums",
+                            movement.quantity_effect >= 0
+                              ? "text-[color:color-mix(in_srgb,#059669_88%,var(--ops-text))]"
+                              : "text-[color:color-mix(in_srgb,#e11d48_88%,var(--ops-text))]"
+                          )}
+                        >
+                          {movement.quantity_effect >= 0 ? "+" : ""}
+                          {movement.quantity_effect}
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                          {movement.location_name}
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] text-xs text-[var(--ops-text-muted)]">
+                          {movement.created_by_name || "Sistema"}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
-          )}
+          </div>
 
-          {!loading && !filteredMovements.length ? (
-            <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-              No existen movimientos para los filtros seleccionados.
-            </div>
-          ) : null}
-        </article>
-
-        <article className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5">
-          <p className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-            <ClipboardList className="h-4 w-4" />
-            Nota operativa
-          </p>
-          <p className="mt-2 text-sm text-slate-600">
-            El saldo se calcula desde backend sobre la secuencia real de{" "}
-            <code>stock_movements</code>. Los ajustes deben confirmarse para
-            impactar inventario y quedar trazados aqui.
-          </p>
-        </article>
+          <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between">
+            <span className="text-[var(--ops-text-muted)]">
+              {filteredMovements.length === 0
+                ? "0 resultados"
+                : `${firstVisible}-${lastVisible} de ${filteredMovements.length}`}
+            </span>
+            <Pagination
+              page={safePage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              className="self-end md:self-auto"
+            />
+          </div>
+        </div>
       </div>
     </section>
   );

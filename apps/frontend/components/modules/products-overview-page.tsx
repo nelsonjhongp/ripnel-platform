@@ -10,13 +10,16 @@ import {
   Plus,
   ReceiptText,
   RefreshCw,
+  RotateCcw,
   Search,
   Shapes,
 } from "lucide-react";
 import { ApiEnvelope, apiFetch, unwrapApiData } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { InlineStatusCard } from "@/components/feedback/status-page";
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { FilterDropdown } from "@/components/ui/filter-dropdown";
 import { Pagination } from "@/components/ui/pagination";
 import {
   Tooltip,
@@ -94,29 +97,76 @@ type ProductsResponse = {
 const STATUS_META: Record<ProductStatus, { label: string; className: string }> = {
   inactive: {
     label: "Inactivo",
-    className: "bg-slate-200 text-slate-700",
+    className:
+      "border-[color:color-mix(in_srgb,#94a3b8_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#94a3b8_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#475569_74%,var(--ops-text))]",
   },
   draft: {
     label: "Borrador",
-    className: "bg-slate-900 text-white",
+    className:
+      "border-[color:color-mix(in_srgb,#334155_60%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#1e293b_90%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f1f5f9_94%,var(--ops-text))]",
   },
   pending_variants: {
     label: "Faltan variantes",
-    className: "bg-amber-100 text-amber-800",
+    className:
+      "border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#d97706_74%,var(--ops-text))]",
   },
   pending_prices: {
     label: "Faltan precios",
-    className: "bg-rose-100 text-rose-700",
+    className:
+      "border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#e11d48_74%,var(--ops-text))]",
   },
   ready_no_stock: {
     label: "Sin stock",
-    className: "bg-sky-100 text-sky-700",
+    className:
+      "border-[color:color-mix(in_srgb,#3b82f6_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#3b82f6_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#2563eb_74%,var(--ops-text))]",
   },
   ready: {
     label: "Listo",
-    className: "bg-emerald-100 text-emerald-700",
+    className:
+      "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]",
   },
 };
+
+function MetricPill({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string;
+  value: string | number;
+  tone?: "default" | "accent" | "success" | "warning";
+}) {
+  const toneClass =
+    tone === "accent"
+      ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))] text-[var(--ops-text)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--ripnel-accent)_14%,transparent)]"
+      : tone === "success"
+      ? "border-[color:color-mix(in_srgb,#10b981_32%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_12%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_78%,var(--ops-text))]"
+      : tone === "warning"
+      ? "border-[color:color-mix(in_srgb,#f59e0b_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
+      : "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text)]";
+  const labelClass =
+    tone === "accent"
+      ? "text-[color:color-mix(in_srgb,var(--ripnel-accent)_72%,var(--ops-text))]"
+      : tone === "success"
+      ? "text-[color:color-mix(in_srgb,#059669_76%,var(--ops-text))]"
+      : tone === "warning"
+      ? "text-[color:color-mix(in_srgb,#f59e0b_82%,var(--ops-text))]"
+      : "text-[var(--ops-text-muted)]";
+
+  return (
+    <div
+      className={cn(
+        "inline-flex items-center gap-2.5 rounded-full border px-3 py-2",
+        toneClass
+      )}
+    >
+      <span className={cn("text-[11px] font-semibold uppercase tracking-[0.16em]", labelClass)}>
+        {label}
+      </span>
+      <span className="text-base font-semibold leading-none text-[var(--ops-text)]">{value}</span>
+    </div>
+  );
+}
 
 const PAGE_SIZE = 10;
 
@@ -142,7 +192,7 @@ function ActionIcon({
       href={href}
       aria-label={label}
       title={label}
-      className="ops-surface inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl border text-[var(--ops-text-muted)] transition hover:border-[color:var(--ripnel-accent)] hover:text-[var(--ops-text)]"
+      className="ops-surface inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border text-[var(--ops-text-muted)] transition hover:border-[color:var(--ripnel-accent)] hover:text-[var(--ops-text)]"
     >
       {children}
     </Link>
@@ -154,7 +204,7 @@ function formatExtraSizes(extraSizes: ProductSizeStock[]) {
 }
 
 export function ProductsOverviewPage() {
-  const { defaultLocation, locationAssignments, locationsLoading } = useAuth();
+  const { defaultLocation, locationAssignments } = useAuth();
   const [response, setResponse] = useState<ProductsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -240,112 +290,145 @@ export function ProductsOverviewPage() {
   const visibleFrom = totalItems ? (page - 1) * PAGE_SIZE + 1 : 0;
   const visibleTo = totalItems ? visibleFrom + products.length - 1 : 0;
 
+  const readyCount = useMemo(
+    () => products.filter((p) => p.status === "ready").length,
+    [products]
+  );
+  const pendingCount = useMemo(
+    () =>
+      products.filter(
+        (p) =>
+          p.status === "draft" ||
+          p.status === "pending_variants" ||
+          p.status === "pending_prices" ||
+          p.status === "ready_no_stock"
+      ).length,
+    [products]
+  );
+
+  const hasActiveFilters = deferredSearch !== "" || filterMode !== "all";
+
   return (
-    <section className="ops-page min-h-screen p-4 md:p-5">
-      <div className="mx-auto flex max-w-7xl flex-col gap-4">
-        <header className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--ripnel-accent-hover)]">
-              Productos
-            </p>
-            <h1 className="ops-title mt-1 text-2xl font-semibold">
-              Maestro de producto
-            </h1>
+    <TooltipProvider delayDuration={120}>
+      <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
+        <div className="mx-auto max-w-[1180px] space-y-4">
+          <PosHeader
+            eyebrow="Productos"
+            title="Maestro de producto"
+            actions={
+              <>
+                <Button asChild variant="accent" size="sm" className="rounded-lg px-3">
+                  <Link href="/productos/nuevo">
+                    <Plus className="h-4 w-4" />
+                    Nuevo
+                  </Link>
+                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      className="rounded-lg"
+                      onClick={loadProducts}
+                      disabled={loading || !selectedLocationId}
+                      aria-label="Actualizar"
+                    >
+                      <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" sideOffset={8}>Actualizar</TooltipContent>
+                </Tooltip>
+              </>
+            }
+          />
+
+          <div className="flex flex-wrap items-center gap-2">
+            <MetricPill label="Total styles" value={totalItems} />
+            <MetricPill label="Listos" value={readyCount} tone="success" />
+            <MetricPill label="Pendientes" value={pendingCount} tone="warning" />
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="accent" size="sm" className="rounded-lg">
-              <Link href="/productos/nuevo">
-                <Plus className="h-4 w-4" />
-                Nuevo
-              </Link>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="rounded-lg"
-              onClick={loadProducts}
-              disabled={loading || !selectedLocationId}
-            >
-              <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-              Actualizar
-            </Button>
-          </div>
-        </header>
-
-        <div className="space-y-3 border-t border-[color:var(--ops-border-soft)] pt-4">
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_180px_220px] xl:items-end">
-                <label className="relative w-full">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
-                  <Input
+          <div className="space-y-4 border-t border-[var(--ops-border-strong)] pt-4">
+            <div className="grid gap-2.5 lg:grid-cols-[minmax(0,1.55fr)_0.92fr_0.92fr_auto] lg:items-end">
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Buscar</label>
+                <div className="sales-field flex h-10 items-center gap-2 rounded-lg px-3 transition hover:bg-[var(--ops-surface-muted)]">
+                  <Search className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
+                  <input
+                    type="text"
                     value={search}
                     onChange={(event) => {
                       setSearch(event.target.value);
                       setPage(1);
                     }}
-                    placeholder="Buscar por codigo, nombre o tipo"
-                    className="ops-surface h-10 rounded-lg border pl-9"
+                    placeholder="Buscar por nombre, SKU o tipo de prenda"
+                    aria-label="Buscar productos"
+                    className="h-full w-full bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
                   />
-                </label>
+                </div>
+              </div>
 
-                <div>
-                  <label htmlFor="filter-mode" className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                    Filtro
-                  </label>
-                  <select
-                    id="filter-mode"
-                    value={filterMode}
-                    onChange={(event) => {
-                      setFilterMode(event.target.value as FilterMode);
+              <FilterDropdown
+                label="Filtro"
+                value={filterMode}
+                options={[
+                  { value: "all", label: "Todos" },
+                  { value: "attention", label: "Por completar" },
+                  { value: "ready", label: "Listos" },
+                  { value: "inactive", label: "Inactivos" },
+                ]}
+                onChange={(v) => {
+                  setFilterMode(v as FilterMode);
+                  setPage(1);
+                }}
+              />
+
+              <FilterDropdown
+                label="Sede activa"
+                value={selectedLocationId}
+                options={locationAssignments.map((assignment) => ({
+                  value: assignment.location_id,
+                  label: `${assignment.location.name}${assignment.is_default ? " · Predeterminada" : ""}`,
+                }))}
+                onChange={(v) => {
+                  setSelectedLocationId(v);
+                  setPage(1);
+                }}
+              />
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setSearch("");
+                      setFilterMode("all");
                       setPage(1);
                     }}
-                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none bg-[var(--ops-surface)]"
+                    disabled={!hasActiveFilters}
+                    variant="outline"
+                    size="icon-sm"
+                    className="h-10 w-10 rounded-lg"
+                    aria-label="Limpiar filtros"
                   >
-                    <option value="all">Todos</option>
-                    <option value="attention">Por completar</option>
-                    <option value="ready">Listos</option>
-                    <option value="inactive">Inactivos</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="location-select" className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                    Sede activa
-                  </label>
-                  <select
-                    id="location-select"
-                    value={selectedLocationId}
-                    onChange={(event) => {
-                      setSelectedLocationId(event.target.value);
-                      setPage(1);
-                    }}
-                    disabled={locationsLoading || !locationAssignments.length}
-                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-70 bg-[var(--ops-surface)]"
-                  >
-                    {!locationAssignments.length ? (
-                      <option value="">Sin sedes asignadas</option>
-                    ) : null}
-                    {locationAssignments.map((assignment) => (
-                      <option key={assignment.location_id} value={assignment.location_id}>
-                        {assignment.location.name}
-                        {assignment.is_default ? " · Predeterminada" : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-          </div>
-
-          {error ? (
-            <div role="alert" aria-live="polite" className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
-              {error}
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={8}>
+                  Limpiar filtros
+                </TooltipContent>
+              </Tooltip>
             </div>
-          ) : null}
+
+            {error ? (
+              <InlineStatusCard title="No pudimos cargar productos" description={error} tone="danger" variant="ops" />
+            ) : null}
 
           {loading ? (
             <div className="ops-text-muted flex min-h-40 items-center justify-center">
               <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
-              Cargando productos...
+              Cargando productos…
             </div>
           ) : !selectedLocationId && !locationAssignments.length ? (
               <div className="ops-empty-state-compact mt-4 rounded-lg p-8 text-center">
@@ -355,164 +438,136 @@ export function ProductsOverviewPage() {
               </p>
             </div>
           ) : products.length ? (
-            <div className="overflow-hidden rounded-lg border border-[color:var(--ops-border-soft)]">
-              <div className="hidden grid-cols-[minmax(0,2fr)_0.95fr_1.8fr_0.8fr_0.8fr_1fr_112px] gap-3 bg-[var(--ops-surface-muted)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)] lg:grid">
-                <div>Producto</div>
-                <div>Codigo</div>
-                <div>Tallas</div>
-                <div>Colores</div>
-                <div>Stock</div>
-                <div>Estado</div>
-                <div className="text-right">Acciones</div>
-              </div>
+            <div className="overflow-x-auto">
+              <div className="min-w-[1080px] border-y border-[var(--ops-border-strong)]">
+                <table className="w-full border-collapse">
+                  <thead className="bg-[var(--ops-surface-muted)]">
+                    <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                      <th className="px-4 py-3">Producto</th>
+                      <th className="px-4 py-3">SKU</th>
+                      <th className="px-4 py-3">Tipo</th>
+                      <th className="px-4 py-3">Tallas</th>
+                      <th className="px-4 py-3">Stock</th>
+                      <th className="px-4 py-3">Estado</th>
+                      <th className="px-4 py-3 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                    {products.map((product) => {
+                      const statusMeta = STATUS_META[product.status];
+                      const visibleSizeStock = getVisibleSizeStock(product.size_stock || []);
+                      const extraSizes = (product.size_stock || []).slice(visibleSizeStock.length);
 
-              <div className="divide-y divide-[color:var(--ops-border-soft)]">
-                {products.map((product) => {
-                  const statusMeta = STATUS_META[product.status];
-                  const visibleSizeStock = getVisibleSizeStock(product.size_stock || []);
-                  const extraSizes = (product.size_stock || []).slice(visibleSizeStock.length);
-
-                  return (
-                    <article
-                      key={product.style_id}
-                      className="px-4 py-2.5 transition hover:bg-[var(--ops-surface-muted)]"
-                    >
-                      <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_0.95fr_1.8fr_0.8fr_0.8fr_1fr_112px] lg:items-center">
-                        <div className="min-w-0">
-                          <h3 className="ops-title truncate text-sm font-semibold">
-                            {product.name}
-                          </h3>
-
-                          <div className="ops-text-muted mt-1 flex flex-wrap gap-2 text-[11px] lg:hidden">
-                            <span>{product.garment_type_name}</span>
-                            {product.configured_color_count > 0 ? (
-                              <span>{product.configured_color_count} colores</span>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 text-sm lg:block">
-                          <div className="ops-text-muted text-[11px] font-semibold uppercase tracking-[0.18em] lg:hidden">
-                            Codigo
-                          </div>
-                          <p className="font-semibold text-[var(--ops-text)]">
-                            {product.style_code || "-"}
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 text-sm lg:block">
-                          <div className="ops-text-muted text-[11px] font-semibold uppercase tracking-[0.18em] lg:hidden">
-                            Tallas
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {visibleSizeStock.length ? (
-                              <>
-                                {visibleSizeStock.map((size) => (
-                                  <span
-                                    key={`${product.style_id}-${size.size_id}`}
-                                    className="ops-metric-pill rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                                  >
-                                    {size.size_code}: {size.qty}
-                                  </span>
-                                ))}
-                                {extraSizes.length > 0 ? (
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <span className="ops-metric-pill cursor-help rounded-full px-2 py-0.5 text-[11px] font-semibold">
-                                          +{extraSizes.length}
-                                        </span>
-                                      </TooltipTrigger>
-                                      <TooltipContent
-                                        side="top"
-                                        sideOffset={8}
-                                        className="max-w-64 text-left"
-                                      >
-                                        {formatExtraSizes(extraSizes)}
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                ) : null}
-                              </>
-                            ) : (
-                              <span className="ops-text-muted text-sm">Sin tallas configuradas</span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 text-sm lg:block">
-                          <div className="ops-text-muted text-[11px] font-semibold uppercase tracking-[0.18em] lg:hidden">
-                            Colores
-                          </div>
-                          <p className="ops-title font-semibold">
-                            {product.configured_color_count}
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 text-sm lg:block">
-                          <div className="ops-text-muted text-[11px] font-semibold uppercase tracking-[0.18em] lg:hidden">
-                            Stock
-                          </div>
-                          <p className="ops-title font-semibold">{product.total_stock_qty}</p>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 text-sm lg:block">
-                          <div className="ops-text-muted text-[11px] font-semibold uppercase tracking-[0.18em] lg:hidden">
-                            Estado
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span
-                              className={cn(
-                                "rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                                statusMeta.className
+                      return (
+                        <tr
+                          key={product.style_id}
+                          className="transition hover:bg-[var(--ops-surface-muted)]"
+                        >
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <p className="text-sm font-semibold text-[var(--ops-text)]">{product.name}</p>
+                            <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">{product.garment_type_name}</p>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">{product.style_code || "—"}</span>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">{product.fabric_name || "—"}</span>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <div className="flex flex-wrap gap-1">
+                              {visibleSizeStock.length ? (
+                                <>
+                                  {visibleSizeStock.map((size) => (
+                                    <span
+                                      key={`${product.style_id}-${size.size_id}`}
+                                      className="inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text)]"
+                                    >
+                                      {size.size_code}: {size.qty}
+                                    </span>
+                                  ))}
+                                  {extraSizes.length > 0 ? (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="inline-flex cursor-help rounded-full border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]">
+                                            +{extraSizes.length}
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent
+                                          side="top"
+                                          sideOffset={8}
+                                          className="max-w-64 text-left"
+                                        >
+                                          {formatExtraSizes(extraSizes)}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  ) : null}
+                                </>
+                              ) : (
+                                <span className="text-sm text-[var(--ops-text-muted)]">Sin tallas</span>
                               )}
-                            >
-                              {statusMeta.label}
-                            </span>
-                            {product.missing_wholesale_size_count > 0 ? (
-                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
-                                May.
+                            </div>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <p className="text-sm font-semibold">{product.total_stock_qty}</p>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span
+                                className={cn(
+                                  "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                                  statusMeta.className
+                                )}
+                              >
+                                {statusMeta.label}
                               </span>
-                            ) : null}
-                            {product.warnings.stock_without_retail_price ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
-                                <CircleAlert className="h-3 w-3" />
-                                Stock sin retail
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-end gap-1">
-                          <ActionIcon
-                            href={buildStyleHref("/productos/estilos", product.style_id)}
-                            label="Editar style"
-                          >
-                            <PencilLine className="h-4 w-4" />
-                          </ActionIcon>
-                          <ActionIcon
-                            href={buildStyleHref("/productos/variantes", product.style_id)}
-                            label="Variantes"
-                          >
-                            <Shapes className="h-4 w-4" />
-                          </ActionIcon>
-                          <ActionIcon
-                            href={buildStyleHref("/precios/crear-y-editar-precio", product.style_id)}
-                            label="Precios"
-                          >
-                            <ReceiptText className="h-4 w-4" />
-                          </ActionIcon>
-                          <ActionIcon
-                            href={buildStyleHref("/precios/listado-de-precios", product.style_id)}
-                            label="Historial"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </ActionIcon>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
+                              {product.missing_wholesale_size_count > 0 ? (
+                                <span className="inline-flex rounded-full border border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[color:color-mix(in_srgb,#d97706_74%,var(--ops-text))]">
+                                  May.
+                                </span>
+                              ) : null}
+                              {product.warnings.stock_without_retail_price ? (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[color:color-mix(in_srgb,#e11d48_74%,var(--ops-text))]">
+                                  <CircleAlert className="h-3 w-3" />
+                                  Stock sin retail
+                                </span>
+                              ) : null}
+                            </div>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <div className="flex items-center justify-end gap-1">
+                              <ActionIcon
+                                href={buildStyleHref("/productos/estilos", product.style_id)}
+                                label="Editar style"
+                              >
+                                <PencilLine className="h-4 w-4" />
+                              </ActionIcon>
+                              <ActionIcon
+                                href={buildStyleHref("/productos/variantes", product.style_id)}
+                                label="Variantes"
+                              >
+                                <Shapes className="h-4 w-4" />
+                              </ActionIcon>
+                              <ActionIcon
+                                href={buildStyleHref("/precios/crear-y-editar-precio", product.style_id)}
+                                label="Precios"
+                              >
+                                <ReceiptText className="h-4 w-4" />
+                              </ActionIcon>
+                              <ActionIcon
+                                href={buildStyleHref("/precios/listado-de-precios", product.style_id)}
+                                label="Historial"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </ActionIcon>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           ) : (
@@ -542,7 +597,8 @@ export function ProductsOverviewPage() {
             </div>
           ) : null}
         </div>
-      </div>
-    </section>
+        </div>
+      </section>
+    </TooltipProvider>
   );
 }

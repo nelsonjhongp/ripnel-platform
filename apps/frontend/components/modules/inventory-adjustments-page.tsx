@@ -13,10 +13,11 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
+import { InlineStatusCard } from "@/components/feedback/status-page";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { FilterDropdown } from "@/components/ui/filter-dropdown";
 import { Pagination } from "@/components/ui/pagination";
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
   Tooltip,
   TooltipContent,
@@ -24,6 +25,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { buildApiUrl } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 type ApiResponse<T> = {
   ok: boolean;
@@ -145,26 +147,71 @@ function formatStatus(status: AdjustmentStatus) {
 
 function getStatusClasses(status: AdjustmentStatus) {
   if (status === "confirmed") {
-    return "bg-emerald-100 text-emerald-700";
+    return "border-[color:color-mix(in_srgb,#10b981_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_82%,var(--ops-text))]";
   }
 
   if (status === "cancelled") {
-    return "bg-rose-100 text-rose-700";
+    return "border-[color:color-mix(in_srgb,#e11d48_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#e11d48_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#e11d48_82%,var(--ops-text))]";
   }
 
-  return "bg-amber-100 text-amber-700";
+  return "border-[color:color-mix(in_srgb,#f59e0b_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f59e0b_82%,var(--ops-text))]";
 }
 
 function getDifferenceClasses(value: number) {
   if (value > 0) {
-    return "text-emerald-700";
+    return "text-[color:color-mix(in_srgb,#059669_88%,var(--ops-text))]";
   }
 
   if (value < 0) {
-    return "text-rose-700";
+    return "text-[color:color-mix(in_srgb,#e11d48_88%,var(--ops-text))]";
   }
 
-  return "text-slate-600";
+  return "text-[var(--ops-text-muted)]";
+}
+
+function MetricPill({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string;
+  value: string | number;
+  tone?: "default" | "accent" | "warning";
+}) {
+  const toneClass =
+    tone === "accent"
+      ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))] text-[var(--ops-text)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--ripnel-accent)_14%,transparent)]"
+      : tone === "warning"
+        ? "border-[color:color-mix(in_srgb,#f59e0b_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
+        : "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text)]";
+  const labelClass =
+    tone === "accent"
+      ? "text-[color:color-mix(in_srgb,var(--ripnel-accent)_72%,var(--ops-text))]"
+      : tone === "warning"
+        ? "text-[color:color-mix(in_srgb,#f59e0b_82%,var(--ops-text))]"
+        : "text-[var(--ops-text-muted)]";
+  const valueClass =
+    tone === "accent"
+      ? "text-[var(--ops-text)]"
+      : tone === "warning"
+        ? "text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
+        : "text-[var(--ops-text)]";
+
+  return (
+    <div
+      className={cn(
+        "inline-flex items-center gap-2.5 rounded-full border px-3 py-2",
+        toneClass
+      )}
+    >
+      <span className={cn("text-[11px] font-semibold uppercase tracking-[0.16em]", labelClass)}>
+        {label}
+      </span>
+      <span className={cn("text-sm font-semibold tabular-nums", valueClass)}>
+        {value}
+      </span>
+    </div>
+  );
 }
 
 export function InventoryAdjustmentsPage() {
@@ -555,7 +602,7 @@ export function InventoryAdjustmentsPage() {
   return (
     <TooltipProvider delayDuration={120}>
       <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
-        <div className="mx-auto flex max-w-[1180px] flex-col gap-4">
+          <div className="mx-auto max-w-[1180px] space-y-4">
           <PosHeader
             eyebrow="Apertura y regularizacion"
             title="Ajustes de inventario"
@@ -565,7 +612,7 @@ export function InventoryAdjustmentsPage() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="rounded-full"
+                  className="rounded-lg"
                   onClick={() => {
                     void loadAdjustments();
                     void loadLocations();
@@ -578,7 +625,7 @@ export function InventoryAdjustmentsPage() {
                   type="button"
                   variant="accent"
                   size="sm"
-                  className="rounded-full"
+                  className="rounded-lg"
                   onClick={openCreateModal}
                 >
                   <PackagePlus className="h-4 w-4" />
@@ -589,67 +636,50 @@ export function InventoryAdjustmentsPage() {
           />
 
           <div className="flex flex-wrap items-center gap-2">
-            <span className="ops-metric-pill inline-flex rounded-full px-3 py-2 text-sm font-semibold">
-              Total: {totals.total}
-            </span>
-            <span className="ops-metric-pill inline-flex rounded-full px-3 py-2 text-sm font-semibold">
-              Borradores: {totals.drafts}
-            </span>
-            <span className="ops-metric-pill inline-flex rounded-full px-3 py-2 text-sm font-semibold">
-              Confirmados: {totals.confirmed}
-            </span>
+            <MetricPill label="Total" value={totals.total} />
+            <MetricPill label="Borradores" value={totals.drafts} tone="warning" />
+            <MetricPill label="Confirmados" value={totals.confirmed} tone="accent" />
           </div>
 
           <div className="space-y-4 border-t border-[var(--ops-border-strong)] pt-4">
             <div className="grid gap-2.5 lg:grid-cols-[1.4fr_0.9fr_0.8fr_auto] lg:items-end">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
-                <Input
-                  type="text"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Buscar por numero, sede, motivo o usuario"
-                  className="ops-surface h-10 rounded-lg border py-2 pl-9 text-sm"
-                />
-              </div>
-
               <div>
-                <label htmlFor="location-filter" className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  Sede
-                </label>
-                <select
-                  id="location-filter"
+                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                    Buscar
+                  </label>
+                  <div className="sales-field flex h-10 items-center gap-2 rounded-lg px-3 transition hover:bg-[var(--ops-surface-muted)]">
+                    <Search className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
+                    <input
+                      type="text"
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="Buscar por numero, sede, motivo o usuario"
+                      className="h-full w-full bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
+                    />
+                  </div>
+                </div>
+
+              <FilterDropdown
+                  label="Sede"
                   value={locationFilter}
-                  onChange={(event) => setLocationFilter(event.target.value)}
-                  className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none transition hover:bg-[var(--ops-surface-muted)] bg-[var(--ops-surface)]"
-                >
-                  <option value="all">Todas</option>
-                  {locations.map((location) => (
-                    <option key={location.location_id} value={location.location_id}>
-                      {location.code} - {location.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  options={[{ value: "all", label: "Todas" }, ...locations.map((location) => ({
+                    value: location.location_id,
+                    label: `${location.code} - ${location.name}`,
+                  }))]}
+                  onChange={setLocationFilter}
+                />
 
-              <div>
-                <label htmlFor="status-filter" className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  Estado
-                </label>
-                <select
-                  id="status-filter"
+                <FilterDropdown
+                  label="Estado"
                   value={statusFilter}
-                  onChange={(event) =>
-                    setStatusFilter(event.target.value as "all" | AdjustmentStatus)
-                  }
-                  className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none transition hover:bg-[var(--ops-surface-muted)] bg-[var(--ops-surface)]"
-                >
-                  <option value="all">Todos</option>
-                  <option value="draft">Borrador</option>
-                  <option value="confirmed">Confirmado</option>
-                  <option value="cancelled">Cancelado</option>
-                </select>
-              </div>
+                  options={[
+                    { value: "all", label: "Todos" },
+                    { value: "draft", label: "Borrador" },
+                    { value: "confirmed", label: "Confirmado" },
+                    { value: "cancelled", label: "Cancelado" },
+                  ]}
+                  onChange={(v) => setStatusFilter(v as "all" | AdjustmentStatus)}
+                />
 
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -673,97 +703,118 @@ export function InventoryAdjustmentsPage() {
             </div>
 
             {error ? (
-              <div role="alert" aria-live="polite" className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                {error}
-              </div>
+              <InlineStatusCard
+                title="No pudimos cargar ajustes"
+                description={error}
+                tone="danger"
+                variant="ops"
+              />
             ) : null}
 
             {notice ? (
-              <div role="status" aria-live="polite" className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                {notice}
-              </div>
+              <InlineStatusCard
+                title="Operacion completada"
+                description={notice}
+                tone="neutral"
+                variant="ops"
+              />
             ) : null}
 
             <div className="overflow-x-auto">
               <div className="min-w-[980px] border-y border-[var(--ops-border-strong)]">
-                <div className="grid grid-cols-[1fr_1fr_0.8fr_1fr_90px_1fr_130px] gap-3 bg-[var(--ops-surface-muted)] px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  <span>Numero</span>
-                  <span>Sede</span>
-                  <span>Estado</span>
-                  <span>Motivo</span>
-                  <span className="text-right">Lineas</span>
-                  <span>Creado</span>
-                  <span className="text-right">Acciones</span>
-                </div>
-
-                <div className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                  {loadingAdjustments || loadingLocations ? (
-                    <div className="ops-text-muted flex min-h-56 items-center justify-center px-4 py-10 text-sm">
-                      <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
-                      Cargando ajustes...
-                    </div>
-                  ) : paginatedAdjustments.length ? (
-                    paginatedAdjustments.map((adjustment) => (
-                      <article
-                        key={adjustment.adjustment_id}
-                        className="grid grid-cols-[1fr_1fr_0.8fr_1fr_90px_1fr_130px] gap-3 px-4 py-[var(--ops-row-py)] transition-colors hover:bg-[var(--ops-surface-muted)]"
-                      >
-                        <div className="text-sm font-semibold text-[var(--ops-text)]">
-                          {adjustment.adjustment_number}
-                        </div>
-                        <div className="text-sm text-[var(--ops-text)]">
-                          <span className="inline-flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />
-                            {adjustment.location_name}
-                          </span>
-                          <p className="text-[11px] text-[var(--ops-text-muted)]">{adjustment.location_code}</p>
-                        </div>
-                        <div>
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusClasses(
-                              adjustment.status
-                            )}`}
-                          >
-                            {formatStatus(adjustment.status)}
-                          </span>
-                        </div>
-                        <div className="truncate text-sm text-[var(--ops-text)]">
-                          {adjustment.reason || "Sin motivo"}
-                        </div>
-                        <div className="text-right text-sm font-semibold text-[var(--ops-text)]">
-                          {adjustment.line_count}
-                        </div>
-                        <div className="text-sm text-[var(--ops-text)]">
-                          {formatDateTime(adjustment.created_at)}
-                          <p className="text-[11px] text-[var(--ops-text-muted)]">
-                            {adjustment.created_by_name || "Sistema"}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="rounded-full"
-                            onClick={() => void openDetail(adjustment.adjustment_id)}
-                          >
-                            <Eye className="h-4 w-4" />
-                            Ver detalle
-                          </Button>
-                        </div>
-                      </article>
-                    ))
-                  ) : (
-                    <div className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                      No hay ajustes para los filtros actuales.
-                    </div>
-                  )}
-                </div>
+                <table className="w-full border-collapse">
+                  <thead className="bg-[var(--ops-surface-muted)]">
+                    <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                      <th className="px-4 py-3">Numero</th>
+                      <th className="px-4 py-3">Sede</th>
+                      <th className="px-4 py-3">Estado</th>
+                      <th className="px-4 py-3">Motivo</th>
+                      <th className="px-4 py-3 text-right">Lineas</th>
+                      <th className="px-4 py-3">Creado</th>
+                      <th className="px-4 py-3 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                    {loadingAdjustments || loadingLocations ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                          <LoaderCircle className="mr-2 inline-block h-5 w-5 animate-spin align-middle" />
+                          Cargando ajustes...
+                        </td>
+                      </tr>
+                    ) : paginatedAdjustments.length ? (
+                      paginatedAdjustments.map((adjustment) => (
+                        <tr
+                          key={adjustment.adjustment_id}
+                          className="transition hover:bg-[var(--ops-surface-muted)]"
+                        >
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <span className="text-sm font-semibold text-[var(--ops-text)]">
+                              {adjustment.adjustment_number}
+                            </span>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <div className="text-sm text-[var(--ops-text)]">
+                              <span className="inline-flex items-center gap-2">
+                                <MapPin className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />
+                                {adjustment.location_name}
+                              </span>
+                              <p className="text-[11px] text-[var(--ops-text-muted)]">{adjustment.location_code}</p>
+                            </div>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <span
+                              className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getStatusClasses(
+                                adjustment.status
+                              )}`}
+                            >
+                              {formatStatus(adjustment.status)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <span className="truncate text-sm text-[var(--ops-text)] block max-w-[180px]">
+                              {adjustment.reason || "Sin motivo"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)] text-right text-sm font-semibold text-[var(--ops-text)]">
+                            {adjustment.line_count}
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <div className="text-sm text-[var(--ops-text)]">
+                              {formatDateTime(adjustment.created_at)}
+                              <p className="text-[11px] text-[var(--ops-text-muted)]">
+                                {adjustment.created_by_name || "Sistema"}
+                              </p>
+                            </div>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)] text-right">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="rounded-lg"
+                              onClick={() => void openDetail(adjustment.adjustment_id)}
+                            >
+                              <Eye className="h-4 w-4" />
+                              Ver detalle
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                          No hay ajustes para los filtros actuales.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
 
             <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between">
-              <span className="ops-secondary-text text-[var(--ops-text-muted)]">
+              <span className="text-sm text-[var(--ops-text-muted)]">
                 {filteredAdjustments.length
                   ? `${visibleFrom}-${visibleTo} de ${filteredAdjustments.length}`
                   : "0 resultados"}
@@ -779,32 +830,34 @@ export function InventoryAdjustmentsPage() {
         </div>
 
         {createOpen ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-            <div className="max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center ops-overlay-backdrop p-4">
+            <div className="ops-overlay-panel max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-2xl p-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-900">Nuevo ajuste</h2>
-                  <p className="mt-1 text-sm text-slate-500">
+                  <h2 className="text-xl font-semibold text-[var(--ops-text)]">Nuevo ajuste</h2>
+                  <p className="mt-1 text-sm text-[var(--ops-text-muted)]">
                     Crea un borrador de apertura, conteo o regularizacion.
                   </p>
                 </div>
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg"
                   onClick={closeCreateModal}
-                  className="rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-50"
                 >
                   Cerrar
-                </button>
+                </Button>
               </div>
 
               <form
                 onSubmit={submitAdjustment}
                 className="mt-6 grid gap-5 xl:grid-cols-[1.05fr_0.95fr]"
               >
-                <article className="rounded-3xl border border-slate-200 bg-white p-5">
+                <article className="rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-5">
                   <div className="grid gap-4 md:grid-cols-2">
                     <label className="space-y-2 text-sm">
-                      <span className="font-medium text-slate-700">Sede</span>
+                      <span className="font-medium text-[var(--ops-text)]">Sede</span>
                       <select
                         value={createLocationId}
                         onChange={(event) => {
@@ -814,7 +867,7 @@ export function InventoryAdjustmentsPage() {
                           setVariantResults([]);
                           setVariantSearchError(null);
                         }}
-                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                        className="sales-field h-10 w-full cursor-pointer rounded-lg px-3 py-2 text-sm outline-none"
                       >
                         <option value="">Selecciona una sede</option>
                         {locations.map((location) => (
@@ -826,37 +879,37 @@ export function InventoryAdjustmentsPage() {
                     </label>
 
                     <label className="space-y-2 text-sm">
-                      <span className="font-medium text-slate-700">Motivo</span>
+                      <span className="font-medium text-[var(--ops-text)]">Motivo</span>
                       <input
                         type="text"
                         value={createReason}
                         onChange={(event) => setCreateReason(event.target.value)}
                         placeholder="Apertura inicial, conteo, regularizacion..."
-                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                        className="sales-field h-10 w-full rounded-lg px-3 py-2 text-sm outline-none"
                       />
                     </label>
                   </div>
 
                   <label className="mt-4 block space-y-2 text-sm">
-                    <span className="font-medium text-slate-700">Notas</span>
+                    <span className="font-medium text-[var(--ops-text)]">Notas</span>
                     <textarea
                       value={createNotes}
                       onChange={(event) => setCreateNotes(event.target.value)}
                       rows={3}
                       placeholder="Detalle adicional del conteo o apertura"
-                      className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                      className="sales-field w-full rounded-2xl px-3 py-2 text-sm outline-none"
                     />
                   </label>
 
-                  <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-sm font-semibold text-slate-700">Buscar variantes</p>
-                    <p className="mt-1 text-sm text-slate-500">
+                  <div className="mt-5 rounded-2xl border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] p-4">
+                    <p className="text-sm font-semibold text-[var(--ops-text)]">Buscar variantes</p>
+                    <p className="mt-1 text-sm text-[var(--ops-text-muted)]">
                       El buscador usa la sede elegida y tambien devuelve variantes con
                       stock actual en cero.
                     </p>
 
                     <div className="relative mt-4">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
                       <input
                         type="text"
                         value={variantQuery}
@@ -867,18 +920,18 @@ export function InventoryAdjustmentsPage() {
                             ? "Buscar por SKU, style, talla o color"
                             : "Primero selecciona una sede"
                         }
-                        className="w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100 disabled:bg-slate-100"
+                        className="sales-field h-10 w-full rounded-lg py-2 pl-9 pr-3 text-sm outline-none disabled:opacity-50"
                       />
                     </div>
 
                     {variantSearchError ? (
-                      <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                      <div className="mt-4 rounded-xl border border-[color:color-mix(in_srgb,#e11d48_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#e11d48_8%,var(--ops-surface))] px-4 py-3 text-sm text-[color:color-mix(in_srgb,#e11d48_82%,var(--ops-text))]">
                         {variantSearchError}
                       </div>
                     ) : null}
 
                     {loadingVariants ? (
-                      <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
+                      <div className="mt-4 flex items-center gap-2 text-sm text-[var(--ops-text-muted)]">
                         <LoaderCircle className="h-4 w-4 animate-spin" />
                         Buscando variantes...
                       </div>
@@ -888,30 +941,32 @@ export function InventoryAdjustmentsPage() {
                       {filteredVariantResults.map((variant) => (
                         <div
                           key={variant.variant_id}
-                          className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[1fr_120px]"
+                          className="grid gap-3 rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4 md:grid-cols-[1fr_120px]"
                         >
                           <div>
-                            <p className="text-sm font-semibold text-slate-900">
+                            <p className="text-sm font-semibold text-[var(--ops-text)]">
                               {variant.style_name}
                             </p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-[var(--ops-text-muted)]">
                               {variant.sku} - {variant.style_code} - {variant.size_code} /{" "}
                               {variant.color_name}
                             </p>
-                            <p className="mt-1 text-sm text-slate-600">
+                            <p className="mt-1 text-sm text-[var(--ops-text-muted)]">
                               Sistema actual:{" "}
-                              <span className="font-semibold">{variant.system_qty}</span>
+                              <span className="font-semibold text-[var(--ops-text)]">{variant.system_qty}</span>
                             </p>
                           </div>
 
-                          <button
+                          <Button
                             type="button"
+                            variant="outline"
+                            size="sm"
+                            className="rounded-lg"
                             onClick={() => addDraftLine(variant)}
-                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-violet-300 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-700 transition hover:border-violet-400 hover:bg-violet-100"
                           >
                             <PackagePlus className="h-4 w-4" />
                             Agregar
-                          </button>
+                          </Button>
                         </div>
                       ))}
 
@@ -919,7 +974,7 @@ export function InventoryAdjustmentsPage() {
                       createLocationId &&
                       variantQuery.trim().length >= 2 &&
                       !filteredVariantResults.length ? (
-                        <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">
+                        <div className="ops-empty-state-compact rounded-xl px-4 py-8 text-center text-sm">
                           No se encontraron variantes para esa busqueda.
                         </div>
                       ) : null}
@@ -927,15 +982,15 @@ export function InventoryAdjustmentsPage() {
                   </div>
                 </article>
 
-                <article className="rounded-3xl border border-slate-200 bg-white p-5">
+                <article className="rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-5">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">Lineas del ajuste</p>
-                      <p className="text-sm text-slate-500">
+                      <p className="text-sm font-semibold text-[var(--ops-text)]">Lineas del ajuste</p>
+                      <p className="text-sm text-[var(--ops-text-muted)]">
                         {draftLines.length} variantes agregadas
                       </p>
                     </div>
-                    <span className="rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">
+                    <span className="inline-flex items-center rounded-full border border-[color:color-mix(in_srgb,#f59e0b_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] px-3 py-1.5 text-xs font-semibold text-[color:color-mix(in_srgb,#f59e0b_72%,var(--ops-text))]">
                       Draft
                     </span>
                   </div>
@@ -947,34 +1002,36 @@ export function InventoryAdjustmentsPage() {
                       return (
                         <div
                           key={line.variant_id}
-                          className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                          className="rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] p-4"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <p className="text-sm font-semibold text-slate-900">
+                              <p className="text-sm font-semibold text-[var(--ops-text)]">
                                 {line.style_name}
                               </p>
-                              <p className="text-xs text-slate-500">
+                              <p className="text-xs text-[var(--ops-text-muted)]">
                                 {line.sku} - {line.size_code} / {line.color_name}
                               </p>
                             </div>
-                            <button
+                            <Button
                               type="button"
+                              variant="outline"
+                              size="icon-sm"
+                              className="rounded-full text-[var(--ops-text-muted)] hover:text-[color:color-mix(in_srgb,#e11d48_78%,var(--ops-text))]"
                               onClick={() => removeDraftLine(line.variant_id)}
-                              className="rounded-full p-2 text-slate-500 transition hover:bg-white hover:text-rose-600"
                               aria-label="Quitar linea"
                             >
                               <Trash2 className="h-4 w-4" />
-                            </button>
+                            </Button>
                           </div>
 
                           <div className="mt-3 grid gap-3 md:grid-cols-3">
-                            <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+                            <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2 text-sm text-[var(--ops-text-muted)]">
                               Sistema:{" "}
-                              <span className="font-semibold">{line.system_qty}</span>
+                              <span className="font-semibold text-[var(--ops-text)]">{line.system_qty}</span>
                             </div>
                             <label className="space-y-1 text-sm">
-                              <span className="font-medium text-slate-700">Conteo</span>
+                              <span className="font-medium text-[var(--ops-text)]">Conteo</span>
                               <input
                                 type="number"
                                 min={0}
@@ -982,11 +1039,11 @@ export function InventoryAdjustmentsPage() {
                                 onChange={(event) =>
                                   updateCountedQty(line.variant_id, event.target.value)
                                 }
-                                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                                className="sales-field h-10 w-full rounded-lg px-3 py-2 text-sm outline-none"
                               />
                             </label>
-                            <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
-                              <span className="text-slate-600">Diferencia: </span>
+                            <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2 text-sm">
+                              <span className="text-[var(--ops-text-muted)]">Diferencia: </span>
                               <span className={`font-semibold ${getDifferenceClasses(difference)}`}>
                                 {difference > 0 ? "+" : ""}
                                 {difference}
@@ -998,16 +1055,18 @@ export function InventoryAdjustmentsPage() {
                     })}
 
                     {!draftLines.length ? (
-                      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                      <div className="ops-empty-state-compact rounded-xl px-4 py-8 text-center text-sm">
                         Aun no agregas variantes al ajuste.
                       </div>
                     ) : null}
                   </div>
 
-                  <button
+                  <Button
                     type="submit"
+                    variant="accent"
+                    size="default"
+                    className="mt-5 w-full rounded-lg"
                     disabled={savingAdjustment || !createLocationId || !draftLines.length}
-                    className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
                   >
                     {savingAdjustment ? (
                       <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -1015,7 +1074,7 @@ export function InventoryAdjustmentsPage() {
                       <PackagePlus className="h-4 w-4" />
                     )}
                     Guardar borrador
-                  </button>
+                  </Button>
                 </article>
               </form>
             </div>
@@ -1023,56 +1082,58 @@ export function InventoryAdjustmentsPage() {
         ) : null}
 
         {detailOpen ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-            <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl">
+          <div className="fixed inset-0 z-50 flex items-center justify-center ops-overlay-backdrop p-4">
+            <div className="ops-overlay-panel max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl p-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-900">Detalle de ajuste</h2>
-                  <p className="mt-1 text-sm text-slate-500">
+                  <h2 className="text-xl font-semibold text-[var(--ops-text)]">Detalle de ajuste</h2>
+                  <p className="mt-1 text-sm text-[var(--ops-text-muted)]">
                     Revisa lineas, diferencias y confirma el documento cuando este listo.
                   </p>
                 </div>
-                <button
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg"
                   onClick={closeDetail}
-                  className="rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-50"
                 >
                   Cerrar
-                </button>
+                </Button>
               </div>
 
               {detailError ? (
-                <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                <div className="mt-5 rounded-xl border border-[color:color-mix(in_srgb,#e11d48_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#e11d48_8%,var(--ops-surface))] px-4 py-3 text-sm text-[color:color-mix(in_srgb,#e11d48_82%,var(--ops-text))]">
                   {detailError}
                 </div>
               ) : null}
 
               {detailLoading ? (
-                <div className="mt-5 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-sm text-slate-500">
+                <div className="ops-empty-state-compact mt-5 flex items-center justify-center gap-2 rounded-xl px-4 py-10 text-sm">
                   <LoaderCircle className="h-4 w-4 animate-spin" />
                   Cargando detalle...
                 </div>
               ) : detail ? (
                 <div className="mt-5 space-y-5">
                   <div className="grid gap-4 md:grid-cols-3">
-                    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                      <p className="text-xs uppercase tracking-wide text-slate-500">Numero</p>
-                      <p className="mt-2 text-lg font-semibold text-slate-900">
+                    <article className="rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Numero</p>
+                      <p className="mt-2 text-lg font-semibold text-[var(--ops-text)]">
                         {detail.adjustment_number}
                       </p>
                     </article>
-                    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                      <p className="text-xs uppercase tracking-wide text-slate-500">Sede</p>
-                      <p className="mt-2 text-lg font-semibold text-slate-900">
+                    <article className="rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Sede</p>
+                      <p className="mt-2 text-lg font-semibold text-[var(--ops-text)]">
                         {detail.location_name}
                       </p>
-                      <p className="text-sm text-slate-500">{detail.location_code}</p>
+                      <p className="text-sm text-[var(--ops-text-muted)]">{detail.location_code}</p>
                     </article>
-                    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                      <p className="text-xs uppercase tracking-wide text-slate-500">Estado</p>
+                    <article className="rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Estado</p>
                       <p className="mt-2">
                         <span
-                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusClasses(
+                          className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getStatusClasses(
                             detail.status
                           )}`}
                         >
@@ -1083,26 +1144,26 @@ export function InventoryAdjustmentsPage() {
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
-                    <article className="rounded-2xl border border-slate-200 bg-white p-4">
-                      <p className="text-sm font-semibold text-slate-900">Cabecera</p>
-                      <dl className="mt-3 space-y-2 text-sm text-slate-600">
+                    <article className="rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4">
+                      <p className="text-sm font-semibold text-[var(--ops-text)]">Cabecera</p>
+                      <dl className="mt-3 space-y-2 text-sm text-[var(--ops-text-muted)]">
                         <div>
-                          <dt className="font-medium text-slate-700">Motivo</dt>
+                          <dt className="font-medium text-[var(--ops-text)]">Motivo</dt>
                           <dd>{detail.reason || "Sin motivo"}</dd>
                         </div>
                         <div>
-                          <dt className="font-medium text-slate-700">Notas</dt>
+                          <dt className="font-medium text-[var(--ops-text)]">Notas</dt>
                           <dd>{detail.notes || "Sin notas"}</dd>
                         </div>
                         <div>
-                          <dt className="font-medium text-slate-700">Creado</dt>
+                          <dt className="font-medium text-[var(--ops-text)]">Creado</dt>
                           <dd>
                             {formatDateTime(detail.created_at)} -{" "}
                             {detail.created_by_name || "Sistema"}
                           </dd>
                         </div>
                         <div>
-                          <dt className="font-medium text-slate-700">Confirmado</dt>
+                          <dt className="font-medium text-[var(--ops-text)]">Confirmado</dt>
                           <dd>
                             {detail.confirmed_at
                               ? `${formatDateTime(detail.confirmed_at)} - ${
@@ -1114,78 +1175,79 @@ export function InventoryAdjustmentsPage() {
                       </dl>
                     </article>
 
-                    <article className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
-                      <p className="text-sm font-semibold text-violet-700">Impacto esperado</p>
-                      <p className="mt-2 text-sm text-violet-800">
+                    <article className="rounded-2xl border border-[color:color-mix(in_srgb,var(--ripnel-accent)_38%,var(--ops-border-strong))] bg-[var(--ripnel-accent-soft)] p-4">
+                      <p className="text-sm font-semibold text-[var(--ripnel-accent-hover)]">Impacto esperado</p>
+                      <p className="mt-2 text-sm text-[var(--ops-text)]">
                         Al confirmar, cada linea ajusta la cantidad final de la sede y
                         genera un movimiento <code>ADJUST</code> en kardex.
                       </p>
                     </article>
                   </div>
 
-                  <div className="overflow-x-auto rounded-2xl border border-slate-200">
-                    <table className="min-w-full divide-y divide-slate-200">
-                      <thead className="bg-slate-50">
-                        <tr>
-                          <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Variante
-                          </th>
-                          <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Sistema
-                          </th>
-                          <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Conteo
-                          </th>
-                          <th className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Diferencia
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 bg-white">
-                        {detail.lines.map((line) => (
-                          <tr key={line.adjustment_line_id} className="hover:bg-slate-50">
-                            <td className="px-3 py-3 text-sm">
-                              <p className="font-semibold text-slate-900">{line.style_name}</p>
-                              <p className="text-xs text-slate-500">
-                                {line.sku} - {line.style_code} - {line.size_code} /{" "}
-                                {line.color_name}
-                              </p>
-                            </td>
-                            <td className="px-3 py-3 text-right text-sm text-slate-700">
-                              {line.system_qty}
-                            </td>
-                            <td className="px-3 py-3 text-right text-sm font-semibold text-slate-900">
-                              {line.counted_qty}
-                            </td>
-                            <td
-                              className={`px-3 py-3 text-right text-sm font-semibold ${getDifferenceClasses(
-                                line.difference_qty
-                              )}`}
-                            >
-                              {line.difference_qty > 0 ? "+" : ""}
-                              {line.difference_qty}
-                            </td>
+                  <div className="overflow-x-auto">
+                    <div className="min-w-[580px] border-y border-[var(--ops-border-strong)]">
+                      <table className="w-full border-collapse">
+                        <thead className="bg-[var(--ops-surface-muted)]">
+                          <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                            <th className="px-4 py-3">Variante</th>
+                            <th className="px-4 py-3 text-right">Sistema</th>
+                            <th className="px-4 py-3 text-right">Conteo</th>
+                            <th className="px-4 py-3 text-right">Diferencia</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                          {detail.lines.map((line) => (
+                            <tr
+                              key={line.adjustment_line_id}
+                              className="transition hover:bg-[var(--ops-surface-muted)]"
+                            >
+                              <td className="px-4 py-[var(--ops-row-py)]">
+                                <p className="truncate text-sm font-semibold text-[var(--ops-text)]">{line.style_name}</p>
+                                <p className="truncate text-xs text-[var(--ops-text-muted)]">
+                                  {line.sku} - {line.style_code} - {line.size_code} /{" "}
+                                  {line.color_name}
+                                </p>
+                              </td>
+                              <td className="px-4 py-[var(--ops-row-py)] text-right text-sm text-[var(--ops-text-muted)]">
+                                {line.system_qty}
+                              </td>
+                              <td className="px-4 py-[var(--ops-row-py)] text-right text-sm font-semibold text-[var(--ops-text)]">
+                                {line.counted_qty}
+                              </td>
+                              <td
+                                className={`px-4 py-[var(--ops-row-py)] text-right text-sm font-semibold tabular-nums ${getDifferenceClasses(
+                                  line.difference_qty
+                                )}`}
+                              >
+                                {line.difference_qty > 0 ? "+" : ""}
+                                {line.difference_qty}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
 
                   <div className="flex justify-end gap-3">
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-lg"
                       onClick={closeDetail}
-                      className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                     >
                       Cerrar
-                    </button>
+                    </Button>
                     {detail.status === "draft" ? (
                       <>
-                        <button
+                        <Button
                           type="button"
+                          variant="destructive"
+                          size="sm"
+                          className="rounded-lg"
                           onClick={() => void cancelAdjustment()}
                           disabled={confirmingAdjustment || cancellingAdjustment}
-                          className="inline-flex items-center gap-2 rounded-xl border border-rose-300 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:border-rose-400 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {cancellingAdjustment ? (
                             <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -1193,12 +1255,14 @@ export function InventoryAdjustmentsPage() {
                             <X className="h-4 w-4" />
                           )}
                           Cancelar ajuste
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
+                          variant="accent"
+                          size="sm"
+                          className="rounded-lg"
                           onClick={() => void confirmAdjustment()}
                           disabled={confirmingAdjustment || cancellingAdjustment}
-                          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
                         >
                           {confirmingAdjustment ? (
                             <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -1206,7 +1270,7 @@ export function InventoryAdjustmentsPage() {
                             <SquareCheckBig className="h-4 w-4" />
                           )}
                           Confirmar ajuste
-                        </button>
+                        </Button>
                       </>
                     ) : null}
                   </div>
