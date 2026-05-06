@@ -155,6 +155,10 @@ type SellableVariant = {
   retail_price: number
 }
 
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN" }).format(value)
+}
+
 function round2(value: number) {
   return Math.round(Number(value || 0) * 100) / 100
 }
@@ -429,6 +433,11 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
 
     if (!saleId) return
 
+    // TODO: Replace window.confirm() with a proper confirmation modal
+    if (!window.confirm("¿Confirmas que deseas anular esta venta? Esta acción es irreversible.")) {
+      return
+    }
+
     setActionError(null)
     setActionSuccess(null)
     setCancelSubmitting(true)
@@ -520,14 +529,10 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
           <header className="rounded-3xl border border-slate-200 bg-white/90 p-[var(--ops-panel-padding)] shadow-sm backdrop-blur">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-xs uppercase tracking-wide text-violet-600">Postventa operativa</p>
-                <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">
+                <p className="text-xs uppercase tracking-wide text-[var(--ripnel-accent-hover)]">Postventa operativa</p>
+                <h1 className="mt-1 text-2xl font-semibold text-[var(--ops-text)] md:text-3xl">
                   {context.sale.sale_number || "Sin correlativo"}
                 </h1>
-                <p className="mt-1 text-sm text-slate-600">
-                  {context.sale.document_type} • {context.sale.status} •{" "}
-                  {formatDateTime(context.sale.confirmed_at, context.sale.created_at)}
-                </p>
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -617,14 +622,14 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                           </div>
                         </div>
                         <p className="text-sm font-semibold text-slate-900">
-                          S/. {Number(line.line_total).toFixed(2)}
+                          {formatCurrency(Number(line.line_total))}
                         </p>
                       </div>
                       <div className="mt-2 grid gap-2 text-sm text-slate-600 md:grid-cols-4">
                         <span>Cantidad: {line.quantity}</span>
-                        <span>Lista: S/. {Number(line.unit_price_list).toFixed(2)}</span>
-                        <span>Final: S/. {Number(line.unit_price_final).toFixed(2)}</span>
-                        <span>Subtotal: S/. {Number(line.line_subtotal).toFixed(2)}</span>
+                        <span>Lista: {formatCurrency(Number(line.unit_price_list))}</span>
+                        <span>Final: {formatCurrency(Number(line.unit_price_final))}</span>
+                        <span>Subtotal: {formatCurrency(Number(line.line_subtotal))}</span>
                       </div>
                     </label>
                   ))}
@@ -671,8 +676,8 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                                 {line.sku} • {line.size_code} / {line.color_code}
                               </p>
                               <p className="mt-1">
-                                Cantidad {line.quantity} • Ref. S/.{" "}
-                                {Number(line.unit_reference_price || 0).toFixed(2)}
+                                Cantidad {line.quantity} • Ref.{" "}
+                                {formatCurrency(Number(line.unit_reference_price || 0))}
                               </p>
                             </div>
                           ))}
@@ -744,7 +749,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                       className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2"
                     >
                       <p className="font-medium capitalize text-slate-800">{payment.method}</p>
-                      <p>Monto: S/. {Number(payment.amount).toFixed(2)}</p>
+                      <p>Monto: {formatCurrency(Number(payment.amount))}</p>
                       <p className="text-xs text-slate-500">{formatDateTime(payment.paid_at)}</p>
                     </div>
                   ))}
@@ -760,7 +765,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                             Reverso {reversal.method}
                           </p>
                           <p className="text-rose-900/80">
-                            - S/. {Number(reversal.amount).toFixed(2)}
+                            - {formatCurrency(Number(reversal.amount))}
                           </p>
                           <p className="text-xs text-rose-700">
                             {reversal.reason} • {formatDateTime(reversal.reversed_at)}
@@ -774,15 +779,15 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                 <div className="mt-4 space-y-2 border-t border-slate-200 pt-4 text-sm">
                   <div className="flex justify-between text-slate-600">
                     <span>Pagos registrados</span>
-                    <span>S/. {paymentSummary.paymentTotal.toFixed(2)}</span>
+                    <span>{formatCurrency(paymentSummary.paymentTotal)}</span>
                   </div>
                   <div className="flex justify-between text-slate-600">
                     <span>Reversos internos</span>
-                    <span>S/. {paymentSummary.reversalTotal.toFixed(2)}</span>
+                    <span>{formatCurrency(paymentSummary.reversalTotal)}</span>
                   </div>
                   <div className="flex justify-between text-base font-bold text-slate-900">
                     <span>Neto operativo</span>
-                    <span>S/. {paymentSummary.netTotal.toFixed(2)}</span>
+                    <span>{formatCurrency(paymentSummary.netTotal)}</span>
                   </div>
                 </div>
               </article>
@@ -808,7 +813,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                           value={replacementSearch}
                           onChange={(event) => setReplacementSearch(event.target.value)}
                           placeholder="Busca por SKU, estilo o código"
-                          className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                          className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[var(--ripnel-accent-soft)]"
                         />
                         {replacementError ? (
                           <p className="mt-2 text-sm text-rose-600">{replacementError}</p>
@@ -819,8 +824,8 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
                           <p className="font-semibold text-slate-900">Línea base seleccionada</p>
                           <p className="mt-1">
-                            {selectedLine.style_name} • {selectedLine.quantity} und • Total original
-                            S/. {Number(selectedLine.line_total).toFixed(2)}
+                            {selectedLine.style_name} • {selectedLine.quantity} und • Total original{" "}
+                            {formatCurrency(Number(selectedLine.line_total))}
                           </p>
                         </div>
                       ) : null}
@@ -859,7 +864,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                                   </div>
                                   <div className="text-right text-sm">
                                     <p className="font-semibold text-slate-900">
-                                      S/. {Number(variant.retail_price || 0).toFixed(2)}
+                                      {formatCurrency(Number(variant.retail_price || 0))}
                                     </p>
                                     <p className="text-slate-500">Stock {Number(variant.stock || 0)}</p>
                                   </div>
@@ -875,7 +880,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                                     >
                                       {valueMatches
                                         ? "Mismo valor total"
-                                        : `Total resultante S/. ${replacementTotal.toFixed(2)}`}
+                                        : `Total resultante ${formatCurrency(replacementTotal)}`}
                                     </span>
                                   </div>
                                 ) : null}
@@ -893,8 +898,8 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
                           <p className="font-semibold">Reemplazo seleccionado</p>
                           <p className="mt-1">
-                            {selectedReplacement.style_name} • {selectedReplacement.sku} • Precio
-                            S/. {Number(selectedReplacement.retail_price || 0).toFixed(2)}
+                            {selectedReplacement.style_name} • {selectedReplacement.sku} • Precio{" "}
+                            {formatCurrency(Number(selectedReplacement.retail_price || 0))}
                           </p>
                         </div>
                       ) : null}
@@ -908,7 +913,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                           value={exchangeReason}
                           onChange={(event) => setExchangeReason(event.target.value)}
                           placeholder="Ej. talla no adecuada, color reemplazado"
-                          className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                          className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[var(--ripnel-accent-soft)]"
                         />
                       </div>
 
@@ -920,7 +925,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                           value={exchangeNotes}
                           onChange={(event) => setExchangeNotes(event.target.value)}
                           rows={3}
-                          className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                          className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[var(--ripnel-accent-soft)]"
                           placeholder="Detalle adicional del cambio"
                         />
                       </div>
@@ -933,7 +938,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                           !selectedReplacementVariantId ||
                           !exchangeReason.trim()
                         }
-                        className="inline-flex items-center gap-2 rounded-2xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex items-center gap-2 rounded-2xl bg-[var(--ripnel-accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <RefreshCcw className="h-4 w-4" />
                         {exchangeSubmitting ? "Registrando cambio..." : "Registrar cambio simple"}
@@ -953,7 +958,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                   className="rounded-3xl border border-slate-200 bg-white/90 p-[var(--ops-panel-padding)] shadow-sm backdrop-blur"
                 >
                   <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
-                    <Undo2 className="h-4 w-4 text-sky-700" />
+                    <Undo2 className="h-4 w-4 text-[var(--ops-text-muted)]" />
                     Anulación total
                   </h2>
 
@@ -968,7 +973,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                           value={cancelReason}
                           onChange={(event) => setCancelReason(event.target.value)}
                           placeholder="Ej. venta digitada por error"
-                          className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                          className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[var(--ripnel-accent-soft)]"
                         />
                       </div>
 
@@ -980,7 +985,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                           value={cancelNotes}
                           onChange={(event) => setCancelNotes(event.target.value)}
                           rows={3}
-                          className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                          className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[var(--ripnel-accent-soft)]"
                           placeholder="Detalle adicional de la anulación"
                         />
                       </div>
@@ -988,7 +993,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                       <button
                         type="submit"
                         disabled={cancelSubmitting || !cancelReason.trim()}
-                        className="inline-flex items-center gap-2 rounded-2xl bg-sky-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex items-center gap-2 rounded-2xl bg-[var(--ripnel-accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <Undo2 className="h-4 w-4" />
                         {cancelSubmitting ? "Anulando venta..." : "Anular venta"}

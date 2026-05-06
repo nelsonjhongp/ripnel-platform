@@ -84,7 +84,7 @@ export default function AccountSecurityPage() {
       backLabel={isRequired ? undefined : "Volver a perfil"}
       title="Seguridad"
     >
-      <PanelSection title="Contrasena" icon={KeyRound}>
+      <PanelSection title="Cambio de contraseña">
         <form onSubmit={submitPassword}>
           <label className="grid gap-3 border-t border-[var(--ops-border-strong)] px-4 py-3 first:border-t-0 md:grid-cols-[200px_minmax(0,1fr)] md:items-center">
             <span className="min-w-0">
@@ -138,12 +138,12 @@ export default function AccountSecurityPage() {
           </label>
 
           {error ? (
-            <div className="border-t border-[var(--ops-border-strong)] px-4 py-3 text-sm text-rose-500">
+            <div role="alert" aria-live="polite" className="border-t border-[var(--ops-border-strong)] px-4 py-3 text-sm text-rose-500">
               {error}
             </div>
           ) : null}
           {message ? (
-            <div className="border-t border-[var(--ops-border-strong)] px-4 py-3 text-sm text-emerald-500">
+            <div role="status" aria-live="polite" className="border-t border-[var(--ops-border-strong)] px-4 py-3 text-sm text-emerald-500">
               {message}
             </div>
           ) : null}
