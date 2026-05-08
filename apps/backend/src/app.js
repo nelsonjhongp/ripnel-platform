@@ -86,8 +86,24 @@ function isPrivateIpv4(hostname) {
 function isAllowedDevOrigin(origin) {
   try {
     const { hostname } = new URL(origin);
-    return hostname === 'localhost' || hostname === '127.0.0.1' || isPrivateIpv4(hostname);
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return true;
+    }
+    if (isPrivateIpv4(hostname)) {
+      return true;
+    }
+    return false;
   } catch (error) {
+    return false;
+  }
+}
+
+function isLocalRequest(origin) {
+  if (!origin) return false;
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.local');
+  } catch {
     return false;
   }
 }
@@ -108,11 +124,17 @@ app.use(
     origin(origin, callback) {
       const normalizedOrigin = normalizeOrigin(origin);
 
-      if (
-        !origin ||
-        (normalizedOrigin && allowedOrigins.has(normalizedOrigin)) ||
-        (env.nodeEnv !== 'production' && normalizedOrigin && isAllowedDevOrigin(normalizedOrigin))
-      ) {
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      if (env.nodeEnv !== 'production') {
+        if (isAllowedDevOrigin(origin) || isLocalRequest(origin)) {
+          return callback(null, true);
+        }
+      }
+
+      if (normalizedOrigin && allowedOrigins.has(normalizedOrigin)) {
         return callback(null, true);
       }
 

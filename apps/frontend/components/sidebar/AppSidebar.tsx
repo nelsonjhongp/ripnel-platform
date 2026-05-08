@@ -5,164 +5,34 @@ import Link from "next/link"
 import Image from "next/image"
 import { usePathname, useRouter } from "next/navigation"
 import {
-  BarChart3,
-  Banknote,
-  ClipboardList,
   ChevronDown,
   CircleUserRound,
   House,
   LayoutDashboard,
-  ReceiptText,
-  RotateCcw,
   Settings,
-  ShoppingBag,
-  ShoppingCart,
   Store,
-  Boxes,
-  Warehouse,
-  Users,
 } from "lucide-react"
 
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
   SidebarHeader,
   SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { cn } from "@/lib/utils"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { resolveTransferCapabilities } from "@/lib/capabilities"
-import {
-  catalogPageDefinitions,
-  getCatalogRoute,
-  productMasterLinks,
-  productMasterSummaryLink,
-} from "@/lib/product-master-metadata"
-
-type SidebarItem = {
-  title: string
-  url: string
-  icon?: React.ComponentType<{ className?: string }>
-  onlyForRoles?: string[]
-  excludeRoles?: string[]
-}
-
-type SidebarGroup = {
-  title: string
-  icon: React.ComponentType<{ className?: string }>
-  permission?: string
-  directLink?: boolean
-  onlyForRoles?: string[]
-  excludeRoles?: string[]
-  items: SidebarItem[]
-}
-
-const SELLER_FOCUSED_ROLES = ["TIENDA", "VENTAS"]
-
-const sidebarGroups: SidebarGroup[] = [
-  {
-    title: "Venta",
-    icon: ShoppingCart,
-    permission: "sales.pos",
-    excludeRoles: ["CAJA"],
-    items: [
-      { title: "Nueva venta", url: "/purchase-system" },
-      { title: "Historial de ventas", url: "/transaction-history" },
-    ],
-  },
-  {
-    title: "Postventa",
-    icon: RotateCcw,
-    permission: "sales.postsale.view",
-    directLink: true,
-    items: [{ title: "Postventa", url: "/postventa" }],
-  },
-  {
-    title: "Caja",
-    icon: Banknote,
-    onlyForRoles: ["ADMIN", "CAJA"],
-    items: [
-      { title: "Caja del día", url: "/caja" },
-      { title: "Historial de caja", url: "/caja/historial" },
-      { title: "Control de cajas", url: "/caja/control", onlyForRoles: ["ADMIN"] },
-    ],
-  },
-  {
-    title: "Inventario",
-    icon: Boxes,
-    permission: "inventory.view",
-    excludeRoles: SELLER_FOCUSED_ROLES,
-    items: [
-      { title: "Stock actual", url: "/inventory" },
-      { title: "Apertura y ajustes", url: "/inventory/ajustes" },
-      { title: "Kardex", url: "/kardex" },
-    ],
-  },
-  {
-    title: "Catalogos",
-    icon: Warehouse,
-    permission: "catalogs.manage",
-    excludeRoles: SELLER_FOCUSED_ROLES,
-    items: [
-      {
-        title: productMasterSummaryLink.label,
-        url: productMasterSummaryLink.href,
-        icon: productMasterSummaryLink.icon,
-      },
-      ...catalogPageDefinitions.map((definition) => ({
-        title: definition.label,
-        url: getCatalogRoute(definition.slug),
-        icon: definition.icon,
-      })),
-    ],
-  },
-  {
-    title: "Productos",
-    icon: ShoppingBag,
-    permission: "products.manage",
-    excludeRoles: SELLER_FOCUSED_ROLES,
-    items: productMasterLinks.map((link) => ({
-      title: link.label,
-      url: link.href,
-      icon: link.icon,
-    })),
-  },
-  {
-    title: "Administracion",
-    icon: Settings,
-    permission: "admin.manage",
-    items: [
-      { title: "Roles y usuarios", url: "/administracion/roles&usuarios" },
-      { title: "Ubicaciones", url: "/administracion/ubicaciones" },
-    ],
-  },
-  {
-    title: "Clientes",
-    icon: Users,
-    onlyForRoles: ["ADMIN", "TIENDA", "CAJA", "VENTAS"],
-    items: [{ title: "Clientes", url: "/clientes" }],
-  },
-  {
-    title: "BI",
-    icon: BarChart3,
-    directLink: true,
-    excludeRoles: SELLER_FOCUSED_ROLES,
-    items: [{ title: "BI", url: "/bi" }],
-  },
-]
-
-const inventoryIcons = {
-  "Stock actual": Warehouse,
-  "Apertura y ajustes": ClipboardList,
-  Kardex: ClipboardList,
-  "Historial de transacciones": ReceiptText,
-}
+import { inventoryIcons, sidebarGroups, type SidebarItem } from "./sidebar-config"
 
 function SidebarLink({
   href,
@@ -176,16 +46,18 @@ function SidebarLink({
   active?: boolean
 }) {
   return (
-    <Link
-      href={href}
-      className={cn(
-        "flex cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium text-sidebar-foreground transition hover:bg-sidebar-accent",
-        active && "bg-sidebar-accent text-sidebar-foreground ring-1 ring-sidebar-border/70"
-      )}
-    >
-      {Icon ? <Icon className="h-4 w-4 text-sidebar-foreground/65" /> : <span className="h-4 w-4" />}
-      <span>{label}</span>
-    </Link>
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        asChild
+        isActive={active}
+        className="h-9 gap-2.5 rounded-xl px-2.5 text-sm font-medium data-[active=true]:ring-1 data-[active=true]:ring-sidebar-border/70"
+      >
+        <Link href={href}>
+          {Icon ? <Icon className="h-4 w-4 text-sidebar-foreground/65" /> : <span className="h-4 w-4" />}
+          <span>{label}</span>
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
   )
 }
 
@@ -225,9 +97,13 @@ function SidebarGroupSection({
     const isActive = pathname === item.url || pathname.startsWith(`${item.url}/`)
 
     return (
-      <div className="border-t border-sidebar-border pt-2.5">
-        <SidebarLink href={item.url} label={title} icon={Icon} active={isActive} />
-      </div>
+      <SidebarGroup className="p-0">
+        <SidebarGroupContent>
+          <SidebarMenu>
+            <SidebarLink href={item.url} label={title} icon={Icon} active={isActive} />
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
     )
   }
 
@@ -236,36 +112,44 @@ function SidebarGroupSection({
   )
 
   return (
-    <Collapsible defaultOpen={isActive} className="group border-t border-sidebar-border pt-2.5">
-      <div className="rounded-xl px-1">
-        <CollapsibleTrigger className="flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left text-sm font-medium text-sidebar-foreground transition hover:bg-sidebar-accent">
-          <Icon className="h-4 w-4 text-sidebar-foreground/65" />
-          <span>{title}</span>
-          <ChevronDown className="ml-auto h-4 w-4 text-sidebar-foreground/55 transition group-data-[state=open]:rotate-180" />
-        </CollapsibleTrigger>
-        <CollapsibleContent className="pt-1">
-          <div className="space-y-0.5 pl-2">
-            {visibleItems.map((item) => {
-              const IconComponent =
-                item.icon ||
-                (title === "Inventario"
+    <SidebarGroup className="p-0">
+      <Collapsible defaultOpen={isActive} className="group">
+        <SidebarGroupContent>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <CollapsibleTrigger asChild>
+                <SidebarMenuButton className="h-9 gap-2.5 rounded-xl px-2.5 text-sm font-medium">
+                  <Icon className="h-4 w-4 text-sidebar-foreground/65" />
+                  <span>{title}</span>
+                  <ChevronDown className="ml-auto h-4 w-4 text-sidebar-foreground/55 transition group-data-[state=open]:rotate-180" />
+                </SidebarMenuButton>
+              </CollapsibleTrigger>
+            </SidebarMenuItem>
+          </SidebarMenu>
+          <CollapsibleContent className="pt-1">
+            <SidebarMenu className="gap-0.5 pl-5">
+              {visibleItems.map((item) => {
+                const IconComponent =
+                  item.icon ||
+                  (title === "Inventario"
                     ? inventoryIcons[item.title as keyof typeof inventoryIcons]
                     : undefined)
 
-              return (
-                <SidebarLink
-                  key={item.url}
-                  href={item.url}
-                  label={item.title}
-                  icon={IconComponent}
-                  active={pathname === item.url || pathname.startsWith(`${item.url}/`)}
-                />
-              )
-            })}
-          </div>
-        </CollapsibleContent>
-      </div>
-    </Collapsible>
+                return (
+                  <SidebarLink
+                    key={item.url}
+                    href={item.url}
+                    label={item.title}
+                    icon={IconComponent}
+                    active={pathname === item.url || pathname.startsWith(`${item.url}/`)}
+                  />
+                )
+              })}
+            </SidebarMenu>
+          </CollapsibleContent>
+        </SidebarGroupContent>
+      </Collapsible>
+    </SidebarGroup>
   )
 }
 
@@ -369,7 +253,7 @@ export function AppSidebar({
         }
         {...props}
       >
-        <SidebarHeader className="border-b border-sidebar-border px-3 py-4">
+        <SidebarHeader className="border-b border-sidebar-border px-3 pb-3 pt-4">
           <div className="flex items-center gap-2.5">
             <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full ring-1 ring-sidebar-border">
               <Image
@@ -388,7 +272,7 @@ export function AppSidebar({
             </div>
           </div>
 
-          <div className="mt-4 rounded-2xl bg-sidebar-accent px-2.5 py-2">
+          <div className="mt-3 rounded-2xl bg-sidebar-accent/70 px-2.5 py-2">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
                 <Store className="h-4 w-4 shrink-0 text-sidebar-foreground/65" />
@@ -414,18 +298,23 @@ export function AppSidebar({
           </div>
         </SidebarHeader>
 
-        <SidebarContent className="px-2.5 py-3">
-          <nav className="space-y-2">
-            <SidebarLink href="/inicio" label="Inicio" icon={House} active={pathname === "/inicio"} />
+        <SidebarContent className="px-2 py-3">
+          <nav className="space-y-3">
+            <SidebarGroup className="p-0">
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  <SidebarLink href="/inicio" label="Inicio" icon={House} active={pathname === "/inicio"} />
+                  <SidebarLink
+                    href="/dashboard"
+                    label="Dashboard"
+                    icon={LayoutDashboard}
+                    active={pathname === "/dashboard"}
+                  />
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
 
-            <div className="border-t border-sidebar-border pt-2.5">
-              <SidebarLink
-                href="/dashboard"
-                label="Dashboard"
-                icon={LayoutDashboard}
-                active={pathname === "/dashboard"}
-              />
-            </div>
+            <div className="mx-2 h-px bg-sidebar-border/80" />
 
             {visibleGroups.map((group) => (
               <SidebarGroupSection
@@ -441,29 +330,32 @@ export function AppSidebar({
           </nav>
         </SidebarContent>
 
-        <SidebarFooter className="border-t border-sidebar-border bg-sidebar px-2.5 py-3">
-          <Link
-            href="/account"
-            className="flex items-center gap-2.5 rounded-2xl px-2.5 py-2 transition hover:bg-sidebar-accent"
-          >
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-foreground">
-              <CircleUserRound className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-sidebar-foreground">
-                {user?.full_name || "Usuario"}
-              </p>
-              <p className="truncate text-xs text-sidebar-foreground/65">{user?.role_name || "Rol"}</p>
-            </div>
-          </Link>
-
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="mt-1.5 flex w-full items-center gap-2.5 rounded-2xl px-2.5 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
-          >
-            <span>Cerrar sesion</span>
-          </button>
+        <SidebarFooter className="border-t border-sidebar-border bg-sidebar px-2 pb-3 pt-2.5">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild className="h-11 rounded-2xl px-2.5">
+                <Link href="/account">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-foreground">
+                    <CircleUserRound className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-sidebar-foreground">
+                      {user?.full_name || "Usuario"}
+                    </p>
+                    <p className="truncate text-xs text-sidebar-foreground/65">{user?.role_name || "Rol"}</p>
+                  </div>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={handleLogout}
+                className="h-9 rounded-xl px-2.5 text-sm font-medium text-red-600 hover:bg-red-50/90 hover:text-red-700"
+              >
+                <span>Cerrar sesion</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
         </SidebarFooter>
       </Sidebar>
 

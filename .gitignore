@@ -40,3 +40,13 @@ yarn-error.log*
 # Supabase local state
 supabase/.branches/
 supabase/.temp/
+
+# Knowledge graph output
+graphify-out/
+apps/graphify-out/
+
+# Local tool configs
+.opencode/
+linear.app/
+cookies.txt
+.codex-login-review.png

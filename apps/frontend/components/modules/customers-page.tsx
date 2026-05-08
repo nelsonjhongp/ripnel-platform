@@ -3,9 +3,6 @@
 import Link from "next/link"
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
-  ArrowDown,
-  ArrowUp,
-  ChevronDown,
   PencilLine,
   Plus,
   RefreshCw,
@@ -29,13 +26,15 @@ import {
   validateCustomerInput,
 } from "@/components/modules/customer-form"
 import { Button } from "@/components/ui/button"
+import { FilterDropdown } from "@/components/ui/filter-dropdown"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  OpsFiltersRow,
+  OpsPageShell,
+  OpsSectionDivider,
+  OpsTableBlock,
+  OpsTableFooter,
+  OpsTableWrap,
+} from "@/components/ui/ops-page-shell"
 import { Pagination } from "@/components/ui/pagination"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -221,7 +220,7 @@ export default function CustomersPage() {
   const sortOptions = [
     { value: "desc", label: "Más reciente" },
     { value: "asc", label: "Más antigua" },
-  ] as const
+  ]
 
   const totalPages = Math.max(1, Math.ceil(customers.length / PAGE_SIZE))
   const safeCurrentPage = Math.min(currentPage, totalPages)
@@ -241,8 +240,7 @@ export default function CustomersPage() {
 
   return (
     <TooltipProvider delayDuration={120}>
-      <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
-        <div className="mx-auto max-w-[1180px] space-y-4">
+      <OpsPageShell width="wide">
           <PosHeader
             eyebrow="Clientes"
             title="Listado de clientes"
@@ -288,9 +286,9 @@ export default function CustomersPage() {
             />
           ) : null}
 
-          <div className="space-y-4 border-t border-[var(--ops-border-strong)] pt-4">
-            <div className="space-y-4">
-              <div className="grid gap-2.5 lg:grid-cols-[minmax(0,1.55fr)_0.92fr_0.92fr_auto] lg:items-end">
+          <OpsSectionDivider>
+            <OpsTableBlock>
+              <OpsFiltersRow>
                 <div>
                   <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                     Buscar
@@ -307,82 +305,19 @@ export default function CustomersPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                    Tipo de documento
-                  </label>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        className="sales-field flex h-10 w-full cursor-pointer items-center gap-2 rounded-lg px-3 text-left text-sm text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
-                      >
-                        <span className="flex-1">
-                          {docFilterOptions.find((option) => option.value === docFilter)?.label || "Todos"}
-                        </span>
-                        <ChevronDown className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="start"
-                      sideOffset={8}
-                      className="min-w-[var(--radix-dropdown-menu-trigger-width)] border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1 text-[var(--ops-text)]"
-                    >
-                      <DropdownMenuRadioGroup value={docFilter} onValueChange={setDocFilter}>
-                        {docFilterOptions.map((option) => (
-                          <DropdownMenuRadioItem
-                            key={option.value}
-                            value={option.value}
-                            className="cursor-pointer rounded-md px-3 py-2 text-sm focus:bg-[var(--ops-surface-muted)] focus:text-[var(--ops-text)]"
-                          >
-                            {option.label}
-                          </DropdownMenuRadioItem>
-                        ))}
-                      </DropdownMenuRadioGroup>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                <FilterDropdown
+                  label="Tipo de documento"
+                  value={docFilter}
+                  options={docFilterOptions}
+                  onChange={setDocFilter}
+                />
 
-                <div>
-                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                    Orden
-                  </label>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        className="sales-field flex h-10 w-full cursor-pointer items-center gap-2 rounded-lg px-3 text-left text-sm text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
-                      >
-                        {sort === "desc" ? (
-                          <ArrowDown className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                        ) : (
-                          <ArrowUp className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                        )}
-                        <span className="flex-1">
-                          {sortOptions.find((option) => option.value === sort)?.label || "Más reciente"}
-                        </span>
-                        <ChevronDown className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="start"
-                      sideOffset={8}
-                      className="min-w-[var(--radix-dropdown-menu-trigger-width)] border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1 text-[var(--ops-text)]"
-                    >
-                      <DropdownMenuRadioGroup value={sort} onValueChange={(value) => setSort(value as "desc" | "asc")}>
-                        {sortOptions.map((option) => (
-                          <DropdownMenuRadioItem
-                            key={option.value}
-                            value={option.value}
-                            className="cursor-pointer rounded-md px-3 py-2 text-sm focus:bg-[var(--ops-surface-muted)] focus:text-[var(--ops-text)]"
-                          >
-                            {option.label}
-                          </DropdownMenuRadioItem>
-                        ))}
-                      </DropdownMenuRadioGroup>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+                <FilterDropdown
+                  label="Orden"
+                  value={sort}
+                  options={sortOptions}
+                  onChange={(v) => setSort(v as "desc" | "asc")}
+                />
 
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -402,10 +337,9 @@ export default function CustomersPage() {
                     Limpiar filtros
                   </TooltipContent>
                 </Tooltip>
-              </div>
+              </OpsFiltersRow>
 
-              <div className="overflow-x-auto">
-                <div className="min-w-[1080px] border-y border-[var(--ops-border-strong)]">
+              <OpsTableWrap minWidth="1080px">
                   <table className="w-full border-collapse">
                     <thead className="bg-[var(--ops-surface-muted)]">
                       <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
@@ -519,10 +453,9 @@ export default function CustomersPage() {
                       )}
                     </tbody>
                   </table>
-                </div>
-              </div>
+              </OpsTableWrap>
 
-              <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between">
+              <OpsTableFooter>
                 <span className="text-sm text-[var(--ops-text-muted)]">
                   {customers.length === 0 ? "0 resultados" : `${firstVisible}-${lastVisible} de ${customers.length}`}
                 </span>
@@ -532,10 +465,9 @@ export default function CustomersPage() {
                   onPageChange={setCurrentPage}
                   className="self-end md:self-auto"
                 />
-              </div>
-            </div>
-          </div>
-        </div>
+              </OpsTableFooter>
+            </OpsTableBlock>
+          </OpsSectionDivider>
 
         {editingCustomer ? (
           <div className="ops-overlay-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -560,7 +492,7 @@ export default function CustomersPage() {
             </div>
           </div>
         ) : null}
-      </section>
+      </OpsPageShell>
     </TooltipProvider>
   )
 }

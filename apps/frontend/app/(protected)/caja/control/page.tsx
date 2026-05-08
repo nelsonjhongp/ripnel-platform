@@ -282,7 +282,7 @@ export default function CashControlPage() {
             </header>
 
             {error ? (
-              <div className="sales-chip sales-chip-danger rounded-xl px-4 py-3 text-sm">
+              <div role="alert" aria-live="polite" className="sales-chip sales-chip-danger rounded-xl px-4 py-3 text-sm">
                 {error}
               </div>
             ) : null}
