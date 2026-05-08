@@ -500,7 +500,7 @@ html[data-theme-preset="graphite"] {
   }
 
   .ops-overlay-backdrop {
-    background: color-mix(in srgb, var(--ops-page-background) 28%, rgb(2 6 23 / 72%));
+    background: color-mix(in srgb, var(--ops-page-background) 18%, rgb(0 0 0 / 74%));
     backdrop-filter: blur(6px);
   }
 
@@ -509,7 +509,7 @@ html[data-theme-preset="graphite"] {
     background: color-mix(in srgb, var(--ops-surface) 96%, transparent);
     color: var(--ops-text);
     box-shadow:
-      0 20px 44px rgb(2 6 23 / 24%),
+      0 20px 44px rgb(0 0 0 / 24%),
       0 0 0 1px color-mix(in srgb, var(--ops-border-strong) 56%, transparent);
   }
 

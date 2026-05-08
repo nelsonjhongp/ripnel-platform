@@ -27,6 +27,14 @@ import {
 } from "@/components/modules/customer-form"
 import { Button } from "@/components/ui/button"
 import { FilterDropdown } from "@/components/ui/filter-dropdown"
+import {
+  OpsFiltersRow,
+  OpsPageShell,
+  OpsSectionDivider,
+  OpsTableBlock,
+  OpsTableFooter,
+  OpsTableWrap,
+} from "@/components/ui/ops-page-shell"
 import { Pagination } from "@/components/ui/pagination"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -232,8 +240,7 @@ export default function CustomersPage() {
 
   return (
     <TooltipProvider delayDuration={120}>
-      <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
-        <div className="mx-auto max-w-[1180px] space-y-4">
+      <OpsPageShell width="wide">
           <PosHeader
             eyebrow="Clientes"
             title="Listado de clientes"
@@ -279,9 +286,9 @@ export default function CustomersPage() {
             />
           ) : null}
 
-          <div className="space-y-4 border-t border-[var(--ops-border-strong)] pt-4">
-            <div className="space-y-4">
-              <div className="grid gap-2.5 lg:grid-cols-[minmax(0,1.55fr)_0.92fr_0.92fr_auto] lg:items-end">
+          <OpsSectionDivider>
+            <OpsTableBlock>
+              <OpsFiltersRow>
                 <div>
                   <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                     Buscar
@@ -330,10 +337,9 @@ export default function CustomersPage() {
                     Limpiar filtros
                   </TooltipContent>
                 </Tooltip>
-              </div>
+              </OpsFiltersRow>
 
-              <div className="overflow-x-auto">
-                <div className="min-w-[1080px] border-y border-[var(--ops-border-strong)]">
+              <OpsTableWrap minWidth="1080px">
                   <table className="w-full border-collapse">
                     <thead className="bg-[var(--ops-surface-muted)]">
                       <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
@@ -447,10 +453,9 @@ export default function CustomersPage() {
                       )}
                     </tbody>
                   </table>
-                </div>
-              </div>
+              </OpsTableWrap>
 
-              <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between">
+              <OpsTableFooter>
                 <span className="text-sm text-[var(--ops-text-muted)]">
                   {customers.length === 0 ? "0 resultados" : `${firstVisible}-${lastVisible} de ${customers.length}`}
                 </span>
@@ -460,10 +465,9 @@ export default function CustomersPage() {
                   onPageChange={setCurrentPage}
                   className="self-end md:self-auto"
                 />
-              </div>
-            </div>
-          </div>
-        </div>
+              </OpsTableFooter>
+            </OpsTableBlock>
+          </OpsSectionDivider>
 
         {editingCustomer ? (
           <div className="ops-overlay-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -488,7 +492,7 @@ export default function CustomersPage() {
             </div>
           </div>
         ) : null}
-      </section>
+      </OpsPageShell>
     </TooltipProvider>
   )
 }

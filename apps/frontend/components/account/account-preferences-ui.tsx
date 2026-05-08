@@ -2,6 +2,8 @@ import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
 import { ArrowLeft, ChevronDown } from "lucide-react";
 
+import { cn } from "@/lib/utils";
+
 export const THEME_CHOICES = [
   { value: "light-stone", label: "Claro neutro" },
   { value: "light-slate", label: "Gris operativo" },
@@ -130,6 +132,54 @@ export function SettingsFieldHint({ children }: { children: ReactNode }) {
   return <span className="mt-0.5 block text-xs leading-4 text-[var(--ops-text-muted)]">{children}</span>;
 }
 
+export function SettingsFormRow({
+  label,
+  detail,
+  children,
+  className,
+}: {
+  label: ReactNode;
+  detail?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "grid gap-3 border-t border-[var(--ops-border-strong)] px-4 py-3 first:border-t-0 md:grid-cols-[200px_minmax(0,1fr)] md:items-center",
+        className
+      )}
+    >
+      <div className="min-w-0">
+        <SettingsFieldLabel>{label}</SettingsFieldLabel>
+        {detail ? <SettingsFieldHint>{detail}</SettingsFieldHint> : null}
+      </div>
+      <div>{children}</div>
+    </div>
+  );
+}
+
+export function SettingsStatusMessage({
+  tone,
+  children,
+}: {
+  tone: "success" | "danger";
+  children: ReactNode;
+}) {
+  return (
+    <div
+      role={tone === "danger" ? "alert" : "status"}
+      aria-live="polite"
+      className={cn(
+        "border-t border-[var(--ops-border-strong)] px-4 py-3 text-sm",
+        tone === "danger" ? "text-rose-500" : "text-emerald-500"
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function PanelSection({
   title,
   description,
@@ -160,15 +210,11 @@ export function ValueRow({
   detail?: string;
 }) {
   return (
-    <div className="grid gap-3 border-t border-[var(--ops-border-strong)] px-4 py-3 first:border-t-0 md:grid-cols-[200px_minmax(0,1fr)] md:items-center">
-      <div className="min-w-0">
-        <SettingsFieldLabel>{label}</SettingsFieldLabel>
-        {detail ? <SettingsFieldHint>{detail}</SettingsFieldHint> : null}
-      </div>
+    <SettingsFormRow label={label} detail={detail}>
       <div className="min-h-8 rounded-md border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-1.5 text-sm font-medium text-[var(--ops-text)]">
         {value}
       </div>
-    </div>
+    </SettingsFormRow>
   );
 }
 
@@ -186,12 +232,7 @@ export function SelectRow({
   children: ReactNode;
 }) {
   return (
-    <div className="grid gap-3 border-t border-[var(--ops-border-strong)] px-4 py-3 first:border-t-0 md:grid-cols-[200px_minmax(0,1fr)] md:items-center">
-      <div className="min-w-0">
-        <SettingsFieldLabel>{label}</SettingsFieldLabel>
-        {detail ? <SettingsFieldHint>{detail}</SettingsFieldHint> : null}
-      </div>
-
+    <SettingsFormRow label={label} detail={detail}>
       <div className="relative">
         <select
           value={value}
@@ -202,6 +243,6 @@ export function SelectRow({
         </select>
         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
       </div>
-    </div>
+    </SettingsFormRow>
   );
 }
