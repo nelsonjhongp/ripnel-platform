@@ -3,12 +3,10 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { ShoppingCart } from "lucide-react"
 import { AppSidebar } from "./AppSidebar"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth/AuthProvider"
-import { resolveProductMasterRouteTitle } from "@/lib/product-master-metadata"
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -17,14 +15,11 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-
-type TopbarAction = {
-  key: string
-  label: string
-  href: string
-  icon?: React.ReactNode
-  variant?: "accent" | "outline"
-}
+import {
+  resolveSidebarDefaultActions,
+  resolveSidebarRouteTitle,
+  type TopbarAction,
+} from "./sidebar-route-metadata"
 
 const SidebarTopbarActionsContext = React.createContext<{
   setActions: React.Dispatch<React.SetStateAction<TopbarAction[]>>
@@ -60,57 +55,11 @@ export function SidebarShell({
   const [contextualActions, setContextualActions] = React.useState<TopbarAction[]>([])
 
   const resolvedTitle = React.useMemo(() => {
-    if (title) return title
-
-    const masterProductTitle = resolveProductMasterRouteTitle(pathname)
-    if (masterProductTitle) {
-      return masterProductTitle
-    }
-
-    const routeTitles: Record<string, string> = {
-      "/sidebar": "Panel del usuario",
-      "/account": "Perfil",
-      "/account/operacion": "Sede operativa",
-      "/account/apariencia": "Apariencia",
-      "/inicio": "Inicio",
-      "/dashboard": "Dashboard operativo",
-      "/bi": "BI y analitica",
-      "/account-mockup": "Cuenta mockup",
-      "/admin-crud": "Gestion de usuarios",
-      "/inventory": "Inventario",
-      "/kardex": "Kardex",
-      "/purchase-system": "Nueva venta",
-      "/transaction-history": "Historial de ventas",
-      "/postventa": "Postventa",
-    }
-
-    if (routeTitles[pathname]) {
-      return routeTitles[pathname]
-    }
-
-    const lastSegment = pathname.split("/").filter(Boolean).pop()
-    if (!lastSegment) return "Panel del usuario"
-
-    return lastSegment
-      .split("-")
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ")
+    return resolveSidebarRouteTitle(pathname, title)
   }, [pathname, title])
 
   const defaultActions = React.useMemo(() => {
-    const actions: TopbarAction[] = []
-
-    if (has("sales.pos")) {
-      actions.push({
-        key: "quick-sale",
-        label: "Venta rapida",
-        href: "/purchase-system",
-        icon: <ShoppingCart className="h-4 w-4" />,
-        variant: "accent",
-      })
-    }
-
-    return actions
+    return resolveSidebarDefaultActions(has)
   }, [has])
 
   const actions = React.useMemo(() => {

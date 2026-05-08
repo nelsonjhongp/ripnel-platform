@@ -158,12 +158,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }));
     } catch (error) {
       console.warn("Failed to load user locations", error);
+      const isAuthError =
+        (error instanceof ApiError && error.status === 401) ||
+        (error instanceof Error && error.message.includes("Not authenticated"));
+
       setState((current) => ({
         ...current,
         locationsLoading: false,
         locationsError: formatLocationsError(error),
         locationAssignments: [],
         defaultLocation: null,
+        ...(isAuthError ? { user: null, sessionExpired: true } : {}),
       }));
     }
   }, []);

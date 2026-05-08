@@ -1,18 +1,46 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
-  Building2,
   LoaderCircle,
-  MapPin,
   PencilLine,
   Plus,
   RefreshCw,
-  Search,
-  Store,
-  Warehouse,
+  RotateCcw,
 } from "lucide-react";
 import { buildApiUrl } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
+import {
+  AdminActionButton,
+  AdminCheckboxRow,
+  AdminConfirmModal,
+  AdminField,
+  AdminInput,
+  AdminModalShell,
+  AdminRowActions,
+  AdminSelect,
+} from "@/components/admin/admin-ui";
+import { Button } from "@/components/ui/button";
+import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import {
+  OpsFiltersRow,
+  OpsPageShell,
+  OpsSearchField,
+  OpsSectionDivider,
+  OpsTableBlock,
+  OpsTableFooter,
+  OpsTableWrap,
+} from "@/components/ui/ops-page-shell";
+import { Pagination } from "@/components/ui/pagination";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type LocationItem = {
   location_id: string;
@@ -53,11 +81,7 @@ const locationTypeLabels: Record<LocationItem["type"], string> = {
   third_party: "Tercero",
 };
 
-function typeIcon(type: LocationItem["type"]) {
-  if (type === "store") return Store;
-  if (type === "warehouse") return Warehouse;
-  return Building2;
-}
+const PAGE_SIZE = 10;
 
 export default function LocationsPage() {
   const [locations, setLocations] = useState<LocationItem[]>([]);
@@ -68,8 +92,12 @@ export default function LocationsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [typeFilter, setTypeFilter] = useState<"all" | LocationItem["type"]>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [showModal, setShowModal] = useState(false);
   const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
   const [formState, setFormState] = useState<FormState>(initialFormState);
+  const [activeChangeLocation, setActiveChangeLocation] = useState<LocationItem | null>(null);
+  const [savingActiveChange, setSavingActiveChange] = useState(false);
 
   async function loadLocations() {
     setLoading(true);
@@ -96,12 +124,10 @@ export default function LocationsPage() {
   }
 
   useEffect(() => {
-    // defer loading to avoid synchronous setState inside effect
     void Promise.resolve().then(() => loadLocations());
   }, []);
 
   const activeCount = locations.filter((location) => location.active).length;
-  const inactiveCount = locations.length - activeCount;
   const storeCount = locations.filter((location) => location.type === "store").length;
   const warehouseCount = locations.filter((location) => location.type === "warehouse").length;
 
@@ -116,7 +142,6 @@ export default function LocationsPage() {
       const matchesType = typeFilter === "all" || location.type === typeFilter;
 
       if (!matchesStatus || !matchesType) return false;
-
       if (!normalizedSearch) return true;
 
       return [location.name, location.code, location.address, locationTypeLabels[location.type]]
@@ -124,6 +149,27 @@ export default function LocationsPage() {
         .some((value) => String(value).toLowerCase().includes(normalizedSearch));
     });
   }, [locations, search, statusFilter, typeFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredLocations.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedLocations = useMemo(() => {
+    const start = (safePage - 1) * PAGE_SIZE;
+    return filteredLocations.slice(start, start + PAGE_SIZE);
+  }, [filteredLocations, safePage]);
+
+  const firstVisible =
+    paginatedLocations.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
+  const lastVisible = firstVisible + paginatedLocations.length - 1;
+
+  const hasActiveFilters =
+    Boolean(search.trim()) || statusFilter !== "all" || typeFilter !== "all";
 
   function resetForm() {
     setEditingLocationId(null);
@@ -138,7 +184,7 @@ export default function LocationsPage() {
     );
   }
 
-  function handleEdit(location: LocationItem) {
+  function openEditModal(location: LocationItem) {
     setEditingLocationId(location.location_id);
     setFormState({
       name: location.name,
@@ -148,19 +194,30 @@ export default function LocationsPage() {
     });
     setError(null);
     setSuccessMessage(null);
+    setShowModal(true);
   }
 
-  async function handleToggleActive(location: LocationItem) {
+  function closeModal() {
+    setShowModal(false);
+    resetForm();
+  }
+
+  async function confirmLocationActiveChange() {
+    if (!activeChangeLocation) {
+      return;
+    }
+
     setError(null);
     setSuccessMessage(null);
+    setSavingActiveChange(true);
 
     try {
-      const response = await fetch(buildApiUrl(`/api/locations/${location.location_id}`), {
+      const response = await fetch(buildApiUrl(`/api/locations/${activeChangeLocation.location_id}`), {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ active: !location.active }),
+        body: JSON.stringify({ active: !activeChangeLocation.active }),
       });
       const payload = await response.json();
 
@@ -170,15 +227,18 @@ export default function LocationsPage() {
 
       updateLocationInList(payload.data);
 
-      if (editingLocationId === location.location_id) {
+      if (editingLocationId === activeChangeLocation.location_id) {
         setFormState((current) => ({ ...current, active: payload.data.active }));
       }
 
       setSuccessMessage(payload.data.active ? "Ubicación activada." : "Ubicación inactivada.");
+      setActiveChangeLocation(null);
     } catch (requestError) {
       setError(
         requestError instanceof Error ? requestError.message : "No se pudo actualizar la ubicación"
       );
+    } finally {
+      setSavingActiveChange(false);
     }
   }
 
@@ -230,7 +290,7 @@ export default function LocationsPage() {
         setSuccessMessage("Ubicación creada.");
       }
 
-      resetForm();
+      closeModal();
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -244,337 +304,362 @@ export default function LocationsPage() {
     }
   }
 
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter("all");
+    setTypeFilter("all");
+    setCurrentPage(1);
+  }
+
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    setCurrentPage(1);
+  }
+
+  function handleTypeFilterChange(value: LocationItem["type"] | "all") {
+    setTypeFilter(typeFilter === value ? "all" : value);
+    setCurrentPage(1);
+  }
+
+  function handleStatusFilterChange(value: "active" | "all") {
+    setStatusFilter(statusFilter === value ? "all" : value);
+    setCurrentPage(1);
+  }
+
   return (
-    <section className="ops-page min-h-screen p-4 md:p-5">
-      <div className="mx-auto flex max-w-7xl flex-col gap-5">
-        <header className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="ops-title text-2xl font-semibold">Ubicaciones</h1>
-            <p className="ops-text-muted text-sm">Gestión de sedes operativas.</p>
-          </div>
-
-          <button
-            type="button"
-            onClick={loadLocations}
-            className="inline-flex items-center gap-2 rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3.5 py-2 text-sm font-semibold text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Recargar
-          </button>
-        </header>
-
-        <div className="ops-surface rounded-2xl border p-4">
-          <div className="grid gap-2 md:grid-cols-3">
-            <article className="ops-surface-muted rounded-xl border border-[var(--ops-border-strong)] px-3 py-2.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">Activas</p>
-              <p className="mt-1 text-xl font-semibold text-[var(--ops-text)]">{activeCount}</p>
-            </article>
-            <article className="ops-surface-muted rounded-xl border border-[var(--ops-border-strong)] px-3 py-2.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">Tiendas</p>
-              <p className="mt-1 text-xl font-semibold text-[var(--ops-text)]">{storeCount}</p>
-            </article>
-            <article className="ops-surface-muted rounded-xl border border-[var(--ops-border-strong)] px-3 py-2.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">Almacenes</p>
-              <p className="mt-1 text-xl font-semibold text-[var(--ops-text)]">{warehouseCount}</p>
-            </article>
-          </div>
-
-          <div className="mt-3 rounded-xl border border-[var(--ops-border-strong)] p-3">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="relative w-full max-w-md">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Buscar por nombre, código, dirección o tipo"
-                  className="w-full rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] py-2 pl-9 pr-3 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)]"
-                />
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter("all")}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                    statusFilter === "all"
-                      ? "bg-[var(--ripnel-accent)] text-white"
-                      : "border border-[var(--ops-border-strong)] bg-[var(--ops-field)] text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
-                  }`}
-                >
-                  Todos ({locations.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter("active")}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                    statusFilter === "active"
-                      ? "bg-emerald-600 text-white"
-                      : "border border-[var(--ops-border-strong)] bg-[var(--ops-field)] text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
-                  }`}
-                >
-                  Activas ({activeCount})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter("inactive")}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                    statusFilter === "inactive"
-                      ? "bg-slate-700 text-white"
-                      : "border border-[var(--ops-border-strong)] bg-[var(--ops-field)] text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
-                  }`}
-                >
-                  Inactivas ({inactiveCount})
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setTypeFilter("all")}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                  typeFilter === "all"
-                    ? "bg-[var(--ripnel-accent)] text-white"
-                    : "border border-[var(--ops-border-strong)] bg-[var(--ops-field)] text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
-                }`}
-              >
-                Todos los tipos
-              </button>
-              {locationTypeOptions.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setTypeFilter(option.value)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                    typeFilter === option.value
-                      ? "bg-[var(--ripnel-accent)] text-white"
-                      : "border border-[var(--ops-border-strong)] bg-[var(--ops-field)] text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-5 xl:grid-cols-[1.2fr_0.9fr]">
-          <article className="ops-surface rounded-2xl border p-5">
-            <div className="flex items-center justify-between border-b border-[var(--ops-border-strong)] pb-3">
-              <h2 className="text-xl font-semibold text-[var(--ops-text)]">Lista de ubicaciones</h2>
-              <span className="ops-metric-pill rounded-full px-3 py-1 text-xs font-semibold">
-                {filteredLocations.length} visibles
-              </span>
-            </div>
-
-            {loading ? (
-              <div className="flex min-h-56 items-center justify-center text-[var(--ops-text-muted)]">
-                <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
-                Cargando ubicaciones...
-              </div>
-            ) : filteredLocations.length ? (
-              <div className="mt-4 space-y-3">
-                {filteredLocations.map((location) => {
-                  const Icon = typeIcon(location.type);
-
-                  return (
-                    <div
-                      key={location.location_id}
-                      className={`rounded-xl border border-[var(--ops-border-strong)] p-4 transition hover:bg-[var(--ops-surface-muted)] ${
-                        location.active ? "" : "opacity-80"
-                      }`}
+    <TooltipProvider delayDuration={120}>
+      <OpsPageShell width="wide">
+          <PosHeader
+            eyebrow="Administración"
+            title="Sedes operativas"
+            actions={
+              <div className="flex items-center gap-2">
+                <Button asChild variant="accent" size="sm" className="rounded-lg">
+                  <Link href="/administracion/ubicaciones/nuevo">
+                    <Plus className="h-3.5 w-3.5" />
+                    Nueva sede
+                  </Link>
+                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      className="rounded-lg"
+                      onClick={loadLocations}
+                      aria-label="Recargar"
                     >
-                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                        <div className="flex items-start gap-3">
-                          <div className="rounded-xl bg-[var(--ripnel-accent-soft)] p-2.5 text-[var(--ripnel-accent-hover)]">
-                            <Icon className="h-4.5 w-4.5" />
-                          </div>
+                      <RefreshCw className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" sideOffset={8}>
+                    Recargar
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            }
+          />
 
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="text-base font-semibold text-[var(--ops-text)]">{location.name}</h3>
-                              <span className="sales-chip sales-chip-neutral rounded-full px-2.5 py-1 text-xs font-semibold">
-                                {locationTypeLabels[location.type]}
-                              </span>
-                              <span
-                                className={`sales-chip rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                  location.active ? "sales-chip-success" : "sales-chip-neutral"
-                                }`}
-                              >
-                                {location.active ? "Activa" : "Inactiva"}
-                              </span>
-                            </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <OpsMetricPill
+              label="Total sedes"
+              value={locations.length}
+              active={statusFilter === "all" && typeFilter === "all"}
+              onClick={() => { setStatusFilter("all"); setTypeFilter("all"); setCurrentPage(1); }}
+            />
+            <OpsMetricPill
+              label="Tiendas"
+              value={storeCount}
+              tone="accent"
+              active={typeFilter === "store"}
+              onClick={() => { setCurrentPage(1); handleTypeFilterChange("store"); }}
+            />
+            <OpsMetricPill
+              label="Almacenes"
+              value={warehouseCount}
+              tone="accent"
+              active={typeFilter === "warehouse"}
+              onClick={() => { setCurrentPage(1); handleTypeFilterChange("warehouse"); }}
+            />
+            <OpsMetricPill
+              label="Activas"
+              value={activeCount}
+              tone="success"
+              active={statusFilter === "active"}
+              onClick={() => { setCurrentPage(1); handleStatusFilterChange("active"); }}
+            />
+          </div>
 
-                            <p className="mt-1 text-sm text-[var(--ops-text-muted)]">
-                              {location.code || "Sin código"}
-                              {location.address ? ` · ${location.address}` : ""}
+          <OpsSectionDivider>
+            <OpsTableBlock>
+            <OpsFiltersRow className="lg:grid-cols-[minmax(0,1.2fr)_0.92fr_auto]">
+              <OpsSearchField
+                value={search}
+                onChange={handleSearchChange}
+                placeholder="Buscar por nombre, código o dirección"
+                ariaLabel="Buscar ubicaciones"
+              />
+
+              <FilterDropdown
+                label="Tipo"
+                value={typeFilter}
+                options={[
+                  { value: "all", label: "Todos los tipos" },
+                  ...locationTypeOptions.map((o) => ({ value: o.value, label: o.label })),
+                ]}
+                onChange={(v) => { setTypeFilter(v as "all" | LocationItem["type"]); setCurrentPage(1); }}
+              />
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={clearFilters}
+                    disabled={!hasActiveFilters}
+                    variant="outline"
+                    size="icon-sm"
+                    className="h-10 w-10 rounded-lg"
+                    aria-label="Limpiar filtros"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={8}>
+                  Limpiar filtros
+                </TooltipContent>
+              </Tooltip>
+            </OpsFiltersRow>
+
+            {error ? (
+              <div role="alert" aria-live="polite" className="rounded-lg border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-4 py-2.5 text-sm text-[color:color-mix(in_srgb,#be123c_74%,var(--ops-text))]">
+                {error}
+              </div>
+            ) : null}
+
+            {successMessage ? (
+              <div role="status" aria-live="polite" className="rounded-lg border border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] px-4 py-2.5 text-sm text-[color:color-mix(in_srgb,#047857_74%,var(--ops-text))]">
+                {successMessage}
+              </div>
+            ) : null}
+
+            <OpsTableWrap minWidth="820px">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-[var(--ops-surface-muted)] text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
+                      <th className="px-4 py-3 text-left">Nombre</th>
+                      <th className="px-4 py-3 text-left">Código</th>
+                      <th className="px-4 py-3 text-left">Tipo</th>
+                      <th className="px-4 py-3 text-left">Dirección</th>
+                      <th className="px-4 py-3 text-left">Estado</th>
+                      <th className="px-4 py-3 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                          <LoaderCircle className="mr-2 inline-block h-5 w-5 animate-spin" />
+                          Cargando ubicaciones…
+                        </td>
+                      </tr>
+                    ) : paginatedLocations.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                          {locations.length
+                            ? "No hay resultados para este filtro."
+                            : "Aún no hay ubicaciones registradas."}
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedLocations.map((location) => (
+                        <tr
+                          key={location.location_id}
+                          className="transition hover:bg-[var(--ops-surface-muted)]"
+                        >
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <p className="text-sm font-semibold text-[var(--ops-text)]">
+                              {location.name}
                             </p>
-
-                            <div className="mt-2.5 flex flex-wrap gap-2">
-                              <button
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--ops-text-muted)] tabular-nums">
+                              {location.code || "—"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <span className="inline-block rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]">
+                              {locationTypeLabels[location.type]}
+                            </span>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <span className="text-sm text-[var(--ops-text)]">
+                              {location.address || "—"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <span
+                              className={cn(
+                                "inline-block rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                                location.active
+                                  ? "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
+                                  : "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]"
+                              )}
+                            >
+                              {location.active ? "Activa" : "Inactiva"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <AdminRowActions>
+                              <AdminActionButton
                                 type="button"
-                                onClick={() => handleEdit(location)}
-                                className="inline-flex items-center gap-1 rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-1 text-xs font-semibold text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
+                                onClick={() => openEditModal(location)}
                               >
                                 <PencilLine className="h-3.5 w-3.5" />
                                 Editar
-                              </button>
-                              <button
+                              </AdminActionButton>
+                              <AdminActionButton
                                 type="button"
-                                onClick={() => handleToggleActive(location)}
-                                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                                  location.active
-                                    ? "border border-[var(--ops-border-strong)] bg-[var(--ops-field)] text-[var(--ops-text)] hover:bg-[var(--ops-surface-muted)]"
-                                    : "bg-emerald-600 text-white hover:bg-emerald-700"
-                                }`}
+                                tone={location.active ? "danger" : "neutral"}
+                                onClick={() => setActiveChangeLocation(location)}
                               >
                                 {location.active ? "Inactivar" : "Activar"}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
+                              </AdminActionButton>
+                            </AdminRowActions>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+            </OpsTableWrap>
 
-                        <div className="flex items-center gap-2 text-sm text-[var(--ops-text-muted)]">
-                          <MapPin className="h-4 w-4" />
-                          {new Date(location.created_at).toLocaleDateString("es-PE")}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="ops-empty-state-compact mt-4 rounded-xl p-8 text-center text-sm">
-                {locations.length
-                  ? "No hay resultados para este filtro."
-                  : "Aún no hay ubicaciones registradas."}
-              </div>
-            )}
-          </article>
+            <OpsTableFooter>
+              <span className="text-sm tabular-nums text-[var(--ops-text-muted)]">
+                {filteredLocations.length === 0
+                  ? "0 resultados"
+                  : `${firstVisible}-${lastVisible} de ${filteredLocations.length}`}
+              </span>
 
-          <article className="ops-surface rounded-2xl border p-5">
-            <div className="border-b border-[var(--ops-border-strong)] pb-3">
-              <h2 className="text-xl font-semibold text-[var(--ops-text)]">
-                {editingLocationId ? "Editar ubicación" : "Crear ubicación"}
-              </h2>
-            </div>
+              <Pagination
+                page={safePage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                className="self-end md:self-auto"
+              />
+            </OpsTableFooter>
+            </OpsTableBlock>
+          </OpsSectionDivider>
 
-            <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-[var(--ops-text)]">Nombre</label>
-                <input
-                  value={formState.name}
-                  onChange={(event) =>
-                    setFormState((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                  placeholder="Tienda Centro"
-                  className="w-full rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-2.5 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)]"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-[var(--ops-text)]">Tipo</label>
-                <select
-                  value={formState.type}
-                  onChange={(event) =>
-                    setFormState((current) => ({
-                      ...current,
-                      type: event.target.value as LocationItem["type"],
-                    }))
-                  }
-                  disabled={editingLocationId !== null}
-                  className="w-full rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-2.5 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+        {showModal ? (
+          <AdminModalShell
+            title={editingLocationId ? "Editar sede" : "Nueva sede"}
+            onClose={closeModal}
+            widthClass="max-w-md"
+            footer={
+              <div className="flex items-center gap-3">
+                <AdminActionButton
+                  type="button"
+                  onClick={closeModal}
+                  className="flex-1"
                 >
-                  {locationTypeOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-[var(--ops-text)]">Dirección</label>
-                <input
-                  value={formState.address}
-                  onChange={(event) =>
-                    setFormState((current) => ({
-                      ...current,
-                      address: event.target.value,
-                    }))
-                  }
-                  placeholder="Av. Ejemplo 123, Lima"
-                  className="w-full rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-2.5 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)]"
-                />
-              </div>
-
-              <label className="flex items-center gap-3 rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-3 py-2.5 text-sm text-[var(--ops-text)]">
-                <input
-                  type="checkbox"
-                  checked={formState.active}
-                  onChange={(event) =>
-                    setFormState((current) => ({
-                      ...current,
-                      active: event.target.checked,
-                    }))
-                  }
-                  className="h-4 w-4 rounded border-[var(--ops-border-strong)]"
-                />
-                {editingLocationId ? "Ubicación activa" : "Crear como ubicación activa"}
-              </label>
-
-              {error ? (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
-              ) : null}
-
-              {successMessage ? (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                  {successMessage}
-                </div>
-              ) : null}
-
-              <div className="grid gap-3 md:grid-cols-2">
-                <button
+                  Cancelar
+                </AdminActionButton>
+                <AdminActionButton
                   type="submit"
+                  form="location-edit-form"
+                  tone="accent"
                   disabled={submitting}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--ripnel-accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-70"
+                  className="flex-1"
                 >
-                  {submitting ? (
-                    <>
-                      <LoaderCircle className="h-4 w-4 animate-spin" />
-                      Guardando...
-                    </>
-                  ) : editingLocationId ? (
-                    <>
-                      <PencilLine className="h-4 w-4" />
-                      Guardar cambios
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="h-4 w-4" />
-                      Crear ubicación
-                    </>
-                  )}
-                </button>
-
-                {editingLocationId ? (
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="inline-flex w-full items-center justify-center rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-4 py-2.5 text-sm font-semibold text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
-                  >
-                    Cancelar
-                  </button>
-                ) : null}
+                  {submitting ? "Guardando..." : editingLocationId ? "Guardar cambios" : "Crear sede"}
+                </AdminActionButton>
               </div>
-            </form>
-          </article>
-        </div>
-      </div>
-    </section>
+            }
+          >
+              <form id="location-edit-form" onSubmit={handleSubmit} className="space-y-4">
+                <AdminField label="Nombre">
+                  <AdminInput
+                    value={formState.name}
+                    onChange={(event) =>
+                      setFormState((current) => ({
+                        ...current,
+                        name: event.target.value,
+                      }))
+                    }
+                    placeholder="Tienda Centro"
+                    autoComplete="off"
+                    required
+                  />
+                </AdminField>
+
+                <AdminField label="Tipo" htmlFor="location-type">
+                  <AdminSelect
+                    id="location-type"
+                    value={formState.type}
+                    onChange={(event) =>
+                      setFormState((current) => ({
+                        ...current,
+                        type: event.target.value as LocationItem["type"],
+                      }))
+                    }
+                    disabled={editingLocationId !== null}
+                  >
+                    {locationTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </AdminSelect>
+                </AdminField>
+
+                <AdminField label="Dirección">
+                  <AdminInput
+                    value={formState.address}
+                    onChange={(event) =>
+                      setFormState((current) => ({
+                        ...current,
+                        address: event.target.value,
+                      }))
+                    }
+                    placeholder="Av. Ejemplo 123, Lima"
+                    autoComplete="off"
+                  />
+                </AdminField>
+
+                <AdminCheckboxRow
+                  label={editingLocationId ? "Sede activa" : "Crear como sede activa"}
+                  checked={formState.active}
+                  onChange={(checked) =>
+                    setFormState((current) => ({
+                      ...current,
+                      active: checked,
+                    }))
+                  }
+                />
+              </form>
+          </AdminModalShell>
+        ) : null}
+        <AdminConfirmModal
+          open={Boolean(activeChangeLocation)}
+          title={activeChangeLocation?.active ? "Inactivar sede" : "Activar sede"}
+          description={
+            activeChangeLocation ? (
+              <>
+                Vas a {activeChangeLocation.active ? "inactivar" : "activar"} la sede{" "}
+                <span className="font-semibold text-[var(--ops-text)]">
+                  {activeChangeLocation.name}
+                </span>
+                .
+              </>
+            ) : null
+          }
+          confirmLabel={activeChangeLocation?.active ? "Inactivar" : "Activar"}
+          confirmTone={activeChangeLocation?.active ? "danger" : "accent"}
+          busy={savingActiveChange}
+          onCancel={() => setActiveChangeLocation(null)}
+          onConfirm={() => void confirmLocationActiveChange()}
+        />
+      </OpsPageShell>
+    </TooltipProvider>
   );
 }

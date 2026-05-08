@@ -5,12 +5,9 @@ import { type ReactNode, useEffect, useMemo, useState } from "react"
 import {
   CalendarRange,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   CircleAlert,
   Eye,
   Filter,
-  Info,
   LayoutGrid,
   List,
   ReceiptText,
@@ -23,6 +20,8 @@ import {
 import { useAuth } from "@/components/auth/AuthProvider"
 import { PermissionGuard } from "@/components/auth/PermissionGuard"
 import { InlineStatusCard } from "@/components/feedback/status-page"
+import { Pagination } from "@/components/ui/pagination"
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import {
   Tooltip,
   TooltipContent,
@@ -355,34 +354,11 @@ export default function PostsalePage() {
       <TooltipProvider delayDuration={120}>
         <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
           <div className="mx-auto max-w-7xl space-y-[var(--ops-stack-gap)]">
-            <header className="sales-panel rounded-lg p-[var(--ops-panel-padding)] shadow-sm">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ripnel-accent-hover)]">
-                    Postventa
-                  </p>
-                  <div className="mt-1 flex items-center gap-2">
-                    <h1 className="text-2xl font-bold text-[var(--ops-text)]">
-                      Postventa controlada
-                    </h1>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          className="sales-field-interactive rounded-full p-1 text-[var(--ops-text-muted)]"
-                          aria-label="Informacion de postventa"
-                        >
-                          <Info className="h-4 w-4" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" sideOffset={8}>
-                        Busca ventas de la sede operativa actual y entra al flujo correspondiente.
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
+            <PosHeader
+              eyebrow="Postventa"
+              title="Postventa controlada"
+              actions={
+                <>
                   <Link
                     href="/transaction-history"
                     className="sales-field sales-field-interactive inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium"
@@ -397,9 +373,9 @@ export default function PostsalePage() {
                       Nueva venta
                     </Link>
                   ) : null}
-                </div>
-              </div>
-            </header>
+                </>
+              }
+            />
 
             <div className="flex flex-wrap gap-2">
               <MetricPill label="Evaluadas" value={stats.count} />
@@ -412,13 +388,14 @@ export default function PostsalePage() {
                 <div className="grid gap-3 lg:grid-cols-[1.4fr_0.8fr_0.9fr_0.9fr_auto] lg:items-end">
                   <div className="relative">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
-                    <input
-                      type="text"
-                      value={search}
-                      onChange={(event) => setSearch(event.target.value)}
-                      placeholder="Buscar por nro. venta o cliente"
-                      className="sales-field h-11 w-full rounded-lg py-2.5 pl-9 pr-3 text-sm"
-                    />
+                      <input
+                        type="text"
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                        placeholder="Buscar por nro. venta o cliente"
+                        className="sales-field h-11 w-full rounded-lg py-2.5 pl-9 pr-3 text-sm"
+                        aria-label="Buscar ventas"
+                      />
                   </div>
 
                   <div>
@@ -471,15 +448,20 @@ export default function PostsalePage() {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={clearFilters}
-                    disabled={!hasActiveFilters}
-                    className="sales-field sales-field-interactive inline-flex h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                    Limpiar
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={clearFilters}
+                        disabled={!hasActiveFilters}
+                        className="sales-field sales-field-interactive inline-flex h-11 w-11 items-center justify-center rounded-lg disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label="Limpiar filtros"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" sideOffset={8}>Limpiar filtros</TooltipContent>
+                  </Tooltip>
                 </div>
 
                 <div className="flex flex-col gap-3 border-t border-[var(--ops-border-strong)] pt-3 md:flex-row md:items-center md:justify-between">
@@ -510,7 +492,7 @@ export default function PostsalePage() {
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between gap-3 md:justify-end">
+                  <div className="flex items-center justify-between gap-4">
                     <span className="ops-secondary-text text-[var(--ops-text-muted)]">
                       {sales.length === 0
                         ? "0 resultados"
@@ -519,36 +501,18 @@ export default function PostsalePage() {
                             sales.length
                           )} de ${sales.length}`}
                     </span>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setCurrentPage((current) => Math.max(1, current - 1))}
-                        disabled={safeCurrentPage <= 1}
-                        className="sales-field sales-field-interactive inline-flex h-9 w-9 items-center justify-center rounded-lg disabled:cursor-not-allowed disabled:opacity-50"
-                        aria-label="Pagina anterior"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </button>
-                      <span className="min-w-14 text-center text-sm font-medium text-[var(--ops-text)]">
-                        {safeCurrentPage}/{totalPages}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setCurrentPage((current) => Math.min(totalPages, current + 1))}
-                        disabled={safeCurrentPage >= totalPages}
-                        className="sales-field sales-field-interactive inline-flex h-9 w-9 items-center justify-center rounded-lg disabled:cursor-not-allowed disabled:opacity-50"
-                        aria-label="Pagina siguiente"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
-                    </div>
+                    <Pagination
+                      page={safeCurrentPage}
+                      totalPages={totalPages}
+                      onPageChange={setCurrentPage}
+                    />
                   </div>
                 </div>
               </div>
 
               <div className="mt-4">
                 {loading ? (
-                  <div className="ops-surface-muted rounded-2xl border px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
+                  <div className="ops-surface-muted rounded-2xl border px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
                     Cargando ventas elegibles...
                   </div>
                 ) : error ? (
@@ -558,7 +522,7 @@ export default function PostsalePage() {
                     tone="danger"
                   />
                 ) : sales.length === 0 ? (
-                  <div className="ops-surface-muted rounded-2xl border px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
+                  <div className="ops-surface-muted rounded-2xl border px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
                     No se encontraron ventas para los filtros aplicados.
                   </div>
                 ) : viewMode === "table" ? (
@@ -581,23 +545,23 @@ export default function PostsalePage() {
                           className="grid gap-[var(--ops-row-gap)] px-4 py-[var(--ops-row-py)] transition hover:bg-[var(--ops-surface-muted)] lg:grid-cols-[1fr_1.15fr_0.95fr_0.95fr_1fr_0.8fr_1.05fr_auto] lg:items-center"
                         >
                           <div className="min-w-0">
-                            <p className="font-semibold text-slate-900 dark:text-slate-50">
+                            <p className="font-semibold text-[var(--ops-text)]">
                               {sale.sale_number || "Sin correlativo"}
                             </p>
-                            <p className="ops-secondary-text mt-1 uppercase tracking-wide text-amber-600 dark:text-amber-300">
+                            <span className="sales-chip sales-chip-accent mt-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
                               {sale.document_type}
-                            </p>
+                            </span>
                           </div>
 
-                          <div className="text-sm text-slate-700 dark:text-slate-200">
+                          <div className="text-xs text-[var(--ops-text)]">
                             {sale.customer_name_text || "Cliente general"}
                           </div>
 
-                          <div className="text-sm text-slate-700 dark:text-slate-200">
+                          <div className="text-xs text-[var(--ops-text)]">
                             {formatDateLabel(sale.confirmed_at, sale.created_at)}
                           </div>
 
-                          <div className="text-sm text-slate-700 dark:text-slate-200">
+                          <div className="text-xs text-[var(--ops-text)]">
                             {sale.location_name}
                           </div>
 
@@ -628,15 +592,15 @@ export default function PostsalePage() {
                           </div>
 
                           <div>
-                            <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                            <p className="text-sm font-semibold text-[var(--ops-text)]">
                               S/. {Number(sale.total_amount || 0).toFixed(2)}
                             </p>
-                            <p className="ops-secondary-text text-slate-500 dark:text-slate-400">
+                            <p className="ops-secondary-text text-[var(--ops-text-muted)]">
                               {sale.currency}
                             </p>
                           </div>
 
-                          <div className="text-sm text-slate-700 dark:text-slate-200">
+                          <div className="text-xs text-[var(--ops-text)]">
                             {buildPostsaleSummary(sale)}
                           </div>
 
@@ -655,7 +619,7 @@ export default function PostsalePage() {
                         <div className="grid gap-3 px-4 py-[var(--ops-row-py)] lg:grid-cols-[1.5fr_auto] lg:items-center">
                           <div className="min-w-0 space-y-2">
                             <div className="flex flex-wrap items-center gap-2">
-                              <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-50">
+                              <h2 className="text-lg font-semibold text-[var(--ops-text)]">
                                 {sale.sale_number || "Sin correlativo"}
                               </h2>
                               <IconStatusBadge
@@ -683,20 +647,20 @@ export default function PostsalePage() {
                               />
                             </div>
 
-                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600 dark:text-slate-300">
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--ops-text)]">
                               <p>{sale.customer_name_text || "Cliente general"}</p>
                               <p>{sale.location_name}</p>
                               <p>{formatDateLabel(sale.confirmed_at, sale.created_at)}</p>
                             </div>
 
                             <div className="flex flex-wrap gap-2">
-                              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-200">
+                              <span className="sales-chip sales-chip-accent rounded-full px-2.5 py-1 text-xs font-medium">
                                 {sale.document_type}
                               </span>
-                              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-200">
+                              <span className="sales-chip rounded-full px-2.5 py-1 text-xs font-medium">
                                 S/. {Number(sale.total_amount || 0).toFixed(2)}
                               </span>
-                              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-200">
+                              <span className="sales-chip rounded-full px-2.5 py-1 text-xs font-medium">
                                 {buildPostsaleSummary(sale)}
                               </span>
                             </div>

@@ -7,6 +7,7 @@ import { ArrowLeft, LoaderCircle, Save } from "lucide-react";
 import { buildApiUrl } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import type { CatalogFieldConfig } from "@/lib/product-master-metadata";
 
 type CatalogFormItem = {
@@ -233,34 +234,31 @@ export function CatalogFormPage({
   }
 
   return (
-    <section className="ops-page min-h-screen p-4 md:p-5">
-      <div className="mx-auto flex max-w-3xl flex-col gap-5">
-        <header className="flex flex-col gap-3">
-          <Button asChild variant="outline" size="sm" className="w-fit rounded-full">
-            <Link href={catalogRoute}>
-              <ArrowLeft className="h-4 w-4" />
-              Volver a {catalogLabel.toLowerCase()}
-            </Link>
-          </Button>
+    <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
+      <div className="mx-auto flex max-w-[1180px] flex-col gap-4">
+        <PosHeader
+          eyebrow="Catalogos"
+          title={`${mode === "edit" ? "Editar" : "Nuevo"} ${catalogLabel.toLowerCase()}`}
+          actions={
+            <Button asChild variant="outline" size="sm" className="rounded-lg">
+              <Link href={catalogRoute}>
+                <ArrowLeft className="h-4 w-4" />
+                Volver
+              </Link>
+            </Button>
+          }
+        />
 
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--ripnel-accent-hover)]">
-              Catalogos
-            </p>
-            <h1 className="ops-title mt-1 text-2xl font-semibold">
-              {mode === "edit" ? `Editar ${catalogLabel.toLowerCase()}` : `Nuevo ${catalogLabel.toLowerCase()}`}
-            </h1>
-          </div>
-        </header>
+        <div className="border-t border-[var(--ops-border-strong)] pt-4" />
 
-        <article className="ops-surface rounded-3xl border p-4 md:p-5">
+        <article className="ops-surface rounded-xl border p-4 md:p-5">
           {loading ? (
             <div className="ops-text-muted flex min-h-40 items-center justify-center">
               <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
               Cargando formulario...
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="mx-auto max-w-3xl space-y-4">
               {fields.map((field) => (
                 <div key={field.key} className="space-y-1.5">
                   <label className="text-sm font-medium text-[var(--ops-text)]">{field.label}</label>
@@ -275,7 +273,7 @@ export function CatalogFormPage({
                       }
                       placeholder={field.placeholder}
                       disabled={Boolean(mode === "edit" && field.editableOnUpdate === false)}
-                      className="ops-surface min-h-24 w-full rounded-2xl border px-3 py-2.5 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--ripnel-accent)]/20 disabled:cursor-not-allowed disabled:bg-[var(--ops-surface-muted)] disabled:text-[var(--ops-text-muted)]"
+                      className="ops-surface min-h-24 w-full rounded-lg border px-3 py-2.5 text-sm outline-none transition focus:ring-2 focus:ring-[var(--ripnel-accent-soft)] disabled:cursor-not-allowed disabled:bg-[var(--ops-surface-muted)] disabled:text-[var(--ops-text-muted)]"
                     />
                   ) : (
                     <Input
@@ -289,7 +287,7 @@ export function CatalogFormPage({
                       }
                       placeholder={field.placeholder}
                       disabled={Boolean(mode === "edit" && field.editableOnUpdate === false)}
-                      className="ops-surface h-10 rounded-2xl border disabled:bg-[var(--ops-surface-muted)] disabled:text-[var(--ops-text-muted)]"
+                      className="ops-surface h-10 rounded-lg border focus:ring-2 focus:ring-[var(--ripnel-accent-soft)] disabled:bg-[var(--ops-surface-muted)] disabled:text-[var(--ops-text-muted)]"
                     />
                   )}
                   {field.helper ? (
@@ -344,13 +342,13 @@ export function CatalogFormPage({
               </label>
 
               {error ? (
-                <div className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
+                <div role="alert" aria-live="polite" className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
                   {error}
                 </div>
               ) : null}
 
               {successMessage ? (
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
+                <div role="status" aria-live="polite" className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
                   {successMessage}
                 </div>
               ) : null}

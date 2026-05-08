@@ -412,6 +412,150 @@ Este estandar tambien aplica a otras vistas, aunque sin forzar tabla o KPIs.
 
 - referencia para no duplicar breadcrumb ni shortcuts globales dentro del contenido.
 
+## Referencia canonica: clientes
+
+La implementacion de `customers-page.tsx` (`apps/frontend/components/modules/customers-page.tsx`) es la referencia canonica para estos patrones visuales. Las reglas de esta seccion tienen prioridad sobre convenciones genericas anteriores del documento.
+
+### Estructura de tabla (sin bordes redondeados)
+
+```tsx
+// La tabla usa border-y (solo borde superior e inferior), sin rounded-*
+<div className="overflow-x-auto">
+  <div className="min-w-[1080px] border-y border-[var(--ops-border-strong)]">
+    <table className="w-full border-collapse">
+      <thead className="bg-[var(--ops-surface-muted)]">
+        <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+          <th className="px-4 py-3">Columna</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+        {/* filas */}
+      </tbody>
+    </table>
+  </div>
+</div>
+```
+
+### Chip de tipo o categoria (neutro)
+
+```tsx
+// Badge neutro con ops-surface-muted, baja saturacion
+<span className="inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]">
+  {label}
+</span>
+```
+
+### Chip de estado binario (Activo/Inactivo)
+
+```tsx
+// Activo: verde sobrio con color-mix — NUNCA usar accent violeta ni rojo
+// Inactivo: neutro opaco con ops-surface-muted
+<span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+  active
+    ? "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
+    : "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]"
+}`}>
+  {active ? "Activo" : "Inactivo"}
+</span>
+```
+
+### Jerarquia de datos en fila
+
+```tsx
+// Dato principal (nombre ancla, correlativo): text-sm font-semibold
+<p className="text-sm font-semibold text-[var(--ops-text)]">{name}</p>
+// Metadato secundario (codigo, tipo doc): text-[11px] uppercase tracking
+<p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">{code}</p>
+```
+
+### Celda de tabla
+
+```tsx
+// Padding vertical usa el token ops-row-py (nunca hardcodear px)
+<td className="px-4 py-[var(--ops-row-py)] align-top">{content}</td>
+```
+
+### Fila con hover
+
+```tsx
+// Toda fila de tabla debe mostrar hover
+<tr className="transition hover:bg-[var(--ops-surface-muted)]">
+```
+
+### Botones en header y acciones
+
+```tsx
+// NUNCA usar rounded-full en botones. Siempre rounded-lg.
+// Boton primario (accent):
+<Button variant="accent" size="sm" className="rounded-lg px-3">
+  <Plus className="h-4 w-4" /> Accion
+</Button>
+// Boton secundario (outline):
+<Button variant="outline" size="sm" className="rounded-lg px-3">
+  <PencilLine className="h-3.5 w-3.5" /> Editar
+</Button>
+```
+
+### Busqueda con sales-field
+
+```tsx
+// El input de busqueda usa el wrapper sales-field, icono inline
+<div className="sales-field flex h-10 items-center gap-2 rounded-lg px-3 transition hover:bg-[var(--ops-surface-muted)]">
+  <Search className="h-4 w-4 text-[var(--ops-text-muted)]" />
+  <input
+    type="text"
+    value={query}
+    onChange={(event) => setQuery(event.target.value)}
+    placeholder="Buscar..."
+    className="h-full w-full bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
+  />
+</div>
+```
+
+### Labels de filtro
+
+```tsx
+// Cada control de filtro DEBE tener un label encima con este patron exacto:
+<label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+  Buscar
+</label>
+
+// La fila de filtros usa grid con columnas proporcionadas:
+<div className="grid gap-2.5 lg:grid-cols-[minmax(0,1.55fr)_0.92fr_0.92fr_auto] lg:items-end">
+  <div>
+    <label ...>Buscar</label>
+    <div className="sales-field ...">{/* input */}</div>
+  </div>
+  <div>
+    <label ...>Tipo</label>
+    {/* dropdown o pills */}
+  </div>
+  ...
+</div>
+
+// Si solo hay busqueda (sin filtros adicionales), usar flex:
+<div className="flex flex-wrap items-end gap-2.5">
+  <div>
+    <label ...>Buscar</label>
+    <div className="sales-field ...">{/* input */}</div>
+  </div>
+  {/* limpiar button */}
+</div>
+```
+
+### KPIs (MetricPill de kardex)
+
+```tsx
+// MetricPill con tonos: default (neutro), accent (violeta), warning (amber)
+// Label: text-[11px] font-semibold uppercase tracking-[0.16em]
+// Value: tabular-nums, todo via color-mix() adaptado al tema
+function MetricPill({ label, value, tone = "default" }) { ... }
+// Uso:
+<MetricPill label="Total" value={count} />
+<MetricPill label="Activos" value={activeCount} tone="accent" />
+<MetricPill label="Pendientes" value={pendingCount} tone="warning" />
+```
+
 ## Casos de prueba del estandar
 
 - Una pagina de historial debe poder montarse con `header`, `kpis`, separador y `bloque tabla`.
