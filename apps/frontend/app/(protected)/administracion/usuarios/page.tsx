@@ -1,12 +1,34 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, RefreshCw, RotateCcw, Search } from "lucide-react";
+import { Plus, RefreshCw, RotateCcw } from "lucide-react";
 import { buildApiUrl } from "@/lib/api";
-import { cn } from "@/lib/utils";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { Button } from "@/components/ui/button";
+import {
+  AdminActionButton,
+  AdminCheckboxRow,
+  AdminConfirmModal,
+  AdminField,
+  AdminInlineMessage,
+  AdminInput,
+  AdminModalShell,
+  AdminRowActions,
+  AdminSection,
+  AdminSelect,
+} from "@/components/admin/admin-ui";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import {
+  OpsFiltersRow,
+  OpsPageShell,
+  OpsSearchField,
+  OpsSectionDivider,
+  OpsTableBlock,
+  OpsTableFooter,
+  OpsTableWrap,
+} from "@/components/ui/ops-page-shell";
 import { Pagination } from "@/components/ui/pagination";
 import {
   Tooltip,
@@ -113,49 +135,6 @@ function statusBadgeClass(active: boolean) {
     : "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]";
 }
 
-function MetricPill({
-  label,
-  value,
-  tone = "default",
-}: {
-  label: string;
-  value: string | number;
-  tone?: "default" | "accent" | "warning";
-}) {
-  const toneClass =
-    tone === "accent"
-      ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))] text-[var(--ops-text)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--ripnel-accent)_14%,transparent)]"
-      : tone === "warning"
-        ? "border-[color:color-mix(in_srgb,#f59e0b_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
-        : "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text)]";
-  const labelClass =
-    tone === "accent"
-      ? "text-[color:color-mix(in_srgb,var(--ripnel-accent)_72%,var(--ops-text))]"
-      : tone === "warning"
-        ? "text-[color:color-mix(in_srgb,#f59e0b_82%,var(--ops-text))]"
-        : "text-[var(--ops-text-muted)]";
-  const valueClass =
-    tone === "accent"
-      ? "text-[var(--ops-text)]"
-      : tone === "warning"
-        ? "text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
-        : "text-[var(--ops-text)]";
-
-  return (
-    <div
-      className={cn(
-        "inline-flex items-center gap-2.5 rounded-full border px-3 py-2",
-        toneClass
-      )}
-    >
-      <span className={cn("text-[11px] font-semibold uppercase tracking-[0.16em]", labelClass)}>
-        {label}
-      </span>
-      <span className={cn("text-base font-semibold leading-none", valueClass)}>{value}</span>
-    </div>
-  );
-}
-
 export default function UsuariosPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -176,6 +155,8 @@ export default function UsuariosPage() {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [userForm, setUserForm] = useState<UserFormState>(emptyUserForm);
   const [savingUser, setSavingUser] = useState(false);
+  const [activeChangeUser, setActiveChangeUser] = useState<User | null>(null);
+  const [savingActiveChange, setSavingActiveChange] = useState(false);
 
   const [locationsOpen, setLocationsOpen] = useState(false);
   const [locationsUser, setLocationsUser] = useState<User | null>(null);
@@ -406,22 +387,25 @@ export default function UsuariosPage() {
     }));
   }
 
-  async function toggleUserActive(user: User) {
-    const targetState = !user.active;
-    const label = targetState ? "activar" : "inactivar";
-
-    if (!window.confirm(`Confirma que deseas ${label} a ${user.full_name}?`)) {
+  async function confirmUserActiveChange() {
+    if (!activeChangeUser) {
       return;
     }
 
+    const targetState = !activeChangeUser.active;
+    setSavingActiveChange(true);
+
     try {
-      await requestJson<User>(`/api/users/${user.user_id}`, {
+      await requestJson<User>(`/api/users/${activeChangeUser.user_id}`, {
         method: "PATCH",
         body: JSON.stringify({ active: targetState }),
       });
+      setActiveChangeUser(null);
       await loadUsers();
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "No se pudo actualizar el usuario");
+    } finally {
+      setSavingActiveChange(false);
     }
   }
 
@@ -511,22 +495,17 @@ export default function UsuariosPage() {
 
   return (
     <TooltipProvider delayDuration={120}>
-      <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-6">
-        <div className="mx-auto max-w-[1180px] space-y-4">
+      <OpsPageShell width="wide" className="md:px-0">
           <PosHeader
             eyebrow="Administración"
             title="Usuarios"
             actions={
               <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="accent"
-                  size="sm"
-                  className="rounded-lg"
-                  onClick={() => openUserForm()}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  Nuevo usuario
+                <Button asChild variant="accent" size="sm" className="rounded-lg">
+                  <Link href="/administracion/usuarios/nuevo">
+                    <Plus className="h-3.5 w-3.5" />
+                    Nuevo usuario
+                  </Link>
                 </Button>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -550,27 +529,20 @@ export default function UsuariosPage() {
           />
 
           <div className="flex flex-wrap gap-2">
-            <MetricPill label="Total usuarios" value={users.length} />
-            <MetricPill label="Activos" value={activeUsers} tone="accent" />
-            <MetricPill label="Inactivos" value={inactiveUsers} />
+            <OpsMetricPill label="Total usuarios" value={users.length} />
+            <OpsMetricPill label="Activos" value={activeUsers} tone="accent" />
+            <OpsMetricPill label="Inactivos" value={inactiveUsers} />
           </div>
 
-          <div className="space-y-4 border-t border-[var(--ops-border-strong)] pt-4">
-            <div className="grid gap-2.5 lg:grid-cols-[minmax(0,1.55fr)_0.92fr_0.92fr_auto] lg:items-end">
-              <div>
-                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Buscar</label>
-                <div className="sales-field flex h-10 items-center gap-2 rounded-lg px-3 transition hover:bg-[var(--ops-surface-muted)]">
-                  <Search className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
-                  <input
-                    type="text"
-                    value={userQuery}
-                    onChange={(event) => setUserQuery(event.target.value)}
-                    placeholder="Buscar por nombre, usuario, email o rol"
-                    aria-label="Buscar usuarios"
-                    className="h-full w-full bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
-                  />
-                </div>
-              </div>
+          <OpsSectionDivider>
+            <OpsTableBlock>
+            <OpsFiltersRow>
+              <OpsSearchField
+                value={userQuery}
+                onChange={setUserQuery}
+                placeholder="Buscar por nombre, usuario, email o rol"
+                ariaLabel="Buscar usuarios"
+              />
               <FilterDropdown label="Rol" value={roleFilter} options={roleFilterOptions} onChange={(v) => { setRoleFilter(v); setUserPage(1); }} />
               <FilterDropdown label="Orden" value={sortOrder} options={[{ value: "desc", label: "Más reciente" }, { value: "asc", label: "Más antiguo" }]} onChange={(v) => { setSortOrder(v as "desc" | "asc"); setUserPage(1); }} />
               <Tooltip>
@@ -581,7 +553,7 @@ export default function UsuariosPage() {
                 </TooltipTrigger>
                 <TooltipContent side="top" sideOffset={8}>Limpiar filtros</TooltipContent>
               </Tooltip>
-            </div>
+            </OpsFiltersRow>
 
             {usersError && (
               <div className="rounded-xl border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-4 py-2.5 text-sm text-[color:color-mix(in_srgb,#be123c_74%,var(--ops-text))]">
@@ -589,7 +561,7 @@ export default function UsuariosPage() {
               </div>
             )}
 
-            <div className="overflow-hidden border-y border-[var(--ops-border-strong)]">
+            <OpsTableWrap minWidth="980px">
               {loadingUsers ? (
                 <div className="px-4 py-6 text-sm text-[var(--ops-text-muted)]">Cargando usuarios…</div>
               ) : filteredUsers.length === 0 ? (
@@ -663,29 +635,27 @@ export default function UsuariosPage() {
                               {new Date(user.updated_at).toLocaleString("es-PE")}
                             </td>
                             <td className="px-4 py-[var(--ops-row-py)] align-top">
-                              <div className="flex flex-wrap justify-end gap-2">
-                                <button
+                              <AdminRowActions>
+                                <AdminActionButton
                                   type="button"
                                   onClick={() => openLocationsModal(user)}
-                                  className="rounded-lg border border-[var(--ops-border-strong)] px-3 py-1.5 text-xs font-medium text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
                                 >
                                   Sedes
-                                </button>
-                                <button
+                                </AdminActionButton>
+                                <AdminActionButton
                                   type="button"
                                   onClick={() => openUserForm(user)}
-                                  className="rounded-lg border border-[var(--ops-border-strong)] px-3 py-1.5 text-xs font-medium text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
                                 >
                                   Editar
-                                </button>
-                                <button
+                                </AdminActionButton>
+                                <AdminActionButton
                                   type="button"
-                                  onClick={() => toggleUserActive(user)}
-                                  className="rounded-lg border border-[var(--ops-border-soft)] px-3 py-1.5 text-xs font-medium text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface-muted)]"
+                                  tone={user.active ? "danger" : "neutral"}
+                                  onClick={() => setActiveChangeUser(user)}
                                 >
                                   {user.active ? "Inactivar" : "Activar"}
-                                </button>
-                              </div>
+                                </AdminActionButton>
+                              </AdminRowActions>
                             </td>
                           </tr>
                         );
@@ -694,16 +664,17 @@ export default function UsuariosPage() {
                   </table>
                 </div>
               )}
-            </div>
+            </OpsTableWrap>
             {!loadingUsers && filteredUsers.length > 0 ? (
-              <div className="flex flex-col gap-3 border-t border-[var(--ops-border-strong)] pt-3 md:flex-row md:items-center md:justify-between">
+              <OpsTableFooter className="border-t border-[var(--ops-border-strong)] pt-3">
                 <div className="text-xs font-medium text-[var(--ops-text-muted)]">
                   {userRangeStart}-{userRangeEnd} de {filteredUsers.length}
                 </div>
                 <Pagination page={safeUserPage} totalPages={totalUserPages} onPageChange={setUserPage} />
-              </div>
+              </OpsTableFooter>
             ) : null}
-          </div>
+            </OpsTableBlock>
+          </OpsSectionDivider>
 
           {locationsError && (
             <div className="rounded-2xl border border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] px-4 py-3 text-sm text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]">
@@ -712,109 +683,113 @@ export default function UsuariosPage() {
           )}
 
           {showUserForm && (
-            <div className="ops-overlay-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
-              <div className="ops-overlay-panel max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl p-5">
-                <h3 className="text-xl font-semibold text-[var(--ops-text)]">
-                  {editingUserId ? "Editar usuario" : "Nuevo usuario"}
-                </h3>
-                <p className="mt-1 text-sm text-[var(--ops-text-muted)]">
-                  {editingUserId
-                    ? "Actualiza la información del usuario."
-                    : "Registro de usuario."}
-                </p>
+            <AdminModalShell
+              title={editingUserId ? "Editar usuario" : "Nuevo usuario"}
+              description={editingUserId ? "Actualiza la información del usuario." : "Registro de usuario."}
+              onClose={closeUserForm}
+              widthClass="max-w-2xl"
+              footer={
+                <div className="flex justify-end gap-3">
+                  <AdminActionButton
+                    type="button"
+                    onClick={closeUserForm}
+                    disabled={savingUser}
+                  >
+                    Cancelar
+                  </AdminActionButton>
+                  <AdminActionButton
+                    type="submit"
+                    form="user-edit-form"
+                    tone="accent"
+                    disabled={savingUser}
+                  >
+                    {savingUser ? "Guardando..." : "Guardar usuario"}
+                  </AdminActionButton>
+                </div>
+              }
+            >
+                <form id="user-edit-form" className="space-y-4" onSubmit={submitUserForm}>
+                  <AdminSection title="Identidad y acceso">
+                    <div className="space-y-4">
+                      <AdminField label="Nombre completo">
+                        <AdminInput
+                          type="text"
+                          required
+                          autoComplete="off"
+                          value={userForm.full_name}
+                          onChange={(event) =>
+                            setUserForm((current) => ({ ...current, full_name: event.target.value }))
+                          }
+                        />
+                      </AdminField>
 
-                <form className="mt-6 space-y-4" onSubmit={submitUserForm}>
-                  <label className="block space-y-1">
-                    <span className="text-sm font-medium text-[var(--ops-text)]">Nombre completo</span>
-                    <input
-                      type="text"
-                      required
-                      autoComplete="off"
-                      value={userForm.full_name}
-                      onChange={(event) =>
-                        setUserForm((current) => ({ ...current, full_name: event.target.value }))
-                      }
-                      className="w-full rounded-xl border border-[var(--ops-border-strong)] px-4 py-2.5 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[var(--ripnel-accent-soft)]"
-                    />
-                  </label>
+                      <AdminField label="Usuario">
+                        <AdminInput
+                          type="text"
+                          required
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          autoComplete="off"
+                          value={userForm.username}
+                          onChange={(event) =>
+                            setUserForm((current) => ({ ...current, username: event.target.value }))
+                          }
+                        />
+                      </AdminField>
 
-                  <label className="block space-y-1">
-                    <span className="text-sm font-medium text-[var(--ops-text)]">Usuario</span>
-                    <input
-                      type="text"
-                      required
-                      autoCapitalize="none"
-                      autoCorrect="off"
-                      autoComplete="off"
-                      value={userForm.username}
-                      onChange={(event) =>
-                        setUserForm((current) => ({ ...current, username: event.target.value }))
-                      }
-                      className="w-full rounded-xl border border-[var(--ops-border-strong)] px-4 py-2.5 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[var(--ripnel-accent-soft)]"
-                    />
-                  </label>
+                      <AdminField label="Email opcional">
+                        <AdminInput
+                          type="email"
+                          autoComplete="off"
+                          value={userForm.email}
+                          onChange={(event) =>
+                            setUserForm((current) => ({ ...current, email: event.target.value }))
+                          }
+                        />
+                      </AdminField>
 
-                  <label className="block space-y-1">
-                    <span className="text-sm font-medium text-[var(--ops-text)]">Email opcional</span>
-                    <input
-                      type="email"
-                      autoComplete="off"
-                      value={userForm.email}
-                      onChange={(event) =>
-                        setUserForm((current) => ({ ...current, email: event.target.value }))
-                      }
-                      className="w-full rounded-xl border border-[var(--ops-border-strong)] px-4 py-2.5 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[var(--ripnel-accent-soft)]"
-                    />
-                  </label>
-
-                  <label htmlFor="role-select" className="block space-y-1">
-                    <span className="text-sm font-medium text-[var(--ops-text)]">Rol</span>
-                    <select
-                      id="role-select"
-                      required={!editingUserId}
-                      value={userForm.role_id}
-                      onChange={(event) =>
-                        setUserForm((current) => ({ ...current, role_id: event.target.value }))
-                      }
-                      className="w-full cursor-pointer rounded-xl border border-[var(--ops-border-strong)] px-4 py-2.5 text-sm text-[var(--ops-text)] outline-none transition hover:border-[var(--ops-border-soft)] focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[var(--ripnel-accent-soft)] bg-[var(--ops-field)]"
-                    >
-                      <option value="">Sin rol</option>
-                      {loadingRoles ? (
-                        <option disabled>Cargando roles...</option>
-                      ) : rolesError ? (
-                        <option disabled>Error al cargar roles</option>
-                      ) : (
-                        roles.map((role) => (
-                          <option key={role.role_id} value={role.role_id}>
-                            {role.name}
-                          </option>
-                        ))
-                      )}
-                    </select>
-                  </label>
+                      <AdminField label="Rol" htmlFor="role-select">
+                        <AdminSelect
+                          id="role-select"
+                          required={!editingUserId}
+                          value={userForm.role_id}
+                          onChange={(event) =>
+                            setUserForm((current) => ({ ...current, role_id: event.target.value }))
+                          }
+                        >
+                          <option value="">Sin rol</option>
+                          {loadingRoles ? (
+                            <option disabled>Cargando roles...</option>
+                          ) : rolesError ? (
+                            <option disabled>Error al cargar roles</option>
+                          ) : (
+                            roles.map((role) => (
+                              <option key={role.role_id} value={role.role_id}>
+                                {role.name}
+                              </option>
+                            ))
+                          )}
+                        </AdminSelect>
+                      </AdminField>
+                    </div>
+                  </AdminSection>
 
                   {!editingUserId ? (
-                    <div className="space-y-2 rounded-2xl border border-[var(--ops-border-strong)] p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-medium text-[var(--ops-text)]">Sedes</div>
-                          <div className="text-xs text-[var(--ops-text-muted)]">
-                            Elige acceso y sede default.
-                          </div>
-                        </div>
+                    <AdminSection
+                      title="Sedes"
+                      description="Elige acceso y sede default."
+                      aside={
                         <div className="rounded-full border border-[var(--ops-border-strong)] px-2.5 py-1 text-xs font-medium text-[var(--ops-text-muted)]">
                           {userForm.location_ids.length}
                         </div>
-                      </div>
-
+                      }
+                    >
                       {loadingLocations ? (
                         <div className="rounded-xl bg-[var(--ops-field)] px-3 py-3 text-sm text-[var(--ops-text-muted)]">
                           Cargando sedes...
                         </div>
                       ) : locationsError ? (
-                        <div className="rounded-xl border border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] px-3 py-3 text-sm text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]">
-                          {locationsError}
-                        </div>
+                        <AdminInlineMessage tone="warning">{locationsError}</AdminInlineMessage>
                       ) : availableLocations.length === 0 ? (
                         <div className="rounded-xl bg-[var(--ops-field)] px-3 py-3 text-sm text-[var(--ops-text-muted)]">
                           No hay sedes activas disponibles.
@@ -870,67 +845,53 @@ export default function UsuariosPage() {
                           })}
                         </div>
                       )}
-                    </div>
+                    </AdminSection>
                   ) : null}
 
-                  <label className="flex items-center gap-3 rounded-2xl border border-[var(--ops-border-strong)] px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={userForm.active}
-                      onChange={(event) =>
-                        setUserForm((current) => ({ ...current, active: event.target.checked }))
-                      }
-                      className="h-4 w-4 rounded border-[var(--ops-border-strong)]"
-                    />
-                    <span className="text-sm text-[var(--ops-text)]">Usuario activo</span>
-                  </label>
-
-                  <div className="flex justify-end gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={closeUserForm}
-                      disabled={savingUser}
-                      className="rounded-xl border border-[var(--ops-border-strong)] px-4 py-2 text-sm font-medium text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={savingUser}
-                      className="rounded-xl bg-[var(--ripnel-accent)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {savingUser ? "Guardando..." : "Guardar usuario"}
-                    </button>
-                  </div>
+                  <AdminCheckboxRow
+                    label="Usuario activo"
+                    checked={userForm.active}
+                    onChange={(checked) =>
+                      setUserForm((current) => ({ ...current, active: checked }))
+                    }
+                  />
                 </form>
-              </div>
-            </div>
+            </AdminModalShell>
           )}
 
           {locationsOpen && (
-            <div className="ops-overlay-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
-              <div className="ops-overlay-panel w-full max-w-2xl rounded-2xl p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h3 className="text-xl font-semibold text-[var(--ops-text)]">Sedes por usuario</h3>
-                    <p className="mt-1 text-sm text-[var(--ops-text-muted)]">
-                      {locationsUser
-                        ? `Asignaciones operativas para ${locationsUser.full_name}.`
-                        : "Configura las sedes del usuario."}
-                    </p>
-                  </div>
-                  <button
+            <AdminModalShell
+              title="Sedes por usuario"
+              description={
+                locationsUser
+                  ? `Asignaciones operativas para ${locationsUser.full_name}.`
+                  : "Configura las sedes del usuario."
+              }
+              onClose={closeLocationsModal}
+              widthClass="max-w-2xl"
+              footer={
+                <div className="flex justify-end gap-3">
+                  <AdminActionButton
                     type="button"
                     onClick={closeLocationsModal}
-                    className="rounded-xl border border-[var(--ops-border-strong)] px-3 py-2 text-sm text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
+                    disabled={savingUserLocations}
                   >
-                    Cerrar
-                  </button>
+                    Cancelar
+                  </AdminActionButton>
+                  <AdminActionButton
+                    type="button"
+                    tone="accent"
+                    onClick={() => void saveUserLocations()}
+                    disabled={savingUserLocations || loadingUserLocations}
+                  >
+                    {savingUserLocations ? "Guardando..." : "Guardar sedes"}
+                  </AdminActionButton>
                 </div>
-
+              }
+            >
                 {userLocationsError && (
-                  <div className="mt-4 rounded-2xl border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-4 py-3 text-sm text-[color:color-mix(in_srgb,#be123c_74%,var(--ops-text))]">
-                    {userLocationsError}
+                  <div className="mt-4">
+                    <AdminInlineMessage tone="danger">{userLocationsError}</AdminInlineMessage>
                   </div>
                 )}
 
@@ -989,30 +950,29 @@ export default function UsuariosPage() {
                     </div>
                   )}
                 </div>
-
-                <div className="mt-6 flex justify-end gap-3">
-                  <button
-                    type="button"
-                    onClick={closeLocationsModal}
-                    disabled={savingUserLocations}
-                    className="rounded-xl border border-[var(--ops-border-strong)] px-4 py-2 text-sm font-medium text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void saveUserLocations()}
-                    disabled={savingUserLocations || loadingUserLocations}
-                    className="rounded-xl bg-[var(--ripnel-accent)] px-4 py-2 text-sm font-medium text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {savingUserLocations ? "Guardando..." : "Guardar sedes"}
-                  </button>
-                </div>
-              </div>
-            </div>
+            </AdminModalShell>
           )}
-        </div>
-      </section>
+          <AdminConfirmModal
+            open={Boolean(activeChangeUser)}
+            title={activeChangeUser?.active ? "Inactivar usuario" : "Activar usuario"}
+            description={
+              activeChangeUser ? (
+                <>
+                  Vas a {activeChangeUser.active ? "inactivar" : "activar"} a{" "}
+                  <span className="font-semibold text-[var(--ops-text)]">
+                    {activeChangeUser.full_name}
+                  </span>
+                  .
+                </>
+              ) : null
+            }
+            confirmLabel={activeChangeUser?.active ? "Inactivar" : "Activar"}
+            confirmTone={activeChangeUser?.active ? "danger" : "accent"}
+            busy={savingActiveChange}
+            onCancel={() => setActiveChangeUser(null)}
+            onConfirm={() => void confirmUserActiveChange()}
+          />
+      </OpsPageShell>
     </TooltipProvider>
   );
 }
