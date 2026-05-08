@@ -1,15 +1,22 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { KeyRound } from "lucide-react";
+import { Eye, EyeOff, KeyRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   AccountPageFrame,
   PanelSection,
-  SettingsFieldHint,
-  SettingsFieldLabel,
+  SettingsFormRow,
+  SettingsStatusMessage,
 } from "@/components/account/account-preferences-ui";
+import { Button } from "@/components/ui/button";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 
 type PasswordForm = {
   current_password: string;
@@ -30,6 +37,9 @@ export default function AccountSecurityPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   async function submitPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -84,78 +94,111 @@ export default function AccountSecurityPage() {
       backLabel={isRequired ? undefined : "Volver a perfil"}
       title="Seguridad"
     >
-      <PanelSection title="Cambio de contraseña">
+      <PanelSection
+        title="Cambio de contraseña"
+        description="Actualiza tu clave con el mismo patrón operativo del resto de la cuenta."
+        icon={KeyRound}
+      >
         <form onSubmit={submitPassword}>
-          <label className="grid gap-3 border-t border-[var(--ops-border-strong)] px-4 py-3 first:border-t-0 md:grid-cols-[200px_minmax(0,1fr)] md:items-center">
-            <span className="min-w-0">
-              <SettingsFieldLabel>Contrasena actual</SettingsFieldLabel>
-            </span>
-            <input
-              type="password"
-              value={form.current_password}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, current_password: event.target.value }))
-              }
-              required
-              autoComplete="current-password"
-              className="h-9 w-full rounded-md border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 text-sm text-[var(--ops-text)] outline-none transition hover:border-[var(--ops-border-soft)] focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[var(--ripnel-accent-soft)]"
-            />
-          </label>
+          <SettingsFormRow label="Contrasena actual">
+            <InputGroup className="h-9 rounded-md border-[var(--ops-border-strong)] bg-[var(--ops-field)] shadow-none focus-within:border-[var(--ripnel-accent)] focus-within:ring-[color:var(--ripnel-accent-soft)]">
+              <InputGroupInput
+                type={showCurrentPassword ? "text" : "password"}
+                value={form.current_password}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, current_password: event.target.value }))
+                }
+                required
+                autoComplete="current-password"
+                className="h-full rounded-md px-3 text-sm text-[var(--ops-text)]"
+              />
+              <InputGroupAddon align="inline-end" className="pr-1">
+                <InputGroupButton
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setShowCurrentPassword((value) => !value)}
+                  aria-label={showCurrentPassword ? "Ocultar contraseña actual" : "Mostrar contraseña actual"}
+                  className="h-7 w-7 rounded-md text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)]"
+                >
+                  {showCurrentPassword ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                </InputGroupButton>
+              </InputGroupAddon>
+            </InputGroup>
+          </SettingsFormRow>
 
-          <label className="grid gap-3 border-t border-[var(--ops-border-strong)] px-4 py-3 md:grid-cols-[200px_minmax(0,1fr)] md:items-center">
-            <span className="min-w-0">
-              <SettingsFieldLabel>Nueva contrasena</SettingsFieldLabel>
-              <SettingsFieldHint>Minimo 10 caracteres, una letra y un numero.</SettingsFieldHint>
-            </span>
-            <input
-              type="password"
-              value={form.new_password}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, new_password: event.target.value }))
-              }
-              required
-              minLength={10}
-              autoComplete="new-password"
-              className="h-9 w-full rounded-md border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 text-sm text-[var(--ops-text)] outline-none transition hover:border-[var(--ops-border-soft)] focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[var(--ripnel-accent-soft)]"
-            />
-          </label>
+          <SettingsFormRow
+            label="Nueva contrasena"
+            detail="Minimo 10 caracteres, una letra y un numero."
+          >
+            <InputGroup className="h-9 rounded-md border-[var(--ops-border-strong)] bg-[var(--ops-field)] shadow-none focus-within:border-[var(--ripnel-accent)] focus-within:ring-[color:var(--ripnel-accent-soft)]">
+              <InputGroupInput
+                type={showNewPassword ? "text" : "password"}
+                value={form.new_password}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, new_password: event.target.value }))
+                }
+                required
+                minLength={10}
+                autoComplete="new-password"
+                className="h-full rounded-md px-3 text-sm text-[var(--ops-text)]"
+              />
+              <InputGroupAddon align="inline-end" className="pr-1">
+                <InputGroupButton
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setShowNewPassword((value) => !value)}
+                  aria-label={showNewPassword ? "Ocultar nueva contraseña" : "Mostrar nueva contraseña"}
+                  className="h-7 w-7 rounded-md text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)]"
+                >
+                  {showNewPassword ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                </InputGroupButton>
+              </InputGroupAddon>
+            </InputGroup>
+          </SettingsFormRow>
 
-          <label className="grid gap-3 border-t border-[var(--ops-border-strong)] px-4 py-3 md:grid-cols-[200px_minmax(0,1fr)] md:items-center">
-            <span className="min-w-0">
-              <SettingsFieldLabel>Confirmar</SettingsFieldLabel>
-            </span>
-            <input
-              type="password"
-              value={form.confirm_password}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, confirm_password: event.target.value }))
-              }
-              required
-              minLength={10}
-              autoComplete="new-password"
-              className="h-9 w-full rounded-md border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 text-sm text-[var(--ops-text)] outline-none transition hover:border-[var(--ops-border-soft)] focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[var(--ripnel-accent-soft)]"
-            />
-          </label>
+          <SettingsFormRow label="Confirmar">
+            <InputGroup className="h-9 rounded-md border-[var(--ops-border-strong)] bg-[var(--ops-field)] shadow-none focus-within:border-[var(--ripnel-accent)] focus-within:ring-[color:var(--ripnel-accent-soft)]">
+              <InputGroupInput
+                type={showConfirmPassword ? "text" : "password"}
+                value={form.confirm_password}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, confirm_password: event.target.value }))
+                }
+                required
+                minLength={10}
+                autoComplete="new-password"
+                className="h-full rounded-md px-3 text-sm text-[var(--ops-text)]"
+              />
+              <InputGroupAddon align="inline-end" className="pr-1">
+                <InputGroupButton
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setShowConfirmPassword((value) => !value)}
+                  aria-label={showConfirmPassword ? "Ocultar confirmación de contraseña" : "Mostrar confirmación de contraseña"}
+                  className="h-7 w-7 rounded-md text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)]"
+                >
+                  {showConfirmPassword ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                </InputGroupButton>
+              </InputGroupAddon>
+            </InputGroup>
+          </SettingsFormRow>
 
-          {error ? (
-            <div role="alert" aria-live="polite" className="border-t border-[var(--ops-border-strong)] px-4 py-3 text-sm text-rose-500">
-              {error}
-            </div>
-          ) : null}
-          {message ? (
-            <div role="status" aria-live="polite" className="border-t border-[var(--ops-border-strong)] px-4 py-3 text-sm text-emerald-500">
-              {message}
-            </div>
-          ) : null}
+          {error ? <SettingsStatusMessage tone="danger">{error}</SettingsStatusMessage> : null}
+          {message ? <SettingsStatusMessage tone="success">{message}</SettingsStatusMessage> : null}
 
           <div className="flex justify-end border-t border-[var(--ops-border-strong)] px-4 py-3">
-            <button
+            <Button
               type="submit"
               disabled={saving}
-              className="rounded-md bg-[var(--ripnel-accent)] px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+              variant="accent"
+              size="sm"
+              className="h-9 rounded-md px-3.5 text-sm font-semibold"
             >
               {saving ? "Guardando..." : "Actualizar contrasena"}
-            </button>
+            </Button>
           </div>
         </form>
       </PanelSection>
