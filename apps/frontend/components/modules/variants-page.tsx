@@ -8,16 +8,30 @@ import {
   CircleAlert,
   LoaderCircle,
   PackagePlus,
+  Power,
   RefreshCw,
   RotateCcw,
   Save,
-  Search,
   Shirt,
 } from "lucide-react";
+import {
+  AdminCheckboxOption,
+  AdminConfirmModal,
+  AdminRowActionsMenu,
+} from "@/components/admin/admin-ui";
 import { ApiEnvelope, apiFetch, unwrapApiData } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import {
+  OpsFiltersRow,
+  OpsPageShell,
+  OpsSearchField,
+  OpsSectionDivider,
+  OpsTableFooter,
+  OpsTableWrap,
+} from "@/components/ui/ops-page-shell";
 import { Pagination } from "@/components/ui/pagination";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
@@ -264,47 +278,6 @@ function getStatusLabel(status: StyleItem["status"]) {
   return "Inactivo";
 }
 
-function MetricPill({
-  label,
-  value,
-  tone = "default",
-}: {
-  label: string;
-  value: string | number;
-  tone?: "default" | "accent" | "success" | "warning";
-}) {
-  const toneClass =
-    tone === "accent"
-      ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))] text-[var(--ops-text)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--ripnel-accent)_14%,transparent)]"
-      : tone === "success"
-      ? "border-[color:color-mix(in_srgb,#10b981_32%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_12%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_78%,var(--ops-text))]"
-      : tone === "warning"
-      ? "border-[color:color-mix(in_srgb,#f59e0b_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
-      : "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text)]";
-  const labelClass =
-    tone === "accent"
-      ? "text-[color:color-mix(in_srgb,var(--ripnel-accent)_72%,var(--ops-text))]"
-      : tone === "success"
-      ? "text-[color:color-mix(in_srgb,#059669_76%,var(--ops-text))]"
-      : tone === "warning"
-      ? "text-[color:color-mix(in_srgb,#f59e0b_82%,var(--ops-text))]"
-      : "text-[var(--ops-text-muted)]";
-
-  return (
-    <div
-      className={cn(
-        "inline-flex items-center gap-2.5 rounded-full border px-3 py-2",
-        toneClass
-      )}
-    >
-      <span className={cn("text-[11px] font-semibold uppercase tracking-[0.16em]", labelClass)}>
-        {label}
-      </span>
-      <span className="text-base font-semibold leading-none text-[var(--ops-text)]">{value}</span>
-    </div>
-  );
-}
-
 export function VariantsPage({
   initialStyleId = null,
 }: {
@@ -329,6 +302,7 @@ export function VariantsPage({
   const [savingConfig, setSavingConfig] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [togglingVariantId, setTogglingVariantId] = useState<string | null>(null);
+  const [pendingStatusVariant, setPendingStatusVariant] = useState<VariantItem | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const hasAppliedInitialSelection = useRef(false);
@@ -706,14 +680,14 @@ export function VariantsPage({
           : "No se pudo actualizar el estado de la variante"
       );
     } finally {
+      setPendingStatusVariant(null);
       setTogglingVariantId(null);
     }
   }
 
   return (
     <TooltipProvider delayDuration={120}>
-      <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
-        <div className="mx-auto max-w-[1180px] space-y-4">
+      <OpsPageShell width="wide">
           <PosHeader
             eyebrow="Productos"
             title="Variantes de producto"
@@ -756,30 +730,21 @@ export function VariantsPage({
           />
 
           <div className="flex flex-wrap items-center gap-2">
-            <MetricPill label="Styles base" value={styles.length} />
-            <MetricPill label="Listos" value={readyStylesCount} tone="accent" />
-            <MetricPill label="Por completar" value={pendingStylesCount} tone="warning" />
+            <OpsMetricPill label="Styles base" value={styles.length} />
+            <OpsMetricPill label="Listos" value={readyStylesCount} tone="accent" />
+            <OpsMetricPill label="Por completar" value={pendingStylesCount} tone="warning" />
           </div>
 
           <div className="space-y-5">
             {!selectedStyleId ? (
-              <div className="space-y-4 border-t border-[var(--ops-border-strong)] pt-4">
-                <div className="grid gap-2.5 lg:grid-cols-[1.45fr_0.84fr_auto] lg:items-end">
-                  <div>
-                    <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                      Buscar
-                    </label>
-                    <div className="sales-field flex h-10 items-center gap-2 rounded-lg px-3 transition hover:bg-[var(--ops-surface-muted)]">
-                      <Search className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
-                      <input
-                        type="text"
-                        value={styleSearch}
-                        onChange={(event) => setStyleSearch(event.target.value)}
-                        placeholder="Buscar por codigo, nombre o tela"
-                        className="h-full w-full bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
-                      />
-                    </div>
-                  </div>
+              <OpsSectionDivider className="space-y-4">
+                <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_auto]">
+                  <OpsSearchField
+                    value={styleSearch}
+                    onChange={setStyleSearch}
+                    placeholder="Buscar por código, nombre o tela"
+                    ariaLabel="Buscar styles para variantes"
+                  />
 
                   <FilterDropdown
                     label="Estado"
@@ -810,10 +775,9 @@ export function VariantsPage({
                       Limpiar filtros
                     </TooltipContent>
                   </Tooltip>
-                </div>
+                </OpsFiltersRow>
 
-                <div className="overflow-x-auto">
-                  <div className="min-w-[1080px] border-y border-[var(--ops-border-strong)]">
+                <OpsTableWrap minWidth="1080px">
                     <table className="w-full border-collapse">
                       <thead className="bg-[var(--ops-surface-muted)]">
                         <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
@@ -909,11 +873,10 @@ export function VariantsPage({
                         )}
                       </tbody>
                     </table>
-                  </div>
-                </div>
+                </OpsTableWrap>
 
                 {!loading ? (
-                  <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between">
+                  <OpsTableFooter>
                     <span className="ops-secondary-text text-[var(--ops-text-muted)]">
                       {filteredStyles.length === 0
                         ? "0 resultados"
@@ -925,9 +888,9 @@ export function VariantsPage({
                       onPageChange={setStylePage}
                       className="self-end md:self-auto"
                     />
-                  </div>
+                  </OpsTableFooter>
                 ) : null}
-              </div>
+              </OpsSectionDivider>
             ) : null}
 
             {selectedStyleId ? (
@@ -1017,18 +980,18 @@ export function VariantsPage({
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                           <div className="space-y-3">
                             <div className="flex flex-wrap gap-2">
-                              <MetricPill
+                              <OpsMetricPill
                                 label="Retail"
                                 value={`${selectedProduct.retail_sizes_covered_count}/${selectedProduct.configured_size_count}`}
                                 tone="success"
                               />
-                              <MetricPill
+                              <OpsMetricPill
                                 label="Mayorista"
                                 value={`${selectedProduct.wholesale_sizes_covered_count}/${selectedProduct.configured_size_count}`}
                                 tone="accent"
                               />
-                              <MetricPill label="Stock" value={selectedProduct.total_stock_qty} />
-                              <MetricPill
+                              <OpsMetricPill label="Stock" value={selectedProduct.total_stock_qty} />
+                              <OpsMetricPill
                                 label="Siguiente paso"
                                 value={selectedProduct.next_step_label}
                               />
@@ -1083,30 +1046,18 @@ export function VariantsPage({
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                       {visibleSizes.map((size) => (
-                        <label
+                        <AdminCheckboxOption
                           key={size.size_id}
-                          className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-sm ${
-                            size.active
-                              ? "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text)]"
-                              : "border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#d97706_74%,var(--ops-text))]"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formState.sizeIds.includes(size.size_id)}
-                            onChange={() =>
-                              setFormState((current) => ({
-                                ...current,
-                                sizeIds: toggleValue(current.sizeIds, size.size_id),
-                              }))
-                            }
-                            className="h-4 w-4 rounded border-[var(--ops-border-strong)]"
-                          />
-                          <span>
-                            {size.code} - {size.name}
-                            {!size.active ? " (inactiva)" : ""}
-                          </span>
-                        </label>
+                          label={size.name}
+                          helper={size.active ? size.code : `${size.code} · inactiva`}
+                          checked={formState.sizeIds.includes(size.size_id)}
+                          onChange={() =>
+                            setFormState((current) => ({
+                              ...current,
+                              sizeIds: toggleValue(current.sizeIds, size.size_id),
+                            }))
+                          }
+                        />
                       ))}
                     </div>
                   </div>
@@ -1120,36 +1071,22 @@ export function VariantsPage({
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                       {visibleColors.map((color) => (
-                        <label
+                        <AdminCheckboxOption
                           key={color.color_id}
-                          className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-sm ${
+                          label={color.name}
+                          helper={
                             color.active
-                              ? "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text)]"
-                              : "border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#d97706_74%,var(--ops-text))]"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formState.colorIds.includes(color.color_id)}
-                            onChange={() =>
-                              setFormState((current) => ({
-                                ...current,
-                                colorIds: toggleValue(current.colorIds, color.color_id),
-                              }))
-                            }
-                            className="h-4 w-4 rounded border-[var(--ops-border-strong)]"
-                          />
-                          <span
-                            className="inline-block h-3.5 w-3.5 rounded-full border border-[var(--ops-border-strong)]"
-                            style={{
-                              backgroundColor: color.hex || "#ffffff",
-                            }}
-                          />
-                          <span>
-                            {color.code ? `${color.code} - ${color.name}` : color.name}
-                            {!color.active ? " (inactivo)" : ""}
-                          </span>
-                        </label>
+                              ? color.code || "Color"
+                              : `${color.code || "Color"} · inactivo`
+                          }
+                          checked={formState.colorIds.includes(color.color_id)}
+                          onChange={() =>
+                            setFormState((current) => ({
+                              ...current,
+                              colorIds: toggleValue(current.colorIds, color.color_id),
+                            }))
+                          }
+                        />
                       ))}
                     </div>
                   </div>
@@ -1238,22 +1175,13 @@ export function VariantsPage({
                 </form>
 
                 <div className="space-y-4 border-t border-[var(--ops-border-strong)] pt-4">
-                  <div className="grid gap-2.5 lg:grid-cols-[1.45fr_0.84fr_auto] lg:items-end">
-                    <div>
-                      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                        Buscar
-                      </label>
-                      <div className="sales-field flex h-10 items-center gap-2 rounded-lg px-3 transition hover:bg-[var(--ops-surface-muted)]">
-                        <Search className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
-                        <input
-                          type="text"
-                          value={variantSearch}
-                          onChange={(event) => setVariantSearch(event.target.value)}
-                          placeholder="Buscar por SKU, talla o color"
-                          className="h-full w-full bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
-                        />
-                      </div>
-                    </div>
+                  <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_auto]">
+                    <OpsSearchField
+                      value={variantSearch}
+                      onChange={setVariantSearch}
+                      placeholder="Buscar por SKU, talla o color"
+                      ariaLabel="Buscar variantes"
+                    />
 
                     <FilterDropdown
                       label="Estado"
@@ -1284,10 +1212,9 @@ export function VariantsPage({
                         Limpiar filtros
                       </TooltipContent>
                     </Tooltip>
-                  </div>
+                  </OpsFiltersRow>
 
-                  <div className="overflow-x-auto">
-                    <div className="min-w-[1080px] border-y border-[var(--ops-border-strong)]">
+                  <OpsTableWrap minWidth="1080px">
                       <table className="w-full border-collapse">
                         <thead className="bg-[var(--ops-surface-muted)]">
                           <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
@@ -1344,32 +1271,32 @@ export function VariantsPage({
                                   </span>
                                 </td>
                                 <td className="px-4 py-[var(--ops-row-py)] text-right">
-                                  <Button
-                                    type="button"
-                                    onClick={() => handleToggleVariantActive(variant)}
-                                    disabled={togglingVariantId === variant.variant_id}
-                                    variant="outline"
-                                    size="sm"
-                                    className="rounded-lg px-3"
-                                  >
-                                    {togglingVariantId === variant.variant_id ? (
-                                      <LoaderCircle className="h-4 w-4 animate-spin" />
-                                    ) : variant.active ? (
-                                      "Inactivar"
-                                    ) : (
-                                      "Activar"
-                                    )}
-                                  </Button>
+                                  <AdminRowActionsMenu
+                                    ariaLabel={`Acciones para ${variant.sku}`}
+                                    items={[
+                                      {
+                                        label: variant.active ? "Inactivar" : "Activar",
+                                        icon:
+                                          togglingVariantId === variant.variant_id ? (
+                                            <LoaderCircle className="h-4 w-4 animate-spin" />
+                                          ) : (
+                                            <Power className="h-4 w-4" />
+                                          ),
+                                        tone: variant.active ? "danger" : "neutral",
+                                        disabled: togglingVariantId === variant.variant_id,
+                                        onSelect: () => setPendingStatusVariant(variant),
+                                      },
+                                    ]}
+                                  />
                                 </td>
                               </tr>
                             ))
                           )}
                         </tbody>
                       </table>
-                    </div>
-                  </div>
+                  </OpsTableWrap>
 
-                  <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between">
+                  <OpsTableFooter>
                     <span className="ops-secondary-text text-[var(--ops-text-muted)]">
                       {filteredVariants.length === 0
                         ? "0 resultados"
@@ -1381,7 +1308,7 @@ export function VariantsPage({
                       onPageChange={setVariantPage}
                       className="self-end md:self-auto"
                     />
-                  </div>
+                  </OpsTableFooter>
                 </div>
                   </div>
                 ) : (
@@ -1399,9 +1326,30 @@ export function VariantsPage({
                 )}
               </article>
             ) : null}
-        </div>
-      </div>
-      </section>
+          </div>
+          <AdminConfirmModal
+            open={Boolean(pendingStatusVariant)}
+            title={pendingStatusVariant?.active ? "Inactivar variante" : "Activar variante"}
+            description={
+              pendingStatusVariant
+                ? `${pendingStatusVariant.sku} cambiará a estado ${
+                    pendingStatusVariant.active ? "inactivo" : "activo"
+                  }.`
+                : ""
+            }
+            confirmLabel={pendingStatusVariant?.active ? "Inactivar" : "Activar"}
+            confirmTone={pendingStatusVariant?.active ? "danger" : "accent"}
+            busy={Boolean(
+              pendingStatusVariant && togglingVariantId === pendingStatusVariant.variant_id
+            )}
+            onCancel={() => setPendingStatusVariant(null)}
+            onConfirm={() => {
+              if (pendingStatusVariant) {
+                void handleToggleVariantActive(pendingStatusVariant);
+              }
+            }}
+          />
+      </OpsPageShell>
     </TooltipProvider>
   );
 }

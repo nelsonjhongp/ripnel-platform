@@ -1,21 +1,45 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Power,
   LoaderCircle,
   PencilLine,
   Plus,
   RefreshCw,
+  ReceiptText,
   RotateCcw,
-  Search,
+  Shapes,
 } from "lucide-react";
+import {
+  AdminActionButton,
+  AdminCheckboxField,
+  AdminConfirmModal,
+  AdminField,
+  AdminFormActionsBar,
+  AdminInlineMessage,
+  AdminInput,
+  AdminModalShell,
+  AdminReadonlyFieldState,
+  AdminRowActionsMenu,
+  AdminSelectMenu,
+  AdminTextarea,
+} from "@/components/admin/admin-ui";
 import { buildApiUrl } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { InlineStatusCard } from "@/components/feedback/status-page";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
-import { Input } from "@/components/ui/input";
+import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import {
+  OpsFiltersRow,
+  OpsPageShell,
+  OpsSearchField,
+  OpsSectionDivider,
+  OpsTableFooter,
+  OpsTableWrap,
+} from "@/components/ui/ops-page-shell";
 import { Pagination } from "@/components/ui/pagination";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
@@ -90,54 +114,13 @@ function getOptionId(item: OptionItem) {
 }
 
 function getOptionLabel(item: OptionItem) {
-  return item.code ? `${String(item.code)} - ${String(item.name)}` : String(item.name || "");
+  return String(item.name || "");
 }
 
 function formatShortDate(value: string) {
   return new Date(value).toLocaleDateString("es-PE", {
     dateStyle: "short",
   });
-}
-
-function MetricPill({
-  label,
-  value,
-  tone = "default",
-}: {
-  label: string;
-  value: string | number;
-  tone?: "default" | "accent" | "success" | "warning";
-}) {
-  const toneClass =
-    tone === "accent"
-      ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))] text-[var(--ops-text)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--ripnel-accent)_14%,transparent)]"
-      : tone === "success"
-      ? "border-[color:color-mix(in_srgb,#10b981_32%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_12%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_78%,var(--ops-text))]"
-      : tone === "warning"
-      ? "border-[color:color-mix(in_srgb,#f59e0b_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
-      : "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text)]";
-  const labelClass =
-    tone === "accent"
-      ? "text-[color:color-mix(in_srgb,var(--ripnel-accent)_72%,var(--ops-text))]"
-      : tone === "success"
-      ? "text-[color:color-mix(in_srgb,#059669_76%,var(--ops-text))]"
-      : tone === "warning"
-      ? "text-[color:color-mix(in_srgb,#f59e0b_82%,var(--ops-text))]"
-      : "text-[var(--ops-text-muted)]";
-
-  return (
-    <div
-      className={cn(
-        "inline-flex items-center gap-2.5 rounded-full border px-3 py-2",
-        toneClass
-      )}
-    >
-      <span className={cn("text-[11px] font-semibold uppercase tracking-[0.16em]", labelClass)}>
-        {label}
-      </span>
-      <span className="text-base font-semibold leading-none text-[var(--ops-text)]">{value}</span>
-    </div>
-  );
 }
 
 async function requestApiData(path: string) {
@@ -182,6 +165,7 @@ export function StylesPage({
 }: {
   initialStyleId?: string | null;
 }) {
+  const router = useRouter();
   const [styles, setStyles] = useState<StyleItem[]>([]);
   const [garmentTypes, setGarmentTypes] = useState<OptionItem[]>([]);
   const [fabrics, setFabrics] = useState<OptionItem[]>([]);
@@ -195,6 +179,8 @@ export function StylesPage({
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [editingStyleId, setEditingStyleId] = useState<string | null>(null);
+  const [pendingStatusStyle, setPendingStatusStyle] = useState<StyleItem | null>(null);
+  const [togglingStyleId, setTogglingStyleId] = useState<string | null>(null);
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const hasAppliedInitialSelection = useRef(false);
 
@@ -340,6 +326,7 @@ export function StylesPage({
   }
 
   async function handleToggleActive(style: StyleItem) {
+    setTogglingStyleId(style.style_id);
     setError(null);
     setSuccessMessage(null);
 
@@ -379,6 +366,9 @@ export function StylesPage({
           ? requestError.message
           : "No se pudo actualizar el style"
       );
+    } finally {
+      setTogglingStyleId(null);
+      setPendingStatusStyle(null);
     }
   }
 
@@ -427,8 +417,7 @@ export function StylesPage({
 
   return (
     <TooltipProvider delayDuration={120}>
-      <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
-        <div className="mx-auto max-w-[1180px] space-y-4">
+      <OpsPageShell width="wide">
           <PosHeader
             eyebrow="Productos"
             title="Estilos de producto"
@@ -463,28 +452,19 @@ export function StylesPage({
           />
 
           <div className="flex flex-wrap items-center gap-2">
-            <MetricPill label="Styles base" value={styles.length} />
-            <MetricPill label="Activos" value={activeCount} tone="success" />
-            <MetricPill label="Inactivos" value={inactiveCount} tone="warning" />
+            <OpsMetricPill label="Styles base" value={styles.length} />
+            <OpsMetricPill label="Activos" value={activeCount} tone="success" />
+            <OpsMetricPill label="Inactivos" value={inactiveCount} tone="warning" />
           </div>
 
-          <div className="space-y-4 border-t border-[var(--ops-border-strong)] pt-4">
-            <div className="grid gap-2.5 lg:grid-cols-[1.45fr_0.84fr_auto] lg:items-end">
-              <div>
-                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  Buscar
-                </label>
-                <div className="sales-field flex h-10 items-center gap-2 rounded-lg px-3 transition hover:bg-[var(--ops-surface-muted)]">
-                  <Search className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Buscar por style, código o catálogos"
-                    className="h-full w-full bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
-                  />
-                </div>
-              </div>
+          <OpsSectionDivider className="space-y-4">
+            <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_auto]">
+              <OpsSearchField
+                value={search}
+                onChange={setSearch}
+                placeholder="Buscar por style, código o catálogos"
+                ariaLabel="Buscar styles"
+              />
 
               <FilterDropdown
                 label="Estado"
@@ -511,10 +491,9 @@ export function StylesPage({
                   Limpiar filtros
                 </TooltipContent>
               </Tooltip>
-            </div>
+            </OpsFiltersRow>
 
-            <div className="overflow-x-auto">
-              <div className="min-w-[1120px] border-y border-[var(--ops-border-strong)]">
+            <OpsTableWrap minWidth="1120px">
                 <div className="ops-surface-muted grid grid-cols-[1.3fr_0.9fr_0.9fr_0.9fr_0.82fr_0.82fr_0.72fr_1.22fr] gap-x-3 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
                   <span>Style</span>
                   <span>Tipo</span>
@@ -599,46 +578,47 @@ export function StylesPage({
                           </span>
                         </div>
 
-                        <div className="flex flex-wrap items-center justify-end gap-1.5">
-                          <Button
-                            type="button"
-                            onClick={() => handleEdit(style)}
-                            variant="outline"
-                            size="sm"
-                            className="rounded-lg px-3"
-                          >
-                            <PencilLine className="h-3.5 w-3.5" />
-                            Editar
-                          </Button>
-                          <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
-                            <Link href={`/productos/variantes?style_id=${encodeURIComponent(style.style_id)}`}>
-                              Variantes
-                            </Link>
-                          </Button>
-                          <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
-                            <Link href={`/precios/crear-y-editar-precio?style_id=${encodeURIComponent(style.style_id)}`}>
-                              Precios
-                            </Link>
-                          </Button>
-                          <Button
-                            type="button"
-                            onClick={() => handleToggleActive(style)}
-                            variant={style.active ? "outline" : "accent"}
-                            size="sm"
-                            className="rounded-lg px-3"
-                          >
-                            {style.active ? "Inactivar" : "Activar"}
-                          </Button>
-                        </div>
+                        <AdminRowActionsMenu
+                          ariaLabel={`Acciones para ${style.name}`}
+                          items={[
+                            {
+                              label: "Editar",
+                              icon: <PencilLine className="h-4 w-4" />,
+                              onSelect: () => handleEdit(style),
+                            },
+                            {
+                              label: "Variantes",
+                              icon: <Shapes className="h-4 w-4" />,
+                              onSelect: () =>
+                                router.push(
+                                  `/productos/variantes?style_id=${encodeURIComponent(style.style_id)}`
+                                ),
+                            },
+                            {
+                              label: "Precios",
+                              icon: <ReceiptText className="h-4 w-4" />,
+                              onSelect: () =>
+                                router.push(
+                                  `/precios/crear-y-editar-precio?style_id=${encodeURIComponent(style.style_id)}`
+                                ),
+                            },
+                            {
+                              label: style.active ? "Inactivar" : "Activar",
+                              icon: <Power className="h-4 w-4" />,
+                              tone: style.active ? "danger" : "neutral",
+                              disabled: togglingStyleId === style.style_id,
+                              onSelect: () => setPendingStatusStyle(style),
+                            },
+                          ]}
+                        />
                       </div>
                     ))
                   )}
                 </div>
-              </div>
-            </div>
+            </OpsTableWrap>
 
             {!loading ? (
-              <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between">
+              <OpsTableFooter>
                 <span className="ops-secondary-text text-[var(--ops-text-muted)]">
                   {filteredStyles.length === 0
                     ? "0 resultados"
@@ -650,23 +630,19 @@ export function StylesPage({
                   onPageChange={setCurrentPage}
                   className="self-end md:self-auto"
                 />
-              </div>
+              </OpsTableFooter>
             ) : null}
-          </div>
+          </OpsSectionDivider>
 
           {editingStyleId ? (
-            <article className="ops-surface rounded-lg border p-4 md:p-5">
-              <div className="border-b border-[color:var(--ops-border-soft)] pb-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ripnel-accent-hover)]">
-                  Edicion segura
-                </p>
-                <h2 className="ops-title mt-1 text-lg font-semibold">Editar style</h2>
-              </div>
-
-              <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-semibold text-[var(--ops-text)]">Nombre</label>
-                  <Input
+            <AdminModalShell
+              title="Editar style"
+              onClose={resetForm}
+              widthClass="max-w-3xl"
+            >
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <AdminField label="Nombre">
+                  <AdminInput
                     value={formState.name}
                     onChange={(event) =>
                       setFormState((current) => ({
@@ -676,117 +652,68 @@ export function StylesPage({
                     }
                     placeholder="Jogger - French Terry"
                     required
-                    className="h-10 rounded-lg"
                   />
-                </div>
+                </AdminField>
 
-                <div className="space-y-1.5">
-                  <label className="text-sm font-semibold text-[var(--ops-text)]">Codigo</label>
-                  <Input
+                <AdminField label="Código">
+                  <AdminReadonlyFieldState
                     value={styles.find((style) => style.style_id === editingStyleId)?.style_code || ""}
-                    readOnly
-                    className="h-10 rounded-lg bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]"
+                    placeholder="Sin código"
                   />
+                </AdminField>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <AdminField label="Tipo de prenda">
+                    <AdminReadonlyFieldState
+                      value={
+                        garmentTypes.find((item) => getOptionId(item) === formState.garment_type_id)?.name ||
+                        ""
+                      }
+                      placeholder="Sin tipo"
+                    />
+                  </AdminField>
+
+                  <AdminField label="Tela">
+                    <AdminReadonlyFieldState
+                      value={
+                        fabrics.find((item) => getOptionId(item) === formState.fabric_id)?.name || ""
+                      }
+                      placeholder="Sin tela"
+                    />
+                  </AdminField>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-semibold text-[var(--ops-text)]">
-                      Tipo de prenda
-                    </label>
-                    <select
-                      value={formState.garment_type_id}
-                      onChange={(event) =>
-                        setFormState((current) => ({
-                          ...current,
-                          garment_type_id: event.target.value,
-                        }))
+                  <AdminField label="Detalle de tela">
+                    <AdminReadonlyFieldState
+                      value={
+                        fabricDetails.find((item) => getOptionId(item) === formState.fabric_detail_id)?.name ||
+                        ""
                       }
-                      disabled
-                      className="ops-surface h-10 w-full cursor-not-allowed rounded-lg border px-3 text-sm text-[var(--ops-text-muted)] outline-none"
-                    >
-                      <option value="">Selecciona un tipo</option>
-                      {garmentTypes.map((item) => (
-                        <option key={getOptionId(item)} value={getOptionId(item)}>
-                          {getOptionLabel(item)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                      placeholder="Sin detalle"
+                    />
+                  </AdminField>
 
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-semibold text-[var(--ops-text)]">Tela</label>
-                    <select
-                      value={formState.fabric_id}
-                      onChange={(event) =>
-                        setFormState((current) => ({
-                          ...current,
-                          fabric_id: event.target.value,
-                        }))
-                      }
-                      disabled
-                      className="ops-surface h-10 w-full cursor-not-allowed rounded-lg border px-3 text-sm text-[var(--ops-text-muted)] outline-none"
-                    >
-                      <option value="">Sin tela</option>
-                      {fabrics.map((item) => (
-                        <option key={getOptionId(item)} value={getOptionId(item)}>
-                          {getOptionLabel(item)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-semibold text-[var(--ops-text)]">
-                      Detalle de tela
-                    </label>
-                    <select
-                      value={formState.fabric_detail_id}
-                      onChange={(event) =>
-                        setFormState((current) => ({
-                          ...current,
-                          fabric_detail_id: event.target.value,
-                        }))
-                      }
-                      disabled
-                      className="ops-surface h-10 w-full cursor-not-allowed rounded-lg border px-3 text-sm text-[var(--ops-text-muted)] outline-none"
-                    >
-                      <option value="">Sin detalle</option>
-                      {fabricDetails.map((item) => (
-                        <option key={getOptionId(item)} value={getOptionId(item)}>
-                          {getOptionLabel(item)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-semibold text-[var(--ops-text)]">Target</label>
-                    <select
+                  <AdminField label="Target">
+                    <AdminSelectMenu
                       value={formState.target_id}
-                      onChange={(event) =>
+                      onValueChange={(value) =>
                         setFormState((current) => ({
                           ...current,
-                          target_id: event.target.value,
+                          target_id: value,
                         }))
                       }
-                      className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none"
-                    >
-                      <option value="">Sin target</option>
-                      {targets.map((item) => (
-                        <option key={getOptionId(item)} value={getOptionId(item)}>
-                          {getOptionLabel(item)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                      placeholder="Sin target"
+                      options={targets.map((item) => ({
+                        value: getOptionId(item),
+                        label: getOptionLabel(item),
+                      }))}
+                    />
+                  </AdminField>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-sm font-semibold text-[var(--ops-text)]">Descripcion</label>
-                  <textarea
+                <AdminField label="Descripción">
+                  <AdminTextarea
                     value={formState.description}
                     onChange={(event) =>
                       setFormState((current) => ({
@@ -795,38 +722,33 @@ export function StylesPage({
                       }))
                     }
                     placeholder="Notas internas del style"
-                    className="ops-surface min-h-24 w-full rounded-lg border px-3 py-2.5 text-sm outline-none"
                   />
-                </div>
+                </AdminField>
 
-                <label className="ops-surface-muted flex items-center gap-3 rounded-lg border px-3 py-3 text-sm text-[var(--ops-text)]">
-                  <input
-                    type="checkbox"
-                    checked={formState.active}
-                    onChange={(event) =>
-                      setFormState((current) => ({
-                        ...current,
-                        active: event.target.checked,
-                      }))
-                    }
-                    className="h-4 w-4 rounded border-[var(--ops-border-strong)]"
-                  />
-                  Mantener style activo
-                </label>
+                <AdminCheckboxField
+                  label="Style activo"
+                  checked={formState.active}
+                  onChange={(checked) =>
+                    setFormState((current) => ({
+                      ...current,
+                      active: checked,
+                    }))
+                  }
+                />
 
                 {error ? (
-                  <InlineStatusCard title="Error" description={error} tone="danger" variant="ops" />
+                  <AdminInlineMessage tone="danger">{error}</AdminInlineMessage>
                 ) : null}
 
                 {successMessage ? (
-                  <InlineStatusCard title="Éxito" description={successMessage} tone="neutral" variant="ops" />
+                  <AdminInlineMessage tone="success">{successMessage}</AdminInlineMessage>
                 ) : null}
 
-                <div className="flex flex-wrap justify-end gap-2">
-                  <Button type="button" variant="outline" className="rounded-lg" onClick={resetForm}>
+                <AdminFormActionsBar>
+                  <AdminActionButton type="button" onClick={resetForm}>
                     Cancelar
-                  </Button>
-                  <Button type="submit" variant="accent" className="rounded-lg" disabled={submitting}>
+                  </AdminActionButton>
+                  <AdminActionButton type="submit" tone="accent" disabled={submitting}>
                     {submitting ? (
                       <>
                         <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -838,13 +760,39 @@ export function StylesPage({
                         Guardar cambios
                       </>
                     )}
-                  </Button>
-                </div>
+                  </AdminActionButton>
+                </AdminFormActionsBar>
               </form>
-            </article>
+            </AdminModalShell>
           ) : null}
-        </div>
-      </section>
+
+          <AdminConfirmModal
+            open={Boolean(pendingStatusStyle)}
+            title={pendingStatusStyle?.active ? "Inactivar style" : "Activar style"}
+            description={
+              pendingStatusStyle ? (
+                <>
+                  {pendingStatusStyle.active
+                    ? `Inactivarás ${pendingStatusStyle.name}.`
+                    : `Activarás ${pendingStatusStyle.name}.`}
+                </>
+              ) : (
+                ""
+              )
+            }
+            confirmLabel={pendingStatusStyle?.active ? "Inactivar" : "Activar"}
+            confirmTone={pendingStatusStyle?.active ? "danger" : "accent"}
+            busy={Boolean(
+              pendingStatusStyle && togglingStyleId === pendingStatusStyle.style_id
+            )}
+            onCancel={() => setPendingStatusStyle(null)}
+            onConfirm={() => {
+              if (pendingStatusStyle) {
+                void handleToggleActive(pendingStatusStyle);
+              }
+            }}
+          />
+      </OpsPageShell>
     </TooltipProvider>
   );
 }
