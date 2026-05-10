@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
   CircleAlert,
@@ -11,12 +12,21 @@ import {
   ReceiptText,
   RefreshCw,
   RotateCcw,
-  Search,
   Shapes,
 } from "lucide-react";
+import { AdminRowActionsMenu } from "@/components/admin/admin-ui";
 import { ApiEnvelope, apiFetch, unwrapApiData } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { InlineStatusCard } from "@/components/feedback/status-page";
+import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import {
+  OpsFiltersRow,
+  OpsPageShell,
+  OpsSearchField,
+  OpsSectionDivider,
+  OpsTableFooter,
+  OpsTableWrap,
+} from "@/components/ui/ops-page-shell";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
@@ -127,47 +137,6 @@ const STATUS_META: Record<ProductStatus, { label: string; className: string }> =
   },
 };
 
-function MetricPill({
-  label,
-  value,
-  tone = "default",
-}: {
-  label: string;
-  value: string | number;
-  tone?: "default" | "accent" | "success" | "warning";
-}) {
-  const toneClass =
-    tone === "accent"
-      ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))] text-[var(--ops-text)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--ripnel-accent)_14%,transparent)]"
-      : tone === "success"
-      ? "border-[color:color-mix(in_srgb,#10b981_32%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_12%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_78%,var(--ops-text))]"
-      : tone === "warning"
-      ? "border-[color:color-mix(in_srgb,#f59e0b_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
-      : "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text)]";
-  const labelClass =
-    tone === "accent"
-      ? "text-[color:color-mix(in_srgb,var(--ripnel-accent)_72%,var(--ops-text))]"
-      : tone === "success"
-      ? "text-[color:color-mix(in_srgb,#059669_76%,var(--ops-text))]"
-      : tone === "warning"
-      ? "text-[color:color-mix(in_srgb,#f59e0b_82%,var(--ops-text))]"
-      : "text-[var(--ops-text-muted)]";
-
-  return (
-    <div
-      className={cn(
-        "inline-flex items-center gap-2.5 rounded-full border px-3 py-2",
-        toneClass
-      )}
-    >
-      <span className={cn("text-[11px] font-semibold uppercase tracking-[0.16em]", labelClass)}>
-        {label}
-      </span>
-      <span className="text-base font-semibold leading-none text-[var(--ops-text)]">{value}</span>
-    </div>
-  );
-}
-
 const PAGE_SIZE = 10;
 
 function getVisibleSizeStock(sizeStock: ProductSizeStock[]) {
@@ -178,32 +147,12 @@ function buildStyleHref(path: string, styleId: string) {
   return `${path}?style_id=${encodeURIComponent(styleId)}`;
 }
 
-function ActionIcon({
-  href,
-  label,
-  children,
-}: {
-  href: string;
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      aria-label={label}
-      title={label}
-      className="ops-surface inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border text-[var(--ops-text-muted)] transition hover:border-[color:var(--ripnel-accent)] hover:text-[var(--ops-text)]"
-    >
-      {children}
-    </Link>
-  );
-}
-
 function formatExtraSizes(extraSizes: ProductSizeStock[]) {
   return extraSizes.map((size) => `${size.size_code}: ${size.qty}`).join(" · ");
 }
 
 export function ProductsOverviewPage() {
+  const router = useRouter();
   const { defaultLocation, locationAssignments } = useAuth();
   const [response, setResponse] = useState<ProductsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -310,8 +259,7 @@ export function ProductsOverviewPage() {
 
   return (
     <TooltipProvider delayDuration={120}>
-      <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
-        <div className="mx-auto max-w-[1180px] space-y-4">
+      <OpsPageShell width="wide">
           <PosHeader
             eyebrow="Productos"
             title="Maestro de producto"
@@ -344,30 +292,22 @@ export function ProductsOverviewPage() {
           />
 
           <div className="flex flex-wrap items-center gap-2">
-            <MetricPill label="Total styles" value={totalItems} />
-            <MetricPill label="Listos" value={readyCount} tone="success" />
-            <MetricPill label="Pendientes" value={pendingCount} tone="warning" />
+            <OpsMetricPill label="Total styles" value={totalItems} />
+            <OpsMetricPill label="Listos" value={readyCount} tone="success" />
+            <OpsMetricPill label="Pendientes" value={pendingCount} tone="warning" />
           </div>
 
-          <div className="space-y-4 border-t border-[var(--ops-border-strong)] pt-4">
-            <div className="grid gap-2.5 lg:grid-cols-[minmax(0,1.55fr)_0.92fr_0.92fr_auto] lg:items-end">
-              <div>
-                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Buscar</label>
-                <div className="sales-field flex h-10 items-center gap-2 rounded-lg px-3 transition hover:bg-[var(--ops-surface-muted)]">
-                  <Search className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(event) => {
-                      setSearch(event.target.value);
-                      setPage(1);
-                    }}
-                    placeholder="Buscar por nombre, SKU o tipo de prenda"
-                    aria-label="Buscar productos"
-                    className="h-full w-full bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
-                  />
-                </div>
-              </div>
+          <OpsSectionDivider className="space-y-4">
+            <OpsFiltersRow>
+              <OpsSearchField
+                value={search}
+                onChange={(value) => {
+                  setSearch(value);
+                  setPage(1);
+                }}
+                placeholder="Buscar por nombre, SKU o tipo de prenda"
+                ariaLabel="Buscar productos"
+              />
 
               <FilterDropdown
                 label="Filtro"
@@ -419,7 +359,7 @@ export function ProductsOverviewPage() {
                   Limpiar filtros
                 </TooltipContent>
               </Tooltip>
-            </div>
+            </OpsFiltersRow>
 
             {error ? (
               <InlineStatusCard title="No pudimos cargar productos" description={error} tone="danger" variant="ops" />
@@ -438,8 +378,7 @@ export function ProductsOverviewPage() {
               </p>
             </div>
           ) : products.length ? (
-            <div className="overflow-x-auto">
-              <div className="min-w-[1080px] border-y border-[var(--ops-border-strong)]">
+            <OpsTableWrap minWidth="1080px">
                 <table className="w-full border-collapse">
                   <thead className="bg-[var(--ops-surface-muted)]">
                     <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
@@ -536,40 +475,46 @@ export function ProductsOverviewPage() {
                             </div>
                           </td>
                           <td className="px-4 py-[var(--ops-row-py)]">
-                            <div className="flex items-center justify-end gap-1">
-                              <ActionIcon
-                                href={buildStyleHref("/productos/estilos", product.style_id)}
-                                label="Editar style"
-                              >
-                                <PencilLine className="h-4 w-4" />
-                              </ActionIcon>
-                              <ActionIcon
-                                href={buildStyleHref("/productos/variantes", product.style_id)}
-                                label="Variantes"
-                              >
-                                <Shapes className="h-4 w-4" />
-                              </ActionIcon>
-                              <ActionIcon
-                                href={buildStyleHref("/precios/crear-y-editar-precio", product.style_id)}
-                                label="Precios"
-                              >
-                                <ReceiptText className="h-4 w-4" />
-                              </ActionIcon>
-                              <ActionIcon
-                                href={buildStyleHref("/precios/listado-de-precios", product.style_id)}
-                                label="Historial"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </ActionIcon>
-                            </div>
+                            <AdminRowActionsMenu
+                              ariaLabel={`Acciones para ${product.name}`}
+                              items={[
+                                {
+                                  label: "Editar style",
+                                  icon: <PencilLine className="h-4 w-4" />,
+                                  onSelect: () =>
+                                    router.push(buildStyleHref("/productos/estilos", product.style_id)),
+                                },
+                                {
+                                  label: "Variantes",
+                                  icon: <Shapes className="h-4 w-4" />,
+                                  onSelect: () =>
+                                    router.push(buildStyleHref("/productos/variantes", product.style_id)),
+                                },
+                                {
+                                  label: "Precios",
+                                  icon: <ReceiptText className="h-4 w-4" />,
+                                  onSelect: () =>
+                                    router.push(
+                                      buildStyleHref("/precios/crear-y-editar-precio", product.style_id)
+                                    ),
+                                },
+                                {
+                                  label: "Historial",
+                                  icon: <Eye className="h-4 w-4" />,
+                                  onSelect: () =>
+                                    router.push(
+                                      buildStyleHref("/precios/listado-de-precios", product.style_id)
+                                    ),
+                                },
+                              ]}
+                            />
                           </td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
-              </div>
-            </div>
+            </OpsTableWrap>
           ) : (
             <div className="ops-empty-state-compact mt-4 rounded-lg p-8 text-center">
               <h3 className="ops-title text-lg font-semibold">
@@ -584,7 +529,7 @@ export function ProductsOverviewPage() {
           )}
 
           {!loading && totalItems ? (
-            <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between">
+            <OpsTableFooter>
               <span className="ops-secondary-text text-[var(--ops-text-muted)]">
                 {visibleFrom}-{visibleTo} de {totalItems}
               </span>
@@ -594,11 +539,10 @@ export function ProductsOverviewPage() {
                 onPageChange={setPage}
                 className="self-end md:self-auto"
               />
-            </div>
+            </OpsTableFooter>
           ) : null}
-        </div>
-        </div>
-      </section>
+      </OpsSectionDivider>
+      </OpsPageShell>
     </TooltipProvider>
   );
 }

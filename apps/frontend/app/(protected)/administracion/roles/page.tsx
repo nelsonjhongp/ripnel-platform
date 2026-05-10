@@ -2,17 +2,17 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, RefreshCw, RotateCcw } from "lucide-react";
+import { PencilLine, Plus, Power, RefreshCw, RotateCcw } from "lucide-react";
 import { buildApiUrl } from "@/lib/api";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
   AdminActionButton,
-  AdminCheckboxRow,
+  AdminCheckboxField,
   AdminConfirmModal,
   AdminField,
   AdminInput,
   AdminModalShell,
-  AdminRowActions,
+  AdminRowActionsMenu,
   AdminSection,
   AdminTextarea,
 } from "@/components/admin/admin-ui";
@@ -102,6 +102,21 @@ function roleBadgeClass(active: boolean) {
   return active
     ? "border border-[var(--ops-border-soft)] bg-[var(--ripnel-accent-soft)] text-[var(--ripnel-accent-hover)]"
     : "border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]";
+}
+
+function formatPermissionChip(permission: RolePermission) {
+  if (permission.description?.trim()) {
+    return permission.description.trim()
+  }
+
+  return permission.key
+    .split(".")
+    .slice(1)
+    .join(" ")
+    .split(/[._-]/g)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
 }
 
 export default function RolesPage() {
@@ -406,7 +421,7 @@ export default function RolesPage() {
                       <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
                         Actualizado
                       </th>
-                      <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
+                      <th className="w-[4.5rem] px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
                         Acciones
                       </th>
                     </tr>
@@ -435,7 +450,7 @@ export default function RolesPage() {
                                   className="inline-flex rounded-full border border-[var(--ops-border-soft)] bg-[var(--ripnel-accent-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--ripnel-accent-hover)]"
                                   title={permission.description || permission.key}
                                 >
-                                  {permission.key}
+                                  {formatPermissionChip(permission)}
                                 </span>
                               ))}
                             </div>
@@ -451,22 +466,23 @@ export default function RolesPage() {
                         <td className="px-4 py-[var(--ops-row-py)] align-top text-xs text-[var(--ops-text-muted)]">
                           {new Date(role.updated_at).toLocaleString("es-PE")}
                         </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top">
-                          <AdminRowActions>
-                            <AdminActionButton
-                              type="button"
-                              onClick={() => openRoleForm(role)}
-                            >
-                              Editar
-                            </AdminActionButton>
-                            <AdminActionButton
-                              type="button"
-                              tone={role.active ? "danger" : "neutral"}
-                              onClick={() => setActiveChangeRole(role)}
-                            >
-                              {role.active ? "Inactivar" : "Activar"}
-                            </AdminActionButton>
-                          </AdminRowActions>
+                        <td className="w-[4.5rem] px-4 py-[var(--ops-row-py)] align-top">
+                          <AdminRowActionsMenu
+                            ariaLabel={`Acciones para ${role.name}`}
+                            items={[
+                              {
+                                label: "Editar",
+                                icon: <PencilLine className="h-3.5 w-3.5" />,
+                                onSelect: () => openRoleForm(role),
+                              },
+                              {
+                                label: role.active ? "Inactivar" : "Activar",
+                                icon: <Power className="h-3.5 w-3.5" />,
+                                tone: role.active ? "danger" : "neutral",
+                                onSelect: () => setActiveChangeRole(role),
+                              },
+                            ]}
+                          />
                         </td>
                       </tr>
                     ))}
@@ -547,16 +563,18 @@ export default function RolesPage() {
                         />
                       </AdminField>
 
-                      <AdminCheckboxRow
-                        label="Rol activo"
-                        checked={roleForm.active}
-                        onChange={(checked) =>
-                          setRoleForm((current) => ({
-                            ...current,
-                            active: checked,
-                          }))
-                        }
-                      />
+                      <AdminField label="Estado">
+                        <AdminCheckboxField
+                          label="Rol activo"
+                          checked={roleForm.active}
+                          onChange={(checked) =>
+                            setRoleForm((current) => ({
+                              ...current,
+                              active: checked,
+                            }))
+                          }
+                        />
+                      </AdminField>
                     </div>
                   </AdminSection>
                 </div>

@@ -28,6 +28,8 @@ export function FilterDropdown({
   className?: string
 }) {
   const selectedLabel = options.find((o) => o.value === value)?.label || options[0]?.label || ""
+  const contentClass =
+    "max-h-64 min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto overscroll-contain border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1"
 
   return (
     <div className={className}>
@@ -49,7 +51,7 @@ export function FilterDropdown({
         <DropdownMenuContent
           align="start"
           sideOffset={8}
-          className="min-w-[var(--radix-dropdown-menu-trigger-width)] border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1"
+          className={contentClass}
         >
           <DropdownMenuRadioGroup value={value} onValueChange={onChange}>
             {options.map((option) => (
