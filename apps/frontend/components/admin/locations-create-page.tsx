@@ -7,13 +7,13 @@ import { buildApiUrl } from "@/lib/api"
 import { AdminFormPageShell } from "@/components/admin/admin-form-page-shell"
 import {
   AdminActionButton,
-  AdminCheckboxRow,
+  AdminCheckboxField,
   AdminField,
   AdminFormActionsBar,
   AdminInput,
   AdminInlineMessage,
   AdminSection,
-  AdminSelect,
+  AdminSelectMenu,
 } from "@/components/admin/admin-ui"
 
 type LocationType = "store" | "warehouse" | "workshop" | "third_party"
@@ -103,18 +103,13 @@ export default function LocationsCreatePage() {
                   />
                 </AdminField>
 
-                <AdminField label="Tipo" htmlFor="location-type">
-                  <AdminSelect
-                    id="location-type"
+                <AdminField label="Tipo">
+                  <AdminSelectMenu
                     value={formState.type}
-                    onChange={(event) => setFormState((current) => ({ ...current, type: event.target.value as LocationType }))}
-                  >
-                    {locationTypeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </AdminSelect>
+                    onValueChange={(value) => setFormState((current) => ({ ...current, type: value as LocationType }))}
+                    placeholder="Selecciona un tipo"
+                    options={locationTypeOptions.map((option) => ({ value: option.value, label: option.label }))}
+                  />
                 </AdminField>
               </div>
             </AdminSection>
@@ -132,12 +127,13 @@ export default function LocationsCreatePage() {
                   />
                 </AdminField>
 
-                <AdminCheckboxRow
-                  label="Crear como sede activa"
-                  description="Quedará disponible para asignaciones y operación apenas se guarde."
-                  checked={formState.active}
-                  onChange={(checked) => setFormState((current) => ({ ...current, active: checked }))}
-                />
+                <AdminField label="Estado">
+                  <AdminCheckboxField
+                    label="Sede activa"
+                    checked={formState.active}
+                    onChange={(checked) => setFormState((current) => ({ ...current, active: checked }))}
+                  />
+                </AdminField>
               </div>
             </AdminSection>
           </div>
