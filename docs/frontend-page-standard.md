@@ -304,7 +304,20 @@ Reglas:
 ### Acciones en fila
 
 - Patron recomendado por defecto: `secundaria compacta de consulta + primaria contextual`.
-- La accion de consulta puede ser `icon-only` o boton pequeno con texto visible; si el reconocimiento mejora de forma clara con texto, se prefiere el boton compacto.
+- Patron visual por defecto: `icono + texto` en botones compactos.
+- En tablas densas de entidades operativas, cuando varias acciones visibles comprometen alineacion, ancho o consistencia entre filas, se permite usar un menu de overflow con `3 puntos verticales`.
+- En ese patron de overflow:
+  - el trigger debe ser un icon-only discreto, con hover y focus claros;
+  - el menu debe abrir alineado al borde derecho de la celda;
+  - los items internos deben mantener `icono + texto`.
+- `Editar` debe verse neutral.
+- `Inactivar`, `Activar`, `Eliminar` u otra accion destructiva nunca deben resolverse como `icon-only` por defecto.
+- `icon-only` queda reservado para acciones universalmente reconocibles, de alta frecuencia y con `tooltip` obligatorio.
+- Si una accion necesita texto para evitar ambiguedad operativa, se prefiere `icono + texto` sobre `solo texto`.
+- El orden recomendado es:
+  - consulta o gestion secundaria;
+  - edicion;
+  - accion destructiva o de cambio fuerte al final.
 - Reservar una sola accion destacada cuando exista una operacion principal contextual.
 - Evitar que la accion secundaria compita visualmente con la primaria.
 - Si una accion es condicional, la celda debe mantener balance visual y no romper la altura o alineacion de la fila.

@@ -6,6 +6,7 @@ import {
   LoaderCircle,
   PencilLine,
   Plus,
+  Power,
   RefreshCw,
   RotateCcw,
 } from "lucide-react";
@@ -14,13 +15,14 @@ import { cn } from "@/lib/utils";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
   AdminActionButton,
-  AdminCheckboxRow,
+  AdminCheckboxField,
   AdminConfirmModal,
   AdminField,
   AdminInput,
+  AdminInlineMessage,
   AdminModalShell,
-  AdminRowActions,
-  AdminSelect,
+  AdminRowActionsMenu,
+  AdminSelectMenu,
 } from "@/components/admin/admin-ui";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
@@ -451,7 +453,7 @@ export default function LocationsPage() {
                       <th className="px-4 py-3 text-left">Tipo</th>
                       <th className="px-4 py-3 text-left">Dirección</th>
                       <th className="px-4 py-3 text-left">Estado</th>
-                      <th className="px-4 py-3 text-right">Acciones</th>
+                      <th className="w-[4.5rem] px-4 py-3 text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
@@ -508,23 +510,23 @@ export default function LocationsPage() {
                               {location.active ? "Activa" : "Inactiva"}
                             </span>
                           </td>
-                          <td className="px-4 py-[var(--ops-row-py)]">
-                            <AdminRowActions>
-                              <AdminActionButton
-                                type="button"
-                                onClick={() => openEditModal(location)}
-                              >
-                                <PencilLine className="h-3.5 w-3.5" />
-                                Editar
-                              </AdminActionButton>
-                              <AdminActionButton
-                                type="button"
-                                tone={location.active ? "danger" : "neutral"}
-                                onClick={() => setActiveChangeLocation(location)}
-                              >
-                                {location.active ? "Inactivar" : "Activar"}
-                              </AdminActionButton>
-                            </AdminRowActions>
+                          <td className="w-[4.5rem] px-4 py-[var(--ops-row-py)]">
+                            <AdminRowActionsMenu
+                              ariaLabel={`Acciones para ${location.name}`}
+                              items={[
+                                {
+                                  label: "Editar",
+                                  icon: <PencilLine className="h-3.5 w-3.5" />,
+                                  onSelect: () => openEditModal(location),
+                                },
+                                {
+                                  label: location.active ? "Inactivar" : "Activar",
+                                  icon: <Power className="h-3.5 w-3.5" />,
+                                  tone: location.active ? "danger" : "neutral",
+                                  onSelect: () => setActiveChangeLocation(location),
+                                },
+                              ]}
+                            />
                           </td>
                         </tr>
                       ))
@@ -576,7 +578,10 @@ export default function LocationsPage() {
               </div>
             }
           >
-              <form id="location-edit-form" onSubmit={handleSubmit} className="space-y-4">
+              <form id="location-edit-form" onSubmit={handleSubmit} className="space-y-5">
+                {error ? <AdminInlineMessage tone="danger">{error}</AdminInlineMessage> : null}
+                {successMessage ? <AdminInlineMessage tone="success">{successMessage}</AdminInlineMessage> : null}
+
                 <AdminField label="Nombre">
                   <AdminInput
                     value={formState.name}
@@ -592,24 +597,19 @@ export default function LocationsPage() {
                   />
                 </AdminField>
 
-                <AdminField label="Tipo" htmlFor="location-type">
-                  <AdminSelect
-                    id="location-type"
+                <AdminField label="Tipo">
+                  <AdminSelectMenu
                     value={formState.type}
-                    onChange={(event) =>
+                    onValueChange={(value) =>
                       setFormState((current) => ({
                         ...current,
-                        type: event.target.value as LocationItem["type"],
+                        type: value as LocationItem["type"],
                       }))
                     }
+                    placeholder="Selecciona un tipo"
+                    options={locationTypeOptions.map((option) => ({ value: option.value, label: option.label }))}
                     disabled={editingLocationId !== null}
-                  >
-                    {locationTypeOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </AdminSelect>
+                  />
                 </AdminField>
 
                 <AdminField label="Dirección">
@@ -626,16 +626,18 @@ export default function LocationsPage() {
                   />
                 </AdminField>
 
-                <AdminCheckboxRow
-                  label={editingLocationId ? "Sede activa" : "Crear como sede activa"}
-                  checked={formState.active}
-                  onChange={(checked) =>
-                    setFormState((current) => ({
-                      ...current,
-                      active: checked,
-                    }))
-                  }
-                />
+                <AdminField label="Estado">
+                  <AdminCheckboxField
+                    label="Sede activa"
+                    checked={formState.active}
+                    onChange={(checked) =>
+                      setFormState((current) => ({
+                        ...current,
+                        active: checked,
+                      }))
+                    }
+                  />
+                </AdminField>
               </form>
           </AdminModalShell>
         ) : null}

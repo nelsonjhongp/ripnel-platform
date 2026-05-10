@@ -7,7 +7,7 @@ import { buildApiUrl } from "@/lib/api"
 import { AdminFormPageShell } from "@/components/admin/admin-form-page-shell"
 import {
   AdminActionButton,
-  AdminCheckboxRow,
+  AdminCheckboxField,
   AdminField,
   AdminFormActionsBar,
   AdminInput,
@@ -133,66 +133,55 @@ export default function RolesCreatePage() {
       eyebrow="Administración"
       title="Nuevo rol"
       backHref="/administracion/roles"
-      maxWidth="max-w-[1180px]"
+      maxWidth="max-w-[1100px]"
     >
-      <form className="space-y-5" onSubmit={submitRoleForm}>
+      <form className="space-y-6" onSubmit={submitRoleForm}>
         {error ? (
           <AdminInlineMessage tone="danger">{error}</AdminInlineMessage>
         ) : null}
 
-        <div className="grid gap-5 xl:grid-cols-[0.78fr_1.22fr]">
-          <div className="space-y-5">
-            <AdminSection title="Identidad del rol">
-              <div className="space-y-4">
-                <AdminField label="Nombre">
-                  <AdminInput
-                    type="text"
-                    required
-                    autoComplete="off"
-                    value={roleForm.name}
-                    onChange={(event) => setRoleForm((current) => ({ ...current, name: event.target.value }))}
-                  />
-                </AdminField>
-
-                <AdminField label="Descripción">
-                  <AdminTextarea
-                    value={roleForm.description}
-                    onChange={(event) => setRoleForm((current) => ({ ...current, description: event.target.value }))}
-                    rows={6}
-                  />
-                </AdminField>
-
-                <AdminCheckboxRow
-                  label="Rol activo"
-                  description="El rol queda disponible para asignarse a nuevos usuarios."
-                  checked={roleForm.active}
-                  onChange={(checked) => setRoleForm((current) => ({ ...current, active: checked }))}
-                />
-              </div>
-            </AdminSection>
-          </div>
-
-          <div className="min-h-0 space-y-5">
-            <AdminSection
-              title="Permisos"
-              aside={
-                <div className="rounded-full border border-[var(--ops-border-strong)] px-2.5 py-1 text-xs font-medium text-[var(--ops-text-muted)]">
-                  {roleForm.permission_keys.length}
-                </div>
-              }
-              className="xl:min-h-[calc(85vh-16rem)]"
-            >
-              <RolePermissionPicker
-                permissions={availablePermissions}
-                selectedKeys={roleForm.permission_keys}
-                onTogglePermission={toggleRolePermission}
-                onClearAll={clearAllRolePermissions}
-                loading={loadingPermissions}
-                error={permissionsError}
+        <AdminSection title="Identidad del rol">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+            <AdminField label="Nombre">
+              <AdminInput
+                type="text"
+                required
+                autoComplete="off"
+                value={roleForm.name}
+                onChange={(event) => setRoleForm((current) => ({ ...current, name: event.target.value }))}
               />
-            </AdminSection>
+            </AdminField>
+
+            <AdminField label="Estado">
+              <AdminCheckboxField
+                label="Rol activo"
+                checked={roleForm.active}
+                onChange={(checked) => setRoleForm((current) => ({ ...current, active: checked }))}
+              />
+            </AdminField>
+
+            <div className="xl:col-span-2">
+              <AdminField label="Descripción">
+                <AdminTextarea
+                  value={roleForm.description}
+                  onChange={(event) => setRoleForm((current) => ({ ...current, description: event.target.value }))}
+                  rows={5}
+                />
+              </AdminField>
+            </div>
           </div>
-        </div>
+        </AdminSection>
+
+        <AdminSection title="Permisos">
+          <RolePermissionPicker
+            permissions={availablePermissions}
+            selectedKeys={roleForm.permission_keys}
+            onTogglePermission={toggleRolePermission}
+            onClearAll={clearAllRolePermissions}
+            loading={loadingPermissions}
+            error={permissionsError}
+          />
+        </AdminSection>
 
         <AdminFormActionsBar>
           <AdminActionButton

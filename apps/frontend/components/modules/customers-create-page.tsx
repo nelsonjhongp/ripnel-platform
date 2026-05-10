@@ -1,12 +1,10 @@
 "use client"
 
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
-import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
-import { Button } from "@/components/ui/button"
 import { buildApiUrl } from "@/lib/api"
+import { AdminFormPageShell } from "@/components/admin/admin-form-page-shell"
 import {
   buildCustomerPayload,
   CustomerForm,
@@ -53,31 +51,17 @@ export default function CustomersCreatePage() {
   }
 
   return (
-    <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
-      <div className="mx-auto flex max-w-4xl flex-col gap-4">
-        <PosHeader
-          eyebrow="Clientes"
-          title="Nuevo cliente"
-          actions={
-            <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
-              <Link href="/clientes">Volver al listado</Link>
-            </Button>
-          }
-        />
-
-        <div className="rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-5 shadow-sm">
-          <CustomerForm
-            mode="create"
-            state={state}
-            onChange={setState}
-            onSubmit={createCustomer}
-            onCancel={() => router.push("/clientes")}
-            submitLabel="Crear cliente"
-            submitting={submitting}
-            error={error}
-          />
-        </div>
-      </div>
-    </section>
+    <AdminFormPageShell eyebrow="Clientes" title="Nuevo cliente" backHref="/clientes" backLabel="Volver">
+      <CustomerForm
+        mode="create"
+        state={state}
+        onChange={setState}
+        onSubmit={createCustomer}
+        onCancel={() => router.push("/clientes")}
+        submitLabel="Crear cliente"
+        submitting={submitting}
+        error={error}
+      />
+    </AdminFormPageShell>
   )
 }
