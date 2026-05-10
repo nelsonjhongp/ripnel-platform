@@ -1,9 +1,16 @@
 "use client"
 
-import React, { type ReactNode } from "react"
-
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import {
+  AdminActionButton,
+  AdminCheckboxField,
+  AdminField,
+  AdminFormActionsBar,
+  AdminInlineMessage,
+  AdminInput,
+  AdminSection,
+  AdminSelectMenu,
+  AdminTextarea,
+} from "@/components/admin/admin-ui"
 import { cn } from "@/lib/utils"
 
 export type CustomerRecord = {
@@ -165,14 +172,6 @@ export function toFormState(customer: CustomerRecord): CustomerFormState {
   }
 }
 
-function FieldLabel({ children, htmlFor }: { children: ReactNode; htmlFor?: string }) {
-  return (
-    <label htmlFor={htmlFor} className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-      {children}
-    </label>
-  )
-}
-
 type CustomerFormProps = {
   state: CustomerFormState
   onChange: (next: CustomerFormState) => void
@@ -196,178 +195,145 @@ export function CustomerForm({
   mode = "create",
   className,
 }: CustomerFormProps) {
-  const docTypeId = React.useId()
-  const docNumberId = React.useId()
-  const fullNameId = React.useId()
-  const businessNameId = React.useId()
-  const commercialNameId = React.useId()
-  const customerTypeId = React.useId()
-  const emailId = React.useId()
-  const phoneId = React.useId()
-  const notesId = React.useId()
-
   function patch(next: Partial<CustomerFormState>) {
     onChange({ ...state, ...next })
   }
 
+  const documentTypeOptions = [
+    { value: "none", label: "Sin documento" },
+    { value: "dni", label: "DNI" },
+    { value: "ruc", label: "RUC" },
+    { value: "ce", label: "CE" },
+    { value: "passport", label: "Pasaporte" },
+  ]
+
+  const customerTypeOptions = [
+    { value: "retail", label: "Retail" },
+    { value: "wholesale", label: "Mayorista" },
+  ]
+
   return (
     <div className={cn("space-y-5", className)}>
       {error ? (
-        <div role="alert" aria-live="polite" className="rounded-xl border border-rose-300 bg-rose-100/70 px-3 py-2 text-sm text-rose-700">
-          {error}
-        </div>
+        <AdminInlineMessage tone="danger">{error}</AdminInlineMessage>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div>
-          <FieldLabel htmlFor={docTypeId}>Tipo de documento</FieldLabel>
-          <select
-            id={docTypeId}
-            value={state.document_type}
-            onChange={(event) =>
-              patch({
-                document_type: event.target.value,
-                document_number: event.target.value === "none" ? "" : state.document_number,
-              })
-            }
-            className="sales-field h-10 w-full rounded-lg px-3 text-sm outline-none bg-[var(--ops-field)]"
-          >
-            <option value="none">Sin documento</option>
-            <option value="dni">DNI</option>
-            <option value="ruc">RUC</option>
-            <option value="ce">CE</option>
-            <option value="passport">Pasaporte</option>
-          </select>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div className="space-y-5">
+          <AdminSection title="Identidad comercial">
+            <div className="grid gap-4 md:grid-cols-2">
+              <AdminField label="Tipo de documento">
+                <AdminSelectMenu
+                  value={state.document_type}
+                  onValueChange={(value) =>
+                    patch({
+                      document_type: value,
+                      document_number: value === "none" ? "" : state.document_number,
+                    })
+                  }
+                  placeholder="Selecciona un tipo"
+                  options={documentTypeOptions}
+                />
+              </AdminField>
+
+              <AdminField label="Número de documento">
+                <AdminInput
+                  value={state.document_number}
+                  disabled={state.document_type === "none"}
+                  onChange={(event) => patch({ document_number: event.target.value })}
+                  placeholder={state.document_type === "none" ? "Sin documento" : "Número de documento"}
+                />
+              </AdminField>
+
+              <AdminField label="Nombre completo">
+                <AdminInput
+                  value={state.full_name}
+                  onChange={(event) => patch({ full_name: event.target.value })}
+                  placeholder="Nombre completo"
+                />
+              </AdminField>
+
+              <AdminField label="Razón social">
+                <AdminInput
+                  value={state.business_name}
+                  onChange={(event) => patch({ business_name: event.target.value })}
+                  placeholder="Razón social"
+                />
+              </AdminField>
+
+              <AdminField label="Nombre comercial">
+                <AdminInput
+                  value={state.commercial_name}
+                  onChange={(event) => patch({ commercial_name: event.target.value })}
+                  placeholder="Nombre comercial"
+                />
+              </AdminField>
+
+              <AdminField label="Tipo de cliente">
+                <AdminSelectMenu
+                  value={state.customer_type}
+                  onValueChange={(value) => patch({ customer_type: value })}
+                  placeholder="Selecciona un tipo"
+                  options={customerTypeOptions}
+                />
+              </AdminField>
+            </div>
+          </AdminSection>
         </div>
 
-        <div>
-          <FieldLabel htmlFor={docNumberId}>Número de documento</FieldLabel>
-          <Input
-            id={docNumberId}
-            value={state.document_number}
-            disabled={state.document_type === "none"}
-            onChange={(event) => patch({ document_number: event.target.value })}
-            placeholder="Número de documento…"
-            className="sales-field h-10 rounded-lg border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 text-sm text-[var(--ops-text)]"
-          />
-        </div>
+        <div className="space-y-5">
+          <AdminSection title="Contacto y operación">
+            <div className="space-y-4">
+              <AdminField label="Email">
+                <AdminInput
+                  type="email"
+                  value={state.email}
+                  onChange={(event) => patch({ email: event.target.value })}
+                  placeholder="email@ejemplo.com"
+                  spellCheck={false}
+                />
+              </AdminField>
 
-        <div>
-          <FieldLabel htmlFor={fullNameId}>Nombre completo</FieldLabel>
-          <Input
-            id={fullNameId}
-            value={state.full_name}
-            onChange={(event) => patch({ full_name: event.target.value })}
-            placeholder="Nombre completo…"
-            className="sales-field h-10 rounded-lg border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 text-sm text-[var(--ops-text)]"
-          />
-        </div>
+              <AdminField label="Teléfono">
+                <AdminInput
+                  type="tel"
+                  value={state.phone}
+                  onChange={(event) => patch({ phone: event.target.value })}
+                  placeholder="999 000 000"
+                />
+              </AdminField>
 
-        <div>
-          <FieldLabel htmlFor={businessNameId}>Razón social</FieldLabel>
-          <Input
-            id={businessNameId}
-            value={state.business_name}
-            onChange={(event) => patch({ business_name: event.target.value })}
-            placeholder="Razón social…"
-            className="sales-field h-10 rounded-lg border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 text-sm text-[var(--ops-text)]"
-          />
-        </div>
+              <AdminField label="Notas">
+                <AdminTextarea
+                  value={state.notes}
+                  onChange={(event) => patch({ notes: event.target.value })}
+                  rows={4}
+                  placeholder="Notas operativas"
+                />
+              </AdminField>
 
-        <div>
-          <FieldLabel htmlFor={commercialNameId}>Nombre comercial</FieldLabel>
-          <Input
-            id={commercialNameId}
-            value={state.commercial_name}
-            onChange={(event) => patch({ commercial_name: event.target.value })}
-            placeholder="Nombre comercial…"
-            className="sales-field h-10 rounded-lg border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 text-sm text-[var(--ops-text)]"
-          />
-        </div>
-
-        <div>
-          <FieldLabel htmlFor={customerTypeId}>Tipo de cliente</FieldLabel>
-          <select
-            id={customerTypeId}
-            value={state.customer_type}
-            onChange={(event) => patch({ customer_type: event.target.value })}
-            className="sales-field h-10 w-full rounded-lg px-3 text-sm outline-none bg-[var(--ops-field)]"
-          >
-            <option value="retail">Retail</option>
-            <option value="wholesale">Mayorista</option>
-          </select>
-        </div>
-
-        <div>
-          <FieldLabel htmlFor={emailId}>Email</FieldLabel>
-          <Input
-            id={emailId}
-            type="email"
-            value={state.email}
-            onChange={(event) => patch({ email: event.target.value })}
-            placeholder="email@ejemplo.com"
-            spellCheck={false}
-            className="sales-field h-10 rounded-lg border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 text-sm text-[var(--ops-text)]"
-          />
-        </div>
-
-        <div>
-          <FieldLabel htmlFor={phoneId}>Teléfono</FieldLabel>
-          <Input
-            id={phoneId}
-            type="tel"
-            value={state.phone}
-            onChange={(event) => patch({ phone: event.target.value })}
-            placeholder="999 000 000…"
-            className="sales-field h-10 rounded-lg border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 text-sm text-[var(--ops-text)]"
-          />
-        </div>
-
-        <div className="md:col-span-2">
-          <FieldLabel htmlFor={notesId}>Notas</FieldLabel>
-          <textarea
-            id={notesId}
-            value={state.notes}
-            onChange={(event) => patch({ notes: event.target.value })}
-            rows={4}
-            placeholder="Notas operativas…"
-            className="sales-field min-h-28 w-full rounded-lg px-3 py-2.5 text-sm outline-none bg-[var(--ops-field)]"
-          />
+              <AdminField label="Estado">
+                <AdminCheckboxField
+                  label="Cliente activo"
+                  checked={state.active}
+                  onChange={(checked) => patch({ active: checked })}
+                />
+              </AdminField>
+            </div>
+          </AdminSection>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--ops-border-strong)] pt-4">
-        <button
-          type="button"
-          onClick={() => patch({ active: !state.active })}
-          className={cn(
-            "inline-flex cursor-pointer items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition",
-            state.active
-              ? "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
-              : "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]"
-          )}
-        >
-          {state.active ? "Cliente activo" : "Cliente inactivo"}
-        </button>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {onCancel ? (
-            <Button type="button" variant="outline" size="sm" onClick={onCancel} className="rounded-lg px-3">
-              {mode === "edit" ? "Cancelar" : "Volver"}
-            </Button>
-          ) : null}
-          <Button
-            type="button"
-            variant="accent"
-            size="sm"
-            onClick={onSubmit}
-            disabled={submitting}
-            className="rounded-lg px-3"
-          >
-            {submitting ? (mode === "create" ? "Creando..." : "Guardando...") : submitLabel}
-          </Button>
-        </div>
-      </div>
+      <AdminFormActionsBar>
+        {onCancel ? (
+          <AdminActionButton type="button" onClick={onCancel}>
+            {mode === "edit" ? "Cancelar" : "Volver"}
+          </AdminActionButton>
+        ) : null}
+        <AdminActionButton type="button" tone="accent" onClick={onSubmit} disabled={submitting}>
+          {submitting ? (mode === "create" ? "Creando..." : "Guardando...") : submitLabel}
+        </AdminActionButton>
+      </AdminFormActionsBar>
     </div>
   )
 }

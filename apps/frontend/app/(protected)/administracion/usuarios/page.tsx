@@ -2,21 +2,21 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, RefreshCw, RotateCcw } from "lucide-react";
+import { MapPin, PencilLine, Plus, Power, RefreshCw, RotateCcw } from "lucide-react";
 import { buildApiUrl } from "@/lib/api";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { Button } from "@/components/ui/button";
 import {
   AdminActionButton,
-  AdminCheckboxRow,
+  AdminCheckboxField,
   AdminConfirmModal,
   AdminField,
   AdminInlineMessage,
   AdminInput,
   AdminModalShell,
-  AdminRowActions,
+  AdminRowActionsMenu,
   AdminSection,
-  AdminSelect,
+  AdminSelectMenu,
 } from "@/components/admin/admin-ui";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
@@ -585,7 +585,7 @@ export default function UsuariosPage() {
                         <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
                           Actualizado
                         </th>
-                        <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
+                        <th className="w-[4.5rem] px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
                           Acciones
                         </th>
                       </tr>
@@ -634,28 +634,28 @@ export default function UsuariosPage() {
                             <td className="px-4 py-[var(--ops-row-py)] align-top text-xs text-[var(--ops-text-muted)]">
                               {new Date(user.updated_at).toLocaleString("es-PE")}
                             </td>
-                            <td className="px-4 py-[var(--ops-row-py)] align-top">
-                              <AdminRowActions>
-                                <AdminActionButton
-                                  type="button"
-                                  onClick={() => openLocationsModal(user)}
-                                >
-                                  Sedes
-                                </AdminActionButton>
-                                <AdminActionButton
-                                  type="button"
-                                  onClick={() => openUserForm(user)}
-                                >
-                                  Editar
-                                </AdminActionButton>
-                                <AdminActionButton
-                                  type="button"
-                                  tone={user.active ? "danger" : "neutral"}
-                                  onClick={() => setActiveChangeUser(user)}
-                                >
-                                  {user.active ? "Inactivar" : "Activar"}
-                                </AdminActionButton>
-                              </AdminRowActions>
+                            <td className="w-[4.5rem] px-4 py-[var(--ops-row-py)] align-top">
+                              <AdminRowActionsMenu
+                                ariaLabel={`Acciones para ${user.full_name}`}
+                                items={[
+                                  {
+                                    label: "Sedes",
+                                    icon: <MapPin className="h-3.5 w-3.5" />,
+                                    onSelect: () => openLocationsModal(user),
+                                  },
+                                  {
+                                    label: "Editar",
+                                    icon: <PencilLine className="h-3.5 w-3.5" />,
+                                    onSelect: () => openUserForm(user),
+                                  },
+                                  {
+                                    label: user.active ? "Inactivar" : "Activar",
+                                    icon: <Power className="h-3.5 w-3.5" />,
+                                    tone: user.active ? "danger" : "neutral",
+                                    onSelect: () => setActiveChangeUser(user),
+                                  },
+                                ]}
+                              />
                             </td>
                           </tr>
                         );
@@ -748,28 +748,18 @@ export default function UsuariosPage() {
                         />
                       </AdminField>
 
-                      <AdminField label="Rol" htmlFor="role-select">
-                        <AdminSelect
-                          id="role-select"
-                          required={!editingUserId}
+                      <AdminField label="Rol" hint={rolesError || undefined}>
+                        <AdminSelectMenu
                           value={userForm.role_id}
-                          onChange={(event) =>
-                            setUserForm((current) => ({ ...current, role_id: event.target.value }))
+                          onValueChange={(value) =>
+                            setUserForm((current) => ({ ...current, role_id: value }))
                           }
-                        >
-                          <option value="">Sin rol</option>
-                          {loadingRoles ? (
-                            <option disabled>Cargando roles...</option>
-                          ) : rolesError ? (
-                            <option disabled>Error al cargar roles</option>
-                          ) : (
-                            roles.map((role) => (
-                              <option key={role.role_id} value={role.role_id}>
-                                {role.name}
-                              </option>
-                            ))
-                          )}
-                        </AdminSelect>
+                          placeholder={
+                            loadingRoles ? "Cargando roles..." : rolesError ? "Error al cargar roles" : "Selecciona un rol"
+                          }
+                          options={roles.map((role) => ({ value: role.role_id, label: role.name }))}
+                          disabled={loadingRoles || Boolean(rolesError)}
+                        />
                       </AdminField>
                     </div>
                   </AdminSection>
@@ -814,7 +804,7 @@ export default function UsuariosPage() {
                                   />
                                   <span>
                                     <span className="block text-sm font-medium text-[var(--ops-text)]">
-                                      {location.name} ({location.code})
+                                      {location.name}
                                     </span>
                                     <span className="block text-xs text-[var(--ops-text-muted)]">
                                       {location.type}
@@ -838,7 +828,7 @@ export default function UsuariosPage() {
                                     }
                                     className="h-4 w-4 border-[var(--ops-border-strong)] disabled:cursor-not-allowed"
                                   />
-                                  Default
+                                  Por defecto
                                 </label>
                               </div>
                             );
@@ -848,13 +838,15 @@ export default function UsuariosPage() {
                     </AdminSection>
                   ) : null}
 
-                  <AdminCheckboxRow
-                    label="Usuario activo"
-                    checked={userForm.active}
-                    onChange={(checked) =>
-                      setUserForm((current) => ({ ...current, active: checked }))
-                    }
-                  />
+                  <AdminField label="Estado">
+                    <AdminCheckboxField
+                      label="Usuario activo"
+                      checked={userForm.active}
+                      onChange={(checked) =>
+                        setUserForm((current) => ({ ...current, active: checked }))
+                      }
+                    />
+                  </AdminField>
                 </form>
             </AdminModalShell>
           )}
@@ -922,7 +914,7 @@ export default function UsuariosPage() {
                               />
                               <span>
                                 <span className="block font-medium text-[var(--ops-text)]">
-                                  {location.name} ({location.code})
+                                  {location.name}
                                 </span>
                                 <span className="block text-sm text-[var(--ops-text-muted)]">
                                   {location.type}
@@ -942,7 +934,7 @@ export default function UsuariosPage() {
                                 onChange={() => setDefaultLocationId(location.location_id)}
                                 className="h-4 w-4 border-[var(--ops-border-strong)]"
                               />
-                              Sede default
+                              Sede por defecto
                             </label>
                           </div>
                         );

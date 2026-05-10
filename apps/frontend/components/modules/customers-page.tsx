@@ -5,12 +5,13 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import {
   PencilLine,
   Plus,
+  Power,
   RefreshCw,
   RotateCcw,
   Search,
-  Trash2,
 } from "lucide-react"
 
+import { AdminConfirmModal, AdminModalShell, AdminRowActionsMenu } from "@/components/admin/admin-ui"
 import { InlineStatusCard } from "@/components/feedback/status-page"
 import {
   buildDisplayName,
@@ -55,7 +56,8 @@ export default function CustomersPage() {
   const [editState, setEditState] = useState<CustomerFormState>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [activeChangeCustomer, setActiveChangeCustomer] = useState<CustomerRecord | null>(null)
+  const [savingActiveChange, setSavingActiveChange] = useState(false)
 
   const abortRef = useRef<AbortController | null>(null)
 
@@ -176,35 +178,40 @@ export default function CustomersPage() {
     }
   }
 
-  async function deleteCustomer(customerId: string) {
-    const customer = customers.find((item) => item.customer_id === customerId)
-    const customerLabel = customer ? buildDisplayName(customer) : "este cliente"
-
-    if (!window.confirm(`¿Eliminar ${customerLabel}? Esta acción no se puede deshacer.`)) {
+  async function changeCustomerActiveState() {
+    if (!activeChangeCustomer) {
       return
     }
 
-    setDeletingId(customerId)
+    setSavingActiveChange(true)
     setSaveError(null)
 
     try {
-      const response = await fetch(buildApiUrl(`/api/customers/${customerId}`), {
-        method: "DELETE",
+      const response = await fetch(buildApiUrl(`/api/customers/${activeChangeCustomer.customer_id}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: !activeChangeCustomer.active }),
       })
 
       const payload = await response.json()
       if (!response.ok) {
-        throw new Error(payload.message || "No se pudo eliminar el cliente")
+        throw new Error(payload.message || "No se pudo actualizar el cliente")
       }
 
-      setCustomers((current) => current.filter((customer) => customer.customer_id !== customerId))
-      if (editingCustomer?.customer_id === customerId) {
-        closeEditModal()
+      setCustomers((current) =>
+        current.map((customer) =>
+          customer.customer_id === activeChangeCustomer.customer_id ? payload.data : customer
+        )
+      )
+      if (editingCustomer?.customer_id === activeChangeCustomer.customer_id) {
+        setEditingCustomer(payload.data)
+        setEditState(toFormState(payload.data))
       }
+      setActiveChangeCustomer(null)
     } catch (submitError: unknown) {
-      setSaveError(submitError instanceof Error ? submitError.message : "No se pudo eliminar el cliente")
+      setSaveError(submitError instanceof Error ? submitError.message : "No se pudo actualizar el cliente")
     } finally {
-      setDeletingId(null)
+      setSavingActiveChange(false)
     }
   }
 
@@ -349,7 +356,7 @@ export default function CustomersPage() {
                         <th className="px-4 py-3">Tipo</th>
                         <th className="px-4 py-3">Estado</th>
                         <th className="px-4 py-3">Alta</th>
-                        <th className="px-4 py-3 text-right">Acciones</th>
+                        <th className="w-[4.5rem] px-4 py-3 text-right">Acciones</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
@@ -423,30 +430,23 @@ export default function CustomersPage() {
                             <td className="px-4 py-[var(--ops-row-py)] text-xs text-[var(--ops-text-muted)]">
                               {formatCustomerDate(customer.created_at)}
                             </td>
-                            <td className="px-4 py-[var(--ops-row-py)]">
-                              <div className="flex items-center justify-end gap-1.5">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => openEditModal(customer)}
-                                  className="rounded-lg px-3"
-                                >
-                                  <PencilLine className="h-3.5 w-3.5" />
-                                  Editar
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="destructive"
-                                  size="sm"
-                                  onClick={() => deleteCustomer(customer.customer_id)}
-                                  disabled={deletingId === customer.customer_id}
-                                  className="rounded-lg px-3"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                  {deletingId === customer.customer_id ? "Eliminando..." : "Eliminar"}
-                                </Button>
-                              </div>
+                            <td className="w-[4.5rem] px-4 py-[var(--ops-row-py)]">
+                              <AdminRowActionsMenu
+                                ariaLabel={`Acciones para ${buildDisplayName(customer)}`}
+                                items={[
+                                  {
+                                    label: "Editar",
+                                    icon: <PencilLine className="h-3.5 w-3.5" />,
+                                    onSelect: () => openEditModal(customer),
+                                  },
+                                  {
+                                    label: customer.active ? "Inactivar" : "Activar",
+                                    icon: <Power className="h-3.5 w-3.5" />,
+                                    tone: customer.active ? "danger" : "neutral",
+                                    onSelect: () => setActiveChangeCustomer(customer),
+                                  },
+                                ]}
+                              />
                             </td>
                           </tr>
                         ))
@@ -470,15 +470,7 @@ export default function CustomersPage() {
           </OpsSectionDivider>
 
         {editingCustomer ? (
-          <div className="ops-overlay-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="ops-overlay-panel w-full max-w-3xl rounded-2xl p-5">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <h2 className="text-base font-semibold text-[var(--ops-text)]">Editar cliente</h2>
-                <Button type="button" variant="outline" size="sm" onClick={closeEditModal} className="rounded-lg px-3">
-                  Cerrar
-                </Button>
-              </div>
-
+          <AdminModalShell title="Editar cliente" onClose={closeEditModal} widthClass="max-w-4xl">
               <CustomerForm
                 mode="edit"
                 state={editState}
@@ -489,9 +481,28 @@ export default function CustomersPage() {
                 submitting={saving}
                 error={saveError}
               />
-            </div>
-          </div>
+          </AdminModalShell>
         ) : null}
+        <AdminConfirmModal
+          open={Boolean(activeChangeCustomer)}
+          title={activeChangeCustomer?.active ? "Inactivar cliente" : "Activar cliente"}
+          description={
+            activeChangeCustomer ? (
+              <>
+                Vas a {activeChangeCustomer.active ? "inactivar" : "activar"} a{" "}
+                <span className="font-semibold text-[var(--ops-text)]">
+                  {buildDisplayName(activeChangeCustomer)}
+                </span>
+                .
+              </>
+            ) : null
+          }
+          confirmLabel={activeChangeCustomer?.active ? "Inactivar" : "Activar"}
+          confirmTone={activeChangeCustomer?.active ? "danger" : "accent"}
+          busy={savingActiveChange}
+          onCancel={() => setActiveChangeCustomer(null)}
+          onConfirm={() => void changeCustomerActiveState()}
+        />
       </OpsPageShell>
     </TooltipProvider>
   )

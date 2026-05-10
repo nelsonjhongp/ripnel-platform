@@ -1,8 +1,21 @@
 import type { ComponentProps, ReactNode } from "react"
-import { AlertTriangle, X } from "lucide-react"
+import { AlertTriangle, EllipsisVertical, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import {
+  OpsMultiSelectMenu,
+  type OpsOption,
+  OpsReadonlyFieldState,
+  OpsSelectionChip,
+  OpsSelectMenu,
+} from "@/components/ui/ops-selection"
 import { cn } from "@/lib/utils"
 
 const adminControlClass =
@@ -71,11 +84,13 @@ export function AdminField({
   children: ReactNode
 }) {
   return (
-    <label htmlFor={htmlFor} className="block space-y-1.5">
-      <span className="text-sm font-medium text-[var(--ops-text)]">{label}</span>
+    <div className="space-y-1.5">
+      <label htmlFor={htmlFor} className="block text-sm font-medium text-[var(--ops-text)]">
+        {label}
+      </label>
       {children}
       {hint ? <span className="block text-xs text-[var(--ops-text-muted)]">{hint}</span> : null}
-    </label>
+    </div>
   )
 }
 
@@ -101,6 +116,72 @@ export function AdminSelect(props: ComponentProps<"select">) {
   )
 }
 
+export function AdminSelectMenu({
+  value,
+  onValueChange,
+  placeholder,
+  options,
+  disabled = false,
+}: {
+  value: string
+  onValueChange: (value: string) => void
+  placeholder: string
+  options: OpsOption[]
+  disabled?: boolean
+}) {
+  return (
+    <OpsSelectMenu
+      value={value}
+      onValueChange={onValueChange}
+      placeholder={placeholder}
+      options={options}
+      disabled={disabled}
+    />
+  )
+}
+
+export function AdminMultiSelectMenu({
+  selectedValues,
+  onToggle,
+  placeholder,
+  options,
+  disabled = false,
+}: {
+  selectedValues: string[]
+  onToggle: (value: string) => void
+  placeholder: string
+  options: OpsOption[]
+  disabled?: boolean
+}) {
+  return (
+    <OpsMultiSelectMenu
+      selectedValues={selectedValues}
+      onToggle={onToggle}
+      placeholder={placeholder}
+      options={options}
+      disabled={disabled}
+    />
+  )
+}
+
+export function AdminSelectionChip({
+  label,
+  onRemove,
+  selected = false,
+}: {
+  label: string
+  onRemove?: () => void
+  selected?: boolean
+}) {
+  return (
+    <OpsSelectionChip label={label} onRemove={onRemove} selected={selected} />
+  )
+}
+
+export function AdminReadonlyFieldState(props: ComponentProps<typeof OpsReadonlyFieldState>) {
+  return <OpsReadonlyFieldState {...props} />
+}
+
 export function AdminCheckboxRow({
   label,
   description,
@@ -124,6 +205,66 @@ export function AdminCheckboxRow({
         <span className="block text-sm text-[var(--ops-text)]">{label}</span>
         {description ? (
           <span className="mt-0.5 block text-xs text-[var(--ops-text-muted)]">{description}</span>
+        ) : null}
+      </span>
+    </label>
+  )
+}
+
+export function AdminCheckboxField({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string
+  checked: boolean
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <label className="inline-flex cursor-pointer items-center gap-2 select-none">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="m-0 h-[0.9375rem] w-[0.9375rem] cursor-pointer rounded-[0.25rem] accent-[var(--ripnel-accent)]"
+      />
+      <span className="text-[0.8125rem] leading-none text-[var(--ops-text-muted)]">{label}</span>
+    </label>
+  )
+}
+
+export function AdminCheckboxOption({
+  label,
+  helper,
+  checked,
+  onChange,
+}: {
+  label: string
+  helper?: string
+  checked: boolean
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <label
+      className={cn(
+        "flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 transition",
+        checked
+          ? "border-[var(--ops-border-soft)] bg-[var(--ripnel-accent-soft)]"
+          : "border-[var(--ops-border-soft)] bg-[var(--ops-surface)] hover:bg-[var(--ops-surface-muted)]"
+      )}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="m-0 mt-0.5 h-[0.9375rem] w-[0.9375rem] cursor-pointer rounded-[0.25rem] accent-[var(--ripnel-accent)]"
+      />
+      <span className="min-w-0">
+        <span className="block text-sm font-medium text-[var(--ops-text)]">{label}</span>
+        {helper ? (
+          <span className="mt-0.5 block text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+            {helper}
+          </span>
         ) : null}
       </span>
     </label>
@@ -160,6 +301,74 @@ export function AdminActionButton({
     tone === "accent" ? "accent" : tone === "danger" ? "destructive" : "outline"
 
   return <Button {...props} variant={variant} size={props.size ?? "sm"} className={cn("rounded-lg px-3", className)} />
+}
+
+export function AdminRowActionButton({
+  icon,
+  tone = "neutral",
+  className,
+  children,
+  ...props
+}: ComponentProps<typeof Button> & {
+  icon?: ReactNode
+  tone?: "neutral" | "accent" | "danger"
+}) {
+  return (
+    <AdminActionButton
+      {...props}
+      tone={tone}
+      className={cn("gap-1.5 whitespace-nowrap", className)}
+    >
+      {icon}
+      {children}
+    </AdminActionButton>
+  )
+}
+
+export function AdminRowActionsMenu({
+  items,
+  ariaLabel = "Acciones",
+}: {
+  items: Array<{
+    label: string
+    icon?: ReactNode
+    onSelect: () => void
+    tone?: "neutral" | "danger"
+    disabled?: boolean
+  }>
+  ariaLabel?: string
+}) {
+  return (
+    <div className="flex w-full justify-end">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            className="cursor-pointer rounded-lg"
+            aria-label={ariaLabel}
+          >
+            <EllipsisVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" sideOffset={8} className="min-w-44 rounded-lg">
+          {items.map((item) => (
+            <DropdownMenuItem
+              key={item.label}
+              disabled={item.disabled}
+              variant={item.tone === "danger" ? "destructive" : "default"}
+              className="cursor-pointer gap-2 rounded-md px-2 py-2"
+              onSelect={() => item.onSelect()}
+            >
+              {item.icon}
+              {item.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  )
 }
 
 export function AdminConfirmModal({
@@ -251,5 +460,5 @@ export function AdminModalShell({
 }
 
 export function AdminRowActions({ children }: { children: ReactNode }) {
-  return <div className="flex flex-wrap justify-end gap-2">{children}</div>
+  return <div className="flex w-full flex-nowrap justify-end gap-1.5">{children}</div>
 }
