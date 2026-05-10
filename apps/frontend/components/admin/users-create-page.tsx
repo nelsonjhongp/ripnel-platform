@@ -1,19 +1,21 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 
 import { buildApiUrl } from "@/lib/api"
 import { AdminFormPageShell } from "@/components/admin/admin-form-page-shell"
 import {
   AdminActionButton,
-  AdminCheckboxRow,
+  AdminCheckboxField,
   AdminField,
   AdminFormActionsBar,
   AdminInput,
   AdminInlineMessage,
+  AdminMultiSelectMenu,
+  AdminSelectionChip,
   AdminSection,
-  AdminSelect,
+  AdminSelectMenu,
 } from "@/components/admin/admin-ui"
 
 type Role = {
@@ -88,6 +90,35 @@ export default function UsersCreatePage() {
   const [userForm, setUserForm] = useState<UserFormState>(emptyUserForm)
   const [savingUser, setSavingUser] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const roleOptions = useMemo(
+    () =>
+      roles.map((role) => ({
+        value: role.role_id,
+        label: role.name,
+      })),
+    [roles]
+  )
+
+  const locationOptions = useMemo(
+    () =>
+      availableLocations.map((location) => ({
+        value: location.location_id,
+        label: location.name,
+        helper: [location.type, location.address].filter(Boolean).join(" · "),
+      })),
+    [availableLocations]
+  )
+
+  const selectedLocationOptions = useMemo(
+    () => locationOptions.filter((location) => userForm.location_ids.includes(location.value)),
+    [locationOptions, userForm.location_ids]
+  )
+
+  const defaultLocationOptions = selectedLocationOptions.map((location) => ({
+    value: location.value,
+    label: location.label,
+  }))
 
   useEffect(() => {
     async function loadRoles() {
@@ -166,7 +197,7 @@ export default function UsersCreatePage() {
       }
 
       if (!userForm.default_location_id) {
-        throw new Error("Elige una sede default para el usuario.")
+        throw new Error("Elige una sede por defecto para el usuario.")
       }
 
       const createdUser = await requestJson<{ username: string; temporary_password?: string }>("/api/users", {
@@ -203,15 +234,15 @@ export default function UsersCreatePage() {
       eyebrow="Administración"
       title="Nuevo usuario"
       backHref="/administracion/usuarios"
-      maxWidth="max-w-[1180px]"
+      maxWidth="max-w-[1100px]"
     >
-      <form className="space-y-5" onSubmit={submitUserForm}>
+      <form className="space-y-6" onSubmit={submitUserForm}>
         {error ? (
           <AdminInlineMessage tone="danger">{error}</AdminInlineMessage>
         ) : null}
 
-        <div className="grid gap-5 xl:grid-cols-[0.82fr_1.18fr]">
-          <div className="space-y-5">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          <div className="space-y-6">
             <AdminSection title="Identidad y acceso">
               <div className="space-y-4">
                 <AdminField label="Nombre completo">
@@ -246,119 +277,92 @@ export default function UsersCreatePage() {
                 </AdminField>
 
                 <AdminField label="Rol" hint={rolesError || undefined}>
-                  <AdminSelect
-                    required
+                  <AdminSelectMenu
                     value={userForm.role_id}
-                    onChange={(event) => setUserForm((current) => ({ ...current, role_id: event.target.value }))}
-                  >
-                    <option value="">Selecciona un rol</option>
-                    {loadingRoles ? (
-                      <option disabled>Cargando roles...</option>
-                    ) : rolesError ? (
-                      <option disabled>Error al cargar roles</option>
-                    ) : (
-                      roles.map((role) => (
-                        <option key={role.role_id} value={role.role_id}>
-                          {role.name}
-                        </option>
-                      ))
-                    )}
-                  </AdminSelect>
+                    onValueChange={(value) => setUserForm((current) => ({ ...current, role_id: value }))}
+                    placeholder={
+                      loadingRoles ? "Cargando roles..." : rolesError ? "Error al cargar roles" : "Selecciona un rol"
+                    }
+                    options={roleOptions}
+                    disabled={loadingRoles || Boolean(rolesError)}
+                  />
                 </AdminField>
 
-                <AdminCheckboxRow
-                  label="Usuario activo"
-                  description="Permite el ingreso apenas reciba su clave temporal."
-                  checked={userForm.active}
-                  onChange={(checked) => setUserForm((current) => ({ ...current, active: checked }))}
-                />
+                <AdminField label="Estado">
+                  <AdminCheckboxField
+                    label="Usuario activo"
+                    checked={userForm.active}
+                    onChange={(checked) => setUserForm((current) => ({ ...current, active: checked }))}
+                  />
+                </AdminField>
               </div>
             </AdminSection>
           </div>
 
-          <div className="space-y-5">
-            <AdminSection
-              title="Sedes y sede default"
-              aside={
-                <div className="rounded-full border border-[var(--ops-border-strong)] px-2.5 py-1 text-xs font-medium text-[var(--ops-text-muted)]">
-                  {userForm.location_ids.length}
-                </div>
-              }
-            >
+          <div className="space-y-6">
+            <AdminSection title="Sedes operativas">
               {loadingLocations ? (
-                <div className="rounded-xl bg-[var(--ops-field)] px-3 py-3 text-sm text-[var(--ops-text-muted)]">
+                <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3.5 py-3 text-sm text-[var(--ops-text-muted)]">
                   Cargando sedes...
                 </div>
               ) : locationsError ? (
                 <AdminInlineMessage tone="warning">{locationsError}</AdminInlineMessage>
               ) : availableLocations.length === 0 ? (
-                <div className="rounded-xl bg-[var(--ops-field)] px-3 py-3 text-sm text-[var(--ops-text-muted)]">
+                <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3.5 py-3 text-sm text-[var(--ops-text-muted)]">
                   No hay sedes activas disponibles.
                 </div>
               ) : (
-                <div className="space-y-3">
-                  <div className="rounded-2xl border border-[var(--ops-border-soft)] bg-[var(--ops-surface)] px-4 py-3">
-                    <p className="text-xs uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                      Regla operativa
-                    </p>
-                    <p className="mt-1 text-sm text-[var(--ops-text)]">
-                      Debes asignar al menos una sede y marcar una como default antes de guardar.
-                    </p>
-                  </div>
+                <div className="space-y-4">
+                  <AdminField label="Sedes asignadas">
+                    <div className="space-y-3">
+                      <AdminMultiSelectMenu
+                        selectedValues={userForm.location_ids}
+                        onToggle={toggleUserFormLocation}
+                        placeholder="Seleccionar sedes"
+                        options={locationOptions}
+                      />
 
-                  <div className="max-h-[28rem] divide-y divide-[var(--ops-border-strong)] overflow-y-auto rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                    {availableLocations.map((location) => {
-                      const checked = userForm.location_ids.includes(location.location_id)
-                      const isDefault = userForm.default_location_id === location.location_id
-
-                      return (
-                        <div
-                          key={location.location_id}
-                          className="grid gap-3 px-4 py-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center"
-                        >
-                          <label className="flex cursor-pointer items-start gap-3">
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={() => toggleUserFormLocation(location.location_id)}
-                              className="mt-1 h-4 w-4 rounded border-[var(--ops-border-strong)]"
+                      {selectedLocationOptions.length ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedLocationOptions.map((location) => (
+                            <AdminSelectionChip
+                              key={location.value}
+                              label={location.label}
+                              onRemove={() => toggleUserFormLocation(location.value)}
                             />
-                            <span className="min-w-0">
-                              <span className="block text-sm font-medium text-[var(--ops-text)]">
-                                {location.name} ({location.code})
-                              </span>
-                              <span className="mt-1 block text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                                {location.type}
-                              </span>
-                              {location.address ? (
-                                <span className="mt-1 block text-xs text-[var(--ops-text-muted)]">
-                                  {location.address}
-                                </span>
-                              ) : null}
-                            </span>
-                          </label>
-
-                          <label
-                            className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${
-                              checked
-                                ? "border-[var(--ops-border-soft)] bg-[var(--ripnel-accent-soft)] text-[var(--ripnel-accent-hover)]"
-                                : "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]"
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="new-user-default-location"
-                              checked={isDefault}
-                              disabled={!checked}
-                              onChange={() => chooseUserFormDefaultLocation(location.location_id)}
-                              className="h-4 w-4 border-[var(--ops-border-strong)] disabled:cursor-not-allowed"
-                            />
-                            Default
-                          </label>
+                          ))}
                         </div>
-                      )
-                    })}
-                  </div>
+                      ) : (
+                        <p className="text-xs text-[var(--ops-text-muted)]">
+                          Selecciona al menos una sede para continuar.
+                        </p>
+                      )}
+                    </div>
+                  </AdminField>
+
+                  <AdminField label="Sede por defecto">
+                    <div className="space-y-3">
+                      <AdminSelectMenu
+                        value={userForm.default_location_id}
+                        onValueChange={chooseUserFormDefaultLocation}
+                        placeholder={
+                          selectedLocationOptions.length ? "Seleccionar sede por defecto" : "Selecciona una sede primero"
+                        }
+                        options={defaultLocationOptions}
+                        disabled={!selectedLocationOptions.length}
+                      />
+
+                      {userForm.default_location_id ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {defaultLocationOptions
+                            .filter((location) => location.value === userForm.default_location_id)
+                            .map((location) => (
+                              <AdminSelectionChip key={location.value} label={location.label} selected />
+                            ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </AdminField>
                 </div>
               )}
             </AdminSection>

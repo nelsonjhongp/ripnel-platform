@@ -5,10 +5,8 @@ import { Dialog as DialogPrimitive } from "radix-ui";
 import { FormEvent, useEffect, useId, useMemo, useState } from "react";
 import {
   Check,
-  ChevronDown,
   Eye,
   LoaderCircle,
-  PencilLine,
   Save,
   ShoppingBag,
   Sparkles,
@@ -16,15 +14,14 @@ import {
 } from "lucide-react";
 import { ApiEnvelope, apiFetch, unwrapApiData } from "@/lib/api";
 import { catalogPageBySlug, type CatalogFieldConfig } from "@/lib/product-master-metadata";
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import {
+  OpsMultiSelectMenu,
+  OpsReadonlyFieldState,
+  OpsSelectionChip,
+  OpsSelectMenu,
+} from "@/components/ui/ops-selection";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
   Sheet,
@@ -173,16 +170,12 @@ function getItemId(item: CatalogItem, keys: string[]) {
   return "";
 }
 
-function getCatalogItemLabel(item: CatalogItem) {
-  if (item.code) {
-    return `${item.code} - ${item.name || ""}`;
-  }
-
+function getCatalogItemName(item: CatalogItem) {
   return String(item.name || "");
 }
 
-function getCatalogItemName(item: CatalogItem) {
-  return String(item.name || "");
+function getCatalogVisibleLabel(item: CatalogItem) {
+  return String(item.name || item.code || "");
 }
 
 function getSizeLabel(item: CatalogItem) {
@@ -257,51 +250,28 @@ async function requestData<T>(path: string, init?: RequestInit): Promise<T> {
 
 function FieldLabel({
   children,
-  onCreate,
+  actionLabel,
+  onAction,
   htmlFor,
 }: {
   children: React.ReactNode;
-  onCreate: () => void;
+  actionLabel?: string;
+  onAction?: () => void;
   htmlFor?: string;
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <label htmlFor={htmlFor} className="text-sm font-semibold text-[var(--ops-text)]">{children}</label>
-      <button
-        type="button"
-        onClick={onCreate}
-        className="cursor-pointer text-xs font-semibold text-[var(--ripnel-accent-hover)] transition hover:text-[var(--ripnel-accent)]"
-      >
-        Crear nuevo
-      </button>
-    </div>
-  );
-}
-
-function SelectedChip({
-  label,
-  onRemove,
-  hex,
-}: {
-  label: string;
-  onRemove: () => void;
-  hex?: string | null;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onRemove}
-      className="ops-metric-pill inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-full px-2.5 text-xs font-semibold transition hover:border-[color:var(--ripnel-accent)]"
-    >
-      <X className="h-3 w-3" />
-      {hex ? (
-        <span
-          className="h-3 w-3 rounded-full border border-[color:var(--ops-border-soft)]"
-          style={{ backgroundColor: hex }}
-        />
+      {actionLabel && onAction ? (
+        <button
+          type="button"
+          onClick={onAction}
+          className="cursor-pointer text-xs font-semibold text-[var(--ripnel-accent-hover)] transition hover:text-[var(--ripnel-accent)]"
+        >
+          {actionLabel}
+        </button>
       ) : null}
-      {label}
-    </button>
+    </div>
   );
 }
 
@@ -325,59 +295,48 @@ function MultiSelectCatalog({
   colorMode?: boolean;
 }) {
   const selectedItems = items.filter((item) => selectedIds.includes(getItemId(item, idKeys)));
-  const triggerLabel = selectedIds.length
-    ? `${selectedIds.length} ${label.toLowerCase()} seleccionadas`
-    : placeholder;
+  const options = items.map((item) => {
+    const itemId = getItemId(item, idKeys);
+    const visibleLabel = colorMode ? getCatalogVisibleLabel(item) : getSizeLabel(item);
+
+    return {
+      value: itemId,
+      label: visibleLabel,
+      leading: colorMode ? (
+        <span
+          className="h-3.5 w-3.5 rounded-full border border-[color:var(--ops-border-soft)]"
+          style={{ backgroundColor: item.hex || "#ffffff" }}
+        />
+      ) : undefined,
+    };
+  });
 
   return (
     <section className="space-y-2">
-      <FieldLabel onCreate={onCreate}>{label}</FieldLabel>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className="ops-surface flex h-10 w-full cursor-pointer items-center justify-between rounded-lg border px-3 text-left text-sm outline-none transition hover:bg-[var(--ops-surface-muted)] focus-visible:ring-2 focus-visible:ring-[color:color-mix(in_srgb,var(--ripnel-accent)_24%,transparent)]"
-          >
-            <span className={selectedIds.length ? "text-[var(--ops-text)]" : "text-[var(--ops-text-muted)]"}>
-              {triggerLabel}
-            </span>
-            <ChevronDown className="h-4 w-4 text-[var(--ops-text-muted)]" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="max-h-72 w-72 overflow-y-auto">
-          {items.map((item) => {
-            const id = getItemId(item, idKeys);
-            const checked = selectedIds.includes(id);
-
-            return (
-              <DropdownMenuCheckboxItem
-                key={id}
-                checked={checked}
-                onCheckedChange={() => onToggle(id)}
-                onSelect={(event) => event.preventDefault()}
-                className="cursor-pointer gap-2"
-              >
-                {colorMode ? (
-                  <span
-                    className="h-3.5 w-3.5 rounded-full border border-[color:var(--ops-border-soft)]"
-                    style={{ backgroundColor: item.hex || "#ffffff" }}
-                  />
-                ) : null}
-                <span>{colorMode ? getCatalogItemLabel(item) : getSizeLabel(item)}</span>
-              </DropdownMenuCheckboxItem>
-            );
-          })}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <FieldLabel actionLabel="Crear nuevo" onAction={onCreate}>{label}</FieldLabel>
+      <OpsMultiSelectMenu
+        selectedValues={selectedIds}
+        onToggle={onToggle}
+        placeholder={placeholder}
+        options={options}
+        formatCountLabel={(count) => `${count} ${label.toLowerCase()} seleccionadas`}
+      />
       <div className="flex min-h-8 flex-wrap gap-1.5">
         {selectedItems.length ? (
           selectedItems.map((item) => {
             const id = getItemId(item, idKeys);
             return (
-              <SelectedChip
+              <OpsSelectionChip
                 key={id}
-                label={colorMode ? getCatalogItemLabel(item) : getSizeLabel(item)}
-                hex={colorMode ? item.hex : null}
+                label={colorMode ? getCatalogVisibleLabel(item) : getSizeLabel(item)}
+                leading={
+                  colorMode ? (
+                    <span
+                      className="h-3 w-3 rounded-full border border-[color:var(--ops-border-soft)]"
+                      style={{ backgroundColor: item.hex || "#ffffff" }}
+                    />
+                  ) : undefined
+                }
                 onRemove={() => onToggle(id)}
               />
             );
@@ -531,11 +490,6 @@ function ConfirmationDialog({
 
 export function ProductCreatePage() {
   const nameId = useId()
-  const garmentTypeId = useId()
-  const fabricId = useId()
-  const fabricDetailId = useId()
-  const targetId = useId()
-  const descriptionId = useId()
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [nameMode, setNameMode] = useState<NameMode>("auto");
   const [garmentTypes, setGarmentTypes] = useState<CatalogItem[]>([]);
@@ -682,7 +636,7 @@ export function ProductCreatePage() {
       description: formState.description.trim(),
       sizes: sizeLabels,
       colors: colorItems.map((item) => ({
-        label: getCatalogItemLabel(item),
+        label: getCatalogVisibleLabel(item),
         hex: item.hex,
       })),
     };
@@ -957,10 +911,7 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
                   <p className="text-sm font-semibold text-[color:color-mix(in_srgb,#047857_74%,var(--ops-text))]">
                     {createdStyle.name}
                   </p>
-                  <p className="mt-1 text-xs text-[color:color-mix(in_srgb,#047857_74%,var(--ops-text))]">
-                    Codigo {createdStyle.style_code || "-"}
-                  </p>
-                </div>
+                  </div>
                 <div className="flex flex-wrap gap-2">
                   <Button asChild variant="outline" size="sm" className="rounded-lg">
                     <Link href={`/productos/variantes?style_id=${encodeURIComponent(createdStyle.style_id)}`}>
@@ -981,35 +932,30 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
             <div className="border-b border-[color:var(--ops-border-soft)] pb-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="space-y-1.5">
-                  <label htmlFor={nameId} className="text-sm font-semibold text-[var(--ops-text)]">Nombre</label>
-                  <div className="relative">
+                  <FieldLabel
+                    htmlFor={nameId}
+                    actionLabel={nameMode === "auto" ? "Editar" : undefined}
+                    onAction={nameMode === "auto" ? () => setNameMode("manual") : undefined}
+                  >
+                    Nombre
+                  </FieldLabel>
+                  {nameMode === "auto" ? (
+                    <OpsReadonlyFieldState
+                      value={formState.name}
+                      placeholder="Se completará automáticamente"
+                    />
+                  ) : (
                     <Input
                       id={nameId}
                       value={formState.name}
                       onChange={(event) =>
                         setFormState((current) => ({ ...current, name: event.target.value }))
                       }
-                      placeholder="Se completara automaticamente…"
-                      className={cn(
-                        "ops-surface h-10 rounded-lg border pr-11",
-                        nameMode === "auto" && "bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]"
-                      )}
+                      className="ops-surface h-10 rounded-lg border"
                       required
-                      readOnly={nameMode === "auto"}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setNameMode("manual")}
-                      className="absolute right-2 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-lg border border-[var(--ops-border-soft)] bg-[var(--ops-surface)] text-[var(--ops-text-muted)] transition hover:border-[color:var(--ripnel-accent)] hover:text-[var(--ops-text)]"
-                      aria-label="Editar nombre"
-                    >
-                      <PencilLine className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
+                  )}
                   <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <span className="text-[var(--ops-text-muted)]">
-                      El codigo se genera automaticamente al crear.
-                    </span>
                     {duplicatedStyle ? (
                       <span className="font-medium text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]">
                         Ya existe un style con este nombre.
@@ -1019,102 +965,73 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
                 </div>
 
                 <div className="space-y-1.5">
-                  <FieldLabel htmlFor={garmentTypeId} onCreate={() => openCatalogPanel("garmentTypes")}>Tipo de prenda</FieldLabel>
-                  <select
-                    id={garmentTypeId}
+                  <FieldLabel actionLabel="Crear nuevo" onAction={() => openCatalogPanel("garmentTypes")}>Tipo de prenda</FieldLabel>
+                  <OpsSelectMenu
                     value={formState.garment_type_id}
-                    onChange={(event) =>
+                    onValueChange={(value) =>
                       setFormState((current) => ({
                         ...current,
-                        garment_type_id: event.target.value,
+                        garment_type_id: value,
                       }))
                     }
-                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none bg-[var(--ops-surface)]"
-                    required
-                  >
-                    <option value="">Seleccionar</option>
-                    {garmentTypes.map((item) => {
-                      const id = getItemId(item, ["garment_type_id"]);
-                      return (
-                        <option key={id} value={id}>
-                          {getCatalogItemLabel(item)}
-                        </option>
-                      );
-                    })}
-                  </select>
+                    placeholder="Seleccionar"
+                    options={garmentTypes.map((item) => ({
+                      value: getItemId(item, ["garment_type_id"]),
+                      label: getCatalogVisibleLabel(item),
+                    }))}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
-                  <FieldLabel htmlFor={fabricId} onCreate={() => openCatalogPanel("fabrics")}>Tela</FieldLabel>
-                  <select
-                    id={fabricId}
+                  <FieldLabel actionLabel="Crear nuevo" onAction={() => openCatalogPanel("fabrics")}>Tela</FieldLabel>
+                  <OpsSelectMenu
                     value={formState.fabric_id}
-                    onChange={(event) =>
-                      setFormState((current) => ({ ...current, fabric_id: event.target.value }))
+                    onValueChange={(value) =>
+                      setFormState((current) => ({ ...current, fabric_id: value }))
                     }
-                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none bg-[var(--ops-surface)]"
-                  >
-                    <option value="">Sin tela</option>
-                    {fabrics.map((item) => {
-                      const id = getItemId(item, ["fabric_id"]);
-                      return (
-                        <option key={id} value={id}>
-                          {getCatalogItemLabel(item)}
-                        </option>
-                      );
-                    })}
-                  </select>
+                    placeholder="Sin tela"
+                    options={fabrics.map((item) => ({
+                      value: getItemId(item, ["fabric_id"]),
+                      label: getCatalogVisibleLabel(item),
+                    }))}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
-                  <FieldLabel htmlFor={fabricDetailId} onCreate={() => openCatalogPanel("fabricDetails")}>Detalle</FieldLabel>
-                  <select
-                    id={fabricDetailId}
+                  <FieldLabel actionLabel="Crear nuevo" onAction={() => openCatalogPanel("fabricDetails")}>Detalle</FieldLabel>
+                  <OpsSelectMenu
                     value={formState.fabric_detail_id}
-                    onChange={(event) =>
+                    onValueChange={(value) =>
                       setFormState((current) => ({
                         ...current,
-                        fabric_detail_id: event.target.value,
+                        fabric_detail_id: value,
                       }))
                     }
-                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none bg-[var(--ops-surface)]"
-                  >
-                    <option value="">Sin detalle</option>
-                    {fabricDetails.map((item) => {
-                      const id = getItemId(item, ["fabric_detail_id"]);
-                      return (
-                        <option key={id} value={id}>
-                          {getCatalogItemLabel(item)}
-                        </option>
-                      );
-                    })}
-                  </select>
+                    placeholder="Sin detalle"
+                    options={fabricDetails.map((item) => ({
+                      value: getItemId(item, ["fabric_detail_id"]),
+                      label: getCatalogVisibleLabel(item),
+                    }))}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
-                  <FieldLabel htmlFor={targetId} onCreate={() => openCatalogPanel("targets")}>Target</FieldLabel>
-                  <select
-                    id={targetId}
+                  <FieldLabel actionLabel="Crear nuevo" onAction={() => openCatalogPanel("targets")}>Target</FieldLabel>
+                  <OpsSelectMenu
                     value={formState.target_id}
-                    onChange={(event) =>
-                      setFormState((current) => ({ ...current, target_id: event.target.value }))
+                    onValueChange={(value) =>
+                      setFormState((current) => ({ ...current, target_id: value }))
                     }
-                    className="ops-surface h-10 w-full cursor-pointer rounded-lg border px-3 text-sm outline-none bg-[var(--ops-surface)]"
-                  >
-                    <option value="">Sin target</option>
-                    {targets.map((item) => {
-                      const id = getItemId(item, ["target_id"]);
-                      return (
-                        <option key={id} value={id}>
-                          {getCatalogItemName(item)}
-                        </option>
-                      );
-                    })}
-                  </select>
+                    placeholder="Sin target"
+                    options={targets.map((item) => ({
+                      value: getItemId(item, ["target_id"]),
+                      label: getCatalogItemName(item),
+                    }))}
+                  />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-sm font-semibold text-[var(--ops-text)]">Descripcion</label>
+                  <label className="text-sm font-semibold text-[var(--ops-text)]">Descripción</label>
                   <Input
                     value={formState.description}
                     onChange={(event) =>
