@@ -800,9 +800,9 @@ export default function DashboardPage() {
           </div>
         </HomeSectionCard>
 
-        {shortcutItems.length > 0 ? <HomeQuickActions items={shortcutItems} /> : null}
+ 0       {shortcutItems.length > 0 ? <HomeQuickActions items={shortcutItems} /> : null}
 
-        <div className="grid gap-5 items-start md:grid-cols-2 md:grid-rows-2 lg:grid-cols-[1.2fr_0.8fr]">
+0        <div className="grid gap-5 items-start md:grid-cols-2 md:grid-rows-2 lg:grid-cols-[1.2fr_0.8fr]">
           {/* Top-left: Ventas */}
           <div>
             {salesToday ? (
