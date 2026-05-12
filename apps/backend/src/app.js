@@ -112,6 +112,26 @@ const app = express();
 const allowedOrigins = new Set();
 const configuredFrontendOrigin = normalizeOrigin(env.frontendUrl);
 
+// Also load explicit allowed origins from env (comma-separated).
+// Supports plain origins (https://foo.com) and wildcard host patterns like "*.vercel.app".
+const wildcardHostPatterns = [];
+const rawAllowedFromEnv = process.env.ALLOWED_ORIGINS || '';
+if (rawAllowedFromEnv) {
+  for (const part of rawAllowedFromEnv.split(',')) {
+    const trimmed = String(part || '').trim();
+    if (!trimmed) continue;
+
+    if (trimmed.includes('*')) {
+      // store hostname pattern for wildcard matching
+      wildcardHostPatterns.push(trimmed.replace(/^\*\./, '').toLowerCase());
+      continue;
+    }
+
+    const normalized = normalizeOrigin(trimmed);
+    if (normalized) allowedOrigins.add(normalized);
+  }
+}
+
 if (configuredFrontendOrigin) {
   for (const origin of collectLocalFrontendOrigins(configuredFrontendOrigin)) {
     allowedOrigins.add(origin);
@@ -124,17 +144,22 @@ app.use(
     origin(origin, callback) {
       const normalizedOrigin = normalizeOrigin(origin);
 
-      if (!origin) {
-        return callback(null, true);
-      }
+      if (!origin) return callback(null, true);
 
-      if (env.nodeEnv !== 'production') {
-        if (isAllowedDevOrigin(origin) || isLocalRequest(origin)) {
-          return callback(null, true);
+      const isAllowedExplicit = normalizedOrigin && allowedOrigins.has(normalizedOrigin);
+      const isAllowedDev = env.nodeEnv !== 'production' && normalizedOrigin && isAllowedDevOrigin(normalizedOrigin);
+      const isAllowedWildcard = (() => {
+        if (!normalizedOrigin) return false;
+        try {
+          const u = new URL(normalizedOrigin);
+          const host = u.hostname.toLowerCase();
+          return wildcardHostPatterns.some((pattern) => host === pattern || host.endsWith('.' + pattern));
+        } catch (e) {
+          return false;
         }
-      }
+      })();
 
-      if (normalizedOrigin && allowedOrigins.has(normalizedOrigin)) {
+      if (isAllowedExplicit || isAllowedDev || isAllowedWildcard) {
         return callback(null, true);
       }
 
