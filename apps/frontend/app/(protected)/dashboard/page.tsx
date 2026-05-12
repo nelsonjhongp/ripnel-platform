@@ -17,7 +17,7 @@ import {
 } from "lucide-react"
 
 import { useAuth } from "@/components/auth/AuthProvider"
-import { ErrorPage, InlineStatusCard, LoadingPage } from "@/components/feedback/status-page"
+import { ErrorPage, ProtectedLoadingPage } from "@/components/feedback/status-page"
 import { HomeQuickActions } from "@/components/home/home-quick-actions"
 import { HomeSectionCard } from "@/components/home/home-section-card"
 import { useSidebarTopbarActions } from "@/components/sidebar"
@@ -256,12 +256,12 @@ function explainDashboardError(error: unknown) {
 function queueTone(status: string) {
   if (status === "error") return "border-rose-200 bg-rose-50 text-rose-700"
   if (status === "pending") return "border-amber-200 bg-amber-50 text-amber-700"
-  return "border-slate-200 bg-slate-50 text-slate-700"
+  return "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text)]"
 }
 
 function cashTone(status: string | null | undefined) {
   if (status === "open") return "border-emerald-200 bg-emerald-50 text-emerald-700"
-  if (status === "closed") return "border-slate-200 bg-slate-100 text-slate-700"
+  if (status === "closed") return "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text)]"
   return "border-amber-200 bg-amber-50 text-amber-700"
 }
 
@@ -472,8 +472,8 @@ export default function DashboardPage() {
 
   if ((loading || authLoading) && !overview) {
     return (
-      <LoadingPage
-        title="Cargando dashboard operativo"
+      <ProtectedLoadingPage
+        title="Cargando dashboard operativo…"
         description="Estamos consolidando caja, ventas, comprobantes, inventario y actividad reciente."
       />
     )
@@ -482,8 +482,10 @@ export default function DashboardPage() {
   if (!overview) {
     return (
       <ErrorPage
+        variant="ops"
         title="No pudimos abrir el dashboard"
         description={error || "El dashboard operativo no esta disponible en este momento."}
+        onReset={() => loadDashboard()}
       />
     )
   }
@@ -629,13 +631,9 @@ export default function DashboardPage() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--ripnel-accent-hover)]">
               Dashboard operativo
             </p>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-[var(--ops-text)] md:text-[2rem]">
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-[var(--ops-text)] md:text-[2rem] [text-wrap:balance]">
               {overview.context.location.name}
             </h1>
-            <p className="mt-2 text-xs font-medium uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">
-              {overview.context.location.code || "Sin codigo"} · {formatDate(overview.context.business_date)}
-              {overview.context.user.role_name ? ` · ${overview.context.user.role_name}` : ""}
-            </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -643,7 +641,7 @@ export default function DashboardPage() {
               type="button"
               onClick={() => loadDashboard({ silent: true })}
               disabled={refreshing}
-              className="inline-flex items-center gap-2 rounded-full bg-[var(--ripnel-accent)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-lg bg-[var(--ripnel-accent)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
               {refreshing ? "Actualizando..." : "Actualizar"}
@@ -860,16 +858,16 @@ export default function DashboardPage() {
               <HomeSectionCard eyebrow="Comprobantes" title="Cola operativa">
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   <div className="sales-panel-muted rounded-xl p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Open</p>
-                    <p className="mt-2 text-2xl font-bold text-slate-900">{receipts.open_count || 0}</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--ops-text-muted)]">Open</p>
+                    <p className="mt-2 text-2xl font-bold text-[var(--ops-text)]">{receipts.open_count || 0}</p>
                   </div>
                   <div className="sales-panel-muted rounded-xl p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Missing</p>
-                    <p className="mt-2 text-2xl font-bold text-slate-900">{receipts.missing_count || 0}</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--ops-text-muted)]">Missing</p>
+                    <p className="mt-2 text-2xl font-bold text-[var(--ops-text)]">{receipts.missing_count || 0}</p>
                   </div>
                   <div className="sales-panel-muted rounded-xl p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Error</p>
-                    <p className="mt-2 text-2xl font-bold text-slate-900">{receipts.error_count || 0}</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--ops-text-muted)]">Error</p>
+                    <p className="mt-2 text-2xl font-bold text-[var(--ops-text)]">{receipts.error_count || 0}</p>
                   </div>
                 </div>
                 <div className="mt-4 space-y-3">
@@ -882,10 +880,10 @@ export default function DashboardPage() {
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="text-sm font-semibold text-slate-900">
+                            <p className="text-sm font-semibold text-[var(--ops-text)]">
                               {item.sale_number || "Sin correlativo"}
                             </p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-[var(--ops-text-muted)]">
                               {item.customer_name_text || "Cliente general"} · {item.document_type}
                             </p>
                           </div>
@@ -897,7 +895,7 @@ export default function DashboardPage() {
                             {item.queue_status}
                           </span>
                         </div>
-                        <p className="mt-2 text-sm text-slate-600">
+                        <p className="mt-2 text-sm text-[var(--ops-text-muted)]">
                           {formatCurrency(item.total_amount)} · {formatDateTime(item.queued_at)}
                         </p>
                       </Link>
@@ -1005,20 +1003,20 @@ export default function DashboardPage() {
               <HomeSectionCard eyebrow="Postventa" title="Ventas recientes con seguimiento">
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   <div className="sales-panel-muted rounded-xl p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Cambio</p>
-                    <p className="mt-2 text-2xl font-bold text-slate-900">
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--ops-text-muted)]">Cambio</p>
+                    <p className="mt-2 text-2xl font-bold text-[var(--ops-text)]">
                       {postsales.eligible_exchange_count || 0}
                     </p>
                   </div>
                   <div className="sales-panel-muted rounded-xl p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Anulable</p>
-                    <p className="mt-2 text-2xl font-bold text-slate-900">
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--ops-text-muted)]">Anulable</p>
+                    <p className="mt-2 text-2xl font-bold text-[var(--ops-text)]">
                       {postsales.eligible_cancel_count || 0}
                     </p>
                   </div>
                   <div className="sales-panel-muted rounded-xl p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Bloqueada</p>
-                    <p className="mt-2 text-2xl font-bold text-slate-900">
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--ops-text-muted)]">Bloqueada</p>
+                    <p className="mt-2 text-2xl font-bold text-[var(--ops-text)]">
                       {postsales.blocked_cancel_count || 0}
                     </p>
                   </div>
@@ -1033,10 +1031,10 @@ export default function DashboardPage() {
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="text-sm font-semibold text-slate-900">
+                            <p className="text-sm font-semibold text-[var(--ops-text)]">
                               {item.sale_number || "Sin correlativo"}
                             </p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-[var(--ops-text-muted)]">
                               {item.customer_name_text || "Cliente general"} · {formatCurrency(item.total_amount)}
                             </p>
                           </div>
@@ -1048,7 +1046,7 @@ export default function DashboardPage() {
                             Caja {item.cash_status}
                           </span>
                         </div>
-                        <p className="mt-2 text-sm text-slate-600">
+                        <p className="mt-2 text-sm text-[var(--ops-text-muted)]">
                           {item.cancel_allowed
                             ? "Permite cambio y anulacion."
                             : "Permite cambio simple, pero la anulacion esta bloqueada."}
@@ -1069,14 +1067,14 @@ export default function DashboardPage() {
                 </p>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div className="sales-panel-muted rounded-xl p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">En cero</p>
-                    <p className="mt-2 text-2xl font-bold text-slate-900">
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--ops-text-muted)]">En cero</p>
+                    <p className="mt-2 text-2xl font-bold text-[var(--ops-text)]">
                       {inventory.zero_stock_count || 0}
                     </p>
                   </div>
                   <div className="sales-panel-muted rounded-xl p-4">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Bajo minimo</p>
-                    <p className="mt-2 text-2xl font-bold text-slate-900">
+                    <p className="text-xs uppercase tracking-[0.2em] text-[var(--ops-text-muted)]">Bajo minimo</p>
+                    <p className="mt-2 text-2xl font-bold text-[var(--ops-text)]">
                       {inventory.low_stock_count || 0}
                     </p>
                   </div>
@@ -1091,8 +1089,8 @@ export default function DashboardPage() {
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="text-sm font-semibold text-slate-900">{item.style_name}</p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-sm font-semibold text-[var(--ops-text)]">{item.style_name}</p>
+                            <p className="text-xs text-[var(--ops-text-muted)]">
                               {item.sku} · {item.size_code} / {item.color_code}
                             </p>
                           </div>
@@ -1135,10 +1133,10 @@ export default function DashboardPage() {
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="text-sm font-semibold text-slate-900">
+                            <p className="text-sm font-semibold text-[var(--ops-text)]">
                               {item.transfer_number || "Sin correlativo"}
                             </p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-[var(--ops-text-muted)]">
                               Desde {item.from_location_name} · {item.qty_shipped_total} und
                             </p>
                           </div>
@@ -1146,7 +1144,7 @@ export default function DashboardPage() {
                             {item.status}
                           </span>
                         </div>
-                        <p className="mt-2 text-sm text-slate-600">
+                        <p className="mt-2 text-sm text-[var(--ops-text-muted)]">
                           Actualizado {formatDateTime(item.shipped_at || item.updated_at)}
                         </p>
                       </Link>
@@ -1172,17 +1170,17 @@ export default function DashboardPage() {
                   className="sales-panel-muted flex flex-col gap-3 rounded-xl px-4 py-3 transition hover:opacity-90 md:flex-row md:items-center md:justify-between"
                 >
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">{item.title}</p>
-                    <p className="mt-1 text-sm text-slate-600">{item.subtitle}</p>
+                    <p className="text-sm font-semibold text-[var(--ops-text)]">{item.title}</p>
+                    <p className="mt-1 text-sm text-[var(--ops-text-muted)]">{item.subtitle}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                    <span className="rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]">
                       {item.type}
                     </span>
-                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                    <span className="rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]">
                       {item.status}
                     </span>
-                    <span className="text-xs text-slate-500">{formatDateTime(item.occurred_at)}</span>
+                    <span className="text-xs text-[var(--ops-text-muted)]">{formatDateTime(item.occurred_at)}</span>
                   </div>
                 </Link>
               ))

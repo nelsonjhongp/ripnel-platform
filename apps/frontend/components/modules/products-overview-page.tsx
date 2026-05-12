@@ -1,26 +1,43 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import {
   CircleAlert,
   Eye,
-  Info,
   LoaderCircle,
   PencilLine,
+  Plus,
   ReceiptText,
   RefreshCw,
-  Search,
+  RotateCcw,
   Shapes,
 } from "lucide-react";
-import { buildApiUrl } from "@/lib/api";
+import { AdminRowActionsMenu } from "@/components/admin/admin-ui";
+import { ApiEnvelope, apiFetch, unwrapApiData } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { InlineStatusCard } from "@/components/feedback/status-page";
+import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import {
+  OpsFiltersRow,
+  OpsPageShell,
+  OpsSearchField,
+  OpsSectionDivider,
+  OpsTableFooter,
+  OpsTableWrap,
+} from "@/components/ui/ops-page-shell";
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
+import { Button } from "@/components/ui/button";
+import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { Pagination } from "@/components/ui/pagination";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 type ProductStatus =
   | "inactive"
@@ -29,6 +46,12 @@ type ProductStatus =
   | "pending_prices"
   | "ready_no_stock"
   | "ready";
+
+type ProductSizeStock = {
+  size_id: string;
+  size_code: string;
+  qty: number;
+};
 
 type ProductSummary = {
   style_id: string;
@@ -41,6 +64,7 @@ type ProductSummary = {
   target_name: string | null;
   configured_size_count: number;
   size_codes: string[];
+  size_stock: ProductSizeStock[];
   configured_color_count: number;
   expected_variant_count: number;
   variant_count: number;
@@ -60,111 +84,140 @@ type ProductSummary = {
 
 type FilterMode = "all" | "attention" | "ready" | "inactive";
 
+type ActiveLocation = {
+  location_id: string;
+  name: string;
+  code: string | null;
+  type: string;
+  address: string | null;
+  active: boolean;
+};
+
+type ProductsResponse = {
+  items: ProductSummary[];
+  active_location: ActiveLocation | null;
+  pagination: {
+    page: number;
+    page_size: number;
+    total_items: number;
+    total_pages: number;
+  };
+};
+
 const STATUS_META: Record<ProductStatus, { label: string; className: string }> = {
   inactive: {
     label: "Inactivo",
-    className: "bg-slate-200 text-slate-700",
+    className:
+      "border-[color:color-mix(in_srgb,#94a3b8_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#94a3b8_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#475569_74%,var(--ops-text))]",
   },
   draft: {
     label: "Borrador",
-    className: "bg-slate-900 text-white",
+    className:
+      "border-[color:color-mix(in_srgb,#334155_60%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#1e293b_90%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f1f5f9_94%,var(--ops-text))]",
   },
   pending_variants: {
     label: "Faltan variantes",
-    className: "bg-amber-100 text-amber-800",
+    className:
+      "border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#d97706_74%,var(--ops-text))]",
   },
   pending_prices: {
     label: "Faltan precios",
-    className: "bg-rose-100 text-rose-700",
+    className:
+      "border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#e11d48_74%,var(--ops-text))]",
   },
   ready_no_stock: {
     label: "Sin stock",
-    className: "bg-sky-100 text-sky-700",
+    className:
+      "border-[color:color-mix(in_srgb,#3b82f6_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#3b82f6_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#2563eb_74%,var(--ops-text))]",
   },
   ready: {
     label: "Listo",
-    className: "bg-emerald-100 text-emerald-700",
+    className:
+      "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]",
   },
 };
 
-function getVisibleSizeCodes(sizeCodes: string[]) {
-  return sizeCodes.slice(0, 4);
+const PAGE_SIZE = 10;
+
+function getVisibleSizeStock(sizeStock: ProductSizeStock[]) {
+  return sizeStock.slice(0, 4);
 }
 
 function buildStyleHref(path: string, styleId: string) {
   return `${path}?style_id=${encodeURIComponent(styleId)}`;
 }
 
-function ActionIcon({
-  href,
-  label,
-  children,
-}: {
-  href: string;
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      aria-label={label}
-      title={label}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950"
-    >
-      {children}
-    </Link>
-  );
-}
-
-function InfoHint({
-  content,
-  label,
-}: {
-  content: string;
-  label: string;
-}) {
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            aria-label={label}
-            className="inline-flex h-5 w-5 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-          >
-            <Info className="h-3.5 w-3.5" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="top" sideOffset={8} className="max-w-72 text-left leading-5">
-          {content}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
+function formatExtraSizes(extraSizes: ProductSizeStock[]) {
+  return extraSizes.map((size) => `${size.size_code}: ${size.qty}`).join(" · ");
 }
 
 export function ProductsOverviewPage() {
-  const [products, setProducts] = useState<ProductSummary[]>([]);
+  const router = useRouter();
+  const { defaultLocation, locationAssignments } = useAuth();
+  const [response, setResponse] = useState<ProductsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
+  const [page, setPage] = useState(1);
+  const [selectedLocationId, setSelectedLocationId] = useState("");
+  const deferredSearch = useDeferredValue(search.trim());
 
-  async function loadProducts() {
+  useEffect(() => {
+    if (!locationAssignments.length) {
+      return;
+    }
+
+    const hasCurrentSelection = locationAssignments.some(
+      (assignment) => assignment.location_id === selectedLocationId
+    );
+
+    if (hasCurrentSelection) {
+      return;
+    }
+
+    const nextLocationId =
+      defaultLocation?.location_id || locationAssignments[0]?.location_id || "";
+
+    if (nextLocationId) {
+      setSelectedLocationId(nextLocationId);
+    }
+  }, [defaultLocation?.location_id, locationAssignments, selectedLocationId]);
+
+  const loadProducts = useCallback(async () => {
+    if (!selectedLocationId) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(buildApiUrl("/api/products"), {
-        cache: "no-store",
+      const params = new URLSearchParams({
+        page: String(page),
+        page_size: String(PAGE_SIZE),
+        filter_mode: filterMode,
+        location_id: selectedLocationId,
       });
-      const payload = await response.json();
 
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo cargar el resumen de productos");
+      if (deferredSearch) {
+        params.set("q", deferredSearch);
       }
 
-      setProducts(payload.data || []);
+      const apiResponse = await apiFetch<ApiEnvelope<ProductsResponse> | ProductsResponse>(
+        `/api/products?${params.toString()}`
+      );
+      const payload = unwrapApiData(apiResponse);
+
+      setResponse(payload);
+      if (payload.pagination?.page && payload.pagination.page !== page) {
+        setPage(payload.pagination.page);
+      }
+
+      if (!selectedLocationId && payload.active_location?.location_id) {
+        setSelectedLocationId(payload.active_location.location_id);
+      }
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -174,344 +227,322 @@ export function ProductsOverviewPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [deferredSearch, filterMode, page, selectedLocationId]);
 
   useEffect(() => {
-    loadProducts();
-  }, []);
+    void loadProducts();
+  }, [loadProducts]);
 
-  const metrics = useMemo(() => {
-    const readyCount = products.filter((product) => product.status === "ready").length;
-    const attentionCount = products.filter(
-      (product) =>
-        product.status === "draft" ||
-        product.status === "pending_variants" ||
-        product.status === "pending_prices" ||
-        product.warnings.stock_without_retail_price
-    ).length;
-    const noStockCount = products.filter(
-      (product) => product.status === "ready_no_stock"
-    ).length;
-    const inactiveCount = products.filter(
-      (product) => product.status === "inactive"
-    ).length;
+  const products = useMemo(() => response?.items ?? [], [response?.items]);
+  const totalItems = response?.pagination.total_items || 0;
+  const totalPages = response?.pagination.total_pages || 1;
+  const visibleFrom = totalItems ? (page - 1) * PAGE_SIZE + 1 : 0;
+  const visibleTo = totalItems ? visibleFrom + products.length - 1 : 0;
 
-    return {
-      readyCount,
-      attentionCount,
-      noStockCount,
-      inactiveCount,
-    };
-  }, [products]);
+  const readyCount = useMemo(
+    () => products.filter((p) => p.status === "ready").length,
+    [products]
+  );
+  const pendingCount = useMemo(
+    () =>
+      products.filter(
+        (p) =>
+          p.status === "draft" ||
+          p.status === "pending_variants" ||
+          p.status === "pending_prices" ||
+          p.status === "ready_no_stock"
+      ).length,
+    [products]
+  );
 
-  const filteredProducts = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-
-    return products.filter((product) => {
-      if (filterMode === "attention") {
-        const requiresAttention =
-          product.status === "draft" ||
-          product.status === "pending_variants" ||
-          product.status === "pending_prices" ||
-          product.warnings.stock_without_retail_price;
-
-        if (!requiresAttention) {
-          return false;
-        }
-      }
-
-      if (filterMode === "ready") {
-        if (product.status !== "ready" && product.status !== "ready_no_stock") {
-          return false;
-        }
-      }
-
-      if (filterMode === "inactive" && product.status !== "inactive") {
-        return false;
-      }
-
-      if (!normalizedSearch) {
-        return true;
-      }
-
-      return [
-        product.name,
-        product.style_code,
-        product.garment_type_name,
-        product.fabric_name,
-        product.target_name,
-      ]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(normalizedSearch));
-    });
-  }, [filterMode, products, search]);
+  const hasActiveFilters = deferredSearch !== "" || filterMode !== "all";
 
   return (
-    <section className="min-h-screen bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f8fafc_28%,#ffffff_68%,#eef2ff_100%)] p-4 md:p-5">
-      <div className="mx-auto flex max-w-7xl flex-col gap-4">
-        <header className="rounded-[28px] border border-slate-200 bg-white/95 px-5 py-4 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)] backdrop-blur md:px-6">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-violet-500">
-                Productos
-              </p>
-              <h1 className="mt-1 text-2xl font-semibold text-slate-950">
-                Resumen de productos
-              </h1>
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
-                <span>
-                  <span className="font-semibold text-slate-700">{products.length}</span> styles
-                </span>
-                <span>
-                  <span className="font-semibold text-emerald-700">{metrics.readyCount}</span> listos
-                </span>
-                <span>
-                  <span className="font-semibold text-amber-700">{metrics.attentionCount}</span> por completar
-                </span>
-                <span>
-                  <span className="font-semibold text-sky-700">{metrics.noStockCount}</span> sin stock
-                </span>
-                <span>
-                  <span className="font-semibold text-slate-700">{metrics.inactiveCount}</span> inactivos
-                </span>
-              </div>
-            </div>
+    <TooltipProvider delayDuration={120}>
+      <OpsPageShell width="wide">
+          <PosHeader
+            eyebrow="Productos"
+            title="Maestro de producto"
+            actions={
+              <>
+                <Button asChild variant="accent" size="sm" className="rounded-lg px-3">
+                  <Link href="/productos/nuevo">
+                    <Plus className="h-4 w-4" />
+                    Nuevo
+                  </Link>
+                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      className="rounded-lg"
+                      onClick={loadProducts}
+                      disabled={loading || !selectedLocationId}
+                      aria-label="Actualizar"
+                    >
+                      <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" sideOffset={8}>Actualizar</TooltipContent>
+                </Tooltip>
+              </>
+            }
+          />
 
-            <button
-              type="button"
-              onClick={loadProducts}
-              className="inline-flex items-center gap-2 self-start rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Recargar
-            </button>
-          </div>
-        </header>
-
-        <article className="rounded-[28px] border border-slate-200 bg-white/95 px-5 py-4 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)] backdrop-blur md:px-6">
-          <div className="flex flex-col gap-3 border-b border-slate-200 pb-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                Vista operativa
-              </p>
-              <div className="mt-1 flex items-center gap-2">
-                <h2 className="text-lg font-semibold text-slate-950">
-                  Seguimiento de productos
-                </h2>
-                <InfoHint
-                  label="Informacion sobre productos y variantes"
-                  content="El nombre visible sale del producto creado en Estilos. Variantes significa combinaciones de talla y color generadas para ese producto, pero ese detalle no se muestra como columna aqui."
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2 lg:items-end">
-              <label className="relative w-full min-w-[260px] max-w-md">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Buscar por codigo, nombre o tipo"
-                  className="w-full rounded-2xl border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm outline-none transition focus:border-violet-400"
-                />
-              </label>
-
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
-                  Filtro
-                </span>
-                <select
-                  value={filterMode}
-                  onChange={(event) => setFilterMode(event.target.value as FilterMode)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 outline-none transition focus:border-violet-400"
-                >
-                  <option value="all">Todos</option>
-                  <option value="attention">Por completar</option>
-                  <option value="ready">Listos</option>
-                  <option value="inactive">Inactivos</option>
-                </select>
-              </div>
-            </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <OpsMetricPill label="Total styles" value={totalItems} />
+            <OpsMetricPill label="Listos" value={readyCount} tone="success" />
+            <OpsMetricPill label="Pendientes" value={pendingCount} tone="warning" />
           </div>
 
-          {error ? (
-            <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {error}
-            </div>
-          ) : null}
+          <OpsSectionDivider className="space-y-4">
+            <OpsFiltersRow>
+              <OpsSearchField
+                value={search}
+                onChange={(value) => {
+                  setSearch(value);
+                  setPage(1);
+                }}
+                placeholder="Buscar por nombre, SKU o tipo de prenda"
+                ariaLabel="Buscar productos"
+              />
+
+              <FilterDropdown
+                label="Filtro"
+                value={filterMode}
+                options={[
+                  { value: "all", label: "Todos" },
+                  { value: "attention", label: "Por completar" },
+                  { value: "ready", label: "Listos" },
+                  { value: "inactive", label: "Inactivos" },
+                ]}
+                onChange={(v) => {
+                  setFilterMode(v as FilterMode);
+                  setPage(1);
+                }}
+              />
+
+              <FilterDropdown
+                label="Sede activa"
+                value={selectedLocationId}
+                options={locationAssignments.map((assignment) => ({
+                  value: assignment.location_id,
+                  label: `${assignment.location.name}${assignment.is_default ? " · Predeterminada" : ""}`,
+                }))}
+                onChange={(v) => {
+                  setSelectedLocationId(v);
+                  setPage(1);
+                }}
+              />
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setSearch("");
+                      setFilterMode("all");
+                      setPage(1);
+                    }}
+                    disabled={!hasActiveFilters}
+                    variant="outline"
+                    size="icon-sm"
+                    className="h-10 w-10 rounded-lg"
+                    aria-label="Limpiar filtros"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={8}>
+                  Limpiar filtros
+                </TooltipContent>
+              </Tooltip>
+            </OpsFiltersRow>
+
+            {error ? (
+              <InlineStatusCard title="No pudimos cargar productos" description={error} tone="danger" variant="ops" />
+            ) : null}
 
           {loading ? (
-            <div className="flex min-h-40 items-center justify-center text-slate-500">
+            <div className="ops-text-muted flex min-h-40 items-center justify-center">
               <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
-              Cargando productos...
+              Cargando productos…
             </div>
-          ) : filteredProducts.length ? (
-            <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200">
-              <div className="hidden grid-cols-[minmax(0,2fr)_0.95fr_1.5fr_0.8fr_0.8fr_1fr_112px] gap-3 bg-slate-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 lg:grid">
-                <div>Producto</div>
-                <div>Codigo</div>
-                <div>Tallas</div>
-                <div>Colores</div>
-                <div>Stock</div>
-                <div>Estado</div>
-                <div className="text-right">Acciones</div>
-              </div>
+          ) : !selectedLocationId && !locationAssignments.length ? (
+              <div className="ops-empty-state-compact mt-4 rounded-lg p-8 text-center">
+              <h3 className="ops-title text-lg font-semibold">No hay sede operativa</h3>
+              <p className="ops-text-muted mt-2 text-sm leading-6">
+                Asigna al menos una sede al usuario para ver stock por talla.
+              </p>
+            </div>
+          ) : products.length ? (
+            <OpsTableWrap minWidth="1080px">
+                <table className="w-full border-collapse">
+                  <thead className="bg-[var(--ops-surface-muted)]">
+                    <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                      <th className="px-4 py-3">Producto</th>
+                      <th className="px-4 py-3">SKU</th>
+                      <th className="px-4 py-3">Tipo</th>
+                      <th className="px-4 py-3">Tallas</th>
+                      <th className="px-4 py-3">Stock</th>
+                      <th className="px-4 py-3">Estado</th>
+                      <th className="px-4 py-3 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                    {products.map((product) => {
+                      const statusMeta = STATUS_META[product.status];
+                      const visibleSizeStock = getVisibleSizeStock(product.size_stock || []);
+                      const extraSizes = (product.size_stock || []).slice(visibleSizeStock.length);
 
-              <div className="divide-y divide-slate-200">
-                {filteredProducts.map((product) => {
-                  const statusMeta = STATUS_META[product.status];
-                  const visibleSizeCodes = getVisibleSizeCodes(product.size_codes || []);
-                  const extraSizesCount = Math.max(
-                    0,
-                    (product.size_codes || []).length - visibleSizeCodes.length
-                  );
-
-                  return (
-                    <article
-                      key={product.style_id}
-                      className="bg-white px-4 py-2.5 transition hover:bg-slate-50/80"
-                    >
-                      <div className="grid gap-3 lg:grid-cols-[minmax(0,2fr)_0.95fr_1.5fr_0.8fr_0.8fr_1fr_112px] lg:items-center">
-                        <div className="min-w-0">
-                          <h3 className="truncate text-sm font-semibold text-slate-950">
-                            {product.name}
-                          </h3>
-
-                          <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-slate-500 lg:hidden">
-                            <span>{product.garment_type_name}</span>
-                            {product.configured_color_count > 0 ? (
-                              <span>{product.configured_color_count} colores</span>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 text-sm lg:block">
-                          <div className="lg:hidden text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                            Codigo
-                          </div>
-                          <p className="font-semibold text-slate-700">
-                            {product.style_code || "-"}
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 text-sm lg:block lg:text-sm">
-                          <div className="lg:hidden text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                            Tallas
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {visibleSizeCodes.length ? (
-                              <>
-                                {visibleSizeCodes.map((sizeCode) => (
-                                  <span
-                                    key={`${product.style_id}-${sizeCode}`}
-                                    className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700"
-                                  >
-                                    {sizeCode}
-                                  </span>
-                                ))}
-                                {extraSizesCount > 0 ? (
-                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
-                                    +{extraSizesCount}
-                                  </span>
-                                ) : null}
-                              </>
-                            ) : (
-                              <span className="text-sm font-semibold text-slate-900">
-                                {product.configured_size_count}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 text-sm lg:block">
-                          <div className="lg:hidden text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                            Colores
-                          </div>
-                          <p className="font-semibold text-slate-900">
-                            {product.configured_color_count}
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 text-sm lg:block">
-                          <div className="lg:hidden text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                            Stock
-                          </div>
-                          <p className="font-semibold text-slate-900">{product.total_stock_qty}</p>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 text-sm lg:block">
-                          <div className="lg:hidden text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                            Estado
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span
-                              className={cn(
-                                "rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                                statusMeta.className
+                      return (
+                        <tr
+                          key={product.style_id}
+                          className="transition hover:bg-[var(--ops-surface-muted)]"
+                        >
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <p className="text-sm font-semibold text-[var(--ops-text)]">{product.name}</p>
+                            <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">{product.garment_type_name}</p>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">{product.style_code || "—"}</span>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">{product.fabric_name || "—"}</span>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <div className="flex flex-wrap gap-1">
+                              {visibleSizeStock.length ? (
+                                <>
+                                  {visibleSizeStock.map((size) => (
+                                    <span
+                                      key={`${product.style_id}-${size.size_id}`}
+                                      className="inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text)]"
+                                    >
+                                      {size.size_code}: {size.qty}
+                                    </span>
+                                  ))}
+                                  {extraSizes.length > 0 ? (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="inline-flex cursor-help rounded-full border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]">
+                                            +{extraSizes.length}
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent
+                                          side="top"
+                                          sideOffset={8}
+                                          className="max-w-64 text-left"
+                                        >
+                                          {formatExtraSizes(extraSizes)}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  ) : null}
+                                </>
+                              ) : (
+                                <span className="text-sm text-[var(--ops-text-muted)]">Sin tallas</span>
                               )}
-                            >
-                              {statusMeta.label}
-                            </span>
-                            {product.missing_wholesale_size_count > 0 ? (
-                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
-                                May.
+                            </div>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <p className="text-sm font-semibold">{product.total_stock_qty}</p>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span
+                                className={cn(
+                                  "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                                  statusMeta.className
+                                )}
+                              >
+                                {statusMeta.label}
                               </span>
-                            ) : null}
-                            {product.warnings.stock_without_retail_price ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700">
-                                <CircleAlert className="h-3 w-3" />
-                                Stock sin retail
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-end gap-1">
-                          <ActionIcon
-                            href={buildStyleHref("/productos/estilos", product.style_id)}
-                            label="Editar style"
-                          >
-                            <PencilLine className="h-4 w-4" />
-                          </ActionIcon>
-                          <ActionIcon
-                            href={buildStyleHref("/productos/variantes", product.style_id)}
-                            label="Variantes"
-                          >
-                            <Shapes className="h-4 w-4" />
-                          </ActionIcon>
-                          <ActionIcon
-                            href={buildStyleHref("/precios/crear-y-editar-precio", product.style_id)}
-                            label="Precios"
-                          >
-                            <ReceiptText className="h-4 w-4" />
-                          </ActionIcon>
-                          <ActionIcon
-                            href={buildStyleHref("/precios/listado-de-precios", product.style_id)}
-                            label="Historial"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </ActionIcon>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            </div>
+                              {product.missing_wholesale_size_count > 0 ? (
+                                <span className="inline-flex rounded-full border border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[color:color-mix(in_srgb,#d97706_74%,var(--ops-text))]">
+                                  May.
+                                </span>
+                              ) : null}
+                              {product.warnings.stock_without_retail_price ? (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[color:color-mix(in_srgb,#e11d48_74%,var(--ops-text))]">
+                                  <CircleAlert className="h-3 w-3" />
+                                  Stock sin retail
+                                </span>
+                              ) : null}
+                            </div>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <AdminRowActionsMenu
+                              ariaLabel={`Acciones para ${product.name}`}
+                              items={[
+                                {
+                                  label: "Editar style",
+                                  icon: <PencilLine className="h-4 w-4" />,
+                                  onSelect: () =>
+                                    router.push(buildStyleHref("/productos/estilos", product.style_id)),
+                                },
+                                {
+                                  label: "Variantes",
+                                  icon: <Shapes className="h-4 w-4" />,
+                                  onSelect: () =>
+                                    router.push(buildStyleHref("/productos/variantes", product.style_id)),
+                                },
+                                {
+                                  label: "Precios",
+                                  icon: <ReceiptText className="h-4 w-4" />,
+                                  onSelect: () =>
+                                    router.push(
+                                      buildStyleHref("/precios/crear-y-editar-precio", product.style_id)
+                                    ),
+                                },
+                                {
+                                  label: "Historial",
+                                  icon: <Eye className="h-4 w-4" />,
+                                  onSelect: () =>
+                                    router.push(
+                                      buildStyleHref("/precios/listado-de-precios", product.style_id)
+                                    ),
+                                },
+                              ]}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+            </OpsTableWrap>
           ) : (
-            <div className="mt-4 rounded-[24px] border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-              <h3 className="text-lg font-semibold text-slate-950">
-                {products.length ? "No hay styles para este filtro" : "Aun no hay styles"}
+            <div className="ops-empty-state-compact mt-4 rounded-lg p-8 text-center">
+              <h3 className="ops-title text-lg font-semibold">
+                {totalItems ? "No hay styles para este filtro" : "No hay productos en esta sede"}
               </h3>
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                {products.length
-                  ? "Prueba otra busqueda o cambia el filtro."
-                  : "Primero registra un style base y luego completa variantes y precios."}
+              <p className="ops-text-muted mt-2 text-sm leading-6">
+                {totalItems
+                  ? "Prueba otra busqueda, sede o filtro."
+                  : "La sede activa no tiene productos para los criterios seleccionados."}
               </p>
             </div>
           )}
-        </article>
-      </div>
-    </section>
+
+          {!loading && totalItems ? (
+            <OpsTableFooter>
+              <span className="ops-secondary-text text-[var(--ops-text-muted)]">
+                {visibleFrom}-{visibleTo} de {totalItems}
+              </span>
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                className="self-end md:self-auto"
+              />
+            </OpsTableFooter>
+          ) : null}
+      </OpsSectionDivider>
+      </OpsPageShell>
+    </TooltipProvider>
   );
 }

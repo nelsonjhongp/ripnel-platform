@@ -3,6 +3,9 @@ import { ModulePlaceholder } from "@/components/modules/module-placeholder"
 import { StylesPage } from "@/components/modules/styles-page"
 import { VariantsPage } from "@/components/modules/variants-page"
 
+// This route currently orchestrates product submodules by slug.
+// `productId` is preserved for compatibility with existing navigation,
+// but it does not represent a real product detail page yet.
 const productPages: Record<
   string,
   { title: string; description: string; bullets: string[] }

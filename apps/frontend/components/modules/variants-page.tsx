@@ -1,18 +1,45 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   Boxes,
   CircleAlert,
   LoaderCircle,
   PackagePlus,
+  Power,
   RefreshCw,
+  RotateCcw,
   Save,
-  Search,
   Shirt,
 } from "lucide-react";
-import { buildApiUrl } from "@/lib/api";
+import {
+  AdminCheckboxOption,
+  AdminConfirmModal,
+  AdminRowActionsMenu,
+} from "@/components/admin/admin-ui";
+import { ApiEnvelope, apiFetch, unwrapApiData } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import {
+  OpsFiltersRow,
+  OpsPageShell,
+  OpsSearchField,
+  OpsSectionDivider,
+  OpsTableFooter,
+  OpsTableWrap,
+} from "@/components/ui/ops-page-shell";
+import { Pagination } from "@/components/ui/pagination";
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type StyleItem = {
   style_id: string;
@@ -124,12 +151,25 @@ type ProductWorkspace = {
   configured_colors: ColorItem[];
 };
 
+type ProductsResponse = {
+  items: StyleItem[];
+};
+
 type VariantFormState = {
   sizeIds: string[];
   colorIds: string[];
 };
 
 type StatusFilter = "all" | "active" | "inactive";
+
+const STYLE_PAGE_SIZE = 10;
+const VARIANT_PAGE_SIZE = 10;
+
+const STATUS_FILTER_OPTIONS = [
+  { value: "all", label: "Todos" },
+  { value: "active", label: "Activos" },
+  { value: "inactive", label: "Inactivos" },
+] as const;
 
 const initialFormState: VariantFormState = {
   sizeIds: [],
@@ -167,29 +207,21 @@ function sortByActive<T extends { active: boolean }>(items: T[]) {
 }
 
 async function requestApiData<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(buildApiUrl(path), {
+  const payload = await apiFetch<T | ApiEnvelope<T>>(path, {
     cache: "no-store",
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
   });
-  const payload = await response.json();
 
-  if (!response.ok) {
-    throw new Error(payload.message || "No se pudo cargar Variantes");
-  }
-
-  return payload.data;
+  return unwrapApiData(payload);
 }
 
 async function requestVariantsBaseData() {
-  const [stylesData, sizesData, colorsData] = await Promise.all([
-    requestApiData<StyleItem[]>("/api/products"),
+  const [productsPayload, sizesData, colorsData] = await Promise.all([
+    requestApiData<ProductsResponse>("/api/products?page=1&page_size=50"),
     requestApiData<SizeItem[]>("/api/sizes"),
     requestApiData<ColorItem[]>("/api/colors"),
   ]);
+  const stylesData = productsPayload?.items || [];
 
   return {
     stylesData,
@@ -200,26 +232,26 @@ async function requestVariantsBaseData() {
 
 function getStatusBadgeClass(status: StyleItem["status"]) {
   if (status === "ready") {
-    return "bg-emerald-100 text-emerald-700";
+    return "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]";
   }
 
   if (status === "ready_no_stock") {
-    return "bg-sky-100 text-sky-700";
+    return "border-[color:color-mix(in_srgb,#3b82f6_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#3b82f6_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#2563eb_74%,var(--ops-text))]";
   }
 
   if (status === "pending_prices") {
-    return "bg-rose-100 text-rose-700";
+    return "border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#e11d48_74%,var(--ops-text))]";
   }
 
   if (status === "pending_variants") {
-    return "bg-amber-100 text-amber-700";
+    return "border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#d97706_74%,var(--ops-text))]";
   }
 
   if (status === "draft") {
-    return "bg-slate-900 text-white";
+    return "border-[color:color-mix(in_srgb,#334155_60%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#1e293b_90%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f1f5f9_94%,var(--ops-text))]";
   }
 
-  return "bg-slate-200 text-slate-700";
+  return "border-[color:color-mix(in_srgb,#94a3b8_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#94a3b8_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#475569_74%,var(--ops-text))]";
 }
 
 function getStatusLabel(status: StyleItem["status"]) {
@@ -251,6 +283,7 @@ export function VariantsPage({
 }: {
   initialStyleId?: string | null;
 }) {
+  const router = useRouter();
   const [styles, setStyles] = useState<StyleItem[]>([]);
   const [sizes, setSizes] = useState<SizeItem[]>([]);
   const [colors, setColors] = useState<ColorItem[]>([]);
@@ -260,13 +293,16 @@ export function VariantsPage({
   const [formState, setFormState] = useState<VariantFormState>(initialFormState);
   const [styleSearch, setStyleSearch] = useState("");
   const [styleStatusFilter, setStyleStatusFilter] = useState<StatusFilter>("all");
+  const [stylePage, setStylePage] = useState(1);
   const [variantSearch, setVariantSearch] = useState("");
   const [variantStatusFilter, setVariantStatusFilter] = useState<StatusFilter>("all");
+  const [variantPage, setVariantPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingSelected, setLoadingSelected] = useState(false);
   const [savingConfig, setSavingConfig] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [togglingVariantId, setTogglingVariantId] = useState<string | null>(null);
+  const [pendingStatusVariant, setPendingStatusVariant] = useState<VariantItem | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const hasAppliedInitialSelection = useRef(false);
@@ -282,12 +318,12 @@ export function VariantsPage({
       setSizes(sizesData);
       setColors(colorsData);
 
-      if (!selectedStyleId && stylesData.length) {
+      if (!selectedStyleId && initialStyleId && stylesData.length) {
         const preferredStyle =
           initialStyleId &&
           stylesData.find((style) => style.style_id === initialStyleId)?.style_id;
 
-        setSelectedStyleId(preferredStyle || stylesData[0].style_id);
+        setSelectedStyleId(preferredStyle || "");
       }
     } catch (requestError) {
       setError(
@@ -345,12 +381,12 @@ export function VariantsPage({
         setSizes(sizesData);
         setColors(colorsData);
 
-        if (stylesData.length) {
+        if (initialStyleId && stylesData.length) {
           const preferredStyle =
             initialStyleId &&
             stylesData.find((style) => style.style_id === initialStyleId)?.style_id;
 
-          setSelectedStyleId((current) => current || preferredStyle || stylesData[0].style_id);
+          setSelectedStyleId((current) => current || preferredStyle || "");
         }
       })
       .catch((requestError) => {
@@ -393,11 +429,22 @@ export function VariantsPage({
       setSelectedSnapshot(null);
       setSelectedWorkspace(null);
       setFormState(initialFormState);
+      setVariantSearch("");
+      setVariantStatusFilter("all");
+      setVariantPage(1);
       return;
     }
 
     loadStyleSnapshot(selectedStyleId);
   }, [selectedStyleId]);
+
+  useEffect(() => {
+    setStylePage(1);
+  }, [styleSearch, styleStatusFilter]);
+
+  useEffect(() => {
+    setVariantPage(1);
+  }, [variantSearch, variantStatusFilter, selectedStyleId]);
 
   const filteredStyles = useMemo(() => {
     const term = normalizeText(styleSearch);
@@ -426,14 +473,14 @@ export function VariantsPage({
   }, [styleSearch, styleStatusFilter, styles]);
 
   useEffect(() => {
-    if (!styles.length) {
+    if (!selectedStyleId || !styles.length) {
       return;
     }
 
     const stillExists = styles.some((style) => style.style_id === selectedStyleId);
 
     if (!stillExists) {
-      setSelectedStyleId(styles[0].style_id);
+      setSelectedStyleId("");
     }
   }, [selectedStyleId, styles]);
 
@@ -479,29 +526,61 @@ export function VariantsPage({
 
   const projectedColorsCount = formState.colorIds.length || 1;
   const projectedCombinations = formState.sizeIds.length * projectedColorsCount;
-  const totalVariants = useMemo(
-    () => styles.reduce((total, style) => total + style.expected_variant_count, 0),
+
+  const readyStylesCount = useMemo(
+    () => styles.filter((style) => style.status === "ready").length,
     [styles]
   );
 
-  const styleCounts = useMemo(
-    () => ({
-      all: styles.length,
-      active: styles.filter((style) => style.active).length,
-      inactive: styles.filter((style) => !style.active).length,
-    }),
+  const pendingStylesCount = useMemo(
+    () =>
+      styles.filter(
+        (style) =>
+          style.status === "draft" ||
+          style.status === "pending_variants" ||
+          style.status === "pending_prices" ||
+          style.warnings.stock_without_retail_price
+      ).length,
     [styles]
   );
 
-  const variantCounts = useMemo(() => {
-    const variants = selectedSnapshot?.variants || [];
+  const styleTotalPages = Math.max(1, Math.ceil(filteredStyles.length / STYLE_PAGE_SIZE));
+  const safeStylePage = Math.min(stylePage, styleTotalPages);
 
-    return {
-      all: variants.length,
-      active: variants.filter((variant) => variant.active).length,
-      inactive: variants.filter((variant) => !variant.active).length,
-    };
-  }, [selectedSnapshot?.variants]);
+  useEffect(() => {
+    if (stylePage !== safeStylePage) {
+      setStylePage(safeStylePage);
+    }
+  }, [safeStylePage, stylePage]);
+
+  const paginatedStyles = useMemo(() => {
+    const start = (safeStylePage - 1) * STYLE_PAGE_SIZE;
+    return filteredStyles.slice(start, start + STYLE_PAGE_SIZE);
+  }, [filteredStyles, safeStylePage]);
+
+  const styleFirstVisible =
+    paginatedStyles.length === 0 ? 0 : (safeStylePage - 1) * STYLE_PAGE_SIZE + 1;
+  const styleLastVisible =
+    paginatedStyles.length === 0 ? 0 : styleFirstVisible + paginatedStyles.length - 1;
+
+  const variantTotalPages = Math.max(1, Math.ceil(filteredVariants.length / VARIANT_PAGE_SIZE));
+  const safeVariantPage = Math.min(variantPage, variantTotalPages);
+
+  useEffect(() => {
+    if (variantPage !== safeVariantPage) {
+      setVariantPage(safeVariantPage);
+    }
+  }, [safeVariantPage, variantPage]);
+
+  const paginatedVariants = useMemo(() => {
+    const start = (safeVariantPage - 1) * VARIANT_PAGE_SIZE;
+    return filteredVariants.slice(start, start + VARIANT_PAGE_SIZE);
+  }, [filteredVariants, safeVariantPage]);
+
+  const variantFirstVisible =
+    paginatedVariants.length === 0 ? 0 : (safeVariantPage - 1) * VARIANT_PAGE_SIZE + 1;
+  const variantLastVisible =
+    paginatedVariants.length === 0 ? 0 : variantFirstVisible + paginatedVariants.length - 1;
 
   const selectedProduct = selectedWorkspace?.product || null;
 
@@ -601,486 +680,468 @@ export function VariantsPage({
           : "No se pudo actualizar el estado de la variante"
       );
     } finally {
+      setPendingStatusVariant(null);
       setTogglingVariantId(null);
     }
   }
 
   return (
-    <section className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_45%,#eef2ff_100%)] p-4 md:p-5">
-      <div className="mx-auto flex max-w-7xl flex-col gap-5">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)] md:p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-violet-500">
-                Productos
-              </p>
-              <h1 className="mt-2 text-2xl font-semibold text-slate-950">
-                Variantes de producto
-              </h1>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
-                Configura tallas y colores permitidos sobre un style existente y
-                genera las variantes faltantes en lote. SKU se crea ahora; barcode
-                queda pendiente para una etapa posterior.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={loadBaseData}
-              className="inline-flex items-center gap-2 self-start rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Recargar
-            </button>
-          </div>
-
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
-            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Styles disponibles
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">{styles.length}</p>
-            </article>
-            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Variantes potenciales
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">{totalVariants}</p>
-            </article>
-            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Faltantes del style
-              </p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">
-                {selectedSnapshot?.summary.missing_count ?? 0}
-              </p>
-            </article>
-          </div>
-        </div>
-
-        <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-          <article className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)] md:p-6">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                  Styles base
-                </p>
-                <h2 className="mt-1 text-xl font-semibold text-slate-950">
-                  Seleccionar style
-                </h2>
-              </div>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                {filteredStyles.length} visibles
-              </span>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
-                <Search className="h-4 w-4 text-slate-400" />
-                <input
-                  value={styleSearch}
-                  onChange={(event) => setStyleSearch(event.target.value)}
-                  placeholder="Buscar por codigo, nombre o tela"
-                  className="w-full bg-transparent outline-none placeholder:text-slate-400"
-                />
-              </label>
-
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { key: "all", label: "Todos", count: styleCounts.all },
-                  { key: "active", label: "Activos", count: styleCounts.active },
-                  { key: "inactive", label: "Inactivos", count: styleCounts.inactive },
-                ].map((option) => {
-                  const isActive = styleStatusFilter === option.key;
-
-                  return (
-                    <button
-                      key={option.key}
+    <TooltipProvider delayDuration={120}>
+      <OpsPageShell width="wide">
+          <PosHeader
+            eyebrow="Productos"
+            title="Variantes de producto"
+            actions={
+              <>
+                {selectedStyleId ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="rounded-lg"
+                    onClick={() => {
+                      setSelectedStyleId("");
+                      router.push("/productos/variantes");
+                    }}
+                  >
+                    Volver a variantes
+                  </Button>
+                ) : null}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
                       type="button"
-                      onClick={() => setStyleStatusFilter(option.key as StatusFilter)}
-                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                        isActive
-                          ? "bg-slate-900 text-white"
-                          : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                      variant="outline"
+                      size="icon-sm"
+                      onClick={loadBaseData}
+                      disabled={loading}
+                      aria-label="Actualizar variantes"
+                      className="rounded-lg"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={8}>
+                    Actualizar
+                  </TooltipContent>
+                </Tooltip>
+              </>
+            }
+          />
+
+          <div className="flex flex-wrap items-center gap-2">
+            <OpsMetricPill label="Styles base" value={styles.length} />
+            <OpsMetricPill label="Listos" value={readyStylesCount} tone="accent" />
+            <OpsMetricPill label="Por completar" value={pendingStylesCount} tone="warning" />
+          </div>
+
+          <div className="space-y-5">
+            {!selectedStyleId ? (
+              <OpsSectionDivider className="space-y-4">
+                <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_auto]">
+                  <OpsSearchField
+                    value={styleSearch}
+                    onChange={setStyleSearch}
+                    placeholder="Buscar por código, nombre o tela"
+                    ariaLabel="Buscar styles para variantes"
+                  />
+
+                  <FilterDropdown
+                    label="Estado"
+                    value={styleStatusFilter}
+                    options={STATUS_FILTER_OPTIONS}
+                    onChange={(v) => setStyleStatusFilter(v as StatusFilter)}
+                  />
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          setStyleSearch("");
+                          setStyleStatusFilter("all");
+                          setStylePage(1);
+                        }}
+                        disabled={!styleSearch.trim() && styleStatusFilter === "all"}
+                        variant="outline"
+                        size="icon-sm"
+                        className="h-10 w-10 rounded-lg"
+                        aria-label="Limpiar filtros"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" sideOffset={8}>
+                      Limpiar filtros
+                    </TooltipContent>
+                  </Tooltip>
+                </OpsFiltersRow>
+
+                <OpsTableWrap minWidth="1080px">
+                    <table className="w-full border-collapse">
+                      <thead className="bg-[var(--ops-surface-muted)]">
+                        <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                          <th className="px-4 py-3">Style</th>
+                          <th className="px-4 py-3">Tipo</th>
+                          <th className="px-4 py-3">Tela</th>
+                          <th className="px-4 py-3">Target</th>
+                          <th className="px-4 py-3">Config.</th>
+                          <th className="px-4 py-3">Cobertura</th>
+                          <th className="px-4 py-3">Estado</th>
+                          <th className="px-4 py-3 text-right">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                        {loading ? (
+                          <tr>
+                            <td colSpan={8} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                              <LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />
+                              Cargando styles…
+                            </td>
+                          </tr>
+                        ) : paginatedStyles.length === 0 ? (
+                          <tr>
+                            <td colSpan={8} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                              No hay styles para este filtro.
+                            </td>
+                          </tr>
+                        ) : (
+                          paginatedStyles.map((style) => (
+                            <tr
+                              key={style.style_id}
+                              className={cn(
+                                "transition hover:bg-[var(--ops-surface-muted)]",
+                                !style.active && "opacity-75"
+                              )}
+                            >
+                              <td className="px-4 py-[var(--ops-row-py)]">
+                                <p className="truncate max-w-[200px] text-sm font-semibold text-[var(--ops-text)]">
+                                  {style.name}
+                                </p>
+                                <div className="mt-1 flex items-center gap-2">
+                                  <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--ripnel-accent-hover)]">
+                                    {style.style_code || "Sin codigo"}
+                                  </span>
+                                  <span className="text-[11px] text-[var(--ops-text-muted)]">
+                                    {new Date(style.created_at).toLocaleDateString("es-PE")}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{style.garment_type_name}</td>
+                              <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{style.fabric_name || "-"}</td>
+                              <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{style.target_name || "-"}</td>
+                              <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                                <p>{style.configured_size_count} tallas</p>
+                                <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">
+                                  {style.configured_color_count} colores
+                                </p>
+                              </td>
+                              <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                                <p>
+                                  {style.variant_count}/{style.expected_variant_count}
+                                </p>
+                                <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">
+                                  retail {style.retail_sizes_covered_count}/{style.configured_size_count}
+                                </p>
+                              </td>
+                              <td className="px-4 py-[var(--ops-row-py)]">
+                                <span
+                                  className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getStatusBadgeClass(
+                                    style.status
+                                  )}`}
+                                >
+                                  {getStatusLabel(style.status)}
+                                </span>
+                              </td>
+                              <td className="px-4 py-[var(--ops-row-py)] text-right">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="rounded-lg px-3"
+                                  onClick={() => {
+                                    setSelectedStyleId(style.style_id);
+                                    router.push(`/productos/variantes?style_id=${encodeURIComponent(style.style_id)}`);
+                                    setSuccessMessage(null);
+                                  }}
+                                >
+                                  Configurar
+                                </Button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                </OpsTableWrap>
+
+                {!loading ? (
+                  <OpsTableFooter>
+                    <span className="ops-secondary-text text-[var(--ops-text-muted)]">
+                      {filteredStyles.length === 0
+                        ? "0 resultados"
+                        : `${styleFirstVisible}-${styleLastVisible} de ${filteredStyles.length}`}
+                    </span>
+                    <Pagination
+                      page={safeStylePage}
+                      totalPages={styleTotalPages}
+                      onPageChange={setStylePage}
+                      className="self-end md:self-auto"
+                    />
+                  </OpsTableFooter>
+                ) : null}
+              </OpsSectionDivider>
+            ) : null}
+
+            {selectedStyleId ? (
+              <article className="ops-surface rounded-lg border p-4 md:p-5">
+                {loadingSelected ? (
+                  <div className="ops-text-muted flex min-h-56 items-center justify-center">
+                    <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
+                    Cargando configuracion…
+                  </div>
+                ) : selectedSnapshot ? (
+                  <div className="space-y-5">
+                    <div
+                      className={`border-b border-[var(--ops-border-strong)] pb-4 ${
+                        selectedSnapshot.style.active ? "" : "opacity-75"
                       }`}
                     >
-                      {option.label} ({option.count})
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {loading ? (
-              <div className="flex min-h-56 items-center justify-center text-slate-500">
-                <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
-                Cargando styles...
-              </div>
-            ) : filteredStyles.length ? (
-              <div className="mt-4 space-y-3">
-                {filteredStyles.map((style) => {
-                  const isSelected = style.style_id === selectedStyleId;
-
-                  return (
-                    <button
-                      key={style.style_id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedStyleId(style.style_id);
-                        setSuccessMessage(null);
-                      }}
-                      className={`w-full rounded-2xl border p-4 text-left transition ${
-                        isSelected
-                          ? "border-indigo-300 bg-indigo-50"
-                          : "border-slate-200 hover:border-slate-300"
-                      } ${style.active ? "" : "opacity-70"}`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-semibold text-slate-900">{style.name}</p>
-                            {style.style_code ? (
-                              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600">
-                                {style.style_code}
+                            <h2 className="ops-title text-xl font-semibold">
+                              {selectedSnapshot.style.name}
+                            </h2>
+                            {selectedSnapshot.style.style_code ? (
+                              <span className="ops-surface rounded-full border border-[color:var(--ops-border-soft)] px-3 py-1 text-xs font-semibold text-[var(--ops-text-muted)]">
+                                {selectedSnapshot.style.style_code}
+                              </span>
+                            ) : null}
+                            {selectedProduct ? (
+                              <span
+                                className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(
+                                  selectedProduct.status
+                                )}`}
+                              >
+                                {getStatusLabel(selectedProduct.status)}
                               </span>
                             ) : null}
                             <span
-                              className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusBadgeClass(
-                                style.status
-                              )}`}
+                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${
+                                selectedSnapshot.style.active
+                                  ? "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
+                                  : "border-[color:color-mix(in_srgb,#94a3b8_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#94a3b8_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#475569_74%,var(--ops-text))]"
+                              }`}
                             >
-                              {getStatusLabel(style.status)}
+                              {selectedSnapshot.style.active ? "Activo" : "Inactivo"}
                             </span>
                           </div>
-                          <p className="mt-2 text-sm text-slate-500">
-                            {style.garment_type_name}
-                            {style.fabric_name ? ` - ${style.fabric_name}` : ""}
-                          </p>
-                          <p className="mt-2 text-xs text-slate-500">
-                            Configuracion actual: {style.configured_size_count} tallas /{" "}
-                            {style.configured_color_count} colores
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            Variantes {style.variant_count}/{style.expected_variant_count} ·
-                            retail {style.retail_sizes_covered_count}/{style.configured_size_count}
-                          </p>
-                        </div>
-
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            style.active
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-slate-200 text-slate-600"
-                          }`}
-                        >
-                          {style.active ? "Activo" : "Inactivo"}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="mt-4 rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-                <h3 className="text-lg font-semibold text-slate-900">
-                  No hay styles para este filtro
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Ajusta la busqueda o el estado para ver otros styles base.
-                </p>
-              </div>
-            )}
-          </article>
-
-          <article className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_24px_90px_-60px_rgba(15,23,42,0.35)] md:p-6">
-            {loadingSelected ? (
-              <div className="flex min-h-56 items-center justify-center text-slate-500">
-                <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
-                Cargando configuracion...
-              </div>
-            ) : selectedSnapshot ? (
-              <div className="space-y-5">
-                <div
-                  className={`rounded-3xl border border-slate-200 bg-slate-50 p-4 ${
-                    selectedSnapshot.style.active ? "" : "opacity-75"
-                  }`}
-                >
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="text-xl font-semibold text-slate-950">
-                          {selectedSnapshot.style.name}
-                        </h2>
-                        {selectedSnapshot.style.style_code ? (
-                          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600">
-                            {selectedSnapshot.style.style_code}
-                          </span>
-                        ) : null}
-                        {selectedProduct ? (
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(
-                              selectedProduct.status
-                            )}`}
-                          >
-                            {getStatusLabel(selectedProduct.status)}
-                          </span>
-                        ) : null}
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                            selectedSnapshot.style.active
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-slate-200 text-slate-600"
-                          }`}
-                        >
-                          {selectedSnapshot.style.active ? "Activo" : "Inactivo"}
-                        </span>
-                      </div>
-                      <div className="mt-3 grid gap-2 text-sm text-slate-500 md:grid-cols-2">
-                        <p>
-                          <span className="font-medium text-slate-700">Tipo:</span>{" "}
-                          {selectedSnapshot.style.garment_type_name}
-                        </p>
-                        <p>
-                          <span className="font-medium text-slate-700">Tela:</span>{" "}
-                          {selectedSnapshot.style.fabric_name || "-"}
-                        </p>
-                        <p>
-                          <span className="font-medium text-slate-700">Target:</span>{" "}
-                          {selectedSnapshot.style.target_name || "-"}
-                        </p>
-                        <p>
-                          <span className="font-medium text-slate-700">Variantes:</span>{" "}
-                          {selectedSnapshot.summary.existing_count} /{" "}
-                          {selectedSnapshot.summary.total_possible}
-                        </p>
-                        {selectedProduct ? (
-                          <>
+                          <div className="mt-3 grid gap-2 text-sm md:grid-cols-2 text-[var(--ops-text-muted)]">
                             <p>
-                              <span className="font-medium text-slate-700">Retail:</span>{" "}
-                              {selectedProduct.retail_sizes_covered_count} /{" "}
-                              {selectedProduct.configured_size_count}
+                              <span className="font-medium text-[var(--ops-text)]">Tipo:</span>{" "}
+                              {selectedSnapshot.style.garment_type_name}
                             </p>
                             <p>
-                              <span className="font-medium text-slate-700">Mayorista:</span>{" "}
-                              {selectedProduct.wholesale_sizes_covered_count} /{" "}
-                              {selectedProduct.configured_size_count}
+                              <span className="font-medium text-[var(--ops-text)]">Tela:</span>{" "}
+                              {selectedSnapshot.style.fabric_name || "-"}
                             </p>
-                          </>
-                        ) : null}
+                            <p>
+                              <span className="font-medium text-[var(--ops-text)]">Target:</span>{" "}
+                              {selectedSnapshot.style.target_name || "-"}
+                            </p>
+                            <p>
+                              <span className="font-medium text-[var(--ops-text)]">Variantes:</span>{" "}
+                              {selectedSnapshot.summary.existing_count} /{" "}
+                              {selectedSnapshot.summary.total_possible}
+                            </p>
+                            {selectedProduct ? (
+                              <>
+                                <p>
+                                  <span className="font-medium text-[var(--ops-text)]">Retail:</span>{" "}
+                                  {selectedProduct.retail_sizes_covered_count} /{" "}
+                                  {selectedProduct.configured_size_count}
+                                </p>
+                                <p>
+                                  <span className="font-medium text-[var(--ops-text)]">Mayorista:</span>{" "}
+                                  {selectedProduct.wholesale_sizes_covered_count} /{" "}
+                                  {selectedProduct.configured_size_count}
+                                </p>
+                              </>
+                            ) : null}
+                          </div>
+                        </div>
+                        <Shirt className="h-10 w-10 text-[var(--ops-text-muted)]" />
                       </div>
                     </div>
-                    <Shirt className="h-10 w-10 text-slate-300" />
-                  </div>
-                </div>
 
-                {selectedProduct ? (
-                  <div className="rounded-3xl border border-slate-200 bg-white p-4">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="space-y-3">
-                        <div className="grid gap-3 md:grid-cols-4">
-                          <article className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                              Retail
-                            </p>
-                            <p className="mt-1 text-lg font-semibold text-slate-900">
-                              {selectedProduct.retail_sizes_covered_count}/
-                              {selectedProduct.configured_size_count}
-                            </p>
-                          </article>
-                          <article className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                              Mayorista
-                            </p>
-                            <p className="mt-1 text-lg font-semibold text-slate-900">
-                              {selectedProduct.wholesale_sizes_covered_count}/
-                              {selectedProduct.configured_size_count}
-                            </p>
-                          </article>
-                          <article className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                              Stock
-                            </p>
-                            <p className="mt-1 text-lg font-semibold text-slate-900">
-                              {selectedProduct.total_stock_qty}
-                            </p>
-                          </article>
-                          <article className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                              Siguiente paso
-                            </p>
-                            <p className="mt-1 text-sm font-semibold text-slate-900">
-                              {selectedProduct.next_step_label}
-                            </p>
-                          </article>
-                        </div>
+                    {selectedProduct ? (
+                      <div>
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="space-y-3">
+                            <div className="flex flex-wrap gap-2">
+                              <OpsMetricPill
+                                label="Retail"
+                                value={`${selectedProduct.retail_sizes_covered_count}/${selectedProduct.configured_size_count}`}
+                                tone="success"
+                              />
+                              <OpsMetricPill
+                                label="Mayorista"
+                                value={`${selectedProduct.wholesale_sizes_covered_count}/${selectedProduct.configured_size_count}`}
+                                tone="accent"
+                              />
+                              <OpsMetricPill label="Stock" value={selectedProduct.total_stock_qty} />
+                              <OpsMetricPill
+                                label="Siguiente paso"
+                                value={selectedProduct.next_step_label}
+                              />
+                            </div>
 
-                        <div className="flex flex-wrap gap-2">
-                          {selectedProduct.missing_retail_size_count > 0 ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700">
-                              <CircleAlert className="h-3.5 w-3.5" />
-                              Faltan {selectedProduct.missing_retail_size_count} tallas retail
-                            </span>
-                          ) : null}
-                          {selectedProduct.warnings.missing_wholesale_prices ? (
-                            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
-                              Mayorista incompleto
-                            </span>
-                          ) : null}
-                          {selectedProduct.warnings.stock_without_retail_price ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700">
-                              <CircleAlert className="h-3.5 w-3.5" />
-                              Stock sin precio retail
-                            </span>
-                          ) : null}
+                            <div className="flex flex-wrap gap-2">
+                              {selectedProduct.missing_retail_size_count > 0 ? (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-2.5 py-1 text-xs font-semibold text-[color:color-mix(in_srgb,#e11d48_74%,var(--ops-text))]">
+                                  <CircleAlert className="h-3.5 w-3.5" />
+                                  Faltan {selectedProduct.missing_retail_size_count} tallas retail
+                                </span>
+                              ) : null}
+                              {selectedProduct.warnings.missing_wholesale_prices ? (
+                                <span className="inline-flex rounded-full border border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] px-2.5 py-1 text-xs font-semibold text-[color:color-mix(in_srgb,#d97706_74%,var(--ops-text))]">
+                                  Mayorista incompleto
+                                </span>
+                              ) : null}
+                              {selectedProduct.warnings.stock_without_retail_price ? (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-2.5 py-1 text-xs font-semibold text-[color:color-mix(in_srgb,#e11d48_74%,var(--ops-text))]">
+                                  <CircleAlert className="h-3.5 w-3.5" />
+                                  Stock sin precio retail
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            <Button asChild variant="accent" size="sm" className="rounded-lg px-3">
+                              <Link
+                                href={`/precios/crear-y-editar-precio?style_id=${encodeURIComponent(selectedProduct.style_id)}`}
+                              >
+                                Ir a precios
+                              </Link>
+                            </Button>
+                            <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
+                              <Link
+                                href={`/precios/listado-de-precios?style_id=${encodeURIComponent(selectedProduct.style_id)}`}
+                              >
+                                Ver historial
+                              </Link>
+                            </Button>
+                          </div>
                         </div>
                       </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        <Link
-                          href={`/precios/crear-y-editar-precio?style_id=${encodeURIComponent(selectedProduct.style_id)}`}
-                          className="inline-flex items-center justify-center rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
-                        >
-                          Ir a precios
-                        </Link>
-                        <Link
-                          href={`/precios/listado-de-precios?style_id=${encodeURIComponent(selectedProduct.style_id)}`}
-                          className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                        >
-                          Ver historial
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
+                    ) : null}
 
                 <form onSubmit={handleSaveConfig} className="space-y-5">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-3">
-                      <label className="text-sm font-medium text-slate-700">Tallas</label>
-                      <span className="text-xs text-slate-500">Obligatorio</span>
+                      <label className="text-sm font-semibold text-[var(--ops-text)]">Tallas</label>
+                      <span className="text-xs text-[var(--ops-text-muted)]">Obligatorio</span>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                       {visibleSizes.map((size) => (
-                        <label
+                        <AdminCheckboxOption
                           key={size.size_id}
-                          className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-sm ${
-                            size.active
-                              ? "border-slate-200 bg-slate-50 text-slate-700"
-                              : "border-amber-200 bg-amber-50 text-amber-700"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formState.sizeIds.includes(size.size_id)}
-                            onChange={() =>
-                              setFormState((current) => ({
-                                ...current,
-                                sizeIds: toggleValue(current.sizeIds, size.size_id),
-                              }))
-                            }
-                            className="h-4 w-4 rounded border-slate-300"
-                          />
-                          <span>
-                            {size.code} - {size.name}
-                            {!size.active ? " (inactiva)" : ""}
-                          </span>
-                        </label>
+                          label={size.name}
+                          helper={size.active ? size.code : `${size.code} · inactiva`}
+                          checked={formState.sizeIds.includes(size.size_id)}
+                          onChange={() =>
+                            setFormState((current) => ({
+                              ...current,
+                              sizeIds: toggleValue(current.sizeIds, size.size_id),
+                            }))
+                          }
+                        />
                       ))}
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-3">
-                      <label className="text-sm font-medium text-slate-700">Colores</label>
-                      <span className="text-xs text-slate-500">
+                      <label className="text-sm font-semibold text-[var(--ops-text)]">Colores</label>
+                      <span className="text-xs text-[var(--ops-text-muted)]">
                         Si no eliges uno, se usara UNICO
                       </span>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                       {visibleColors.map((color) => (
-                        <label
+                        <AdminCheckboxOption
                           key={color.color_id}
-                          className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-sm ${
+                          label={color.name}
+                          helper={
                             color.active
-                              ? "border-slate-200 bg-slate-50 text-slate-700"
-                              : "border-amber-200 bg-amber-50 text-amber-700"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={formState.colorIds.includes(color.color_id)}
-                            onChange={() =>
-                              setFormState((current) => ({
-                                ...current,
-                                colorIds: toggleValue(current.colorIds, color.color_id),
-                              }))
-                            }
-                            className="h-4 w-4 rounded border-slate-300"
-                          />
-                          <span
-                            className="inline-block h-3.5 w-3.5 rounded-full border border-slate-300"
-                            style={{
-                              backgroundColor: color.hex || "#ffffff",
-                            }}
-                          />
-                          <span>
-                            {color.code ? `${color.code} - ${color.name}` : color.name}
-                            {!color.active ? " (inactivo)" : ""}
-                          </span>
-                        </label>
+                              ? color.code || "Color"
+                              : `${color.code || "Color"} · inactivo`
+                          }
+                          checked={formState.colorIds.includes(color.color_id)}
+                          onChange={() =>
+                            setFormState((current) => ({
+                              ...current,
+                              colorIds: toggleValue(current.colorIds, color.color_id),
+                            }))
+                          }
+                        />
                       ))}
                     </div>
                   </div>
 
                   <div className="grid gap-3 md:grid-cols-3">
-                    <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <article className="rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
                         Tallas elegidas
                       </p>
-                      <p className="mt-2 text-2xl font-semibold text-slate-900">
+                      <p className="mt-2 text-2xl font-semibold text-[var(--ops-text)]">
                         {formState.sizeIds.length}
                       </p>
                     </article>
-                    <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <article className="rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
                         Colores elegidos
                       </p>
-                      <p className="mt-2 text-2xl font-semibold text-slate-900">
+                      <p className="mt-2 text-2xl font-semibold text-[var(--ops-text)]">
                         {formState.colorIds.length || 1}
                       </p>
                     </article>
-                    <article className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <article className="rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
                         Combinaciones proyectadas
                       </p>
-                      <p className="mt-2 text-2xl font-semibold text-slate-900">
+                      <p className="mt-2 text-2xl font-semibold text-[var(--ops-text)]">
                         {projectedCombinations}
                       </p>
                     </article>
                   </div>
 
                   {error ? (
-                    <div className="rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    <div role="alert" aria-live="polite" className="rounded-xl border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_10%,var(--ops-surface))] px-3 py-2 text-sm text-[color:color-mix(in_srgb,#e11d48_82%,var(--ops-text))]">
                       {error}
                     </div>
                   ) : null}
 
                   {successMessage ? (
-                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                    <div role="status" aria-live="polite" className="rounded-xl border border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] px-3 py-2 text-sm text-[color:color-mix(in_srgb,#059669_82%,var(--ops-text))]">
                       {successMessage}
                     </div>
                   ) : null}
 
                   <div className="grid gap-3 md:grid-cols-2">
-                    <button
+                    <Button
                       type="submit"
                       disabled={savingConfig}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-lg px-3"
                     >
                       {savingConfig ? (
                         <>
                           <LoaderCircle className="h-4 w-4 animate-spin" />
-                          Guardando...
+                          Guardando…
                         </>
                       ) : (
                         <>
@@ -1088,18 +1149,20 @@ export function VariantsPage({
                           Guardar configuracion
                         </>
                       )}
-                    </button>
+                    </Button>
 
-                    <button
+                    <Button
                       type="button"
                       onClick={handleGenerateVariants}
                       disabled={generating}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-70"
+                      variant="accent"
+                      size="sm"
+                      className="rounded-lg px-3"
                     >
                       {generating ? (
                         <>
                           <LoaderCircle className="h-4 w-4 animate-spin" />
-                          Generando...
+                          Generando…
                         </>
                       ) : (
                         <>
@@ -1107,150 +1170,186 @@ export function VariantsPage({
                           Generar variantes faltantes
                         </>
                       )}
-                    </button>
+                    </Button>
                   </div>
                 </form>
 
-                <div className="rounded-3xl border border-slate-200 p-4">
-                  <div className="flex flex-col gap-3 border-b border-slate-200 pb-3 lg:flex-row lg:items-end lg:justify-between">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                        Resultado
-                      </p>
-                      <h3 className="mt-1 text-lg font-semibold text-slate-950">
-                        Variantes generadas
-                      </h3>
-                    </div>
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                      {filteredVariants.length} visibles
-                    </span>
-                  </div>
+                <div className="space-y-4 border-t border-[var(--ops-border-strong)] pt-4">
+                  <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_auto]">
+                    <OpsSearchField
+                      value={variantSearch}
+                      onChange={setVariantSearch}
+                      placeholder="Buscar por SKU, talla o color"
+                      ariaLabel="Buscar variantes"
+                    />
 
-                  <div className="mt-4 space-y-3">
-                    <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-600">
-                      <Search className="h-4 w-4 text-slate-400" />
-                      <input
-                        value={variantSearch}
-                        onChange={(event) => setVariantSearch(event.target.value)}
-                        placeholder="Buscar por SKU, talla o color"
-                        className="w-full bg-transparent outline-none placeholder:text-slate-400"
-                      />
-                    </label>
+                    <FilterDropdown
+                      label="Estado"
+                      value={variantStatusFilter}
+                      options={STATUS_FILTER_OPTIONS}
+                      onChange={(v) => setVariantStatusFilter(v as StatusFilter)}
+                    />
 
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        { key: "all", label: "Todos", count: variantCounts.all },
-                        { key: "active", label: "Activos", count: variantCounts.active },
-                        { key: "inactive", label: "Inactivos", count: variantCounts.inactive },
-                      ].map((option) => {
-                        const isActive = variantStatusFilter === option.key;
-
-                        return (
-                          <button
-                            key={option.key}
-                            type="button"
-                            onClick={() => setVariantStatusFilter(option.key as StatusFilter)}
-                            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                              isActive
-                                ? "bg-slate-900 text-white"
-                                : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
-                            }`}
-                          >
-                            {option.label} ({option.count})
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {filteredVariants.length ? (
-                    <div className="mt-4 space-y-3">
-                      {filteredVariants.map((variant) => (
-                        <div
-                          key={variant.variant_id}
-                          className={`rounded-2xl border border-slate-200 bg-slate-50 p-4 ${
-                            variant.active ? "" : "opacity-70"
-                          }`}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            setVariantSearch("");
+                            setVariantStatusFilter("all");
+                            setVariantPage(1);
+                          }}
+                          disabled={!variantSearch.trim() && variantStatusFilter === "all"}
+                          variant="outline"
+                          size="icon-sm"
+                          className="h-10 w-10 rounded-lg"
+                          aria-label="Limpiar filtros"
                         >
-                          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                            <div className="space-y-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Boxes className="h-4 w-4 text-slate-400" />
-                                <p className="text-sm font-semibold text-slate-900">
-                                  {variant.size_code} / {variant.color_code}
-                                </p>
-                                <span
-                                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                    variant.active
-                                      ? "bg-emerald-100 text-emerald-700"
-                                      : "bg-slate-200 text-slate-600"
-                                  }`}
-                                >
-                                  {variant.active ? "Activa" : "Inactiva"}
-                                </span>
-                              </div>
-                              <p className="text-sm text-slate-500">
-                                {variant.size_name} - {variant.color_name}
-                              </p>
-                            </div>
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" sideOffset={8}>
+                        Limpiar filtros
+                      </TooltipContent>
+                    </Tooltip>
+                  </OpsFiltersRow>
 
-                            <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
-                              <div className="grid gap-2 text-sm text-slate-500 md:text-right">
-                                <p>
-                                  <span className="font-medium text-slate-700">SKU:</span>{" "}
-                                  {variant.sku}
-                                </p>
-                                <p>
-                                  <span className="font-medium text-slate-700">Barcode:</span>{" "}
-                                  {variant.barcode || "Pendiente"}
-                                </p>
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() => handleToggleVariantActive(variant)}
-                                disabled={togglingVariantId === variant.variant_id}
-                                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70"
-                              >
-                                {togglingVariantId === variant.variant_id ? (
-                                  <LoaderCircle className="h-4 w-4 animate-spin" />
-                                ) : variant.active ? (
-                                  "Inactivar"
-                                ) : (
-                                  "Activar"
+                  <OpsTableWrap minWidth="1080px">
+                      <table className="w-full border-collapse">
+                        <thead className="bg-[var(--ops-surface-muted)]">
+                          <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                            <th className="px-4 py-3">Variante</th>
+                            <th className="px-4 py-3">Detalle</th>
+                            <th className="px-4 py-3">SKU</th>
+                            <th className="px-4 py-3">Barcode</th>
+                            <th className="px-4 py-3">Estado</th>
+                            <th className="px-4 py-3 text-right">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                          {paginatedVariants.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                                No hay variantes para este filtro.
+                              </td>
+                            </tr>
+                          ) : (
+                            paginatedVariants.map((variant) => (
+                              <tr
+                                key={variant.variant_id}
+                                className={cn(
+                                  "transition hover:bg-[var(--ops-surface-muted)]",
+                                  !variant.active && "opacity-70"
                                 )}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="mt-4 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-                      <p className="text-sm text-slate-500">
-                        No hay variantes para este filtro. Ajusta la busqueda o el
-                        estado para revisar otros registros.
+                              >
+                                <td className="px-4 py-[var(--ops-row-py)]">
+                                  <div className="flex items-center gap-2">
+                                    <Boxes className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
+                                    <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
+                                      {variant.size_code} / {variant.color_code}
+                                    </p>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                                  <p>{variant.size_name}</p>
+                                  <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">
+                                    {variant.color_name}
+                                  </p>
+                                </td>
+                                <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{variant.sku}</td>
+                                <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{variant.barcode || "Pendiente"}</td>
+                                <td className="px-4 py-[var(--ops-row-py)]">
+                                  <span
+                                    className={cn(
+                                      "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                                      variant.active
+                                        ? "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
+                                        : "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]"
+                                    )}
+                                  >
+                                    {variant.active ? "Activa" : "Inactiva"}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-[var(--ops-row-py)] text-right">
+                                  <AdminRowActionsMenu
+                                    ariaLabel={`Acciones para ${variant.sku}`}
+                                    items={[
+                                      {
+                                        label: variant.active ? "Inactivar" : "Activar",
+                                        icon:
+                                          togglingVariantId === variant.variant_id ? (
+                                            <LoaderCircle className="h-4 w-4 animate-spin" />
+                                          ) : (
+                                            <Power className="h-4 w-4" />
+                                          ),
+                                        tone: variant.active ? "danger" : "neutral",
+                                        disabled: togglingVariantId === variant.variant_id,
+                                        onSelect: () => setPendingStatusVariant(variant),
+                                      },
+                                    ]}
+                                  />
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                  </OpsTableWrap>
+
+                  <OpsTableFooter>
+                    <span className="ops-secondary-text text-[var(--ops-text-muted)]">
+                      {filteredVariants.length === 0
+                        ? "0 resultados"
+                        : `${variantFirstVisible}-${variantLastVisible} de ${filteredVariants.length}`}
+                    </span>
+                    <Pagination
+                      page={safeVariantPage}
+                      totalPages={variantTotalPages}
+                      onPageChange={setVariantPage}
+                      className="self-end md:self-auto"
+                    />
+                  </OpsTableFooter>
+                </div>
+                  </div>
+                ) : (
+                  <div className="flex min-h-56 items-center justify-center rounded-3xl border border-dashed border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] p-8 text-center">
+                    <div>
+                      <h3 className="text-lg font-semibold text-[var(--ops-text)]">
+                        Selecciona un style
+                      </h3>
+                      <p className="mt-2 text-sm leading-6 text-[var(--ops-text-muted)]">
+                        Desde aqui definiras tallas, colores y la generacion de SKU por
+                        combinacion.
                       </p>
                     </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="flex min-h-56 items-center justify-center rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-900">
-                    Selecciona un style
-                  </h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-500">
-                    Desde aqui definiras tallas, colores y la generacion de SKU por
-                    combinacion.
-                  </p>
-                </div>
-              </div>
+                  </div>
+                )}
+              </article>
+            ) : null}
+          </div>
+          <AdminConfirmModal
+            open={Boolean(pendingStatusVariant)}
+            title={pendingStatusVariant?.active ? "Inactivar variante" : "Activar variante"}
+            description={
+              pendingStatusVariant
+                ? `${pendingStatusVariant.sku} cambiará a estado ${
+                    pendingStatusVariant.active ? "inactivo" : "activo"
+                  }.`
+                : ""
+            }
+            confirmLabel={pendingStatusVariant?.active ? "Inactivar" : "Activar"}
+            confirmTone={pendingStatusVariant?.active ? "danger" : "accent"}
+            busy={Boolean(
+              pendingStatusVariant && togglingVariantId === pendingStatusVariant.variant_id
             )}
-          </article>
-        </div>
-      </div>
-    </section>
+            onCancel={() => setPendingStatusVariant(null)}
+            onConfirm={() => {
+              if (pendingStatusVariant) {
+                void handleToggleVariantActive(pendingStatusVariant);
+              }
+            }}
+          />
+      </OpsPageShell>
+    </TooltipProvider>
   );
 }

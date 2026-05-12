@@ -19,7 +19,7 @@ export function HomeSectionCard({
     <section className="space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ripnel-accent-hover)]">
             {eyebrow}
           </p>
           <h2 className="mt-1 text-base font-semibold text-[var(--ops-text)] md:text-lg">{title}</h2>

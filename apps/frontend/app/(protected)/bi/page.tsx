@@ -248,25 +248,21 @@ export default function BusinessIntelligencePage() {
   const isCustomersView = selectedView?.id === "clientes"
 
   return (
-    <section className="min-h-screen bg-[radial-gradient(circle_at_top,#e0f2fe_0%,#f0f9ff_26%,#f8fafc_60%,#eef2ff_100%)] px-4 py-6 md:px-8">
+    <section className="ops-page min-h-screen px-4 py-6 md:px-8">
       <div className="mx-auto max-w-7xl space-y-5">
-        <header className="rounded-[28px] border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
+        <header className="px-1 space-y-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--ripnel-accent-hover)]">
                 BI y analitica
               </p>
-              <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">Analítica y visualizaciones</h1>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-                Esta vista agrupa analíticas y visualizaciones. El dashboard del ERP se reserva
-                para la operación diaria; aquí puedes seleccionar vistas y comparar información.
-              </p>
+              <h1 className="mt-1 text-2xl font-bold text-[var(--ops-text)] md:text-[1.75rem]">Analítica y visualizaciones</h1>
             </div>
 
             <div className="flex flex-wrap gap-2">
               <Link
                 href="/dashboard"
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                className="inline-flex items-center gap-2 rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-4 py-2.5 text-sm font-medium text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface-muted)]"
               >
                 <LayoutPanelTop className="h-4 w-4" />
                 Volver al dashboard
@@ -278,10 +274,10 @@ export default function BusinessIntelligencePage() {
 
         <div className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)]">
           <div className="h-full">
-            <article className="h-full rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur">
+            <article className="h-full rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-5">
               <div className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4 text-sky-600" />
-                <h2 className="text-lg font-semibold text-slate-900">Selecciona una vista BI</h2>
+                <h2 className="text-lg font-semibold text-[var(--ops-text)]">Selecciona una vista BI</h2>
               </div>
               <div className="mt-4 space-y-3">
                   {views.map((view) => {
@@ -293,16 +289,16 @@ export default function BusinessIntelligencePage() {
                       key={view.id}
                       type="button"
                       onClick={() => setSelectedViewId(view.id)}
-                      className={`block w-full rounded-3xl border px-4 py-4 text-left transition ${
+                      className={`block w-full rounded-lg border px-4 py-4 text-left transition ${
                         isActive
                           ? "border-sky-300 bg-sky-50 shadow-sm"
-                          : "border-slate-200 bg-slate-50 hover:bg-white"
+                          : "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] hover:bg-[var(--ops-surface)]"
                       }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-sm font-semibold text-slate-900">{view.title}</p>
-                          <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-500">
+                          <p className="text-sm font-semibold text-[var(--ops-text)]">{view.title}</p>
+                          <p className="mt-1 text-xs uppercase tracking-[0.2em] text-[var(--ops-text-muted)]">
                             {view.category}
                           </p>
                         </div>
@@ -316,7 +312,7 @@ export default function BusinessIntelligencePage() {
                           {isConfigured ? "Disponible" : "Pendiente"}
                         </span>
                       </div>
-                      <p className="mt-3 text-sm leading-6 text-slate-600">{view.description}</p>
+                      <p className="mt-3 text-sm leading-6 text-[var(--ops-text-muted)]">{view.description}</p>
                     </button>
                   )
                 })}
@@ -325,46 +321,46 @@ export default function BusinessIntelligencePage() {
           </div>
 
           <div>
-            <article className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-md backdrop-blur md:p-6">
+            <article className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-5 md:p-6">
               {selectedView ? (
                 <>
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--ops-text-muted)]">
                         Vista activa
                       </p>
-                      <h2 className="mt-1 text-xl font-semibold text-slate-900">{selectedView.title}</h2>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">{selectedView.description}</p>
+                      <h2 className="mt-1 text-xl font-semibold text-[var(--ops-text)]">{selectedView.title}</h2>
+                      <p className="mt-2 text-sm leading-6 text-[var(--ops-text-muted)]">{selectedView.description}</p>
                     </div>
-                    <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                    <span className="rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-3 py-1 text-xs font-semibold text-[var(--ops-text-muted)]">
                       {selectedView.category}
                     </span>
                   </div>
 
                   {isCustomersView ? (
                     <div className="mt-5 space-y-4">
-                      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 md:flex-row md:items-end md:justify-between">
+                      <div className="flex flex-col gap-3 rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-4 py-3 md:flex-row md:items-end md:justify-between">
                         <div className="grid gap-3 sm:grid-cols-2">
                           <div>
-                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
                               Fecha desde
                             </label>
                             <input
                               type="date"
                               value={dateFrom}
                               onChange={(event) => setDateFrom(event.target.value)}
-                              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+                              className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2 text-sm text-[var(--ops-text-muted)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--ripnel-accent-soft)]"
                             />
                           </div>
                           <div>
-                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
                               Fecha hasta
                             </label>
                             <input
                               type="date"
                               value={dateTo}
                               onChange={(event) => setDateTo(event.target.value)}
-                              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+                              className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2 text-sm text-[var(--ops-text-muted)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--ripnel-accent-soft)]"
                             />
                           </div>
                         </div>
@@ -372,7 +368,7 @@ export default function BusinessIntelligencePage() {
                         <button
                           type="button"
                           onClick={() => setReloadTick((value) => value + 1)}
-                          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                          className="inline-flex items-center gap-2 rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2 text-sm font-medium text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface-muted)]"
                         >
                           <RefreshCw className="h-4 w-4" />
                           Actualizar
@@ -388,14 +384,14 @@ export default function BusinessIntelligencePage() {
                       ) : null}
 
                       {analyticsLoading ? (
-                        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-500">
+                        <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
                           Cargando graficas de clientes...
                         </div>
                       ) : (
                         <div className="grid gap-4 xl:grid-cols-2">
-                          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                            <h3 className="text-sm font-semibold text-slate-900">Clientes que más compran</h3>
-                            <div className="mt-3 h-64">
+                          <article className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4">
+                            <h3 className="text-sm font-semibold text-[var(--ops-text)]">Clientes que más compran</h3>
+                            <div className="mt-3 h-64" aria-label="Gráfico: Clientes que más compran">
                               {topCustomersChart.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
                                   <BarChart data={topCustomersChart} layout="vertical" margin={{ left: 24 }}>
@@ -427,9 +423,9 @@ export default function BusinessIntelligencePage() {
                             </div>
                           </article>
 
-                          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                            <h3 className="text-sm font-semibold text-slate-900">Productos que más compran</h3>
-                            <div className="mt-3 h-64">
+                          <article className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4">
+                            <h3 className="text-sm font-semibold text-[var(--ops-text)]">Productos que más compran</h3>
+                            <div className="mt-3 h-64" aria-label="Gráfico: Productos que más compran">
                               {topProductsChart.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
                                   <BarChart data={topProductsChart}>
@@ -456,9 +452,9 @@ export default function BusinessIntelligencePage() {
                             </div>
                           </article>
 
-                          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                            <h3 className="text-sm font-semibold text-slate-900">Ventas por tipo de comprobante</h3>
-                            <div className="mt-3 h-64">
+                          <article className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4">
+                            <h3 className="text-sm font-semibold text-[var(--ops-text)]">Ventas por tipo de comprobante</h3>
+                            <div className="mt-3 h-64" aria-label="Gráfico: Ventas por tipo de comprobante">
                               {byDocumentChart.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
                                   <BarChart data={byDocumentChart}>
@@ -484,9 +480,9 @@ export default function BusinessIntelligencePage() {
                             </div>
                           </article>
 
-                          <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                            <h3 className="text-sm font-semibold text-slate-900">Comportamiento por día de semana</h3>
-                            <div className="mt-3 h-64">
+                          <article className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4">
+                            <h3 className="text-sm font-semibold text-[var(--ops-text)]">Comportamiento por día de semana</h3>
+                            <div className="mt-3 h-64" aria-label="Gráfico: Comportamiento por día de semana">
                               {byWeekdayChart.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
                                   <AreaChart data={byWeekdayChart}>
@@ -527,13 +523,13 @@ export default function BusinessIntelligencePage() {
                       )}
                     </div>
                   ) : (
-                    <div className="relative mt-5 overflow-hidden rounded-[24px] bg-white">
+                    <div className="relative mt-5 overflow-hidden rounded-xl bg-[var(--ops-surface)]">
                       <div
-                        className="pointer-events-none absolute inset-x-0 top-0 z-20 h-16 bg-white"
+                        className="pointer-events-none absolute inset-x-0 top-0 z-20 h-16 bg-[var(--ops-surface)]"
                         aria-hidden="true"
                       />
                       <div
-                        className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-40 bg-white"
+                        className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-40 bg-[var(--ops-surface)]"
                         aria-hidden="true"
                       />
                       <div className="h-[58vh] w-full">
@@ -542,8 +538,8 @@ export default function BusinessIntelligencePage() {
                         ) : (
                           <div className="flex h-full items-center justify-center px-6 text-center">
                             <div className="max-w-lg space-y-3">
-                              <p className="text-lg font-semibold text-slate-900">Vista no disponible</p>
-                              <p className="text-sm leading-6 text-slate-600">
+                              <p className="text-lg font-semibold text-[var(--ops-text)]">Vista no disponible</p>
+                              <p className="text-sm leading-6 text-[var(--ops-text-muted)]">
                                 Esta vista fue migrada a graficas nativas o no requiere un embed externo.
                               </p>
                             </div>
@@ -556,19 +552,20 @@ export default function BusinessIntelligencePage() {
               ) : (
                     <div className="flex h-[58vh] items-center justify-center text-center">
                   <div className="max-w-lg space-y-3">
-                    <p className="text-lg font-semibold text-slate-900">No hay vistas BI disponibles</p>
-                    <p className="text-sm leading-6 text-slate-600">
+                    <p className="text-lg font-semibold text-[var(--ops-text)]">No hay vistas BI disponibles</p>
+                    <p className="text-sm leading-6 text-[var(--ops-text-muted)]">
                       No se encontraron vistas disponibles. Selecciona una vista en el panel izquierdo.
                     </p>
                   </div>
                 </div>
               )}
-              <div className="mt-6 border-t border-slate-200 pt-5">
+              <div className="mt-6 border-t border-[var(--ops-border-strong)] pt-5">
+                {/* Tooltip: visible en hover */}
                 <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-violet-600" />
-                  <h2 className="text-lg font-semibold text-slate-900">Uso recomendado</h2>
+                  <Users className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />
+                  <h2 className="text-lg font-semibold text-[var(--ops-text)]">Uso recomendado</h2>
                 </div>
-                <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
+                <div className="mt-4 space-y-3 text-sm leading-6 text-[var(--ops-text-muted)]">
                   <p>
                     Usa <strong>Dashboard</strong> para decidir rapido que atender hoy en la sede activa.
                   </p>

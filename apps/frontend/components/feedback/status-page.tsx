@@ -18,6 +18,10 @@ const opsToneClasses: Record<StatusTone, string> = {
     "border-[color:color-mix(in_srgb,#f43f5e_40%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_13%,var(--ops-surface))] text-[var(--ops-text)]",
 };
 
+export type StatusAction =
+  | { href: string; label: string }
+  | { onClick: () => void; label: string };
+
 export function StatusPage({
   icon,
   eyebrow,
@@ -34,8 +38,8 @@ export function StatusPage({
   description: string;
   tone?: StatusTone;
   variant?: StatusVariant;
-  primaryAction?: { href: string; label: string };
-  secondaryAction?: { href: string; label: string };
+  primaryAction?: StatusAction;
+  secondaryAction?: StatusAction;
 }) {
   const toneClasses = variant === "ops" ? opsToneClasses : defaultToneClasses;
   const isOps = variant === "ops";
@@ -88,30 +92,58 @@ export function StatusPage({
               </div>
               <div className="flex flex-wrap gap-3">
                 {primaryAction ? (
-                  <Link
-                    href={primaryAction.href}
-                    className={
-                      isOps
-                        ? "inline-flex items-center gap-2 rounded-xl border border-[color:color-mix(in_srgb,var(--ripnel-accent)_30%,transparent)] bg-[var(--ripnel-accent)] px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)]"
-                        : "inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
-                    }
-                  >
-                    <Home className="h-4 w-4" />
-                    {primaryAction.label}
-                  </Link>
+                  "href" in primaryAction ? (
+                    <Link
+                      href={primaryAction.href}
+                      className={
+                        isOps
+                          ? "inline-flex items-center gap-2 rounded-xl border border-[color:color-mix(in_srgb,var(--ripnel-accent)_30%,transparent)] bg-[var(--ripnel-accent)] px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)]"
+                          : "inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+                      }
+                    >
+                      <Home className="h-4 w-4" />
+                      {primaryAction.label}
+                    </Link>
+                  ) : (
+                    <button
+                      onClick={primaryAction.onClick}
+                      className={
+                        isOps
+                          ? "inline-flex items-center gap-2 rounded-xl border border-[color:color-mix(in_srgb,var(--ripnel-accent)_30%,transparent)] bg-[var(--ripnel-accent)] px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] cursor-pointer"
+                          : "inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 cursor-pointer"
+                      }
+                    >
+                      <Home className="h-4 w-4" />
+                      {primaryAction.label}
+                    </button>
+                  )
                 ) : null}
                 {secondaryAction ? (
-                  <Link
-                    href={secondaryAction.href}
-                    className={
-                      isOps
-                        ? "inline-flex items-center gap-2 rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3.5 py-2 text-sm font-semibold text-[var(--ops-text-muted)] transition hover:text-[var(--ops-text)]"
-                        : "inline-flex items-center gap-2 rounded-2xl border border-current/15 px-4 py-2.5 text-sm font-semibold text-current/80 transition hover:bg-white/60"
-                    }
-                  >
-                    <RefreshCcw className="h-4 w-4" />
-                    {secondaryAction.label}
-                  </Link>
+                  "href" in secondaryAction ? (
+                    <Link
+                      href={secondaryAction.href}
+                      className={
+                        isOps
+                          ? "inline-flex items-center gap-2 rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3.5 py-2 text-sm font-semibold text-[var(--ops-text-muted)] transition hover:text-[var(--ops-text)]"
+                          : "inline-flex items-center gap-2 rounded-2xl border border-current/15 px-4 py-2.5 text-sm font-semibold text-current/80 transition hover:bg-white/60"
+                      }
+                    >
+                      <RefreshCcw className="h-4 w-4" />
+                      {secondaryAction.label}
+                    </Link>
+                  ) : (
+                    <button
+                      onClick={secondaryAction.onClick}
+                      className={
+                        isOps
+                          ? "inline-flex items-center gap-2 rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3.5 py-2 text-sm font-semibold text-[var(--ops-text-muted)] transition hover:text-[var(--ops-text)] cursor-pointer"
+                          : "inline-flex items-center gap-2 rounded-2xl border border-current/15 px-4 py-2.5 text-sm font-semibold text-current/80 transition hover:bg-white/60 cursor-pointer"
+                      }
+                    >
+                      <RefreshCcw className="h-4 w-4" />
+                      {secondaryAction.label}
+                    </button>
+                  )
                 ) : null}
               </div>
             </div>
@@ -145,6 +177,12 @@ export function LoadingPage({
   );
 }
 
+export function ProtectedLoadingPage(
+  props: Omit<Parameters<typeof LoadingPage>[0], "variant">
+) {
+  return <LoadingPage variant="ops" {...props} />;
+}
+
 export function NotFoundPage({ variant = "default" }: { variant?: StatusVariant }) {
   return (
     <StatusPage
@@ -157,6 +195,10 @@ export function NotFoundPage({ variant = "default" }: { variant?: StatusVariant 
       secondaryAction={{ href: "/purchase-system", label: "Abrir nueva venta" }}
     />
   );
+}
+
+export function ProtectedNotFoundPage() {
+  return <NotFoundPage variant="ops" />;
 }
 
 export function ForbiddenPage({ variant = "default" }: { variant?: StatusVariant }) {
@@ -174,14 +216,20 @@ export function ForbiddenPage({ variant = "default" }: { variant?: StatusVariant
   );
 }
 
+export function ProtectedForbiddenPage() {
+  return <ForbiddenPage variant="ops" />;
+}
+
 export function ErrorPage({
   title = "Ocurrió un error inesperado",
   description = "La aplicación encontró un problema y no pudo completar la operación actual.",
   variant = "default",
+  onReset,
 }: {
   title?: string;
   description?: string;
   variant?: StatusVariant;
+  onReset?: () => void;
 }) {
   return (
     <StatusPage
@@ -192,9 +240,19 @@ export function ErrorPage({
       tone="danger"
       variant={variant}
       primaryAction={{ href: "/inicio", label: "Volver al inicio" }}
-      secondaryAction={{ href: "/transaction-history", label: "Ir al historial" }}
+      secondaryAction={
+        onReset
+          ? { onClick: onReset, label: "Reintentar" }
+          : { href: "/transaction-history", label: "Ir al historial" }
+      }
     />
   );
+}
+
+export function ProtectedErrorPage(
+  props: Omit<Parameters<typeof ErrorPage>[0], "variant"> & { variant?: StatusVariant }
+) {
+  return <ErrorPage variant="ops" {...props} />;
 }
 
 export function InlineStatusCard({

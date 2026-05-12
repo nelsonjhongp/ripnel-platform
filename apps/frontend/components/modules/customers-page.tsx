@@ -1,319 +1,217 @@
-"use client";
+"use client"
 
-import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, PencilLine, Plus, RefreshCw, Trash2, X } from "lucide-react";
-import { apiFetch, buildApiUrl, unwrapApiData } from "@/lib/api";
+import Link from "next/link"
+import { useEffect, useMemo, useRef, useState } from "react"
+import {
+  PencilLine,
+  Plus,
+  Power,
+  RefreshCw,
+  RotateCcw,
+  Search,
+} from "lucide-react"
 
-type Customer = {
-  customer_id: string;
-  internal_code: string | null;
-  document_type: string;
-  document_number: string | null;
-  full_name: string | null;
-  business_name: string | null;
-  commercial_name: string | null;
-  email: string | null;
-  phone: string | null;
-  customer_type: string;
-  active: boolean;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-};
+import { AdminConfirmModal, AdminModalShell, AdminRowActionsMenu } from "@/components/admin/admin-ui"
+import { InlineStatusCard } from "@/components/feedback/status-page"
+import {
+  buildDisplayName,
+  buildCustomerPayload,
+  CustomerForm,
+  CustomerFormState,
+  CUSTOMER_TYPE_LABELS,
+  CustomerRecord,
+  DOC_TYPE_LABELS,
+  EMPTY_FORM,
+  formatCustomerDate,
+  toFormState,
+  validateCustomerInput,
+} from "@/components/modules/customer-form"
+import { Button } from "@/components/ui/button"
+import { FilterDropdown } from "@/components/ui/filter-dropdown"
+import {
+  OpsFiltersRow,
+  OpsPageShell,
+  OpsSectionDivider,
+  OpsTableBlock,
+  OpsTableFooter,
+  OpsTableWrap,
+} from "@/components/ui/ops-page-shell"
+import { Pagination } from "@/components/ui/pagination"
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { apiFetch, buildApiUrl, unwrapApiData } from "@/lib/api"
 
-type CustomerFormState = {
-  document_type: string;
-  document_number: string;
-  full_name: string;
-  business_name: string;
-  commercial_name: string;
-  email: string;
-  phone: string;
-  customer_type: string;
-  active: boolean;
-  notes: string;
-};
-
-const DOC_TYPE_LABELS: Record<string, string> = {
-  none: "—",
-  dni: "DNI",
-  ruc: "RUC",
-  ce: "CE",
-  passport: "Pasaporte",
-};
-
-const CUSTOMER_TYPE_LABELS: Record<string, string> = {
-  retail: "Retail",
-  wholesale: "Mayorista",
-};
-
-const DOC_RULES: Record<string, { label: string; regex: RegExp }> = {
-  dni: { label: "DNI", regex: /^\d{8}$/ },
-  ruc: { label: "RUC", regex: /^\d{11}$/ },
-  ce: { label: "CE", regex: /^[A-Za-z0-9]{9,12}$/ },
-  passport: { label: "Pasaporte", regex: /^[A-Za-z0-9]{6,15}$/ },
-};
-
-const EMPTY_FORM: CustomerFormState = {
-  document_type: "none",
-  document_number: "",
-  full_name: "",
-  business_name: "",
-  commercial_name: "",
-  email: "",
-  phone: "",
-  customer_type: "retail",
-  active: true,
-  notes: "",
-};
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("es-PE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
-function buildDisplayName(c: Customer) {
-  return c.full_name || c.business_name || c.commercial_name || "—";
-}
-
-function trimOrNull(value: string) {
-  const normalized = value.trim();
-  return normalized.length ? normalized : null;
-}
-
-function validateCustomerInput(
-  input: Pick<
-    CustomerFormState,
-    "document_type" | "document_number" | "full_name" | "business_name" | "commercial_name"
-  >
-) {
-  const nameIsMissing =
-    !input.full_name.trim() && !input.business_name.trim() && !input.commercial_name.trim();
-
-  if (nameIsMissing) {
-    return "Ingresa al menos un nombre.";
-  }
-
-  if (input.document_type === "none") {
-    if (input.document_number.trim()) {
-      return "Si el tipo es sin documento, el número debe ir vacío.";
-    }
-    return null;
-  }
-
-  const rule = DOC_RULES[input.document_type];
-  if (!rule) {
-    return "Tipo de documento inválido.";
-  }
-
-  const normalizedNumber =
-    input.document_type === "passport"
-      ? input.document_number.trim().toUpperCase()
-      : input.document_number.trim();
-
-  if (!normalizedNumber) {
-    return "Número de documento obligatorio.";
-  }
-
-  if (!rule.regex.test(normalizedNumber)) {
-    return `Formato inválido para ${rule.label}.`;
-  }
-
-  return null;
-}
-
-function buildCustomerPayload(input: CustomerFormState) {
-  const normalizedDocumentNumber =
-    input.document_type === "none"
-      ? null
-      : input.document_type === "passport"
-      ? input.document_number.trim().toUpperCase()
-      : input.document_number.trim();
-
-  return {
-    document_type: input.document_type,
-    document_number: normalizedDocumentNumber,
-    full_name: trimOrNull(input.full_name),
-    business_name: trimOrNull(input.business_name),
-    commercial_name: trimOrNull(input.commercial_name),
-    email: trimOrNull(input.email),
-    phone: trimOrNull(input.phone),
-    customer_type: input.customer_type,
-    active: input.active,
-    notes: trimOrNull(input.notes),
-  };
-}
-
-function toFormState(c: Customer): CustomerFormState {
-  return {
-    document_type: c.document_type,
-    document_number: c.document_number || "",
-    full_name: c.full_name || "",
-    business_name: c.business_name || "",
-    commercial_name: c.commercial_name || "",
-    email: c.email || "",
-    phone: c.phone || "",
-    customer_type: c.customer_type,
-    active: c.active,
-    notes: c.notes || "",
-  };
-}
+const PAGE_SIZE = 10
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [docFilter, setDocFilter] = useState<string>("all");
-  const [sort, setSort] = useState<"desc" | "asc">("desc");
-  const [activeTab, setActiveTab] = useState<"list" | "create">("list");
+  const [customers, setCustomers] = useState<CustomerRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [query, setQuery] = useState("")
+  const [docFilter, setDocFilter] = useState("all")
+  const [sort, setSort] = useState<"desc" | "asc">("desc")
+  const [currentPage, setCurrentPage] = useState(1)
 
-  const [createState, setCreateState] = useState<CustomerFormState>(EMPTY_FORM);
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
+  const [editingCustomer, setEditingCustomer] = useState<CustomerRecord | null>(null)
+  const [editState, setEditState] = useState<CustomerFormState>(EMPTY_FORM)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [activeChangeCustomer, setActiveChangeCustomer] = useState<CustomerRecord | null>(null)
+  const [savingActiveChange, setSavingActiveChange] = useState(false)
 
-  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-  const [editState, setEditState] = useState<CustomerFormState>(EMPTY_FORM);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null)
 
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  async function fetchCustomers(nextQuery: string, nextDocFilter: string, nextSort: "desc" | "asc") {
+    if (abortRef.current) {
+      abortRef.current.abort()
+    }
 
-  async function fetchCustomers(docType: string, sortOrder: string) {
-    if (abortRef.current) abortRef.current.abort();
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
+    const controller = new AbortController()
+    abortRef.current = controller
 
-    setLoading(true);
-    setError(null);
+    setLoading(true)
+    setError(null)
 
     try {
-      const params = new URLSearchParams();
-      if (docType !== "all") params.set("document_type", docType);
-      params.set("sort", sortOrder);
+      const params = new URLSearchParams()
+      const normalizedQuery = nextQuery.trim()
 
-      const payload = await apiFetch<{ ok: boolean; data: Customer[] } | Customer[]>(
+      if (normalizedQuery) {
+        params.set("q", normalizedQuery)
+      }
+
+      if (nextDocFilter !== "all") {
+        params.set("document_type", nextDocFilter)
+      }
+      params.set("sort", nextSort)
+
+      const payload = await apiFetch<{ ok: boolean; data: CustomerRecord[] } | CustomerRecord[]>(
         `/api/customers?${params.toString()}`,
         {
-          signal: ctrl.signal,
+          signal: controller.signal,
           cache: "no-store",
         }
-      );
+      )
 
-      const nextCustomers = unwrapApiData<Customer[]>(payload);
-      setCustomers(Array.isArray(nextCustomers) ? nextCustomers : []);
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name === "AbortError") return;
-      setError(err instanceof Error ? err.message : "Error desconocido");
+      const nextCustomers = unwrapApiData<CustomerRecord[]>(payload)
+      setCustomers(Array.isArray(nextCustomers) ? nextCustomers : [])
+    } catch (loadError: unknown) {
+      if (loadError instanceof Error && loadError.name === "AbortError") {
+        return
+      }
+
+      setCustomers([])
+      setError(loadError instanceof Error ? loadError.message : "No se pudieron cargar los clientes")
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchCustomers(docFilter, sort);
-  }, [docFilter, sort]);
+    const timer = window.setTimeout(() => {
+      void fetchCustomers(query, docFilter, sort)
+    }, 180)
 
-  function openEditModal(customer: Customer) {
-    setEditingCustomer(customer);
-    setEditState(toFormState(customer));
-    setSaveError(null);
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [docFilter, query, sort])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [docFilter, query, sort])
+
+  function clearFilters() {
+    setQuery("")
+    setDocFilter("all")
+    setSort("desc")
+  }
+
+  function openEditModal(customer: CustomerRecord) {
+    setEditingCustomer(customer)
+    setEditState(toFormState(customer))
+    setSaveError(null)
   }
 
   function closeEditModal() {
-    setEditingCustomer(null);
-    setEditState(EMPTY_FORM);
-    setSaveError(null);
-  }
-
-  async function createCustomer() {
-    setCreateError(null);
-    const validationError = validateCustomerInput(createState);
-    if (validationError) {
-      setCreateError(validationError);
-      return;
-    }
-
-    setCreating(true);
-    try {
-      const res = await fetch(buildApiUrl("/api/customers"), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildCustomerPayload(createState)),
-      });
-
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.message || "Error al crear cliente");
-
-      setCustomers((prev) => (sort === "desc" ? [payload.data, ...prev] : [...prev, payload.data]));
-      setCreateState(EMPTY_FORM);
-      setActiveTab("list");
-    } catch (err: unknown) {
-      setCreateError(err instanceof Error ? err.message : "Error al crear cliente");
-    } finally {
-      setCreating(false);
-    }
+    setEditingCustomer(null)
+    setEditState(EMPTY_FORM)
+    setSaveError(null)
   }
 
   async function saveEdit() {
-    if (!editingCustomer) return;
-
-    const validationError = validateCustomerInput(editState);
-    if (validationError) {
-      setSaveError(validationError);
-      return;
+    if (!editingCustomer) {
+      return
     }
 
-    setSaving(true);
-    setSaveError(null);
+    const validationError = validateCustomerInput(editState)
+    if (validationError) {
+      setSaveError(validationError)
+      return
+    }
+
+    setSaving(true)
+    setSaveError(null)
 
     try {
-      const res = await fetch(buildApiUrl(`/api/customers/${editingCustomer.customer_id}`), {
+      const response = await fetch(buildApiUrl(`/api/customers/${editingCustomer.customer_id}`), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildCustomerPayload(editState)),
-      });
+      })
 
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.message || "Error al guardar");
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.message || "No se pudo guardar el cliente")
+      }
 
-      setCustomers((prev) =>
-        prev.map((c) => (c.customer_id === editingCustomer.customer_id ? payload.data : c))
-      );
-      closeEditModal();
-    } catch (err: unknown) {
-      setSaveError(err instanceof Error ? err.message : "Error al guardar");
+      setCustomers((current) =>
+        current.map((customer) =>
+          customer.customer_id === editingCustomer.customer_id ? payload.data : customer
+        )
+      )
+      closeEditModal()
+    } catch (submitError: unknown) {
+      setSaveError(submitError instanceof Error ? submitError.message : "No se pudo guardar el cliente")
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
   }
 
-  async function deleteCustomer(customerId: string) {
-    const customer = customers.find((c) => c.customer_id === customerId);
-    const customerLabel = customer ? buildDisplayName(customer) : "este cliente";
-
-    if (!window.confirm(`¿Eliminar ${customerLabel}? Esta acción no se puede deshacer.`)) {
-      return;
+  async function changeCustomerActiveState() {
+    if (!activeChangeCustomer) {
+      return
     }
 
-    setDeletingId(customerId);
-    setSaveError(null);
+    setSavingActiveChange(true)
+    setSaveError(null)
 
     try {
-      const res = await fetch(buildApiUrl(`/api/customers/${customerId}`), { method: "DELETE" });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.message || "Error al eliminar cliente");
+      const response = await fetch(buildApiUrl(`/api/customers/${activeChangeCustomer.customer_id}`), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: !activeChangeCustomer.active }),
+      })
 
-      setCustomers((prev) => prev.filter((c) => c.customer_id !== customerId));
-      if (editingCustomer?.customer_id === customerId) closeEditModal();
-    } catch (err: unknown) {
-      setSaveError(err instanceof Error ? err.message : "Error al eliminar cliente");
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload.message || "No se pudo actualizar el cliente")
+      }
+
+      setCustomers((current) =>
+        current.map((customer) =>
+          customer.customer_id === activeChangeCustomer.customer_id ? payload.data : customer
+        )
+      )
+      if (editingCustomer?.customer_id === activeChangeCustomer.customer_id) {
+        setEditingCustomer(payload.data)
+        setEditState(toFormState(payload.data))
+      }
+      setActiveChangeCustomer(null)
+    } catch (submitError: unknown) {
+      setSaveError(submitError instanceof Error ? submitError.message : "No se pudo actualizar el cliente")
     } finally {
-      setDeletingId(null);
+      setSavingActiveChange(false)
     }
   }
 
@@ -324,438 +222,288 @@ export default function CustomersPage() {
     { value: "ce", label: "CE" },
     { value: "passport", label: "Pasaporte" },
     { value: "none", label: "Sin doc." },
-  ];
+  ]
 
-  const isEmpty = !loading && !error && customers.length === 0;
+  const sortOptions = [
+    { value: "desc", label: "Más reciente" },
+    { value: "asc", label: "Más antigua" },
+  ]
+
+  const totalPages = Math.max(1, Math.ceil(customers.length / PAGE_SIZE))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const paginatedCustomers = useMemo(() => {
+    const start = (safeCurrentPage - 1) * PAGE_SIZE
+    return customers.slice(start, start + PAGE_SIZE)
+  }, [customers, safeCurrentPage])
+  const firstVisible = paginatedCustomers.length === 0 ? 0 : (safeCurrentPage - 1) * PAGE_SIZE + 1
+  const lastVisible = paginatedCustomers.length === 0 ? 0 : firstVisible + paginatedCustomers.length - 1
+  const hasActiveFilters = query.trim().length > 0 || docFilter !== "all" || sort !== "desc"
+
+  useEffect(() => {
+    if (currentPage !== safeCurrentPage) {
+      setCurrentPage(safeCurrentPage)
+    }
+  }, [currentPage, safeCurrentPage])
 
   return (
-    <section className="ops-page min-h-screen p-4 md:p-5">
-      <div className="mx-auto flex max-w-7xl flex-col gap-4">
-        <header className="space-y-1">
-          <h1 className="ops-title text-2xl font-semibold">Clientes</h1>
-          <p className="ops-text-muted text-sm">Gestión operativa de clientes.</p>
-        </header>
-
-        <div className="ops-surface rounded-2xl border p-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-1 rounded-lg border border-[var(--ops-border-strong)] p-1">
-              <button
-                type="button"
-                onClick={() => setActiveTab("list")}
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-                  activeTab === "list"
-                    ? "bg-[var(--ripnel-accent)] text-white"
-                    : "text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
-                }`}
-              >
-                Listado
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("create")}
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${
-                  activeTab === "create"
-                    ? "bg-[var(--ripnel-accent)] text-white"
-                    : "text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
-                }`}
-              >
-                Nuevo cliente
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Link
-                href="/clientes/dashboards"
-                className="sales-chip sales-chip-interactive rounded-md px-3 py-1.5 text-xs font-semibold"
-              >
-                Dashboards BI
-              </Link>
-              <button
-                type="button"
-                onClick={() => fetchCustomers(docFilter, sort)}
-                disabled={loading}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-1.5 text-xs font-semibold text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-                Actualizar
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {error ? (
-          <div className="rounded-md border border-red-300 bg-red-100/70 px-3 py-2 text-sm text-red-700">{error}</div>
-        ) : null}
-
-        {saveError ? (
-          <div className="rounded-md border border-red-300 bg-red-100/70 px-3 py-2 text-sm text-red-700">{saveError}</div>
-        ) : null}
-
-        {activeTab === "list" ? (
-          <div className="ops-surface rounded-2xl border">
-            <div className="border-b border-[var(--ops-border-strong)] p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex flex-wrap items-center gap-1 rounded-md border border-[var(--ops-border-strong)] bg-[var(--ops-field)] p-1">
-                  {docFilterOptions.map((opt) => (
-                    <button
-                      key={opt.value}
+    <TooltipProvider delayDuration={120}>
+      <OpsPageShell width="wide">
+          <PosHeader
+            eyebrow="Clientes"
+            title="Listado de clientes"
+            actions={
+              <>
+                <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
+                  <Link href="/clientes/dashboards">Dashboards BI</Link>
+                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
                       type="button"
-                      onClick={() => setDocFilter(opt.value)}
-                      className={`cursor-pointer rounded px-2.5 py-1 text-xs font-semibold transition ${
-                        docFilter === opt.value
-                          ? "bg-[var(--ripnel-accent)] text-white"
-                          : "text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
-                      }`}
+                      variant="outline"
+                      size="icon-sm"
+                      onClick={() => fetchCustomers(query, docFilter, sort)}
+                      disabled={loading}
+                      aria-label="Actualizar clientes"
+                      className="rounded-lg"
                     >
-                      {opt.label}
-                    </button>
-                  ))}
+                      <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={8}>
+                    Actualizar
+                  </TooltipContent>
+                </Tooltip>
+                <Button asChild variant="accent" size="sm" className="rounded-lg px-3">
+                  <Link href="/clientes/nuevo">
+                    <Plus className="h-4 w-4" />
+                    Nuevo cliente
+                  </Link>
+                </Button>
+              </>
+            }
+          />
+
+          {saveError ? (
+            <InlineStatusCard
+              title="No pudimos completar la acción"
+              description={saveError}
+              tone="danger"
+              variant="ops"
+            />
+          ) : null}
+
+          <OpsSectionDivider>
+            <OpsTableBlock>
+              <OpsFiltersRow>
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                    Buscar
+                  </label>
+                  <div className="sales-field flex h-10 items-center gap-2 rounded-lg px-3 transition hover:bg-[var(--ops-surface-muted)]">
+                    <Search className="h-4 w-4 text-[var(--ops-text-muted)]" />
+                    <input
+                      type="text"
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="Nombre, razón social, documento, correo, teléfono o código"
+                      className="h-full w-full bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
+                    />
+                  </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setSort((s) => (s === "desc" ? "asc" : "desc"))}
-                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-1.5 text-xs font-semibold text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
-                >
-                  {sort === "desc" ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
-                  Fecha {sort === "desc" ? "más reciente" : "más antigua"}
-                </button>
+                <FilterDropdown
+                  label="Tipo de documento"
+                  value={docFilter}
+                  options={docFilterOptions}
+                  onChange={setDocFilter}
+                />
 
-                <span className="ml-auto text-xs text-[var(--ops-text-muted)]">
-                  {loading ? "Cargando..." : `${customers.length} cliente${customers.length !== 1 ? "s" : ""}`}
-                </span>
-              </div>
-            </div>
+                <FilterDropdown
+                  label="Orden"
+                  value={sort}
+                  options={sortOptions}
+                  onChange={(v) => setSort(v as "desc" | "asc")}
+                />
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="border-b border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)]">
-                  <tr>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ops-text-muted)]">Código</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ops-text-muted)]">Tipo doc.</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ops-text-muted)]">N° documento</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ops-text-muted)]">Cliente</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ops-text-muted)]">Email</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ops-text-muted)]">Teléfono</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ops-text-muted)]">Tipo</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ops-text-muted)]">Estado</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold text-[var(--ops-text-muted)]">Ingreso</th>
-                    <th className="px-3 py-2 text-right text-xs font-semibold text-[var(--ops-text-muted)]">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--ops-border-soft)]">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={10} className="px-3 py-6 text-center text-sm text-[var(--ops-text-muted)]">
-                        Cargando clientes...
-                      </td>
-                    </tr>
-                  ) : null}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      onClick={clearFilters}
+                      disabled={!hasActiveFilters}
+                      aria-label="Limpiar filtros"
+                      className="mt-auto h-10 w-10 rounded-lg"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={8}>
+                    Limpiar filtros
+                  </TooltipContent>
+                </Tooltip>
+              </OpsFiltersRow>
 
-                  {isEmpty ? (
-                    <tr>
-                      <td colSpan={10} className="px-3 py-6 text-center text-sm text-[var(--ops-text-muted)]">
-                        No hay clientes registrados con este filtro.
-                      </td>
-                    </tr>
-                  ) : null}
-
-                  {!loading &&
-                    customers.map((c) => (
-                      <tr key={c.customer_id} className="hover:bg-[var(--ops-surface-muted)]/60">
-                        <td className="px-3 py-2 font-mono text-xs text-[var(--ops-text-muted)]">{c.internal_code || "—"}</td>
-                        <td className="px-3 py-2">
-                          <span className="sales-chip rounded px-1.5 py-0.5 text-[11px] font-semibold">
-                            {DOC_TYPE_LABELS[c.document_type] ?? c.document_type}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 font-mono text-xs text-[var(--ops-text)]">{c.document_number || "—"}</td>
-                        <td className="px-3 py-2 text-[var(--ops-text)]">{buildDisplayName(c)}</td>
-                        <td className="px-3 py-2 text-[var(--ops-text-muted)]">{c.email || "—"}</td>
-                        <td className="px-3 py-2 text-[var(--ops-text-muted)]">{c.phone || "—"}</td>
-                        <td className="px-3 py-2">
-                          <span
-                            className={`sales-chip rounded px-1.5 py-0.5 text-[11px] font-semibold ${
-                              c.customer_type === "wholesale" ? "sales-chip-accent" : "sales-chip-neutral"
-                            }`}
-                          >
-                            {CUSTOMER_TYPE_LABELS[c.customer_type] ?? c.customer_type}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2">
-                          <span
-                            className={`sales-chip rounded px-1.5 py-0.5 text-[11px] font-semibold ${
-                              c.active ? "sales-chip-success" : "sales-chip-neutral"
-                            }`}
-                          >
-                            {c.active ? "Activo" : "Inactivo"}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-xs text-[var(--ops-text-muted)]">{formatDate(c.created_at)}</td>
-                        <td className="px-3 py-2 text-right">
-                          <div className="inline-flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => openEditModal(c)}
-                              className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-2.5 py-1 text-xs font-semibold text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
-                            >
-                              <PencilLine size={12} />
-                              Editar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => deleteCustomer(c.customer_id)}
-                              disabled={deletingId === c.customer_id}
-                              className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[var(--ops-border-soft)] bg-transparent px-2.5 py-1 text-xs font-semibold text-rose-600 transition hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              <Trash2 size={12} />
-                              {deletingId === c.customer_id ? "Eliminando..." : "Eliminar"}
-                            </button>
-                          </div>
-                        </td>
+              <OpsTableWrap minWidth="1080px">
+                  <table className="w-full border-collapse">
+                    <thead className="bg-[var(--ops-surface-muted)]">
+                      <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                        <th className="px-4 py-3">Cliente</th>
+                        <th className="px-4 py-3">Documento</th>
+                        <th className="px-4 py-3">Contacto</th>
+                        <th className="px-4 py-3">Tipo</th>
+                        <th className="px-4 py-3">Estado</th>
+                        <th className="px-4 py-3">Alta</th>
+                        <th className="w-[4.5rem] px-4 py-3 text-right">Acciones</th>
                       </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : (
-          <div className="ops-surface rounded-2xl border p-4">
-            {createError ? (
-              <div className="mb-3 rounded-md border border-red-300 bg-red-100/70 px-3 py-2 text-sm text-red-700">
-                {createError}
-              </div>
-            ) : null}
+                    </thead>
+                    <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                      {loading ? (
+                        <tr>
+                          <td colSpan={7} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                            Cargando clientes...
+                          </td>
+                        </tr>
+                      ) : error ? (
+                        <tr>
+                          <td colSpan={7} className="px-4 py-6">
+                            <InlineStatusCard
+                              title="No pudimos cargar clientes"
+                              description={error}
+                              tone="danger"
+                              variant="ops"
+                            />
+                          </td>
+                        </tr>
+                      ) : paginatedCustomers.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                            No hay clientes registrados con este filtro.
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedCustomers.map((customer) => (
+                          <tr
+                            key={customer.customer_id}
+                            className="transition hover:bg-[var(--ops-surface-muted)]"
+                          >
+                            <td className="px-4 py-[var(--ops-row-py)]">
+                              <p className="text-sm font-semibold text-[var(--ops-text)]">
+                                {buildDisplayName(customer)}
+                              </p>
+                              <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                                {customer.internal_code || "Sin código"}
+                              </p>
+                            </td>
+                            <td className="px-4 py-[var(--ops-row-py)]">
+                              <p className="text-sm text-[var(--ops-text)]">
+                                {customer.document_number || "Sin documento"}
+                              </p>
+                              <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                                {DOC_TYPE_LABELS[customer.document_type] || customer.document_type}
+                              </p>
+                            </td>
+                            <td className="px-4 py-[var(--ops-row-py)]">
+                              <p className="text-sm text-[var(--ops-text)]">{customer.email || "Sin email"}</p>
+                              <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                                {customer.phone || "Sin teléfono"}
+                              </p>
+                            </td>
+                            <td className="px-4 py-[var(--ops-row-py)]">
+                              <span className="inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]">
+                                {CUSTOMER_TYPE_LABELS[customer.customer_type] || customer.customer_type}
+                              </span>
+                            </td>
+                            <td className="px-4 py-[var(--ops-row-py)]">
+                              <span
+                                className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                                  customer.active
+                                    ? "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
+                                    : "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]"
+                                }`}
+                              >
+                                {customer.active ? "Activo" : "Inactivo"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-[var(--ops-row-py)] text-xs text-[var(--ops-text-muted)]">
+                              {formatCustomerDate(customer.created_at)}
+                            </td>
+                            <td className="w-[4.5rem] px-4 py-[var(--ops-row-py)]">
+                              <AdminRowActionsMenu
+                                ariaLabel={`Acciones para ${buildDisplayName(customer)}`}
+                                items={[
+                                  {
+                                    label: "Editar",
+                                    icon: <PencilLine className="h-3.5 w-3.5" />,
+                                    onSelect: () => openEditModal(customer),
+                                  },
+                                  {
+                                    label: customer.active ? "Inactivar" : "Activar",
+                                    icon: <Power className="h-3.5 w-3.5" />,
+                                    tone: customer.active ? "danger" : "neutral",
+                                    onSelect: () => setActiveChangeCustomer(customer),
+                                  },
+                                ]}
+                              />
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+              </OpsTableWrap>
 
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-              <select
-                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
-                value={createState.document_type}
-                onChange={(e) =>
-                  setCreateState((s) => ({
-                    ...s,
-                    document_type: e.target.value,
-                    document_number: e.target.value === "none" ? "" : s.document_number,
-                  }))
-                }
-              >
-                <option value="none">Sin documento</option>
-                <option value="dni">DNI</option>
-                <option value="ruc">RUC</option>
-                <option value="ce">CE</option>
-                <option value="passport">Pasaporte</option>
-              </select>
-              <input
-                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                placeholder="Número de documento"
-                value={createState.document_number}
-                disabled={createState.document_type === "none"}
-                onChange={(e) => setCreateState((s) => ({ ...s, document_number: e.target.value }))}
-              />
-              <select
-                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
-                value={createState.customer_type}
-                onChange={(e) => setCreateState((s) => ({ ...s, customer_type: e.target.value }))}
-              >
-                <option value="retail">Retail</option>
-                <option value="wholesale">Mayorista</option>
-              </select>
-              <input
-                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
-                placeholder="Nombre completo"
-                value={createState.full_name}
-                onChange={(e) => setCreateState((s) => ({ ...s, full_name: e.target.value }))}
-              />
-              <input
-                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
-                placeholder="Razón social"
-                value={createState.business_name}
-                onChange={(e) => setCreateState((s) => ({ ...s, business_name: e.target.value }))}
-              />
-              <input
-                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
-                placeholder="Nombre comercial"
-                value={createState.commercial_name}
-                onChange={(e) => setCreateState((s) => ({ ...s, commercial_name: e.target.value }))}
-              />
-              <input
-                type="email"
-                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
-                placeholder="email@ejemplo.com"
-                value={createState.email}
-                onChange={(e) => setCreateState((s) => ({ ...s, email: e.target.value }))}
-              />
-              <input
-                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
-                placeholder="999 000 000"
-                value={createState.phone}
-                onChange={(e) => setCreateState((s) => ({ ...s, phone: e.target.value }))}
-              />
-              <input
-                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
-                placeholder="Notas"
-                value={createState.notes}
-                onChange={(e) => setCreateState((s) => ({ ...s, notes: e.target.value }))}
-              />
-            </div>
+              <OpsTableFooter>
+                <span className="text-sm text-[var(--ops-text-muted)]">
+                  {customers.length === 0 ? "0 resultados" : `${firstVisible}-${lastVisible} de ${customers.length}`}
+                </span>
+                <Pagination
+                  page={safeCurrentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  className="self-end md:self-auto"
+                />
+              </OpsTableFooter>
+            </OpsTableBlock>
+          </OpsSectionDivider>
 
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setCreateState((s) => ({ ...s, active: !s.active }))}
-                className={`sales-chip rounded-md px-2.5 py-1 text-xs font-semibold ${
-                  createState.active ? "sales-chip-success" : "sales-chip-neutral"
-                }`}
-              >
-                {createState.active ? "Activo" : "Inactivo"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setCreateState(EMPTY_FORM)}
-                disabled={creating}
-                className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-1.5 text-xs font-semibold text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <X size={12} />
-                Limpiar
-              </button>
-              <button
-                type="button"
-                onClick={createCustomer}
-                disabled={creating}
-                className="inline-flex cursor-pointer items-center gap-1 rounded-md bg-[var(--ripnel-accent)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Plus size={12} />
-                {creating ? "Creando..." : "Crear cliente"}
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {editingCustomer ? (
-        <div className="ops-overlay-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="ops-overlay-panel w-full max-w-2xl rounded-2xl p-5">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-[var(--ops-text)]">Editar cliente</h3>
-              <button
-                type="button"
-                onClick={closeEditModal}
-                className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-2.5 py-1 text-xs font-semibold text-[var(--ops-text)]"
-              >
-                Cerrar
-              </button>
-            </div>
-
-            {saveError ? (
-              <div className="mb-3 rounded-md border border-red-300 bg-red-100/70 px-3 py-2 text-sm text-red-700">
-                {saveError}
-              </div>
-            ) : null}
-
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-              <select
-                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
-                value={editState.document_type}
-                onChange={(e) =>
-                  setEditState((s) => ({
-                    ...s,
-                    document_type: e.target.value,
-                    document_number: e.target.value === "none" ? "" : s.document_number,
-                  }))
-                }
-              >
-                <option value="none">Sin documento</option>
-                <option value="dni">DNI</option>
-                <option value="ruc">RUC</option>
-                <option value="ce">CE</option>
-                <option value="passport">Pasaporte</option>
-              </select>
-              <input
-                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                placeholder="Número"
-                value={editState.document_number}
-                disabled={editState.document_type === "none"}
-                onChange={(e) => setEditState((s) => ({ ...s, document_number: e.target.value }))}
+        {editingCustomer ? (
+          <AdminModalShell title="Editar cliente" onClose={closeEditModal} widthClass="max-w-4xl">
+              <CustomerForm
+                mode="edit"
+                state={editState}
+                onChange={setEditState}
+                onSubmit={saveEdit}
+                onCancel={closeEditModal}
+                submitLabel="Guardar cambios"
+                submitting={saving}
+                error={saveError}
               />
-              <input
-                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
-                placeholder="Nombre completo"
-                value={editState.full_name}
-                onChange={(e) => setEditState((s) => ({ ...s, full_name: e.target.value }))}
-              />
-              <input
-                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
-                placeholder="Razón social"
-                value={editState.business_name}
-                onChange={(e) => setEditState((s) => ({ ...s, business_name: e.target.value }))}
-              />
-              <input
-                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
-                placeholder="Nombre comercial"
-                value={editState.commercial_name}
-                onChange={(e) => setEditState((s) => ({ ...s, commercial_name: e.target.value }))}
-              />
-              <select
-                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
-                value={editState.customer_type}
-                onChange={(e) => setEditState((s) => ({ ...s, customer_type: e.target.value }))}
-              >
-                <option value="retail">Retail</option>
-                <option value="wholesale">Mayorista</option>
-              </select>
-              <input
-                type="email"
-                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
-                placeholder="Email"
-                value={editState.email}
-                onChange={(e) => setEditState((s) => ({ ...s, email: e.target.value }))}
-              />
-              <input
-                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none"
-                placeholder="Teléfono"
-                value={editState.phone}
-                onChange={(e) => setEditState((s) => ({ ...s, phone: e.target.value }))}
-              />
-              <input
-                className="sales-field h-9 rounded-md px-2.5 text-sm outline-none md:col-span-2"
-                placeholder="Notas"
-                value={editState.notes}
-                onChange={(e) => setEditState((s) => ({ ...s, notes: e.target.value }))}
-              />
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => setEditState((s) => ({ ...s, active: !s.active }))}
-                className={`sales-chip rounded-md px-2.5 py-1 text-xs font-semibold ${
-                  editState.active ? "sales-chip-success" : "sales-chip-neutral"
-                }`}
-              >
-                {editState.active ? "Activo" : "Inactivo"}
-              </button>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={closeEditModal}
-                  disabled={saving}
-                  className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-1.5 text-xs font-semibold text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={saveEdit}
-                  disabled={saving}
-                  className="inline-flex cursor-pointer items-center gap-1 rounded-md bg-[var(--ripnel-accent)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {saving ? "Guardando..." : "Guardar"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-    </section>
-  );
+          </AdminModalShell>
+        ) : null}
+        <AdminConfirmModal
+          open={Boolean(activeChangeCustomer)}
+          title={activeChangeCustomer?.active ? "Inactivar cliente" : "Activar cliente"}
+          description={
+            activeChangeCustomer ? (
+              <>
+                Vas a {activeChangeCustomer.active ? "inactivar" : "activar"} a{" "}
+                <span className="font-semibold text-[var(--ops-text)]">
+                  {buildDisplayName(activeChangeCustomer)}
+                </span>
+                .
+              </>
+            ) : null
+          }
+          confirmLabel={activeChangeCustomer?.active ? "Inactivar" : "Activar"}
+          confirmTone={activeChangeCustomer?.active ? "danger" : "accent"}
+          busy={savingActiveChange}
+          onCancel={() => setActiveChangeCustomer(null)}
+          onConfirm={() => void changeCustomerActiveState()}
+        />
+      </OpsPageShell>
+    </TooltipProvider>
+  )
 }

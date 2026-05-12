@@ -7,11 +7,11 @@ import { ArrowLeft, CreditCard, ReceiptText, RotateCcw, User } from "lucide-reac
 import { useAuth } from "@/components/auth/AuthProvider"
 import { PermissionGuard } from "@/components/auth/PermissionGuard"
 import {
-  ErrorPage,
-  ForbiddenPage,
+  ProtectedErrorPage,
+  ProtectedForbiddenPage,
   InlineStatusCard,
-  LoadingPage,
-  NotFoundPage,
+  ProtectedLoadingPage,
+  ProtectedNotFoundPage,
 } from "@/components/feedback/status-page"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Button } from "@/components/ui/button"
@@ -202,7 +202,7 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
 
   if (loading) {
     return (
-      <LoadingPage
+      <ProtectedLoadingPage
         title="Cargando detalle de venta"
         description="Estamos recuperando la venta confirmada y sus movimientos asociados."
       />
@@ -210,16 +210,16 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
   }
 
   if (error instanceof ApiError && error.status === 404) {
-    return <NotFoundPage />
+    return <ProtectedNotFoundPage />
   }
 
   if (error instanceof ApiError && error.status === 403) {
-    return <ForbiddenPage />
+    return <ProtectedForbiddenPage />
   }
 
   if (error || !sale) {
     return (
-      <ErrorPage
+      <ProtectedErrorPage
         title="No pudimos abrir el detalle de venta"
         description={error?.message || "La venta solicitada no esta disponible para esta sede operativa."}
       />

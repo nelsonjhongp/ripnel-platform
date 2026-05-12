@@ -2,12 +2,33 @@ const { query } = require('../../shared/db');
 
 async function findProductSummaries(filters = {}) {
   const values = [];
-  let styleFilter = '';
+  const conditions = [];
+  let locationRef = null;
 
   if (filters.styleId) {
     values.push(filters.styleId);
-    styleFilter = `where ps.style_id = $${values.length}`;
+    conditions.push(`ps.style_id = $${values.length}`);
   }
+
+  if (filters.query) {
+    values.push(`%${filters.query}%`);
+    const searchRef = `$${values.length}`;
+    conditions.push(`(
+      ps.name ilike ${searchRef}
+      or ps.style_code ilike ${searchRef}
+      or gt.name ilike ${searchRef}
+      or coalesce(f.name, '') ilike ${searchRef}
+      or coalesce(t.name, '') ilike ${searchRef}
+    )`);
+  }
+
+  if (filters.locationId) {
+    values.push(filters.locationId);
+    locationRef = `$${values.length}`;
+  }
+
+  const styleWhereClause = conditions.length ? `where ${conditions.join(' and ')}` : '';
+  const inventoryLocationJoin = locationRef ? ` and i.location_id = ${locationRef}` : '';
 
   const result = await query(
     `with base_styles as (
@@ -28,7 +49,19 @@ async function findProductSummaries(filters = {}) {
        left join fabrics f on f.fabric_id = ps.fabric_id
        left join fabric_details fd on fd.fabric_detail_id = ps.fabric_detail_id
        left join targets t on t.target_id = ps.target_id
-       ${styleFilter}
+       ${styleWhereClause}
+     ),
+     size_stock as (
+       select
+         pv.style_id,
+         pv.size_id,
+         coalesce(sum(i.qty), 0)::int as stock_qty
+       from product_variants pv
+       left join inventory i
+         on i.variant_id = pv.variant_id
+        ${inventoryLocationJoin}
+       where pv.style_id in (select style_id from base_styles)
+       group by pv.style_id, pv.size_id
      ),
      configured_sizes as (
        select
@@ -37,9 +70,23 @@ async function findProductSummaries(filters = {}) {
          array_remove(
            array_agg(s.code order by s.sort_order asc, s.code asc),
            null
-         ) as size_codes
+         ) as size_codes,
+         coalesce(
+           json_agg(
+             json_build_object(
+               'size_id', s.size_id,
+               'size_code', s.code,
+               'qty', coalesce(ssk.stock_qty, 0)
+             )
+             order by s.sort_order asc, s.code asc
+           ) filter (where s.size_id is not null),
+           '[]'::json
+         ) as size_stock
        from style_sizes ss
        inner join sizes s on s.size_id = ss.size_id
+       left join size_stock ssk
+         on ssk.style_id = ss.style_id
+        and ssk.size_id = ss.size_id
        where ss.style_id in (select style_id from base_styles)
        group by ss.style_id
      ),
@@ -63,11 +110,13 @@ async function findProductSummaries(filters = {}) {
      inventory_by_style as (
        select
          pv.style_id,
-         count(*)::int as inventory_row_count,
-         count(*) filter (where i.qty > 0)::int as stocked_variant_count,
+         count(i.variant_id)::int as inventory_row_count,
+         count(*) filter (where coalesce(i.qty, 0) > 0 and i.variant_id is not null)::int as stocked_variant_count,
          coalesce(sum(i.qty), 0)::int as total_stock_qty
-       from inventory i
-       inner join product_variants pv on pv.variant_id = i.variant_id
+       from product_variants pv
+       left join inventory i
+         on i.variant_id = pv.variant_id
+        ${inventoryLocationJoin}
        where pv.style_id in (select style_id from base_styles)
        group by pv.style_id
      ),
@@ -83,16 +132,6 @@ async function findProductSummaries(filters = {}) {
          and ssp.start_date <= current_date
          and (ssp.end_date is null or ssp.end_date >= current_date)
        group by ssp.style_id, ssp.size_id
-     ),
-     size_stock as (
-       select
-         pv.style_id,
-         pv.size_id,
-         coalesce(sum(i.qty), 0)::int as stock_qty
-       from product_variants pv
-       left join inventory i on i.variant_id = pv.variant_id
-       where pv.style_id in (select style_id from base_styles)
-       group by pv.style_id, pv.size_id
      ),
      size_coverage as (
        select
@@ -127,6 +166,7 @@ async function findProductSummaries(filters = {}) {
        bs.target_name,
        coalesce(cs.configured_size_count, 0)::int as configured_size_count,
        coalesce(cs.size_codes, '{}') as size_codes,
+       coalesce(cs.size_stock, '[]'::json) as size_stock,
        coalesce(cc.configured_color_count, 0)::int as configured_color_count,
        coalesce(v.variant_count, 0)::int as variant_count,
        coalesce(v.active_variant_count, 0)::int as active_variant_count,
