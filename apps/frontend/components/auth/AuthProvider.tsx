@@ -10,6 +10,7 @@ export type AuthUser = {
   email?: string | null;
   role_id?: string | null;
   role_name?: string | null;
+  must_change_password?: boolean;
 };
 
 export type AuthLocation = {
@@ -61,6 +62,7 @@ type AuthContextValue = AuthState & {
   refresh: () => Promise<void>;
   refreshLocations: () => Promise<void>;
   login: (input: { username: string; password: string }) => Promise<void>;
+  changePassword: (input: { current_password: string; new_password: string }) => Promise<void>;
   logout: () => Promise<void>;
   setDefaultLocation: (locationId: string) => Promise<void>;
   clearAuthNotice: () => void;
@@ -156,12 +158,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }));
     } catch (error) {
       console.warn("Failed to load user locations", error);
+      const isAuthError =
+        (error instanceof ApiError && error.status === 401) ||
+        (error instanceof Error && error.message.includes("Not authenticated"));
+
       setState((current) => ({
         ...current,
         locationsLoading: false,
         locationsError: formatLocationsError(error),
         locationAssignments: [],
         defaultLocation: null,
+        ...(isAuthError ? { user: null, sessionExpired: true } : {}),
       }));
     }
   }, []);
@@ -180,7 +187,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         authMessage: null,
         sessionExpired: false,
       }));
-      await fetchLocations(data.user.user_id);
+      if (data.user.must_change_password) {
+        setState((current) => ({
+          ...current,
+          locationsLoading: false,
+          locationsError: null,
+          locationAssignments: [],
+          defaultLocation: null,
+        }));
+      } else {
+        await fetchLocations(data.user.user_id);
+      }
     } catch (error) {
       const isUnauthorized = error instanceof ApiError && error.status === 401;
       setState(
@@ -213,11 +230,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           authMessage: null,
           sessionExpired: false,
         }));
-        await fetchLocations(data.user.user_id);
+        if (data.user.must_change_password) {
+          setState((current) => ({
+            ...current,
+            locationsLoading: false,
+            locationsError: null,
+            locationAssignments: [],
+            defaultLocation: null,
+          }));
+        } else {
+          await fetchLocations(data.user.user_id);
+        }
       } catch (error) {
         setState((current) => ({ ...current, loading: false }));
         throw error;
       }
+    },
+    [fetchLocations]
+  );
+
+  const changePassword = React.useCallback(
+    async (input: { current_password: string; new_password: string }) => {
+      const data = await apiFetch<{ user: AuthUser; permissions: string[] }>(
+        "/api/auth/change-password",
+        {
+          method: "POST",
+          body: JSON.stringify(input),
+        }
+      );
+
+      setState((current) => ({
+        ...current,
+        user: data.user,
+        permissions: data.permissions || [],
+        authMessage: null,
+        sessionExpired: false,
+      }));
+      await fetchLocations(data.user.user_id);
     },
     [fetchLocations]
   );
@@ -306,12 +355,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       refresh,
       refreshLocations,
       login,
+      changePassword,
       logout,
       setDefaultLocation,
       clearAuthNotice,
       has,
     }),
-    [state, refresh, refreshLocations, login, logout, setDefaultLocation, clearAuthNotice, has]
+    [
+      state,
+      refresh,
+      refreshLocations,
+      login,
+      changePassword,
+      logout,
+      setDefaultLocation,
+      clearAuthNotice,
+      has,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

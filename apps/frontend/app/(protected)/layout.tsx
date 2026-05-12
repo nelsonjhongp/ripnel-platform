@@ -1,4 +1,5 @@
 import { SidebarShell } from "@/components/sidebar"
+import { SidebarProvider } from "@/components/ui/sidebar"
 import { ProtectedGuard } from "@/components/auth/ProtectedGuard"
 import { VisualPreferencesProvider } from "@/components/appearance/VisualPreferencesProvider"
 
@@ -10,7 +11,9 @@ export default function ProtectedLayout({
   return (
     <ProtectedGuard>
       <VisualPreferencesProvider>
-        <SidebarShell>{children}</SidebarShell>
+        <SidebarProvider>
+          <SidebarShell>{children}</SidebarShell>
+        </SidebarProvider>
       </VisualPreferencesProvider>
     </ProtectedGuard>
   )

@@ -315,6 +315,11 @@ function normalizeSalesPageSize(value, fallback = 25) {
   return Math.min(parsed, 100);
 }
 
+function normalizeSalesOffset(value) {
+  const parsed = normalizeNonNegativeInteger(value);
+  return parsed === null ? 0 : parsed;
+}
+
 function normalizeSalesCursor(value) {
   const normalized = normalizeText(value);
   if (!normalized) return null;
@@ -1414,10 +1419,14 @@ async function listSales(input = {}) {
   const receiptStatus = normalizeText(input.receipt_status);
   const dateFrom = normalizeDate(input.date_from);
   const dateTo = normalizeDate(input.date_to);
-  const page = normalizeSalesPage(input.page);
-  const pageSize = normalizeSalesPageSize(input.page_size, 25);
+  const legacyLimit = normalizeSalesPageSize(input.limit, 25);
+  const legacyOffset = normalizeSalesOffset(input.offset);
+  const pageSize = normalizeSalesPageSize(input.page_size, legacyLimit);
+  const page = input.page ? normalizeSalesPage(input.page) : Math.floor(legacyOffset / pageSize) + 1;
   const cursor = normalizeSalesCursor(input.cursor);
   const { location } = await resolveOperatingContext(input.user_id);
+  const offset = (page - 1) * pageSize;
+  const limit = pageSize;
 
   if (status && !['draft', 'confirmed', 'cancelled'].includes(status)) {
     throw new AppError('Invalid status value', 400);
@@ -1470,10 +1479,27 @@ async function listSales(input = {}) {
 
   return {
     items: salesPage.items,
-    total: salesPage.total,
+    total:
+      typeof salesPage.total === 'number'
+        ? salesPage.total
+        : salesPage.pagination?.total_count ?? salesPage.items.length,
     limit,
     offset,
-    has_more: offset + salesPage.items.length < salesPage.total,
+    has_more:
+      typeof salesPage.total === 'number'
+        ? offset + salesPage.items.length < salesPage.total
+        : Boolean(salesPage.pagination?.has_next),
+    pagination: salesPage.pagination || {
+      mode: 'page',
+      cursor: null,
+      next_cursor: null,
+      page,
+      page_size: pageSize,
+      total_count: typeof salesPage.total === 'number' ? salesPage.total : salesPage.items.length,
+      total_pages: 1,
+      has_next: false,
+      has_prev: page > 1,
+    },
   };
 }
 

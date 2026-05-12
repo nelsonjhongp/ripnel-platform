@@ -15,7 +15,6 @@ import {
   Cell,
   PieChart,
   Pie,
-  Sector,
 } from "recharts"
 
 // Simple demo datasets approximating the Power BI visuals in the screenshots

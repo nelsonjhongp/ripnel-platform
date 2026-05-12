@@ -4,6 +4,8 @@ import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { ChevronRight, History, Info, RefreshCw } from "lucide-react"
 
+import { Pagination } from "@/components/ui/pagination"
+
 import { PermissionGuard } from "@/components/auth/PermissionGuard"
 import {
   ErrorPage,
@@ -22,7 +24,7 @@ import {
 } from "@/lib/cash"
 
 const CASH_ALLOWED_ROLES = ["ADMIN", "CAJA"]
-const PAGE_SIZE = 20
+const PAGE_SIZE = 10
 
 type RangeFilter = "7d" | "30d"
 type StatusFilter = "all" | "open" | "closed"
@@ -177,14 +179,14 @@ export default function CashHistoryPage() {
       <TooltipProvider delayDuration={120}>
         <section className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
           <div className="mx-auto max-w-6xl space-y-5">
-            <header className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
+            <header className="px-1 space-y-4">
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="text-xs uppercase tracking-wide text-[var(--ripnel-accent-hover)]">Caja</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ripnel-accent-hover)]">Caja</p>
                     <HelpTooltip content="Aquí revisas las sesiones diarias registradas de la sede actual, con su estado y total consolidado." />
                   </div>
-                  <h1 className="mt-1 text-2xl font-semibold text-[var(--ops-text)] md:text-3xl">
+                  <h1 className="mt-1 text-2xl font-semibold text-[var(--ops-text)] md:text-[1.75rem]">
                     Historial de caja
                   </h1>
                 </div>
@@ -200,7 +202,7 @@ export default function CashHistoryPage() {
               </div>
             </header>
 
-            <div className="sales-panel flex flex-col gap-3 rounded-lg p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="flex flex-wrap gap-2">
                 {[
                   { value: "7d", label: "7 días" },
@@ -243,13 +245,12 @@ export default function CashHistoryPage() {
               </div>
             </div>
 
-            <div className="sales-panel rounded-lg px-4 py-3 shadow-sm">
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
                 <SummaryMetric label="Sesiones" value={stats.count} />
                 <SummaryMetric
                   label="Pendientes"
                   value={stats.openCount}
-                  valueClassName="text-amber-700"
+                  valueClassName="text-[color:color-mix(in_srgb,#d97706_78%,var(--ops-text))]"
                 />
                 <SummaryMetric label="Cerradas" value={stats.closedCount} />
                 <SummaryMetric
@@ -258,11 +259,10 @@ export default function CashHistoryPage() {
                   valueClassName="text-[var(--ripnel-accent-hover)]"
                 />
               </div>
-            </div>
 
-            <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
+            <article>
               <div className="flex items-center gap-2">
-                <History className="h-4 w-4 text-violet-600" />
+                <History className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />
                 <p className="text-sm font-semibold text-[var(--ops-text)]">Sesiones registradas</p>
               </div>
 
@@ -328,11 +328,11 @@ export default function CashHistoryPage() {
                             {closing.opened_by_name || "Usuario no identificado"}
                           </p>
                           {closing.is_consistent === false ? (
-                            <p className="text-amber-700">
+                            <p className="text-[color:color-mix(in_srgb,#d97706_78%,var(--ops-text))]">
                               Diferencia {formatAmount(closing.difference)}
                             </p>
                           ) : (
-                            <p className="text-emerald-700">Consistencia OK</p>
+                            <p className="text-[color:color-mix(in_srgb,#059669_80%,var(--ops-text))]">Consistencia OK</p>
                           )}
                         </div>
 
@@ -349,29 +349,12 @@ export default function CashHistoryPage() {
                     ))}
                   </div>
 
-                  <div className="mt-4 flex flex-col gap-3 border-t border-[var(--ops-border-strong)] pt-4 md:flex-row md:items-center md:justify-between">
-                    <p className="text-sm text-[var(--ops-text-muted)]">
-                      Página {page} de {totalPages}
-                    </p>
-
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setPage((current) => Math.max(current - 1, 1))}
-                        disabled={page <= 1}
-                        className="sales-field sales-field-interactive rounded-xl px-3 py-2 text-sm font-medium text-[var(--ops-text)] disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Anterior
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPage((current) => Math.min(current + 1, totalPages))}
-                        disabled={page >= totalPages}
-                        className="sales-field sales-field-interactive rounded-xl px-3 py-2 text-sm font-medium text-[var(--ops-text)] disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Siguiente
-                      </button>
-                    </div>
+                  <div className="mt-4 border-t border-[var(--ops-border-strong)] pt-4">
+                    <Pagination
+                      page={page}
+                      totalPages={totalPages}
+                      onPageChange={setPage}
+                    />
                   </div>
                 </>
               )}

@@ -48,6 +48,8 @@ async function getSales(req, res, next) {
       receipt_status: req.query.receipt_status,
       date_from: req.query.date_from,
       date_to: req.query.date_to,
+      limit: req.query.limit,
+      offset: req.query.offset,
       page: req.query.page,
       page_size: req.query.page_size,
       cursor: req.query.cursor,

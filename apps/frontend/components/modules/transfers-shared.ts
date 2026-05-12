@@ -48,18 +48,18 @@ export function formatTransferStatus(status: TransferStatus) {
 
 export function getTransferStatusClasses(status: TransferStatus) {
   if (status === "draft") {
-    return "bg-slate-100 text-slate-700";
+    return "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text-muted)]";
   }
 
   if (status === "shipped") {
-    return "bg-amber-100 text-amber-700";
+    return "border-[color:color-mix(in_srgb,#f59e0b_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] text-[color:color-mix(in_srgb,#d97706_72%,var(--ops-text))]";
   }
 
   if (status === "received") {
-    return "bg-emerald-100 text-emerald-700";
+    return "border-[color:color-mix(in_srgb,#10b981_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_82%,var(--ops-text))]";
   }
 
-  return "bg-rose-100 text-rose-700";
+  return "border-[color:color-mix(in_srgb,#e11d48_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#e11d48_8%,var(--ops-surface))] text-[color:color-mix(in_srgb,#e11d48_82%,var(--ops-text))]";
 }
 
 export function formatDateTime(value: string | null) {
