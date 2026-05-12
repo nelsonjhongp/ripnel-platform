@@ -9,7 +9,11 @@ function buildCookie({ token }) {
     `ripnel_session=${encodeURIComponent(token)}`,
     'Path=/',
     'HttpOnly',
-    'SameSite=Lax',
+    // In production we need cookies to be sent on cross-site XHR/fetch requests
+    // (frontend and backend live on different origins). Browsers require
+    // `SameSite=None; Secure` for cross-site cookies. For local development
+    // keep `Lax` to avoid exposing cookies unnecessarily.
+    isProd ? 'SameSite=None' : 'SameSite=Lax',
     `Max-Age=${60 * 60 * 8}`,
   ];
 
