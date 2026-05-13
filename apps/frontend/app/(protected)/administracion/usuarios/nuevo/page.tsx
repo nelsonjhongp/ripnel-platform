@@ -1,4 +1,4 @@
-import UsersCreatePage from "@/components/admin/users-create-page"
+import UsersCreatePage from "@/components/modules/administration/users-create-page"
 
 export default function Page() {
   return <UsersCreatePage />

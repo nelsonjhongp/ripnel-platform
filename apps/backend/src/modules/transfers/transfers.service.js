@@ -4,6 +4,7 @@ const {
   findAllTransfers,
   findTransferHeaderById,
   findTransferLinesByTransferId,
+  findTransferRequestCandidateRows,
   insertTransfer,
   insertTransferLine,
   updateTransferLineShipment,
@@ -68,6 +69,37 @@ function ensureUniqueVariantIds(lines) {
   }
 
   return true;
+}
+
+function groupRequestCandidates(rows = []) {
+  const grouped = new Map();
+
+  for (const row of rows) {
+    if (!grouped.has(row.variant_id)) {
+      grouped.set(row.variant_id, {
+        variant_id: row.variant_id,
+        sku: row.sku,
+        style_code: row.style_code,
+        style_name: row.style_name,
+        garment_type_name: row.garment_type_name || null,
+        size_code: row.size_code,
+        color_name: row.color_name,
+        total_available: 0,
+        candidate_sources: [],
+      });
+    }
+
+    const current = grouped.get(row.variant_id);
+    current.total_available += Number(row.qty_available || 0);
+    current.candidate_sources.push({
+      location_id: row.location_id,
+      location_code: row.location_code,
+      location_name: row.location_name,
+      qty_available: Number(row.qty_available || 0),
+    });
+  }
+
+  return [...grouped.values()];
 }
 
 async function resolveTransferActorContext(auth = {}) {
@@ -189,6 +221,34 @@ async function listPendingReceipts(auth = {}) {
   return transfers.filter((transfer) => locationIds.has(transfer.to_location_id));
 }
 
+async function listTransferRequestCandidates(input = {}, auth = {}) {
+  const actor = await resolveTransferActorContext(auth);
+  const query = normalizeText(input.query);
+  const sourceLocationId = normalizeUuid(input.source_location_id);
+
+  if (!actor.capabilities.request_create) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
+  if (!actor.default_location_id) {
+    throw new AppError('Authenticated user has no default location assigned', 409, {
+      code: 'DEFAULT_LOCATION_REQUIRED',
+    });
+  }
+
+  if (!query || query.length < 2) {
+    return [];
+  }
+
+  const rows = await findTransferRequestCandidateRows({
+    destinationLocationId: actor.default_location_id,
+    searchQuery: query,
+    sourceLocationId,
+  });
+
+  return groupRequestCandidates(rows);
+}
+
 async function createTransfer(input, auth = {}) {
   const actor = await resolveTransferActorContext(auth);
   const fromLocationId = normalizeUuid(input.from_location_id);
@@ -262,6 +322,23 @@ async function createTransfer(input, auth = {}) {
 
   try {
     await client.query('begin');
+
+    for (const line of normalizedLines) {
+      const availableQty = await findInventoryQtyByLocationAndVariant(
+        fromLocationId,
+        line.variant_id,
+        client.query.bind(client)
+      );
+
+      if (availableQty < Number(line.qty_requested)) {
+        const variant = variants.find((candidate) => candidate.variant_id === line.variant_id);
+        throw new AppError(
+          `Stock insuficiente para ${variant?.sku || line.variant_id}. Actualiza la solicitud o ajusta cantidades.`,
+          409,
+          { code: 'TRANSFER_REQUEST_STOCK_CHANGED' }
+        );
+      }
+    }
 
     const transfer = await insertTransfer(
       {
@@ -544,6 +621,7 @@ async function cancelTransferById(transferId, input = {}, auth = {}) {
 module.exports = {
   listTransfers,
   listPendingReceipts,
+  listTransferRequestCandidates,
   getTransferById,
   createTransfer,
   shipTransferById,

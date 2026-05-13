@@ -4,13 +4,14 @@ import React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "./AuthProvider";
 import { ProtectedLoadingPage } from "@/components/feedback/status-page";
+import { appRoutes } from "@/lib/routes";
 
 export function ProtectedGuard({ children }: { children: React.ReactNode }) {
   const { loading, user, sessionExpired } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const requiresPasswordChange = Boolean(user?.must_change_password);
-  const isPasswordChangePage = pathname === "/account/seguridad";
+  const isPasswordChangePage = pathname === appRoutes.accountSecurity;
 
   React.useEffect(() => {
     if (!loading && !user) {
@@ -23,8 +24,8 @@ export function ProtectedGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (!loading && user?.must_change_password && pathname !== "/account/seguridad") {
-      router.replace("/account/seguridad");
+    if (!loading && user?.must_change_password && pathname !== appRoutes.accountSecurity) {
+      router.replace(appRoutes.accountSecurity);
     }
   }, [loading, user, router, pathname, sessionExpired]);
 

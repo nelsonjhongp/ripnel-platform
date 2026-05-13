@@ -220,31 +220,39 @@ function allocateSaleDiscountAcrossItems(items, saleDiscountAmount) {
 }
 
 function applyTaxesToComputedItems(items, taxRate) {
-  const subtotalAmount = round2(
+  const totalDocumentAmount = round2(
     items.reduce((accumulator, item) => accumulator + Number(item.line_subtotal || 0), 0)
   );
-  const taxAmount = round2(subtotalAmount * taxRate);
+  const taxAmount =
+    taxRate > 0
+      ? round2(totalDocumentAmount - totalDocumentAmount / (1 + Number(taxRate || 0)))
+      : 0;
   let remainingTax = taxAmount;
 
   const computedItems = items.map((item, index) => {
+    const lineSubtotal = round2(Number(item.line_subtotal || 0));
     const lineTax =
-      index === items.length - 1 ? remainingTax : round2(Number(item.line_subtotal || 0) * taxRate);
+      taxRate <= 0
+        ? 0
+        : index === items.length - 1
+          ? remainingTax
+          : round2(lineSubtotal - lineSubtotal / (1 + Number(taxRate || 0)));
 
     remainingTax = round2(remainingTax - lineTax);
 
     return {
       ...item,
-      unit_price_final: round2(Number(item.line_subtotal || 0) / item.quantity),
+      unit_price_final: round2(lineSubtotal / item.quantity),
       line_tax: lineTax,
-      line_total: round2(Number(item.line_subtotal || 0) + lineTax),
+      line_total: lineSubtotal,
     };
   });
 
   return {
     items: computedItems,
-    subtotalAmount,
+    subtotalAmount: totalDocumentAmount,
     taxAmount,
-    totalAmount: round2(subtotalAmount + taxAmount),
+    totalAmount: totalDocumentAmount,
   };
 }
 

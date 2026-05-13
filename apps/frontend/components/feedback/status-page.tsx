@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AlertTriangle, Ban, Home, LoaderCircle, RefreshCcw, SearchX } from "lucide-react";
+import { appRoutes } from "@/lib/routes";
 
 type StatusTone = "neutral" | "warning" | "danger";
 type StatusVariant = "default" | "ops";
@@ -192,7 +193,7 @@ export function NotFoundPage({ variant = "default" }: { variant?: StatusVariant 
       description="La página solicitada no forma parte del flujo actual o fue movida a otra ruta operativa."
       variant={variant}
       primaryAction={{ href: "/inicio", label: "Ir al inicio" }}
-      secondaryAction={{ href: "/purchase-system", label: "Abrir nueva venta" }}
+      secondaryAction={{ href: appRoutes.purchaseSystem, label: "Abrir nueva venta" }}
     />
   );
 }
@@ -211,7 +212,7 @@ export function ForbiddenPage({ variant = "default" }: { variant?: StatusVariant
       tone="warning"
       variant={variant}
       primaryAction={{ href: "/inicio", label: "Volver al inicio" }}
-      secondaryAction={{ href: "/account", label: "Ver mi cuenta" }}
+      secondaryAction={{ href: appRoutes.account, label: "Ver mi cuenta" }}
     />
   );
 }
@@ -243,7 +244,7 @@ export function ErrorPage({
       secondaryAction={
         onReset
           ? { onClick: onReset, label: "Reintentar" }
-          : { href: "/transaction-history", label: "Ir al historial" }
+          : { href: appRoutes.transactionHistory, label: "Ir al historial" }
       }
     />
   );

@@ -89,16 +89,27 @@ function buildCashClosingProjection(alias = 'cc', includeConsistency = false) {
   `;
 }
 
-async function findCashClosingByLocationAndDate(locationId, businessDate, executor = query) {
-  const result = await executor(
+async function findCashClosingByLocationAndDate(locationId, dateFrom, dateToOrExecutor, executor) {
+  let dateEnd, exec
+  if (typeof dateToOrExecutor === "function") {
+    dateEnd = dateFrom
+    exec = dateToOrExecutor
+  } else if (typeof dateToOrExecutor === "string") {
+    dateEnd = dateToOrExecutor
+    exec = typeof executor === "function" ? executor : query
+  } else {
+    dateEnd = dateFrom
+    exec = query
+  }
+  const result = await exec(
     `SELECT
        ${buildCashClosingProjection('cc')}
      FROM cash_closings cc
      INNER JOIN locations l ON l.location_id = cc.location_id
      LEFT JOIN users ou ON ou.user_id = cc.opened_by
      LEFT JOIN users cu ON cu.user_id = cc.closed_by
-     WHERE cc.location_id = $1 AND cc.business_date = $2`,
-    [locationId, businessDate]
+     WHERE cc.location_id = $1 AND cc.business_date >= $2 AND cc.business_date <= $3`,
+    [locationId, dateFrom, dateEnd]
   );
   return result.rows[0] || null;
 }
@@ -212,14 +223,26 @@ async function sumSalesPaymentsByLocationAndDate(locationId, businessDate) {
   return result.rows;
 }
 
-async function countSalesByLocationAndDate(locationId, businessDate) {
-  const result = await query(
+async function countSalesByLocationAndDate(locationId, dateFrom, dateToOrExecutor, executor) {
+  let dateEnd, exec
+  if (typeof dateToOrExecutor === "function") {
+    dateEnd = dateFrom
+    exec = dateToOrExecutor
+  } else if (typeof dateToOrExecutor === "string") {
+    dateEnd = dateToOrExecutor
+    exec = typeof executor === "function" ? executor : query
+  } else {
+    dateEnd = dateFrom
+    exec = query
+  }
+  const result = await exec(
     `SELECT COUNT(*) AS sale_count, COALESCE(SUM(total_amount), 0) AS grand_total
      FROM sales
      WHERE location_id = $1
        AND status = 'confirmed'
-       AND DATE(confirmed_at AT TIME ZONE 'America/Lima') = $2::date`,
-    [locationId, businessDate]
+       AND DATE(confirmed_at AT TIME ZONE 'America/Lima') >= $2::date
+       AND DATE(confirmed_at AT TIME ZONE 'America/Lima') <= $3::date`,
+    [locationId, dateFrom, dateEnd]
   );
   return result.rows[0];
 }

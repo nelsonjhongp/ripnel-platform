@@ -3,6 +3,7 @@ const { requireAuth } = require('../../middlewares/auth');
 const {
   getTransfers,
   getPendingReceipts,
+  getTransferRequestCandidates,
   getTransfer,
   postTransfer,
   postShipTransfer,
@@ -17,6 +18,7 @@ router.use(requireAuth);
 
 router.get('/', requireTransferCapability('visible'), getTransfers);
 router.get('/pending-receipts', requireTransferCapability('receive'), getPendingReceipts);
+router.get('/request-candidates', requireTransferCapability('request_create'), getTransferRequestCandidates);
 router.get('/:transferId', requireTransferCapability('visible'), getTransfer);
 router.post('/', requireTransferCapability('request_create'), postTransfer);
 router.post('/:transferId/ship', requireTransferCapability('ship'), postShipTransfer);
