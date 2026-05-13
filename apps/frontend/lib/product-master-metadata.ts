@@ -11,6 +11,7 @@ import {
   ShoppingBag,
   Warehouse,
 } from "lucide-react"
+import { appRoutes, buildCatalogRoute, buildProductModuleRoute, productRouteSlugs } from "@/lib/routes"
 
 export type CatalogFieldConfig = {
   key: string
@@ -31,6 +32,7 @@ export type CatalogPageDefinition = {
   slug: string
   label: string
   shortLabel: string
+  entityLabel: string
   shortDescription: string
   nextStepLabel: string
   endpoint: string
@@ -63,6 +65,7 @@ export const catalogPageDefinitions: CatalogPageDefinition[] = [
     slug: "tallas",
     label: "Tallas",
     shortLabel: "Tallas",
+    entityLabel: "talla",
     shortDescription: "Base para styles, variantes y precios.",
     nextStepLabel: "Completar styles con tallas permitidas.",
     endpoint: "/api/sizes",
@@ -115,6 +118,7 @@ export const catalogPageDefinitions: CatalogPageDefinition[] = [
     slug: "colores",
     label: "Colores",
     shortLabel: "Colores",
+    entityLabel: "color",
     shortDescription: "Colores comerciales y tecnicos.",
     nextStepLabel: "Dejar UNICO listo para casos sin color comercial.",
     endpoint: "/api/colors",
@@ -158,6 +162,7 @@ export const catalogPageDefinitions: CatalogPageDefinition[] = [
     slug: "tipo-prenda",
     label: "Tipo de prenda",
     shortLabel: "Tipo de prenda",
+    entityLabel: "tipo de prenda",
     shortDescription: "Familias base del style.",
     nextStepLabel: "Usar familias limpias antes de cargar estilos.",
     endpoint: "/api/garment-types",
@@ -195,6 +200,7 @@ export const catalogPageDefinitions: CatalogPageDefinition[] = [
     slug: "telas",
     label: "Telas",
     shortLabel: "Telas",
+    entityLabel: "tela",
     shortDescription: "Base comercial del style.",
     nextStepLabel: "Dejar telas frecuentes listas antes del alta masiva.",
     endpoint: "/api/fabrics",
@@ -231,6 +237,7 @@ export const catalogPageDefinitions: CatalogPageDefinition[] = [
     slug: "detalle-de-tela",
     label: "Detalle de tela",
     shortLabel: "Detalle de tela",
+    entityLabel: "detalle de tela",
     shortDescription: "Calificadores opcionales del style.",
     nextStepLabel: "Cargar solo lo que realmente ayuda a diferenciar productos.",
     endpoint: "/api/fabric-details",
@@ -267,6 +274,7 @@ export const catalogPageDefinitions: CatalogPageDefinition[] = [
     slug: "targets",
     label: "Targets",
     shortLabel: "Targets",
+    entityLabel: "target",
     shortDescription: "Segmentacion comercial opcional.",
     nextStepLabel: "Usarlo solo si cambia una decision comercial real.",
     endpoint: "/api/targets",
@@ -301,28 +309,28 @@ export const catalogPageBySlug = Object.fromEntries(
 
 export const productMasterLinks: ProductMasterLink[] = [
   {
-    href: "/productos",
+    href: appRoutes.products,
     label: "Resumen",
     shortDescription: "Seguimiento general del maestro de producto.",
     nextStepLabel: "Detectar que styles requieren completar variantes o precios.",
     icon: Warehouse,
   },
   {
-    href: "/productos/nuevo",
+    href: `${appRoutes.products}/nuevo`,
     label: "Nuevo",
     shortDescription: "Alta rapida de style con tallas y colores iniciales.",
     nextStepLabel: "Crear variantes y continuar con precios.",
     icon: Plus,
   },
   {
-    href: "/productos/estilos",
+    href: buildProductModuleRoute(productRouteSlugs.styles),
     label: "Estilos",
     shortDescription: "Alta y mantenimiento del style base.",
     nextStepLabel: "Despues de crear un style, continuar en Variantes.",
     icon: Shirt,
   },
   {
-    href: "/productos/variantes",
+    href: buildProductModuleRoute(productRouteSlugs.variants),
     label: "Variantes",
     shortDescription: "Configuracion de tallas, colores y SKU por combinacion.",
     nextStepLabel: "Cerrar configuracion antes de cargar precios y stock.",
@@ -331,43 +339,43 @@ export const productMasterLinks: ProductMasterLink[] = [
 ]
 
 export function resolveProductMasterRouteTitle(pathname: string) {
-  if (pathname === "/catalogos") {
+  if (pathname === appRoutes.catalogs) {
     return "Catalogos maestros"
   }
 
-  if (pathname.startsWith("/catalogos/")) {
+  if (pathname.startsWith(`${appRoutes.catalogs}/`)) {
     const slug = pathname.split("/")[2]
     return catalogPageBySlug[slug]?.label || null
   }
 
-  if (pathname === "/productos") {
+  if (pathname === appRoutes.products) {
     return "Maestro de producto"
   }
 
   const matchedProductLink = productMasterLinks.find((link) => link.href === pathname)
   if (matchedProductLink) {
-    if (matchedProductLink.href === "/productos/nuevo") return "Nuevo producto"
+    if (matchedProductLink.href === `${appRoutes.products}/nuevo`) return "Nuevo producto"
     return matchedProductLink.label === "Resumen"
       ? "Maestro de producto"
       : `${matchedProductLink.label} de producto`
   }
 
-  if (pathname.startsWith("/productos/")) {
+  if (pathname.startsWith(`${appRoutes.products}/`)) {
     const slug = pathname.split("/")[2]
     if (slug === "nuevo") return "Nuevo producto"
-    if (slug === "estilos") return "Estilos de producto"
-    if (slug === "variantes") return "Variantes de producto"
+    if (slug === productRouteSlugs.styles) return "Estilos de producto"
+    if (slug === productRouteSlugs.variants) return "Variantes de producto"
   }
 
   return null
 }
 
 export function getCatalogRoute(slug: string) {
-  return `/catalogos/${slug}`
+  return buildCatalogRoute(slug)
 }
 
 export const productMasterSummaryLink = {
-  href: "/catalogos",
+  href: appRoutes.catalogs,
   label: "Catalogos maestros",
   icon: ReceiptText,
 }

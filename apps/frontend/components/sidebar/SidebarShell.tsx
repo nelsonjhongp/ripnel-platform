@@ -7,6 +7,7 @@ import { AppSidebar } from "./AppSidebar"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth/AuthProvider"
+import { TopbarNotifications } from "@/components/notifications"
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -94,24 +95,27 @@ export function SidebarShell({
             </Breadcrumb>
           </div>
 
-          {actions.length > 0 ? (
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              {actions.map((action) => (
-                <Button
-                  key={action.key}
-                  asChild
-                  variant={action.variant || "outline"}
-                  size="sm"
-                  className="rounded-full px-3.5"
-                >
-                  <Link href={action.href}>
-                    {action.icon}
-                    {action.label}
-                  </Link>
-                </Button>
-              ))}
-            </div>
-          ) : null}
+          <div className="flex items-center justify-end gap-2">
+            <TopbarNotifications />
+            {actions.length > 0 ? (
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                {actions.map((action) => (
+                  <Button
+                    key={action.key}
+                    asChild
+                    variant={action.variant || "outline"}
+                    size="sm"
+                    className="rounded-full px-3.5"
+                  >
+                    <Link href={action.href}>
+                      {action.icon}
+                      {action.label}
+                    </Link>
+                  </Button>
+                ))}
+              </div>
+            ) : null}
+          </div>
         </header>
 
         <main className="flex-1 overflow-auto w-full min-h-screen">{children}</main>

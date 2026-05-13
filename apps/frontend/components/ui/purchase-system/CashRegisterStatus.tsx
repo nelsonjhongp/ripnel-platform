@@ -1,8 +1,19 @@
 "use client"
 
+import type { MouseEventHandler } from "react"
+
 import { ReceiptText } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+
+type CashRegisterStatusProps = {
+  totalItems?: number
+  subtotal?: number
+  totalLabel?: string
+  summaryLabel?: string
+  onClear?: MouseEventHandler<HTMLButtonElement>
+  className?: string
+}
 
 export function CashRegisterStatus({
   totalItems = 0,
@@ -11,7 +22,7 @@ export function CashRegisterStatus({
   summaryLabel = "Subtotal",
   onClear,
   className,
-}) {
+}: CashRegisterStatusProps) {
   return (
     <section className={cn("space-y-3", className)}>
       <div className="flex items-center gap-2">

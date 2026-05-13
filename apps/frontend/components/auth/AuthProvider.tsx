@@ -145,7 +145,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const response = await apiFetch<UserLocationsResponse | UserLocationsPayload>(
-        `/api/users/${userId}/locations`
+        `/api/users/${userId}/locations`,
+        {
+          suppressAuthEvent: true,
+        }
       );
       const payload = unwrapApiData(response);
       const locationState = buildLocationState(payload);
@@ -158,9 +161,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }));
     } catch (error) {
       console.warn("Failed to load user locations", error);
-      const isAuthError =
-        (error instanceof ApiError && error.status === 401) ||
-        (error instanceof Error && error.message.includes("Not authenticated"));
 
       setState((current) => ({
         ...current,
@@ -168,7 +168,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         locationsError: formatLocationsError(error),
         locationAssignments: [],
         defaultLocation: null,
-        ...(isAuthError ? { user: null, sessionExpired: true } : {}),
       }));
     }
   }, []);
@@ -200,11 +199,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       const isUnauthorized = error instanceof ApiError && error.status === 401;
+      const sessionExpired =
+        error instanceof ApiError &&
+        error.status === 401 &&
+        (error.code === "SESSION_EXPIRED" || error.code === "INVALID_SESSION");
+
       setState(
         buildSignedOutState({
           loading: false,
-          authMessage: isUnauthorized ? null : "No se pudo validar la sesión actual.",
-          sessionExpired: false,
+          authMessage: isUnauthorized
+            ? sessionExpired
+              ? "Tu sesión expiró. Vuelve a iniciar sesión para continuar."
+              : null
+            : "No se pudo validar la sesión actual.",
+          sessionExpired,
         })
       );
     }

@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/collapsible"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { resolveTransferCapabilities } from "@/lib/capabilities"
+import { appRoutes } from "@/lib/routes"
 import { inventoryIcons, sidebarGroups, type SidebarItem } from "./sidebar-config"
 
 function SidebarLink({
@@ -181,8 +182,16 @@ export function AppSidebar({
     return sidebarGroups
       .map((group) => {
         const items = group.items.filter((item) => {
-          if (group.title === "Transferencias") {
+          if (item.permission && !has(item.permission)) {
+            return false
+          }
+
+          if (item.url.startsWith("/transferencias/")) {
             if (item.url.endsWith("/crear-transferencia")) {
+              return transferCapabilities.requestCreate
+            }
+
+            if (item.url.endsWith("/solicitar-productos")) {
               return transferCapabilities.requestCreate
             }
 
@@ -288,7 +297,7 @@ export function AppSidebar({
               </div>
               <button
                 type="button"
-                onClick={() => router.push("/account")}
+                onClick={() => router.push(appRoutes.account)}
                 className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-sidebar-foreground/65 transition hover:bg-background/70 hover:text-sidebar-foreground"
                 aria-label="Gestionar sede"
               >
@@ -303,12 +312,12 @@ export function AppSidebar({
             <SidebarGroup className="p-0">
               <SidebarGroupContent>
                 <SidebarMenu>
-                  <SidebarLink href="/inicio" label="Inicio" icon={House} active={pathname === "/inicio"} />
+                  <SidebarLink href={appRoutes.home} label="Inicio" icon={House} active={pathname === appRoutes.home} />
                   <SidebarLink
-                    href="/dashboard"
+                    href={appRoutes.dashboard}
                     label="Dashboard"
                     icon={LayoutDashboard}
-                    active={pathname === "/dashboard"}
+                    active={pathname === appRoutes.dashboard}
                   />
                 </SidebarMenu>
               </SidebarGroupContent>
@@ -334,7 +343,7 @@ export function AppSidebar({
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild className="h-11 rounded-2xl px-2.5">
-                <Link href="/account">
+                <Link href={appRoutes.account}>
                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-foreground">
                     <CircleUserRound className="h-5 w-5" />
                   </div>
