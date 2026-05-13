@@ -2,7 +2,7 @@
 
 Fuente principal para composicion visual de paginas frontend en RIPNEL. Este documento define como componer una pagina por bloques reutilizables y fija el patron canonico para headers operativos, listados y modulos de soporte.
 
-La referencia principal para listados tabulares es `transaction-history`. La composicion base es:
+La referencia principal para listados tabulares es `/ventas/historial`. La composicion base es:
 
 - `header`;
 - `kpis` opcionales;
@@ -400,7 +400,7 @@ Este estandar tambien aplica a otras vistas, aunque sin forzar tabla o KPIs.
 
 ## Referencias de uso
 
-### `transaction-history`
+### `/ventas/historial`
 
 - referencia principal del patron tabular;
 - usa `header` -> `kpis` -> separador -> `bloque tabla`;
@@ -427,7 +427,7 @@ Este estandar tambien aplica a otras vistas, aunque sin forzar tabla o KPIs.
 
 ## Referencia canonica: clientes
 
-La implementacion de `customers-page.tsx` (`apps/frontend/components/modules/customers-page.tsx`) es la referencia canonica para estos patrones visuales. Las reglas de esta seccion tienen prioridad sobre convenciones genericas anteriores del documento.
+La implementacion de `customers-page.tsx` (`apps/frontend/components/modules/customers/customers-page.tsx`) es la referencia canonica para estos patrones visuales. Las reglas de esta seccion tienen prioridad sobre convenciones genericas anteriores del documento.
 
 ### Estructura de tabla (sin bordes redondeados)
 
