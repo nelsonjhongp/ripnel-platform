@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { CatalogFormPage } from "@/components/modules/catalog-form-page";
+import { CatalogFormPage } from "@/components/modules/catalogs/catalog-form-page";
 import { catalogPageBySlug, getCatalogRoute } from "@/lib/product-master-metadata";
 
 export default async function NewCatalogItemPage({
@@ -20,9 +20,7 @@ export default async function NewCatalogItemPage({
       catalogRoute={getCatalogRoute(page.slug)}
       endpoint={page.endpoint}
       fields={page.fields}
-      idKey={page.idKey}
       duplicateStrategy={page.duplicateStrategy}
-      mode="create"
     />
   );
 }
