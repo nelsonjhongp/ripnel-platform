@@ -1,4 +1,4 @@
-import RolesCreatePage from "@/components/admin/roles-create-page"
+import RolesCreatePage from "@/components/modules/administration/roles-create-page"
 
 export default function Page() {
   return <RolesCreatePage />

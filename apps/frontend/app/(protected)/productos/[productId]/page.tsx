@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation"
-import { ModulePlaceholder } from "@/components/modules/module-placeholder"
-import { StylesPage } from "@/components/modules/styles-page"
-import { VariantsPage } from "@/components/modules/variants-page"
+import { ModulePlaceholder } from "@/components/modules/shared/module-placeholder"
+import { StylesPage } from "@/components/modules/products/styles-page"
+import { VariantsPage } from "@/components/modules/products/variants-page"
+import { productRouteSlugs } from "@/lib/routes"
 
 // This route currently orchestrates product submodules by slug.
 // `productId` is preserved for compatibility with existing navigation,
@@ -10,7 +11,7 @@ const productPages: Record<
   string,
   { title: string; description: string; bullets: string[] }
 > = {
-  estilos: {
+  [productRouteSlugs.styles]: {
     title: "Estilos de producto",
     description: "Modulo para registrar el style base y su definicion comercial antes de configurar variantes.",
     bullets: [
@@ -20,7 +21,7 @@ const productPages: Record<
       "Servira como nodo principal para variantes y precios.",
     ],
   },
-  variantes: {
+  [productRouteSlugs.variants]: {
     title: "Variantes de producto",
     description: "Modulo operativo para configurar tallas, colores y generar SKU por combinacion.",
     bullets: [
@@ -49,11 +50,11 @@ export default async function ProductPage({
     notFound()
   }
 
-  if (productId === "estilos") {
+  if (productId === productRouteSlugs.styles) {
     return <StylesPage initialStyleId={initialStyleId || null} />
   }
 
-  if (productId === "variantes") {
+  if (productId === productRouteSlugs.variants) {
     return <VariantsPage initialStyleId={initialStyleId || null} />
   }
 

@@ -1,7 +1,18 @@
 const { query } = require('../../shared/db');
 
-async function findSalesHeadlineByLocationAndDate(locationId, businessDate, executor = query) {
-  const result = await executor(
+async function findSalesHeadlineByLocationAndDate(locationId, dateFrom, dateToOrExecutor, executor) {
+  let dateEnd, exec
+  if (typeof dateToOrExecutor === "function") {
+    dateEnd = dateFrom
+    exec = dateToOrExecutor
+  } else if (typeof dateToOrExecutor === "string") {
+    dateEnd = dateToOrExecutor
+    exec = typeof executor === "function" ? executor : query
+  } else {
+    dateEnd = dateFrom
+    exec = query
+  }
+  const result = await exec(
     `SELECT
        COUNT(*)::int AS sale_count,
        COALESCE(SUM(total_amount), 0)::numeric(12,2) AS total_amount,
@@ -9,15 +20,27 @@ async function findSalesHeadlineByLocationAndDate(locationId, businessDate, exec
      FROM sales
      WHERE location_id = $1
        AND status = 'confirmed'
-       AND DATE(confirmed_at AT TIME ZONE 'America/Lima') = $2::date`,
-    [locationId, businessDate]
+       AND DATE(confirmed_at AT TIME ZONE 'America/Lima') >= $2::date
+       AND DATE(confirmed_at AT TIME ZONE 'America/Lima') <= $3::date`,
+    [locationId, dateFrom, dateEnd]
   );
 
   return result.rows[0] || null;
 }
 
-async function findPaymentTotalsByLocationAndDate(locationId, businessDate, executor = query) {
-  const result = await executor(
+async function findPaymentTotalsByLocationAndDate(locationId, dateFrom, dateToOrExecutor, executor) {
+  let dateEnd, exec
+  if (typeof dateToOrExecutor === "function") {
+    dateEnd = dateFrom
+    exec = dateToOrExecutor
+  } else if (typeof dateToOrExecutor === "string") {
+    dateEnd = dateToOrExecutor
+    exec = typeof executor === "function" ? executor : query
+  } else {
+    dateEnd = dateFrom
+    exec = query
+  }
+  const result = await exec(
     `WITH payment_movements AS (
        SELECT
          sp.method,
@@ -26,7 +49,8 @@ async function findPaymentTotalsByLocationAndDate(locationId, businessDate, exec
        INNER JOIN sales s ON s.sale_id = sp.sale_id
        WHERE s.location_id = $1
          AND s.status = 'confirmed'
-         AND DATE(s.confirmed_at AT TIME ZONE 'America/Lima') = $2::date
+         AND DATE(s.confirmed_at AT TIME ZONE 'America/Lima') >= $2::date
+         AND DATE(s.confirmed_at AT TIME ZONE 'America/Lima') <= $3::date
 
        UNION ALL
 
@@ -35,14 +59,15 @@ async function findPaymentTotalsByLocationAndDate(locationId, businessDate, exec
          -spr.amount AS signed_amount
        FROM sales_payment_reversals spr
        WHERE spr.location_id = $1
-         AND DATE(spr.reversed_at AT TIME ZONE 'America/Lima') = $2::date
+         AND DATE(spr.reversed_at AT TIME ZONE 'America/Lima') >= $2::date
+         AND DATE(spr.reversed_at AT TIME ZONE 'America/Lima') <= $3::date
      )
      SELECT
        method,
        COALESCE(SUM(signed_amount), 0)::numeric(12,2) AS total
      FROM payment_movements
      GROUP BY method`,
-    [locationId, businessDate]
+    [locationId, dateFrom, dateEnd]
   );
 
   return result.rows;

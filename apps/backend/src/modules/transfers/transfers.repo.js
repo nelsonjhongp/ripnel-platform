@@ -210,6 +210,65 @@ async function findTransferLinesByTransferId(transferId, executor = query) {
   return result.rows;
 }
 
+async function findTransferRequestCandidateRows(
+  { destinationLocationId, searchQuery, sourceLocationId = null, limit = 80 },
+  executor = query
+) {
+  const values = [destinationLocationId, `%${searchQuery}%`];
+  let sourceFilter = '';
+
+  if (sourceLocationId) {
+    values.push(sourceLocationId);
+    sourceFilter = `and l.location_id = $${values.length}`;
+  }
+
+  values.push(limit);
+
+  const result = await executor(
+    `select
+       l.location_id,
+       l.code as location_code,
+       l.name as location_name,
+       pv.variant_id,
+       pv.sku,
+       ps.style_code,
+       ps.name as style_name,
+       gt.name as garment_type_name,
+       s.code as size_code,
+       c.name as color_name,
+       i.qty::int as qty_available
+     from inventory i
+     inner join locations l on l.location_id = i.location_id
+     inner join product_variants pv on pv.variant_id = i.variant_id
+     inner join product_styles ps on ps.style_id = pv.style_id
+     left join garment_types gt on gt.garment_type_id = ps.garment_type_id
+     inner join sizes s on s.size_id = pv.size_id
+     inner join colors c on c.color_id = pv.color_id
+     where i.qty > 0
+       and l.active = true
+       and l.location_id <> $1
+       and (
+         pv.sku ilike $2
+         or ps.style_code ilike $2
+         or ps.name ilike $2
+         or s.code ilike $2
+         or c.name ilike $2
+         or coalesce(gt.name, '') ilike $2
+       )
+       ${sourceFilter}
+     order by
+       ps.name asc,
+       s.sort_order asc,
+       c.name asc,
+       i.qty desc,
+       l.name asc
+     limit $${values.length}`,
+    values
+  );
+
+  return result.rows;
+}
+
 async function insertTransfer(payload, executor = query) {
   const result = await executor(
     `insert into stock_transfers (
@@ -417,6 +476,7 @@ module.exports = {
   findAllTransfers,
   findTransferHeaderById,
   findTransferLinesByTransferId,
+  findTransferRequestCandidateRows,
   insertTransfer,
   insertTransferLine,
   updateTransferLineShipment,

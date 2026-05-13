@@ -9,8 +9,10 @@ import {
   ReceiptText,
   RotateCcw,
   Settings,
+  Settings2,
   ShoppingBag,
   ShoppingCart,
+  Tag,
   Users,
   Warehouse,
 } from "lucide-react"
@@ -21,11 +23,13 @@ import {
   productMasterLinks,
   productMasterSummaryLink,
 } from "@/lib/product-master-metadata"
+import { appRoutes, buildTransferModuleRoute, transferRouteSlugs } from "@/lib/routes"
 
 export type SidebarItem = {
   title: string
   url: string
   icon?: React.ComponentType<{ className?: string }>
+  permission?: string
   onlyForRoles?: string[]
   excludeRoles?: string[]
 }
@@ -49,8 +53,8 @@ export const sidebarGroups: SidebarGroup[] = [
     permission: "sales.pos",
     excludeRoles: ["CAJA"],
     items: [
-      { title: "Nueva venta", url: "/purchase-system" },
-      { title: "Historial de ventas", url: "/transaction-history" },
+      { title: "Nueva venta", url: appRoutes.purchaseSystem },
+      { title: "Historial de ventas", url: appRoutes.transactionHistory },
     ],
   },
   {
@@ -58,16 +62,26 @@ export const sidebarGroups: SidebarGroup[] = [
     icon: RotateCcw,
     permission: "sales.postsale.view",
     directLink: true,
-    items: [{ title: "Postventa", url: "/postventa" }],
+    items: [{ title: "Postventa", url: appRoutes.postsales }],
   },
   {
     title: "Caja",
     icon: Banknote,
     onlyForRoles: ["ADMIN", "CAJA"],
     items: [
-      { title: "Caja del día", url: "/caja" },
-      { title: "Historial de caja", url: "/caja/historial" },
-      { title: "Control de cajas", url: "/caja/control", onlyForRoles: ["ADMIN"] },
+      { title: "Caja del día", url: appRoutes.cash },
+      { title: "Historial de caja", url: `${appRoutes.cash}/historial` },
+      { title: "Control de cajas", url: `${appRoutes.cash}/control`, onlyForRoles: ["ADMIN"] },
+    ],
+  },
+  {
+    title: "Inventario",
+    icon: Boxes,
+    excludeRoles: SELLER_FOCUSED_ROLES,
+    items: [
+      { title: "Stock actual", url: appRoutes.inventory, permission: "inventory.view" },
+      { title: "Movimientos de stock", url: appRoutes.kardex, permission: "inventory.view" },
+      { title: "Apertura y ajustes", url: appRoutes.inventoryAdjustments, permission: "inventory.view" },
     ],
   },
   {
@@ -75,20 +89,21 @@ export const sidebarGroups: SidebarGroup[] = [
     icon: ArrowRightLeft,
     excludeRoles: SELLER_FOCUSED_ROLES,
     items: [
-      { title: "Solicitar productos", url: "/transferencias/solicitar-productos" },
-      { title: "Listado de transferencias", url: "/transferencias/listado-de-transferencias" },
-      { title: "Recepciones pendientes", url: "/transferencias/recepciones-pendientes" },
-    ],
-  },
-  {
-    title: "Inventario",
-    icon: Boxes,
-    permission: "inventory.view",
-    excludeRoles: SELLER_FOCUSED_ROLES,
-    items: [
-      { title: "Stock actual", url: "/inventory" },
-      { title: "Apertura y ajustes", url: "/inventory/ajustes" },
-      { title: "Kardex", url: "/kardex" },
+      {
+        title: "Solicitar productos",
+        url: buildTransferModuleRoute(transferRouteSlugs.requestProducts),
+        icon: ArrowRightLeft,
+      },
+      {
+        title: "Listado de transferencias",
+        url: buildTransferModuleRoute(transferRouteSlugs.list),
+        icon: ArrowRightLeft,
+      },
+      {
+        title: "Recepciones pendientes",
+        url: buildTransferModuleRoute(transferRouteSlugs.pendingReceipts),
+        icon: ArrowRightLeft,
+      },
     ],
   },
   {
@@ -125,30 +140,40 @@ export const sidebarGroups: SidebarGroup[] = [
     icon: Settings,
     permission: "admin.manage",
     items: [
-      { title: "Usuarios", url: "/administracion/usuarios" },
-      { title: "Roles", url: "/administracion/roles" },
-      { title: "Ubicaciones", url: "/administracion/ubicaciones" },
+      { title: "Usuarios", url: appRoutes.administrationUsers },
+      { title: "Roles", url: appRoutes.administrationRoles },
+      { title: "Ubicaciones", url: appRoutes.administrationLocations },
     ],
   },
   {
     title: "Clientes",
     icon: Users,
     onlyForRoles: ["ADMIN", "TIENDA", "CAJA", "VENTAS"],
-    items: [{ title: "Clientes", url: "/clientes" }],
+    items: [{ title: "Clientes", url: appRoutes.customers }],
+  },
+  {
+    title: "Precios",
+    icon: Tag,
+    permission: "prices.manage",
+    excludeRoles: SELLER_FOCUSED_ROLES,
+    items: [
+      { title: "Listado de precios", url: appRoutes.prices, icon: Tag },
+      { title: "Reglas", url: `${appRoutes.prices}/reglas`, icon: Settings2 },
+    ],
   },
   {
     title: "BI",
     icon: BarChart3,
     directLink: true,
     excludeRoles: SELLER_FOCUSED_ROLES,
-    items: [{ title: "BI", url: "/bi" }],
+    items: [{ title: "BI", url: appRoutes.businessIntelligence }],
   },
 ]
 
 export const inventoryIcons = {
   "Stock actual": Warehouse,
+  "Movimientos de stock": ClipboardList,
   "Apertura y ajustes": ClipboardList,
-  Kardex: ClipboardList,
   "Historial de transacciones": ReceiptText,
   Dashboard: LayoutDashboard,
 }

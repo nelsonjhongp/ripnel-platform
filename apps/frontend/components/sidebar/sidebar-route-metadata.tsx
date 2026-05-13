@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import { ShoppingCart } from "lucide-react"
 import { resolveProductMasterRouteTitle } from "@/lib/product-master-metadata"
+import { appRoutes, buildTransferModuleRoute, transferRouteSlugs } from "@/lib/routes"
 
 export type TopbarAction = {
   key: string
@@ -12,22 +13,24 @@ export type TopbarAction = {
 
 const routeTitles: Record<string, string> = {
   "/sidebar": "Panel del usuario",
-  "/account": "Perfil",
-  "/inicio": "Inicio",
-  "/dashboard": "Dashboard operativo",
-  "/bi": "BI y analitica",
-  "/account-mockup": "Cuenta mockup",
-  "/administracion/usuarios": "Usuarios",
-  "/administracion/roles": "Roles",
-  "/administracion/ubicaciones": "Ubicaciones",
-  "/inventory": "Inventario",
-  "/kardex": "Kardex",
-  "/purchase-system": "Nueva venta",
-  "/transaction-history": "Historial de ventas",
-  "/postventa": "Postventa",
-  "/transferencias/listado-de-transferencias": "Transferencias",
-  "/transferencias/solicitar-productos": "Solicitar productos",
-  "/transferencias/recepciones-pendientes": "Recepciones pendientes",
+  [appRoutes.account]: "Perfil",
+  [appRoutes.home]: "Inicio",
+  [appRoutes.dashboard]: "Dashboard operativo",
+  [appRoutes.businessIntelligence]: "BI y analitica",
+  [appRoutes.administrationUsers]: "Usuarios",
+  [appRoutes.administrationRoles]: "Roles",
+  [appRoutes.administrationLocations]: "Ubicaciones",
+  [appRoutes.inventory]: "Inventario",
+  [appRoutes.kardex]: "Movimientos de stock",
+  [appRoutes.purchaseSystem]: "Nueva venta",
+  [appRoutes.transactionHistory]: "Historial de ventas",
+  [appRoutes.postsales]: "Postventa",
+  [buildTransferModuleRoute(transferRouteSlugs.list)]: "Transferencias",
+  [buildTransferModuleRoute(transferRouteSlugs.requestProducts)]: "Solicitar productos",
+  [buildTransferModuleRoute(transferRouteSlugs.pendingReceipts)]: "Recepciones pendientes",
+  [appRoutes.prices]: "Listado de precios",
+  [`${appRoutes.prices}/crear`]: "Gestion de precios",
+  [`${appRoutes.prices}/reglas`]: "Reglas de precio",
 }
 
 export function resolveSidebarRouteTitle(pathname: string, explicitTitle?: string) {
@@ -58,7 +61,7 @@ export function resolveSidebarDefaultActions(hasPermission: (permission: string)
     actions.push({
       key: "quick-sale",
       label: "Venta rapida",
-      href: "/purchase-system",
+      href: appRoutes.purchaseSystem,
       icon: <ShoppingCart className="h-4 w-4" />,
       variant: "accent",
     })

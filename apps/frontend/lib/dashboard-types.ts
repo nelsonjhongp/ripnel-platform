@@ -1,0 +1,207 @@
+export type DashboardLocation = {
+  location_id: string
+  name: string
+  code: string | null
+  type: string
+}
+
+export type DashboardContext = {
+  generated_at: string
+  business_date: string
+  date_from?: string
+  location: DashboardLocation
+  user: {
+    user_id: string
+    full_name: string
+    role_name: string | null
+  }
+}
+
+export type DashboardSections = {
+  sales: boolean
+  cash: boolean
+  receipts: boolean
+  postsales: boolean
+  inventory: boolean
+  transfers: boolean
+}
+
+export type PaymentTotals = {
+  cash: number
+  yape: number
+  plin: number
+  transfer: number
+  all: number
+}
+
+export type SalesToday = {
+  visible: boolean
+  sale_count?: number
+  total_amount?: number
+  last_confirmed_at?: string | null
+  by_method?: PaymentTotals
+}
+
+export type CashClosing = {
+  cash_closing_id: string
+  business_date: string
+  status: "open" | "closed"
+  total_all: number
+  location_name: string
+  opened_by_name?: string | null
+  closed_by_name?: string | null
+  closed_at?: string | null
+}
+
+export type CashSummary = {
+  sale_count: number
+  grand_total: number
+  by_method: PaymentTotals
+  consistency: CashConsistency
+}
+
+export type CashConsistency = {
+  sales_total: number
+  payment_total: number
+  difference: number
+  is_consistent: boolean
+}
+
+export type CashSection = {
+  visible: boolean
+  closing?: CashClosing | null
+  sales_summary?: CashSummary
+}
+
+export type ReceiptQueueItem = {
+  sale_id: string
+  sale_number: string | null
+  document_type: string
+  customer_name_text: string | null
+  total_amount: number
+  currency: string
+  queued_at: string
+  queue_status: "missing" | "pending" | "error"
+  sunat_message: string | null
+}
+
+export type ReceiptsSection = {
+  visible: boolean
+  open_count?: number
+  missing_count?: number
+  pending_count?: number
+  error_count?: number
+  latest?: ReceiptQueueItem[]
+}
+
+export type PostsalesItem = {
+  sale_id: string
+  sale_number: string | null
+  customer_name_text: string | null
+  total_amount: number
+  currency: string
+  business_date: string
+  occurred_at: string
+  cash_status: "open" | "closed" | "missing"
+  exchange_allowed: boolean
+  cancel_allowed: boolean
+}
+
+export type PostsalesSection = {
+  visible: boolean
+  recent_window_days?: number
+  total_recent_confirmed?: number
+  eligible_exchange_count?: number
+  eligible_cancel_count?: number
+  blocked_cancel_count?: number
+  latest?: PostsalesItem[]
+}
+
+export type TransferItem = {
+  transfer_id: string
+  transfer_number: string | null
+  status: string
+  from_location_name: string
+  to_location_name: string
+  shipped_at: string | null
+  updated_at: string
+  qty_shipped_total: number
+}
+
+export type TransfersSection = {
+  visible: boolean
+  pending_receipts_count?: number
+  draft_outgoing_count?: number
+  latest?: TransferItem[]
+}
+
+export type InventoryItem = {
+  variant_id: string
+  sku: string
+  style_name: string
+  style_code: string
+  size_code: string
+  color_code: string
+  qty: number
+}
+
+export type InventorySection = {
+  visible: boolean
+  low_stock_threshold?: number
+  zero_stock_count?: number
+  low_stock_count?: number
+  critical_variants?: InventoryItem[]
+}
+
+export type Shortcut = {
+  key: string
+  label: string
+  href: string
+  description: string
+}
+
+export type DashboardOverview = {
+  context: DashboardContext
+  sections: DashboardSections
+  sales_today: SalesToday
+  cash: CashSection
+  receipts_queue: ReceiptsSection
+  postsales: PostsalesSection
+  transfers: TransfersSection
+  inventory: InventorySection
+  shortcuts: Shortcut[]
+}
+
+export type ActivityItem = {
+  id: string
+  type: string
+  occurred_at: string
+  title: string
+  subtitle: string
+  status: string
+  href: string
+}
+
+export type DashboardActivity = {
+  items: ActivityItem[]
+}
+
+export type OperationalPriority = {
+  key: string
+  title: string
+  description: string
+  href: string
+  tone: "warning" | "danger" | "neutral"
+}
+
+export type PaymentBarData = {
+  key: string
+  label: string
+  amount: number
+}
+
+export type PressureBarData = {
+  key: string
+  label: string
+  value: number
+}

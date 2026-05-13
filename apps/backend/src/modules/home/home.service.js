@@ -203,7 +203,7 @@ function buildHero({
       tone: 'default',
       cta: {
         label: 'Nueva venta',
-        href: '/purchase-system',
+        href: '/ventas',
       },
     };
   }
@@ -230,14 +230,14 @@ function buildQuickActions({
     actions.push({
       key: 'new-sale',
       label: 'Nueva venta',
-      href: '/purchase-system',
+      href: '/ventas',
       description: 'Registrar una venta desde la sede activa.',
       tone: 'primary',
     });
     actions.push({
       key: 'sales-history',
       label: 'Ventas',
-      href: '/transaction-history',
+      href: '/ventas/historial',
       description: 'Seguir ventas confirmadas y su detalle.',
       tone: 'default',
     });
@@ -287,7 +287,7 @@ function buildQuickActions({
     actions.push({
       key: 'inventory',
       label: 'Inventario',
-      href: '/inventory',
+      href: '/inventario',
       description: 'Revisar stock y quiebres de la sede.',
       tone: 'default',
     });
@@ -361,7 +361,7 @@ function buildPriorities({
       key: 'low-stock',
       title: 'Stock bajo mínimo',
       description: `${inventoryCounts.low_stock_count} variante(s) están por debajo del umbral de reposición.`,
-      href: '/inventory',
+      href: '/inventario',
       tone: 'default',
     });
   }
@@ -467,7 +467,7 @@ async function getHomeOverview(input = {}) {
           meta: `S/. ${round2(personalSalesSummary?.sales_today_total).toFixed(2)}`,
           scope: 'personal',
           tone: 'default',
-          href: '/transaction-history',
+          href: '/ventas/historial',
         }
       : null,
     salesCapability
@@ -478,7 +478,7 @@ async function getHomeOverview(input = {}) {
           meta: `S/. ${round2(personalSalesSummary?.sales_week_total).toFixed(2)}`,
           scope: 'personal',
           tone: 'default',
-          href: '/transaction-history',
+          href: '/ventas/historial',
         }
       : null,
     transferCapabilities.request_create || transferCapabilities.request_view_own
@@ -522,7 +522,7 @@ async function getHomeOverview(input = {}) {
           meta: `${Number(inventoryCounts?.zero_stock_count || 0)} en cero`,
           scope: 'location',
           tone: Number(inventoryCounts?.zero_stock_count || 0) > 0 ? 'warning' : 'default',
-          href: '/inventory',
+          href: '/inventario',
         }
       : null,
     adminCapability
@@ -533,7 +533,7 @@ async function getHomeOverview(input = {}) {
           meta: `S/. ${round2(assignedNetworkSummary?.sales_today_total).toFixed(2)}`,
           scope: 'assigned_network',
           tone: 'default',
-          href: '/dashboard',
+          href: '/panel',
         }
       : null,
     adminCapability
