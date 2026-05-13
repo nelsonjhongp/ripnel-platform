@@ -1,8 +1,23 @@
 "use client"
 
+import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react"
+
 import { cn } from "@/lib/utils"
 
-export function CompactPickerPopover({ className, children }) {
+type CompactPickerBaseProps = {
+  className?: string
+  children?: ReactNode
+}
+
+type CompactPickerListProps = CompactPickerBaseProps & HTMLAttributes<HTMLDivElement>
+
+type CompactPickerOptionProps = CompactPickerBaseProps &
+  ButtonHTMLAttributes<HTMLButtonElement> & {
+    active?: boolean
+    selected?: boolean
+  }
+
+export function CompactPickerPopover({ className, children }: CompactPickerBaseProps) {
   return (
     <div className={cn("ops-picker-popover overflow-hidden rounded-xl", className)}>
       {children}
@@ -10,7 +25,7 @@ export function CompactPickerPopover({ className, children }) {
   )
 }
 
-export function CompactPickerList({ className, children, ...props }) {
+export function CompactPickerList({ className, children, ...props }: CompactPickerListProps) {
   return (
     <div className={cn("ops-picker-list", className)} {...props}>
       {children}
@@ -24,7 +39,7 @@ export function CompactPickerOption({
   className,
   children,
   ...props
-}) {
+}: CompactPickerOptionProps) {
   return (
     <button
       type="button"
@@ -38,7 +53,7 @@ export function CompactPickerOption({
   )
 }
 
-export function CompactPickerEmpty({ className, children }) {
+export function CompactPickerEmpty({ className, children }: CompactPickerBaseProps) {
   return (
     <div className={cn("px-3 py-4 text-sm text-[var(--ops-text-muted)]", className)}>
       {children}
@@ -46,7 +61,7 @@ export function CompactPickerEmpty({ className, children }) {
   )
 }
 
-export function CompactPickerSeparator({ className }) {
+export function CompactPickerSeparator({ className }: Pick<CompactPickerBaseProps, "className">) {
   return <div className={cn("ops-picker-separator", className)} />
 }
 

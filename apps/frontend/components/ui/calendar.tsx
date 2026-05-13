@@ -15,13 +15,12 @@ import {
 import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
-function CalendarMonthCaption({ calendarMonth, className, ...props }: MonthCaptionProps) {
+function CalendarMonthCaption({ calendarMonth, className }: MonthCaptionProps) {
   const { previousMonth, nextMonth, goToMonth, labels } = useDayPicker()
   const caption = format(calendarMonth.date, "LLLL yyyy", { locale: es })
 
   return (
     <div
-      {...props}
       className={cn("mx-auto flex min-h-7 w-full max-w-[11rem] items-center justify-between gap-2", className)}
     >
       <button

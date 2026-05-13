@@ -1,5 +1,7 @@
 "use client"
 
+import type { ReactNode } from "react"
+import type { LucideIcon } from "lucide-react"
 import { Check, ChevronLeft, ChevronRight } from "lucide-react"
 
 import { Stepper } from "@/components/ui/stepper"
@@ -12,20 +14,41 @@ const DEFAULT_STEPS = [
   { id: "payment", label: "Cobro" },
 ]
 
-/**
- * @param {{
- *   eyebrow?: string
- *   title?: string
- *   subtitle?: string | null
- *   meta?: import("react").ReactNode
- *   actions?: import("react").ReactNode
- *   steps?: Array<{ id: string; label: string }>
- *   currentStep?: number
- *   progress?: any
- *   className?: string
- *   surface?: "plain" | "panel"
- * }} props
- */
+type PosHeaderStep = {
+  id: string
+  label: string
+}
+
+type PosHeaderProgressItem = {
+  id: string
+  label: string
+  icon?: LucideIcon
+  active?: boolean
+  complete?: boolean
+}
+
+type PosHeaderProgress = {
+  items?: PosHeaderProgressItem[]
+  onSelect?: (itemId: string) => void
+  onPrevious?: () => void
+  onNext?: () => void
+  canGoPrevious?: boolean
+  canGoNext?: boolean
+}
+
+type PosHeaderProps = {
+  eyebrow?: string
+  title?: string
+  subtitle?: string | null
+  meta?: ReactNode
+  actions?: ReactNode
+  steps?: PosHeaderStep[]
+  currentStep?: number
+  progress?: PosHeaderProgress
+  className?: string
+  surface?: "plain" | "panel"
+}
+
 export function PosHeader({
   eyebrow = "Operacion comercial",
   title = "Nueva venta",
@@ -37,7 +60,7 @@ export function PosHeader({
   progress = undefined,
   className = "",
   surface = "plain",
-}) {
+}: PosHeaderProps) {
   const showStepper = Array.isArray(steps) && typeof currentStep === "number"
   const progressItems = Array.isArray(progress?.items) ? progress.items : []
   const showProgress = progressItems.length > 0

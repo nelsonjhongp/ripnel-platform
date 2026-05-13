@@ -107,12 +107,14 @@ export function OpsSearchField({
   onChange,
   placeholder,
   ariaLabel,
+  onFocus,
 }: {
   label?: string
   value: string
   onChange: (value: string) => void
   placeholder: string
   ariaLabel: string
+  onFocus?: () => void
 }) {
   return (
     <div>
@@ -125,6 +127,7 @@ export function OpsSearchField({
           type="text"
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          onFocus={onFocus}
           placeholder={placeholder}
           aria-label={ariaLabel}
           className="h-full w-full bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
