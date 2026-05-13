@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
+import { appRoutes } from "@/lib/routes"
 
 export default function Page() {
-  redirect("/bi?view=clientes")
+  redirect(`${appRoutes.businessIntelligence}?view=clientes`)
 }

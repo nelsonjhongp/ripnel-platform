@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { CatalogCrudPage } from "@/components/modules/catalog-crud-page"
+import { CatalogCrudPage } from "@/components/modules/catalogs/catalog-crud-page"
 import { catalogPageBySlug, getCatalogRoute } from "@/lib/product-master-metadata"
 
 export default async function CatalogPage({
@@ -22,8 +22,11 @@ export default async function CatalogPage({
       emptyTitle={page.emptyTitle}
       emptyDescription={page.emptyDescription}
       listFields={page.listFields}
+      fields={page.fields}
       idKey={page.idKey}
       catalogRoute={getCatalogRoute(page.slug)}
+      entityLabel={page.entityLabel}
+      duplicateStrategy={page.duplicateStrategy}
     />
   )
 }
