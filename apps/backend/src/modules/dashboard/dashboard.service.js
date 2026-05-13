@@ -106,13 +106,13 @@ function buildShortcuts(sections, cashClosing) {
     shortcuts.push({
       key: 'new-sale',
       label: 'Nueva venta',
-      href: '/purchase-system',
+      href: '/ventas',
       description: 'Registrar una nueva venta en la sede activa.',
     });
     shortcuts.push({
       key: 'sales-history',
       label: 'Historial',
-      href: '/transaction-history',
+      href: '/ventas/historial',
       description: 'Revisar ventas confirmadas y su detalle.',
     });
   }
@@ -141,7 +141,7 @@ function buildShortcuts(sections, cashClosing) {
     shortcuts.push({
       key: 'inventory',
       label: 'Inventario',
-      href: '/inventory',
+      href: '/inventario',
       description: 'Revisar stock actual y variantes criticas.',
     });
   }
@@ -175,7 +175,7 @@ function mapSalesEvent(event) {
       event.total_amount || 0
     ).toFixed(2)} · ${event.document_type}`,
     status: 'confirmed',
-    href: `/purchase-system/${event.sale_id}`,
+    href: `/ventas/${event.sale_id}`,
   };
 }
 
@@ -189,7 +189,7 @@ function mapReceiptEvent(event) {
       event.customer_name_text || 'Cliente general'
     }${event.sunat_message ? ` · ${event.sunat_message}` : ''}`,
     status: event.queue_status,
-    href: `/purchase-system/${event.sale_id}`,
+    href: `/ventas/${event.sale_id}`,
   };
 }
 
@@ -236,7 +236,7 @@ function mapAdjustmentEvent(event) {
     title: `Ajuste ${event.adjustment_number || ''}`.trim(),
     subtitle: `${event.status}${event.reason ? ` · ${event.reason}` : ''}`,
     status: event.status,
-    href: '/inventory/ajustes',
+    href: '/inventario/ajustes',
   };
 }
 
@@ -285,6 +285,8 @@ async function getDashboardOverview(input = {}) {
   const permissions = Array.isArray(input.permissions) ? input.permissions : [];
   const roleName = input.role_name || user.role_name || null;
   const businessDate = todayPeruDate();
+  const dateFrom = input.date_from || businessDate;
+  const dateTo = input.date_to || businessDate;
   const sections = buildSections({ permissions, roleName });
 
   const needsSalesAggregates = sections.sales || sections.cash;
@@ -306,13 +308,13 @@ async function getDashboardOverview(input = {}) {
     const executor = client.query.bind(client);
 
     if (needsSalesAggregates) {
-      salesHeadline = await findSalesHeadlineByLocationAndDate(location.location_id, businessDate, executor);
-      paymentRows = await findPaymentTotalsByLocationAndDate(location.location_id, businessDate, executor);
-      salesRow = await countSalesByLocationAndDate(location.location_id, businessDate, executor);
+      salesHeadline = await findSalesHeadlineByLocationAndDate(location.location_id, dateFrom, dateTo, executor);
+      paymentRows = await findPaymentTotalsByLocationAndDate(location.location_id, dateFrom, dateTo, executor);
+      salesRow = await countSalesByLocationAndDate(location.location_id, dateFrom, dateTo, executor);
     }
 
     if (sections.cash) {
-      currentCashClosing = await findCashClosingByLocationAndDate(location.location_id, businessDate, executor);
+      currentCashClosing = await findCashClosingByLocationAndDate(location.location_id, dateFrom, dateTo, executor);
     }
 
     if (sections.receipts) {
@@ -355,7 +357,8 @@ async function getDashboardOverview(input = {}) {
   return {
     context: {
       generated_at: new Date().toISOString(),
-      business_date: businessDate,
+      business_date: dateTo,
+      date_from: dateFrom,
       location,
       user: {
         user_id: user.user_id,

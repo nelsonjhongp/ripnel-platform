@@ -300,16 +300,8 @@ function mapWorkspaceSize(row) {
 async function listProducts(input = {}) {
   const page = normalizePage(input.page);
   const pageSize = normalizePageSize(input.pageSize);
-  const filterMode = normalizeFilterMode(input.filterMode);
-  const searchQuery = normalizeQuery(input.query);
-  const activeLocation = await resolveActiveLocationForUser(input.userId, input.locationId);
-  const rows = await findProductSummaries({
-    locationId: activeLocation ? activeLocation.location_id : null,
-    query: searchQuery,
-  });
-  const decoratedRows = rows.map(decorateProductSummary).filter((row) =>
-    matchesFilterMode(row, filterMode)
-  );
+  const snapshot = await listProductSnapshots(input);
+  const decoratedRows = snapshot.items;
   const totalItems = decoratedRows.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -318,7 +310,7 @@ async function listProducts(input = {}) {
 
   return {
     items,
-    active_location: activeLocation,
+    active_location: snapshot.active_location,
     pagination: {
       page: safePage,
       page_size: pageSize,
@@ -353,7 +345,25 @@ async function getProductWorkspace(styleId) {
   };
 }
 
+async function listProductSnapshots(input = {}) {
+  const filterMode = normalizeFilterMode(input.filterMode);
+  const searchQuery = normalizeQuery(input.query);
+  const activeLocation = await resolveActiveLocationForUser(input.userId, input.locationId);
+  const rows = await findProductSummaries({
+    locationId: activeLocation ? activeLocation.location_id : null,
+    query: searchQuery,
+  });
+
+  return {
+    items: rows.map(decorateProductSummary).filter((row) =>
+      matchesFilterMode(row, filterMode)
+    ),
+    active_location: activeLocation,
+  };
+}
+
 module.exports = {
   listProducts,
   getProductWorkspace,
+  listProductSnapshots,
 };
