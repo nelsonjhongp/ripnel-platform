@@ -19,6 +19,17 @@ async function findAllPrices(filters = {}) {
     conditions.push(`ssp.active = $${values.length}`);
   }
 
+  if (filters.search) {
+    values.push(`%${filters.search}%`);
+    const searchRef = `$${values.length}`;
+    conditions.push(`(
+      ps.name ilike ${searchRef}
+      or coalesce(ps.style_code, '') ilike ${searchRef}
+      or s.name ilike ${searchRef}
+      or s.code ilike ${searchRef}
+    )`);
+  }
+
   const whereClause = conditions.length ? `where ${conditions.join(' and ')}` : '';
 
   const result = await query(
@@ -52,6 +63,10 @@ async function findAllPrices(filters = {}) {
   );
 
   return result.rows;
+}
+
+async function findPriceWorkspaceRowsByStyleId(styleId) {
+  return findAllPrices({ styleId });
 }
 
 async function findStylesMissingCommercialPrices() {
@@ -226,6 +241,7 @@ async function updatePrice(priceId, payload) {
 
 module.exports = {
   findAllPrices,
+  findPriceWorkspaceRowsByStyleId,
   findStylesMissingCommercialPrices,
   findPriceById,
   findStyleById,

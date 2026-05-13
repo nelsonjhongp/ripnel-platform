@@ -1,6 +1,7 @@
 const {
   listTransfers,
   listPendingReceipts,
+  listTransferRequestCandidates,
   getTransferById,
   createTransfer,
   shipTransferById,
@@ -21,6 +22,15 @@ async function getPendingReceipts(req, res, next) {
   try {
     const transfers = await listPendingReceipts(req.auth);
     res.json({ ok: true, data: transfers });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getTransferRequestCandidates(req, res, next) {
+  try {
+    const candidates = await listTransferRequestCandidates(req.query, req.auth);
+    res.json({ ok: true, data: candidates });
   } catch (error) {
     next(error);
   }
@@ -74,6 +84,7 @@ async function postCancelTransfer(req, res, next) {
 module.exports = {
   getTransfers,
   getPendingReceipts,
+  getTransferRequestCandidates,
   getTransfer,
   postTransfer,
   postShipTransfer,
