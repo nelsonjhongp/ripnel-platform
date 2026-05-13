@@ -1,4 +1,5 @@
 const express = require('express');
+const { requireAuth } = require('../../middlewares/auth');
 const {
   getPricingRules,
   postPricingRule,
@@ -6,6 +7,8 @@ const {
 } = require('./pricing-rules.controller');
 
 const router = express.Router();
+
+router.use(requireAuth);
 
 router.get('/', getPricingRules);
 router.post('/', postPricingRule);

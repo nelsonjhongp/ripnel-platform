@@ -1,9 +1,14 @@
 const { AppError } = require('../../shared/errors');
 const { pool } = require('../../shared/db');
-const { listProducts } = require('../products/products.service');
+const {
+  getProductWorkspace,
+  listProductSnapshots,
+} = require('../products/products.service');
+const { listPricingRules } = require('./pricing-rules.service');
 const {
   findAllPrices,
   findPriceById,
+  findPriceWorkspaceRowsByStyleId,
   findStyleById,
   findSizeById,
   findConfiguredStyleSize,
@@ -32,6 +37,35 @@ function isValidPriceType(priceType) {
   return ALLOWED_PRICE_TYPES.includes(priceType);
 }
 
+function normalizeCoverageFilter(value) {
+  const normalized = String(value || 'all').trim().toLowerCase();
+
+  if (
+    normalized === 'missing_retail' ||
+    normalized === 'missing_wholesale' ||
+    normalized === 'stock_without_retail'
+  ) {
+    return normalized;
+  }
+
+  return 'all';
+}
+
+function normalizeStatusFilter(value) {
+  const normalized = String(value || 'all').trim().toLowerCase();
+  const allowed = new Set([
+    'all',
+    'inactive',
+    'draft',
+    'pending_variants',
+    'pending_prices',
+    'ready_no_stock',
+    'ready',
+  ]);
+
+  return allowed.has(normalized) ? normalized : 'all';
+}
+
 function coercePrice(value) {
   const numericValue = Number(value);
 
@@ -45,6 +79,7 @@ function coercePrice(value) {
 async function listPrices(input = {}) {
   const styleId = input.style_id?.trim() || null;
   const priceType = input.price_type?.trim() || null;
+  const search = input.q?.trim() || null;
   const active =
     typeof input.active === 'string'
       ? input.active === 'true'
@@ -60,7 +95,68 @@ async function listPrices(input = {}) {
     styleId,
     priceType,
     active,
+    search,
   });
+}
+
+function mapPriceCatalogRow(product) {
+  return {
+    style_id: product.style_id,
+    style_code: product.style_code,
+    style_name: product.name,
+    active: product.active,
+    garment_type_name: product.garment_type_name,
+    fabric_name: product.fabric_name,
+    target_name: product.target_name,
+    size_codes: product.size_codes,
+    configured_size_count: product.configured_size_count,
+    configured_color_count: product.configured_color_count,
+    variant_count: product.variant_count,
+    active_variant_count: product.active_variant_count,
+    inventory_row_count: product.inventory_row_count,
+    total_stock_qty: product.total_stock_qty,
+    retail_sizes_covered_count: product.retail_sizes_covered_count,
+    wholesale_sizes_covered_count: product.wholesale_sizes_covered_count,
+    missing_retail_size_count: product.missing_retail_size_count,
+    missing_wholesale_size_count: product.missing_wholesale_size_count,
+    sizes_with_stock_without_retail_count: product.sizes_with_stock_without_retail_count,
+    status: product.status,
+    next_step_label: product.next_step_label,
+    warnings: product.warnings,
+  };
+}
+
+async function listPriceCatalog(input = {}) {
+  const coverage = normalizeCoverageFilter(input.coverage);
+  const status = normalizeStatusFilter(input.status);
+  const searchQuery = input.q?.trim() || null;
+  const snapshot = await listProductSnapshots({
+    userId: input.userId,
+    locationId: input.locationId,
+    query: searchQuery,
+  });
+
+  return snapshot.items
+    .filter((product) => {
+      if (status !== 'all' && product.status !== status) {
+        return false;
+      }
+
+      if (coverage === 'missing_retail') {
+        return product.missing_retail_size_count > 0;
+      }
+
+      if (coverage === 'missing_wholesale') {
+        return product.missing_wholesale_size_count > 0;
+      }
+
+      if (coverage === 'stock_without_retail') {
+        return product.sizes_with_stock_without_retail_count > 0;
+      }
+
+      return true;
+    })
+    .map(mapPriceCatalogRow);
 }
 
 async function createPrice(input) {
@@ -166,8 +262,12 @@ async function createPrice(input) {
   }
 }
 
-async function listPriceCoverageGaps() {
-  const products = await listProducts();
+async function listPriceCoverageGaps(input = {}) {
+  const snapshot = await listProductSnapshots({
+    userId: input.userId,
+    locationId: input.locationId,
+  });
+  const products = snapshot.items;
 
   return products
     .filter(
@@ -207,6 +307,28 @@ async function listPriceCoverageGaps() {
       total_stock_qty: product.total_stock_qty,
       status: product.status,
     }));
+}
+
+async function getPriceWorkspace(styleId) {
+  const normalizedStyleId = String(styleId || '').trim();
+
+  if (!normalizedStyleId) {
+    throw new AppError('Style id is required', 400);
+  }
+
+  const [workspace, priceRows, pricingRules] = await Promise.all([
+    getProductWorkspace(normalizedStyleId),
+    findPriceWorkspaceRowsByStyleId(normalizedStyleId),
+    listPricingRules(),
+  ]);
+
+  return {
+    product: workspace.product,
+    configured_sizes: workspace.configured_sizes,
+    configured_colors: workspace.configured_colors,
+    price_rows: priceRows,
+    pricing_rules: pricingRules,
+  };
 }
 
 async function patchPrice(priceId, input) {
@@ -282,7 +404,9 @@ async function patchPrice(priceId, input) {
 
 module.exports = {
   listPrices,
+  listPriceCatalog,
   listPriceCoverageGaps,
+  getPriceWorkspace,
   createPrice,
   patchPrice,
   ALLOWED_PRICE_TYPES,
