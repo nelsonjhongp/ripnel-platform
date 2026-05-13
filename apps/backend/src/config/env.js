@@ -12,6 +12,7 @@ const env = {
   databaseUrl: process.env.DATABASE_URL || '',
   jwtSecret: process.env.JWT_SECRET || '',
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+  sessionCookieDomain: process.env.SESSION_COOKIE_DOMAIN || '',
   apiSunatBaseUrl: process.env.APISUNAT_BASE_URL || '',
   apiSunatIssuePath:
     process.env.APISUNAT_ISSUE_PATH || '/personas/v1/sendBill',

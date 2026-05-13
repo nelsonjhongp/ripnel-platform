@@ -2,27 +2,7 @@ const { env } = require('../../config/env');
 const { AppError } = require('../../shared/errors');
 const { signJwt } = require('../../shared/jwt');
 const { loginWithUsernamePassword, getMe, changePassword } = require('./auth.service');
-
-function buildCookie({ token }) {
-  const isProd = env.nodeEnv === 'production';
-  const parts = [
-    `ripnel_session=${encodeURIComponent(token)}`,
-    'Path=/',
-    'HttpOnly',
-    // In production we need cookies to be sent on cross-site XHR/fetch requests
-    // (frontend and backend live on different origins). Browsers require
-    // `SameSite=None; Secure` for cross-site cookies. For local development
-    // keep `Lax` to avoid exposing cookies unnecessarily.
-    isProd ? 'SameSite=None' : 'SameSite=Lax',
-    `Max-Age=${60 * 60 * 8}`,
-  ];
-
-  if (isProd) {
-    parts.push('Secure');
-  }
-
-  return parts.join('; ');
-}
+const { buildSessionCookie } = require('./session-cookie');
 
 async function login(req, res, next) {
   try {
@@ -45,7 +25,7 @@ async function login(req, res, next) {
       { expiresInSeconds: 60 * 60 * 8 }
     );
 
-    res.setHeader('Set-Cookie', buildCookie({ token }));
+    res.setHeader('Set-Cookie', buildSessionCookie({ token }));
     return res.status(200).json({ user, permissions });
   } catch (error) {
     return next(error);
@@ -86,7 +66,7 @@ async function postChangePassword(req, res, next) {
       { expiresInSeconds: 60 * 60 * 8 }
     );
 
-    res.setHeader('Set-Cookie', buildCookie({ token }));
+    res.setHeader('Set-Cookie', buildSessionCookie({ token }));
     return res.status(200).json(data);
   } catch (error) {
     return next(error);
@@ -94,10 +74,7 @@ async function postChangePassword(req, res, next) {
 }
 
 async function logout(_req, res) {
-  res.setHeader(
-    'Set-Cookie',
-    'ripnel_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'
-  );
+  res.setHeader('Set-Cookie', buildSessionCookie({ clear: true }));
   return res.status(204).send();
 }
 
