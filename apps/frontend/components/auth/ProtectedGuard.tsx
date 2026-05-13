@@ -7,7 +7,7 @@ import { ProtectedLoadingPage } from "@/components/feedback/status-page";
 import { appRoutes } from "@/lib/routes";
 
 export function ProtectedGuard({ children }: { children: React.ReactNode }) {
-  const { loading, user, sessionExpired } = useAuth();
+  const { loading, user, sessionExpired, signedOutIntentional } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const requiresPasswordChange = Boolean(user?.must_change_password);
@@ -15,8 +15,15 @@ export function ProtectedGuard({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     if (!loading && !user) {
+      if (signedOutIntentional) {
+        router.replace(appRoutes.login);
+        return;
+      }
+
+      const currentSearch = typeof window !== "undefined" ? window.location.search : "";
+      const nextPath = `${pathname || "/"}${currentSearch}`;
       const params = new URLSearchParams({
-        next: pathname || "/",
+        next: nextPath,
       });
 
       params.set("reason", sessionExpired ? "session-expired" : "auth-required");
@@ -27,7 +34,7 @@ export function ProtectedGuard({ children }: { children: React.ReactNode }) {
     if (!loading && user?.must_change_password && pathname !== appRoutes.accountSecurity) {
       router.replace(appRoutes.accountSecurity);
     }
-  }, [loading, user, router, pathname, sessionExpired]);
+  }, [loading, user, router, pathname, sessionExpired, signedOutIntentional]);
 
   if (loading) {
     return <ProtectedLoadingPage title="Validando sesión" description="Estamos confirmando tu acceso antes de abrir el módulo." />;

@@ -239,7 +239,8 @@ export function AppSidebar({
     try {
       await logout()
     } finally {
-      router.push("/")
+      router.replace("/")
+      router.refresh()
     }
   }
 

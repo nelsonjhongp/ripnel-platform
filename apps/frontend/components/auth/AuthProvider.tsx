@@ -52,6 +52,7 @@ type AuthState = {
   loading: boolean;
   authMessage: string | null;
   sessionExpired: boolean;
+  signedOutIntentional: boolean;
   locationsLoading: boolean;
   locationsError: string | null;
   locationAssignments: AuthLocationAssignment[];
@@ -101,6 +102,7 @@ function buildSignedOutState(overrides: Partial<AuthState> = {}): AuthState {
     loading: false,
     authMessage: null,
     sessionExpired: false,
+    signedOutIntentional: false,
     locationsLoading: false,
     locationsError: null,
     locationAssignments: [],
@@ -116,6 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loading: true,
     authMessage: null,
     sessionExpired: false,
+    signedOutIntentional: false,
     locationsLoading: false,
     locationsError: null,
     locationAssignments: [],
@@ -130,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             ? "Tu sesión expiró. Vuelve a iniciar sesión para continuar."
             : null,
           sessionExpired: Boolean(current.user),
+          signedOutIntentional: false,
         })
       );
     }
@@ -185,6 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading: false,
         authMessage: null,
         sessionExpired: false,
+        signedOutIntentional: false,
       }));
       if (data.user.must_change_password) {
         setState((current) => ({
@@ -237,6 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           loading: false,
           authMessage: null,
           sessionExpired: false,
+          signedOutIntentional: false,
         }));
         if (data.user.must_change_password) {
           setState((current) => ({
@@ -286,7 +292,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         suppressAuthEvent: true,
       });
     } finally {
-      setState(buildSignedOutState());
+      setState(
+        buildSignedOutState({
+          signedOutIntentional: true,
+        })
+      );
     }
   }, []);
 
@@ -295,6 +305,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ...current,
       authMessage: null,
       sessionExpired: false,
+      signedOutIntentional: false,
     }));
   }, []);
 

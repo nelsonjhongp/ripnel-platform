@@ -22,6 +22,7 @@ const dashboardRoutes = require('./modules/dashboard/dashboard.routes');
 const homeRoutes = require('./modules/home/home.routes');
 const productsRoutes = require('./modules/products/products.routes');
 const notificationsRoutes = require('./modules/notifications/notifications.routes');
+const { AppError } = require('./shared/errors');
 const {
   errorHandler,
   notFoundHandler,
@@ -164,7 +165,11 @@ app.use(
         return callback(null, true);
       }
 
-      return callback(new Error('CORS origin not allowed'));
+      return callback(
+        new AppError('CORS origin not allowed', 403, {
+          code: 'CORS_ORIGIN_DENIED',
+        })
+      );
     },
   })
 );
