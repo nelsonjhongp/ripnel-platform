@@ -1,0 +1,299 @@
+"use client"
+
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { LoaderCircle, RefreshCw, Save } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { DateFilterPicker } from "@/components/ui/date-filter-picker"
+import { OpsMetricPill } from "@/components/ui/ops-metric-pill"
+import { OpsSectionDivider, OpsTableBlock, OpsTableWrap } from "@/components/ui/ops-page-shell"
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import {
+  createPricingRule,
+  fetchPricingRules,
+  updatePricingRule,
+} from "@/lib/api-prices"
+import type { PricingRuleRow } from "@/lib/prices-types"
+
+function formatDate(value: string | null) {
+  if (!value) return "-"
+
+  return new Intl.DateTimeFormat("es-PE", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(value))
+}
+
+export function PricingRulesPage() {
+  const [rules, setRules] = useState<PricingRuleRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+
+  const [minQty, setMinQty] = useState("3")
+  const [active, setActive] = useState(true)
+  const [validFrom, setValidFrom] = useState("")
+  const [validTo, setValidTo] = useState("")
+
+  const loadRules = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const data = await fetchPricingRules()
+      setRules(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudieron cargar las reglas")
+      setRules([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadRules()
+  }, [loadRules])
+
+  const wholesaleRule = useMemo(
+    () =>
+      rules.find((rule) => rule.rule_type === "WHOLESALE_MIN_QTY_TOTAL") || null,
+    [rules]
+  )
+
+  useEffect(() => {
+    if (!wholesaleRule) {
+      return
+    }
+
+    setMinQty(String(wholesaleRule.min_qty))
+    setActive(wholesaleRule.active)
+    setValidFrom(wholesaleRule.valid_from?.slice(0, 10) || "")
+    setValidTo(wholesaleRule.valid_to?.slice(0, 10) || "")
+  }, [wholesaleRule])
+
+  async function handleSubmit() {
+    setSubmitting(true)
+    setError(null)
+    setMessage(null)
+
+    try {
+      const payload = {
+        min_qty: Number(minQty),
+        active,
+        valid_from: validFrom || null,
+        valid_to: validTo || null,
+      }
+
+      if (wholesaleRule) {
+        await updatePricingRule(wholesaleRule.rule_id, payload)
+      } else {
+        await createPricingRule({
+          rule_type: "WHOLESALE_MIN_QTY_TOTAL",
+          ...payload,
+        })
+      }
+
+      await loadRules()
+      setMessage("Regla mayorista guardada correctamente")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo guardar la regla")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <TooltipProvider delayDuration={120}>
+      <PosHeader
+        eyebrow="Precios"
+        title="Regla mayorista"
+        actions={
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                onClick={() => void loadRules()}
+                disabled={loading}
+                aria-label="Actualizar"
+                className="rounded-lg"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top" sideOffset={8}>
+              Actualizar
+            </TooltipContent>
+          </Tooltip>
+        }
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <OpsMetricPill label="Reglas" value={rules.length} />
+        <OpsMetricPill
+          label="Minimo mayorista"
+          value={wholesaleRule?.min_qty ?? 0}
+          tone="accent"
+        />
+        <OpsMetricPill
+          label="Activa"
+          value={wholesaleRule?.active ? "Si" : "No"}
+          tone={wholesaleRule?.active ? "success" : "default"}
+        />
+      </div>
+
+      <OpsSectionDivider>
+        <div className="mx-auto max-w-4xl space-y-6">
+          <section className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-5">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                  Cantidad minima
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={minQty}
+                  onChange={(event) => setMinQty(event.target.value)}
+                  className="sales-field h-10 w-full rounded-lg px-3 text-sm text-[var(--ops-text)] outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                  Estado
+                </label>
+                <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-[var(--ops-text)]">
+                  <input
+                    type="checkbox"
+                    checked={active}
+                    onChange={(event) => setActive(event.target.checked)}
+                    className="h-4 w-4 rounded border-[var(--ops-border-strong)] accent-[var(--ripnel-accent)]"
+                  />
+                  Regla activa
+                </label>
+              </div>
+
+              <DateFilterPicker
+                label="Vigente desde"
+                value={validFrom}
+                onChange={setValidFrom}
+                ariaLabel="Vigente desde"
+              />
+
+              <DateFilterPicker
+                label="Vigente hasta"
+                value={validTo}
+                onChange={setValidTo}
+                ariaLabel="Vigente hasta"
+                min={validFrom || undefined}
+              />
+            </div>
+
+            {message ? (
+              <div className="mt-4 rounded-lg border border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] px-3 py-2 text-sm text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]">
+                {message}
+              </div>
+            ) : null}
+
+            {error ? (
+              <div className="mt-4 rounded-lg border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-3 py-2 text-sm text-[color:color-mix(in_srgb,#be123c_74%,var(--ops-text))]">
+                {error}
+              </div>
+            ) : null}
+
+            <div className="mt-4 flex justify-end">
+              <Button
+                type="button"
+                variant="accent"
+                size="sm"
+                className="rounded-lg px-3"
+                onClick={() => void handleSubmit()}
+                disabled={submitting || Number.isNaN(Number(minQty)) || Number(minQty) <= 0}
+              >
+                {submitting ? (
+                  <>
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4" />
+                    Guardar regla
+                  </>
+                )}
+              </Button>
+            </div>
+          </section>
+
+          <OpsTableBlock>
+            <OpsTableWrap minWidth="720px">
+              <table className="w-full border-collapse">
+                <thead className="bg-[var(--ops-surface-muted)]">
+                  <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                    <th className="px-4 py-3">Regla</th>
+                    <th className="px-4 py-3">Minimo</th>
+                    <th className="px-4 py-3">Vigencia</th>
+                    <th className="px-4 py-3">Estado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                  {loading ? (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
+                      >
+                        Cargando reglas...
+                      </td>
+                    </tr>
+                  ) : rules.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
+                      >
+                        No hay reglas registradas.
+                      </td>
+                    </tr>
+                  ) : (
+                    rules.map((rule) => (
+                      <tr
+                        key={rule.rule_id}
+                        className="transition hover:bg-[var(--ops-surface-muted)]"
+                      >
+                        <td className="px-4 py-[var(--ops-row-py)] align-top text-sm font-semibold text-[var(--ops-text)]">
+                          {rule.rule_type}
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] align-top text-sm text-[var(--ops-text)]">
+                          {rule.min_qty}
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] align-top text-sm text-[var(--ops-text-muted)]">
+                          {formatDate(rule.valid_from)} -{" "}
+                          {rule.valid_to ? formatDate(rule.valid_to) : "Sin fin"}
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] align-top">
+                          <span
+                            className={rule.active
+                              ? "inline-flex rounded-full border border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
+                              : "inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]"}
+                          >
+                            {rule.active ? "Activa" : "Inactiva"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </OpsTableWrap>
+          </OpsTableBlock>
+        </div>
+      </OpsSectionDivider>
+    </TooltipProvider>
+  )
+}
