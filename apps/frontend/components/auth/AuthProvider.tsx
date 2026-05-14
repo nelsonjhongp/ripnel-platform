@@ -126,13 +126,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   React.useEffect(() => {
-    function handleAuthError() {
+    function handleAuthError(event: Event) {
+      const detail = (event as CustomEvent<{ code?: string }>).detail;
+      const isSessionExpired = detail?.code === "SESSION_EXPIRED";
+
+      if (isSessionExpired) {
+        fetch("/api/auth/logout", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        }).catch(() => {});
+      }
+
       setState((current) =>
         buildSignedOutState({
           authMessage: current.user
             ? "Tu sesión expiró. Vuelve a iniciar sesión para continuar."
             : null,
-          sessionExpired: Boolean(current.user),
+          sessionExpired: Boolean(current.user) || isSessionExpired,
           signedOutIntentional: false,
         })
       );

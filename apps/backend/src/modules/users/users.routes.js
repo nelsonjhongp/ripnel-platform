@@ -1,5 +1,7 @@
 const express = require('express');
 const { requireAuth, requirePermission, requireSelfOrPermission } = require('../../middlewares/auth');
+const { validate } = require('../../middlewares/validate');
+const { createUser, patchUser } = require('../../shared/schemas');
 const {
   getUsers,
   postUser,
@@ -11,7 +13,7 @@ const {
 const router = express.Router();
 
 router.get('/', requireAuth, requirePermission('admin.manage'), getUsers);
-router.post('/', requireAuth, requirePermission('admin.manage'), postUser);
+router.post('/', requireAuth, requirePermission('admin.manage'), validate(createUser), postUser);
 router.get(
   '/:userId/locations',
   requireAuth,
@@ -24,6 +26,6 @@ router.put(
   requireSelfOrPermission('admin.manage'),
   putUserLocationsByUserId
 );
-router.patch('/:userId', requireAuth, requirePermission('admin.manage'), patchUserById);
+router.patch('/:userId', requireAuth, requirePermission('admin.manage'), validate(patchUser), patchUserById);
 
 module.exports = router;

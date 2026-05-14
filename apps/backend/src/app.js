@@ -1,6 +1,8 @@
 const os = require('os');
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const { env } = require('./config/env');
 const authRoutes = require('./modules/auth/auth.routes');
 const healthRoutes = require('./modules/health/health.routes');
@@ -173,7 +175,21 @@ app.use(
     },
   })
 );
-app.use(express.json());
+app.use(helmet());
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    ok: false,
+    message: 'Too many login attempts, please try again later',
+    code: 'RATE_LIMIT_EXCEEDED',
+  },
+});
+
+app.use(express.json({ limit: '1mb' }));
 
 app.use('/health', healthRoutes);
 app.use('/api/auth', authRoutes);
