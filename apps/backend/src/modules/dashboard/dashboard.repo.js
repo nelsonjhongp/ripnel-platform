@@ -518,6 +518,28 @@ async function findRecentCashEvents(locationId, limit = 5, executor = query) {
   return result.rows;
 }
 
+async function findSalesByDepartment(locationId, dateFrom, dateTo, executor = query) {
+  const result = await executor(
+    `SELECT
+       c.department,
+       COUNT(*)::int AS sale_count,
+       COALESCE(SUM(s.total_amount), 0)::numeric(12,2) AS total_amount
+     FROM sales s
+     INNER JOIN customers c ON c.customer_id = s.customer_id
+     WHERE s.location_id = $1
+       AND s.status = 'confirmed'
+       AND c.department IS NOT NULL
+       AND c.department <> ''
+       AND DATE(s.confirmed_at AT TIME ZONE 'America/Lima') >= $2::date
+       AND DATE(s.confirmed_at AT TIME ZONE 'America/Lima') <= $3::date
+     GROUP BY c.department
+     ORDER BY total_amount DESC`,
+    [locationId, dateFrom, dateTo]
+  );
+
+  return result.rows;
+}
+
 module.exports = {
   findSalesHeadlineByLocationAndDate,
   findPaymentTotalsByLocationAndDate,

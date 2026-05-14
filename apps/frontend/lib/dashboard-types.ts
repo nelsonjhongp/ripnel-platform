@@ -194,6 +194,45 @@ export type OperationalPriority = {
   tone: "warning" | "danger" | "neutral"
 }
 
+export type CustomerAnalytics = {
+  top_customers: Array<{
+    customer_name: string
+    sale_count: number
+    total_amount: number
+  }>
+  top_products: Array<{
+    product_name: string
+    style_code: string
+    qty_sold: number
+    total_amount: number
+  }>
+  by_document_type: Array<{
+    document_type: string
+    sale_count: number
+    total_amount: number
+  }>
+  by_weekday: Array<{
+    weekday_number: number
+    sale_count: number
+    total_amount: number
+  }>
+}
+
+export type DepartmentSalesData = {
+  name: string
+  sale_count: number
+  total_amount: number
+}
+
+export type DepartmentSalesResponse = {
+  context: {
+    location_id: string
+    date_from: string
+    date_to: string
+  }
+  departments: DepartmentSalesData[]
+}
+
 export type PaymentBarData = {
   key: string
   label: string
