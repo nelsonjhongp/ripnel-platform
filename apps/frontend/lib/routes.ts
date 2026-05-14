@@ -3,7 +3,7 @@ export const appRoutes = {
   forbidden: "/forbidden",
   home: "/inicio",
   dashboard: "/panel",
-  businessIntelligence: "/bi",
+  businessIntelligence: "/panel",
   account: "/cuenta",
   accountSecurity: "/cuenta/seguridad",
   administrationUsers: "/administracion/usuarios",

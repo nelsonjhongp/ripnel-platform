@@ -1,5 +1,5 @@
-import BusinessIntelligencePage from "@/components/modules/bi/bi-page"
+import { redirect } from "next/navigation"
 
 export default function Page() {
-  return <BusinessIntelligencePage />
+  redirect("/panel")
 }

@@ -1,5 +1,7 @@
 const express = require('express');
 const { requireAuth, requirePermission } = require('../../middlewares/auth');
+const { validate } = require('../../middlewares/validate');
+const { createSale } = require('../../shared/schemas');
 const {
 	getSalesPosContext,
 	getSellableVariants,
@@ -28,6 +30,6 @@ router.get('/:saleId/proforma-pdf', getSaleProformaPdfFile);
 router.get('/:saleId/pdf', getSalePdfFile);
 router.post('/:saleId/retry-receipt', postRetrySaleReceipt);
 router.get('/:saleId', getSaleById);
-router.post('/', postSale);
+router.post('/', validate(createSale), postSale);
 
 module.exports = router;

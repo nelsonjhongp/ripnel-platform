@@ -2,7 +2,6 @@ import type * as React from "react"
 import {
   ArrowRightLeft,
   Banknote,
-  BarChart3,
   Boxes,
   ClipboardList,
   LayoutDashboard,
@@ -161,13 +160,7 @@ export const sidebarGroups: SidebarGroup[] = [
       { title: "Reglas", url: `${appRoutes.prices}/reglas`, icon: Settings2 },
     ],
   },
-  {
-    title: "BI",
-    icon: BarChart3,
-    directLink: true,
-    excludeRoles: SELLER_FOCUSED_ROLES,
-    items: [{ title: "BI", url: appRoutes.businessIntelligence }],
-  },
+
 ]
 
 export const inventoryIcons = {

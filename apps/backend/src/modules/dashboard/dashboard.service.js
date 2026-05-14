@@ -23,6 +23,7 @@ const {
   findRecentTransferEvents,
   findRecentAdjustmentEvents,
   findRecentCashEvents,
+  findSalesByDepartment,
 } = require('./dashboard.repo');
 
 const LOW_STOCK_THRESHOLD = 3;
@@ -442,6 +443,27 @@ async function getDashboardOverview(input = {}) {
   };
 }
 
+async function getSalesByDepartment(input = {}) {
+  const { user, location } = await resolveDashboardContext(input.user_id);
+  const dateFrom = input.date_from || todayPeruDate();
+  const dateTo = input.date_to || todayPeruDate();
+
+  const rows = await findSalesByDepartment(location.location_id, dateFrom, dateTo);
+
+  return {
+    context: {
+      location_id: location.location_id,
+      date_from: dateFrom,
+      date_to: dateTo,
+    },
+    departments: rows.map((r) => ({
+      name: r.department,
+      sale_count: Number(r.sale_count || 0),
+      total_amount: round2(r.total_amount),
+    })),
+  };
+}
+
 async function getDashboardActivity(input = {}) {
   const { user, location } = await resolveDashboardContext(input.user_id);
   const permissions = Array.isArray(input.permissions) ? input.permissions : [];
@@ -505,4 +527,5 @@ async function getDashboardActivity(input = {}) {
 module.exports = {
   getDashboardOverview,
   getDashboardActivity,
+  getSalesByDepartment,
 };
