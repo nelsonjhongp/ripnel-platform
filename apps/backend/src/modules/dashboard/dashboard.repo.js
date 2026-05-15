@@ -557,4 +557,5 @@ module.exports = {
   findRecentTransferEvents,
   findRecentAdjustmentEvents,
   findRecentCashEvents,
+  findSalesByDepartment,
 };
