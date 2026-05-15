@@ -249,6 +249,47 @@ export default function DashboardPage() {
 
   useSidebarTopbarActions(dashboardTopbarActions)
 
+  const byWeekdayChart = useMemo(() => {
+    if (!analytics?.by_weekday) return []
+    return analytics.by_weekday.map((item) => ({
+      weekday: WEEKDAY_LABELS[Number(item.weekday_number)] || `Dia ${item.weekday_number}`,
+      sale_count: Number(item.sale_count || 0),
+      total_amount: Number(item.total_amount || 0),
+    }))
+  }, [analytics])
+
+  const topCustomersChart = useMemo(() => {
+    if (!analytics?.top_customers) return []
+    return analytics.top_customers.map((item) => ({
+      name: item.customer_name,
+      total_amount: Number(item.total_amount || 0),
+      sale_count: Number(item.sale_count || 0),
+    }))
+  }, [analytics])
+
+  const topProductsChart = useMemo(() => {
+    if (!analytics?.top_products) return []
+    return analytics.top_products.map((item) => ({
+      name: item.product_name,
+      qty_sold: Number(item.qty_sold || 0),
+      total_amount: Number(item.total_amount || 0),
+    }))
+  }, [analytics])
+
+  const byDocumentChart = useMemo(() => {
+    if (!analytics?.by_document_type) return []
+    return analytics.by_document_type.map((item) => ({
+      type: item.document_type === "boleta" ? "Boleta" : item.document_type === "factura" ? "Factura" : item.document_type === "proforma" ? "Proforma" : item.document_type,
+      count: Number(item.sale_count || 0),
+      total: Number(item.total_amount || 0),
+    }))
+  }, [analytics])
+
+  const activityItems = useMemo(() => {
+    if (!activity?.items) return []
+    return activity.items.slice(0, 10)
+  }, [activity])
+
   if ((loading || authLoading) && !overview) {
     return (
       <ProtectedLoadingPage
@@ -291,47 +332,6 @@ export default function DashboardPage() {
     : []
 
   const paymentPieData = paymentMix.filter((p) => p.amount > 0)
-
-  const byWeekdayChart = useMemo(() => {
-    if (!analytics?.by_weekday) return []
-    return analytics.by_weekday.map((item) => ({
-      weekday: WEEKDAY_LABELS[Number(item.weekday_number)] || `Dia ${item.weekday_number}`,
-      sale_count: Number(item.sale_count || 0),
-      total_amount: Number(item.total_amount || 0),
-    }))
-  }, [analytics])
-
-  const topCustomersChart = useMemo(() => {
-    if (!analytics?.top_customers) return []
-    return analytics.top_customers.map((item) => ({
-      name: item.customer_name,
-      total_amount: Number(item.total_amount || 0),
-      sale_count: Number(item.sale_count || 0),
-    }))
-  }, [analytics])
-
-  const topProductsChart = useMemo(() => {
-    if (!analytics?.top_products) return []
-    return analytics.top_products.map((item) => ({
-      name: item.product_name,
-      qty_sold: Number(item.qty_sold || 0),
-      total_amount: Number(item.total_amount || 0),
-    }))
-  }, [analytics])
-
-  const byDocumentChart = useMemo(() => {
-    if (!analytics?.by_document_type) return []
-    return analytics.by_document_type.map((item) => ({
-      type: item.document_type === "boleta" ? "Boleta" : item.document_type === "factura" ? "Factura" : item.document_type === "proforma" ? "Proforma" : item.document_type,
-      count: Number(item.sale_count || 0),
-      total: Number(item.total_amount || 0),
-    }))
-  }, [analytics])
-
-  const activityItems = useMemo(() => {
-    if (!activity?.items) return []
-    return activity.items.slice(0, 10)
-  }, [activity])
 
   const pressureData = [
     { key: "receipts", label: "Comprobantes", value: Number(receipts?.open_count || 0) },
