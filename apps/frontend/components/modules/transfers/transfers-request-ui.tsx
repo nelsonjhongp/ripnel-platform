@@ -1,11 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Dialog as DialogPrimitive } from "radix-ui";
 import {
   ArrowRight,
   LoaderCircle,
-  PackageSearch,
   RotateCcw,
   ShoppingBag,
   Trash2,
@@ -17,10 +15,7 @@ import {
   AdminInlineMessage,
   AdminTextarea,
 } from "@/components/admin/admin-ui";
-import {
-  OpsTableBlock,
-  OpsTableWrap,
-} from "@/components/ui/ops-page-shell";
+import { OpsTableBlock } from "@/components/ui/ops-page-shell";
 import { cn } from "@/lib/utils";
 
 export type RequestCandidateSource = {
@@ -149,106 +144,6 @@ export function LockedLocationField({
   );
 }
 
-export function ProductSearchTable({
-  products,
-  loading,
-  query,
-  emptyMessage,
-  onSelect,
-}: {
-  products: RequestProductGroup[];
-  loading: boolean;
-  query: string;
-  emptyMessage?: string;
-  onSelect: (product: RequestProductGroup) => void;
-}) {
-  return (
-    <OpsTableBlock>
-      <div className="flex items-center gap-2">
-        <PackageSearch className="h-4 w-4 text-[var(--ops-text-muted)]" />
-        <h2 className="text-sm font-semibold text-[var(--ops-text)]">Buscar producto</h2>
-      </div>
-
-      <OpsTableWrap minWidth="760px">
-        <table className="w-full border-collapse">
-          <thead className="bg-[var(--ops-surface-muted)]">
-            <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-              <th className="px-4 py-3">Producto</th>
-              <th className="px-4 py-3">Línea/Categoría</th>
-              <th className="px-4 py-3 text-right">Stock disponible</th>
-              <th className="px-4 py-3 text-right">Acción</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-            {loading ? (
-              <tr>
-                <td
-                  colSpan={4}
-                  className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
-                >
-                  <LoaderCircle className="mr-2 inline-block h-5 w-5 animate-spin" />
-                  Buscando stock...
-                </td>
-              </tr>
-            ) : query.trim().length < 2 ? (
-              <tr>
-                <td
-                  colSpan={4}
-                  className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
-                >
-                  Busca un producto para agregarlo a la solicitud.
-                </td>
-              </tr>
-            ) : products.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={4}
-                  className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
-                >
-                  {emptyMessage || "No encontramos productos con ese criterio."}
-                </td>
-              </tr>
-            ) : (
-              products.map((product) => (
-                <tr
-                  key={product.product_key}
-                  className="transition hover:bg-[var(--ops-surface-muted)]"
-                >
-                  <td className="px-4 py-[var(--ops-row-py)]">
-                    <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                      {product.style_name}
-                    </p>
-                    <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ripnel-accent-hover)]">
-                      {product.secondary_code}
-                    </p>
-                  </td>
-                  <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
-                    {product.garment_type_name || "Sin categoría"}
-                  </td>
-                  <td className="px-4 py-[var(--ops-row-py)] text-right">
-                    <StockBadge qty={product.total_available} />
-                  </td>
-                  <td className="px-4 py-[var(--ops-row-py)] text-right">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="rounded-lg px-3"
-                      onClick={() => onSelect(product)}
-                    >
-                      Seleccionar
-                    </Button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </OpsTableWrap>
-    </OpsTableBlock>
-  );
-}
-
 export function InlineVariantForm({
   product,
   lockedOriginId,
@@ -327,7 +222,7 @@ export function InlineVariantForm({
   }
 
   return (
-    <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4">
+    <div className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4">
       <div className="flex items-start justify-between gap-3 border-b border-[var(--ops-border-soft)] pb-3 mb-4">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--ripnel-accent-hover)]">
@@ -370,11 +265,11 @@ export function InlineVariantForm({
           </div>
 
           {!selectedVariant ? (
-            <div className="rounded-xl border border-dashed border-[var(--ops-border-soft)] px-4 py-4 text-sm text-[var(--ops-text-muted)]">
+            <div className="rounded-lg border border-dashed border-[var(--ops-border-soft)] px-4 py-4 text-sm text-[var(--ops-text-muted)]">
               Selecciona color y talla para ver sedes con stock.
             </div>
           ) : visibleSources.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-[var(--ops-border-soft)] px-4 py-4 text-sm text-[var(--ops-text-muted)]">
+            <div className="rounded-lg border border-dashed border-[var(--ops-border-soft)] px-4 py-4 text-sm text-[var(--ops-text-muted)]">
               Este producto no tiene stock disponible en otras sedes.
             </div>
           ) : (
@@ -390,7 +285,7 @@ export function InlineVariantForm({
                     disabled={blocked}
                     onClick={() => setSelectedOriginId(source.location_id)}
                     className={cn(
-                      "flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left transition",
+                      "flex w-full items-center justify-between rounded-lg border px-3 py-3 text-left transition",
                       selected
                         ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_34%,var(--ops-border-strong))] bg-[var(--ripnel-accent-soft)]"
                         : "border-[var(--ops-border-soft)] bg-[var(--ops-surface)] hover:bg-[var(--ops-surface-muted)]",
@@ -426,7 +321,7 @@ export function InlineVariantForm({
               className="max-w-[180px]"
             />
           </div>
-          <div className="rounded-xl border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-4 py-3 text-sm text-[var(--ops-text-muted)]">
+          <div className="rounded-lg border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-4 py-3 text-sm text-[var(--ops-text-muted)]">
             {selectedVariant ? (
               <>
                 <p className="font-medium text-[var(--ops-text)]">
@@ -462,242 +357,6 @@ export function InlineVariantForm({
         </Button>
       </div>
     </div>
-  );
-}
-
-export function ProductVariantSelector({
-  open,
-  onOpenChange,
-  product,
-  lockedOriginId,
-  onAdd,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  product: RequestProductGroup | null;
-  lockedOriginId: string;
-  onAdd: (variant: RequestProductVariant, source: RequestCandidateSource, quantity: number) => void;
-}) {
-  const colors = useMemo(
-    () =>
-      product
-        ? [...new Set(product.variants.map((variant) => variant.color_name))]
-            .filter(Boolean)
-            .sort((left, right) => left.localeCompare(right, "es", { sensitivity: "base" }))
-        : [],
-    [product]
-  );
-  const sizes = useMemo(
-    () =>
-      product
-        ? [...new Set(product.variants.map((variant) => variant.size_code))]
-            .filter(Boolean)
-            .sort((left, right) => left.localeCompare(right, "es", { sensitivity: "base" }))
-        : [],
-    [product]
-  );
-
-  const [selectedColor, setSelectedColor] = useState(colors.length === 1 ? colors[0] : "");
-  const [selectedSize, setSelectedSize] = useState(sizes.length === 1 ? sizes[0] : "");
-  const [selectedOriginId, setSelectedOriginId] = useState(lockedOriginId || "");
-  const [quantity, setQuantity] = useState("1");
-
-  const selectedVariant = useMemo(() => {
-    if (!product || !selectedColor || !selectedSize) {
-      return null;
-    }
-
-    return (
-      product.variants.find(
-        (variant) =>
-          variant.color_name === selectedColor && variant.size_code === selectedSize
-      ) || null
-    );
-  }, [product, selectedColor, selectedSize]);
-
-  const visibleSources = useMemo(() => {
-    if (!selectedVariant) {
-      return [];
-    }
-
-    return selectedVariant.candidate_sources.filter((source) =>
-      lockedOriginId ? source.location_id === lockedOriginId : true
-    );
-  }, [lockedOriginId, selectedVariant]);
-
-  const selectedSource =
-    visibleSources.find((source) => source.location_id === selectedOriginId) || null;
-  const parsedQuantity = Number(quantity);
-  const quantityError =
-    selectedSource &&
-    (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0 || parsedQuantity > selectedSource.qty_available)
-      ? `La cantidad debe estar entre 1 y ${selectedSource.qty_available}.`
-      : null;
-  const canSubmit =
-    !!selectedVariant &&
-    !!selectedSource &&
-    !quantityError &&
-    Number.isInteger(parsedQuantity) &&
-    parsedQuantity > 0;
-
-  if (!product) {
-    return null;
-  }
-
-  return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
-      <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/15 backdrop-blur-[2px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
-        <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[min(94vw,760px)] -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-5 shadow-xl outline-none data-open:animate-in data-open:zoom-in-95 data-closed:animate-out data-closed:zoom-out-95">
-          <div className="flex items-start justify-between gap-4 border-b border-[var(--ops-border-soft)] pb-4">
-            <div className="space-y-1">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--ripnel-accent-hover)]">
-                Variante
-              </p>
-              <DialogPrimitive.Title className="text-xl font-semibold text-[var(--ops-text)]">
-                {product.style_name}
-              </DialogPrimitive.Title>
-              <DialogPrimitive.Description className="text-sm text-[var(--ops-text-muted)]">
-                {selectedVariant?.sku || product.secondary_code}
-              </DialogPrimitive.Description>
-            </div>
-            <DialogPrimitive.Close asChild>
-              <Button type="button" variant="ghost" size="icon-sm" className="rounded-lg">
-                <X className="h-4 w-4" />
-              </Button>
-            </DialogPrimitive.Close>
-          </div>
-
-          <div className="mt-4 space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <SelectionBlock
-                label="Color"
-                options={colors}
-                value={selectedColor}
-                onChange={setSelectedColor}
-              />
-              <SelectionBlock
-                label="Talla"
-                options={sizes}
-                value={selectedSize}
-                onChange={setSelectedSize}
-              />
-            </div>
-
-            <section className="space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  Orígenes disponibles
-                </p>
-                {lockedOriginId ? (
-                  <span className="text-xs text-[var(--ops-text-muted)]">
-                    Origen fijado por el borrador actual
-                  </span>
-                ) : null}
-              </div>
-
-              {!selectedVariant ? (
-                <div className="rounded-xl border border-dashed border-[var(--ops-border-soft)] px-4 py-4 text-sm text-[var(--ops-text-muted)]">
-                  Selecciona color y talla para ver sedes con stock.
-                </div>
-              ) : visibleSources.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-[var(--ops-border-soft)] px-4 py-4 text-sm text-[var(--ops-text-muted)]">
-                  Este producto no tiene stock disponible en otras sedes.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {visibleSources.map((source) => {
-                    const selected = source.location_id === selectedOriginId;
-                    const blocked = !!lockedOriginId && source.location_id !== lockedOriginId;
-
-                    return (
-                      <button
-                        key={source.location_id}
-                        type="button"
-                        disabled={blocked}
-                        onClick={() => setSelectedOriginId(source.location_id)}
-                        className={cn(
-                          "flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left transition",
-                          selected
-                            ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_34%,var(--ops-border-strong))] bg-[var(--ripnel-accent-soft)]"
-                            : "border-[var(--ops-border-soft)] bg-[var(--ops-surface)] hover:bg-[var(--ops-surface-muted)]",
-                          blocked && "cursor-not-allowed opacity-60"
-                        )}
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-[var(--ops-text)]">
-                            {source.location_name}
-                          </p>
-                          <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                            {source.location_code}
-                          </p>
-                        </div>
-                        <StockBadge qty={source.qty_available} blocked={blocked} />
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </section>
-
-            <div className="grid gap-4 md:grid-cols-[minmax(0,180px)_1fr]">
-              <div className="space-y-1.5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  Cantidad
-                </p>
-                <QuantityInput
-                  value={quantity}
-                  onChange={setQuantity}
-                  disabled={!selectedSource}
-                  max={selectedSource?.qty_available}
-                  className="max-w-[180px]"
-                />
-              </div>
-              <div className="rounded-xl border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-4 py-3 text-sm text-[var(--ops-text-muted)]">
-                {selectedVariant ? (
-                  <>
-                    <p className="font-medium text-[var(--ops-text)]">
-                      {selectedVariant.color_name} / {selectedVariant.size_code}
-                    </p>
-                    <p className="mt-1">
-                      Selecciona una sede con stock y define cuántas unidades quieres agregar.
-                    </p>
-                  </>
-                ) : (
-                  <p>Elige una combinación válida antes de agregarla al borrador.</p>
-                )}
-              </div>
-            </div>
-
-            {quantityError ? <AdminInlineMessage tone="danger">{quantityError}</AdminInlineMessage> : null}
-          </div>
-
-          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <DialogPrimitive.Close asChild>
-              <Button type="button" variant="outline" className="rounded-lg">
-                Cancelar
-              </Button>
-            </DialogPrimitive.Close>
-            <Button
-              type="button"
-              variant="accent"
-              className="rounded-lg"
-              disabled={!canSubmit}
-              onClick={() => {
-                if (!selectedVariant || !selectedSource || !canSubmit) {
-                  return;
-                }
-
-                onAdd(selectedVariant, selectedSource, parsedQuantity);
-                onOpenChange(false);
-              }}
-            >
-              Agregar
-            </Button>
-          </div>
-        </DialogPrimitive.Content>
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
   );
 }
 
@@ -807,9 +466,9 @@ export function DraftSummaryPanel({
         </div>
       ) : null}
 
-      <div className="space-y-3 rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4">
+      <div className="space-y-3 rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4">
         {draftLines.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-[var(--ops-border-soft)] px-4 py-8 text-center text-sm text-[var(--ops-text-muted)]">
+          <div className="rounded-lg border border-dashed border-[var(--ops-border-soft)] px-4 py-8 text-center text-sm text-[var(--ops-text-muted)]">
             Aún no agregas productos al borrador.
           </div>
         ) : (
@@ -817,7 +476,7 @@ export function DraftSummaryPanel({
             {draftLines.map((line) => (
               <div
                 key={line.variant_id}
-                className="rounded-xl border border-[var(--ops-border-soft)] px-3 py-3"
+                className="rounded-lg border border-[var(--ops-border-soft)] px-3 py-3"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -864,7 +523,7 @@ export function DraftSummaryPanel({
         )}
       </div>
 
-      <div className="space-y-1 rounded-xl border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-4 py-3">
+      <div className="space-y-1 rounded-lg border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-4 py-3">
         <p className="text-sm text-[var(--ops-text-muted)]">
           {totals.lines} líneas
         </p>

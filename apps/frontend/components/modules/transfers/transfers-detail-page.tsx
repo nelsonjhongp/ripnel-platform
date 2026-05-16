@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/ops-page-shell";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { ApiError, apiFetch, type ApiEnvelope, unwrapApiData } from "@/lib/api";
+import { buildTransferModuleRoute, transferRouteSlugs } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import {
   formatDateTime,
@@ -173,7 +174,7 @@ export function TransferDetailPage({
         actions={
           <div className="flex items-center gap-2">
             <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
-              <Link href="/transferencias/listado-de-transferencias">
+              <Link href={buildTransferModuleRoute(transferRouteSlugs.list)}>
                 <ArrowLeft className="h-3.5 w-3.5" />
                 Volver al listado
               </Link>

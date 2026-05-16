@@ -141,10 +141,6 @@ export default function TransactionHistoryPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    setCurrentPage(1)
-  }, [dateFrom, dateTo, search, status])
-
-  useEffect(() => {
     let active = true
     const controller = new AbortController()
 
@@ -169,7 +165,12 @@ export default function TransactionHistoryPage() {
 
         if (active) {
           setSales(Array.isArray(data?.items) ? data.items : [])
-          setTotalResults(Number(data?.total || 0))
+          const nextTotal = Number(data?.total || 0)
+          const nextTotalPages = Math.max(1, Math.ceil(nextTotal / PAGE_SIZE))
+          setTotalResults(nextTotal)
+          if (currentPage > nextTotalPages) {
+            setCurrentPage(nextTotalPages)
+          }
         }
       } catch (loadError) {
         if (!active || controller.signal.aborted) {
@@ -195,12 +196,6 @@ export default function TransactionHistoryPage() {
 
   const totalPages = Math.max(1, Math.ceil(totalResults / PAGE_SIZE))
   const safeCurrentPage = Math.min(currentPage, totalPages)
-
-  useEffect(() => {
-    if (currentPage !== safeCurrentPage) {
-      setCurrentPage(safeCurrentPage)
-    }
-  }, [currentPage, safeCurrentPage])
 
   const totals = useMemo(() => {
     const confirmed = sales.filter((item) => item.status === "confirmed")
@@ -258,7 +253,10 @@ export default function TransactionHistoryPage() {
                     <input
                       type="text"
                       value={search}
-                      onChange={(event) => setSearch(event.target.value)}
+                      onChange={(event) => {
+                        setSearch(event.target.value)
+                        setCurrentPage(1)
+                      }}
                       placeholder="Buscar por nro. venta o cliente"
                       className="h-full w-full bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
                     />
@@ -270,16 +268,22 @@ export default function TransactionHistoryPage() {
                   value={status}
                   options={[
                     { value: "all", label: "Todas" },
-                    { value: "completed", label: "Completadas" },
+                    { value: "confirmed", label: "Confirmadas" },
                     { value: "cancelled", label: "Canceladas" },
                   ]}
-                  onChange={setStatus}
+                  onChange={(value) => {
+                    setStatus(value)
+                    setCurrentPage(1)
+                  }}
                 />
 
                 <DateFilterPicker
                   label="Fecha desde"
                   value={dateFrom}
-                  onChange={setDateFrom}
+                  onChange={(value) => {
+                    setDateFrom(value)
+                    setCurrentPage(1)
+                  }}
                   ariaLabel="Fecha desde"
                   max={dateTo || undefined}
                 />
@@ -287,7 +291,10 @@ export default function TransactionHistoryPage() {
                 <DateFilterPicker
                   label="Fecha hasta"
                   value={dateTo}
-                  onChange={setDateTo}
+                  onChange={(value) => {
+                    setDateTo(value)
+                    setCurrentPage(1)
+                  }}
                   ariaLabel="Fecha hasta"
                   min={dateFrom || undefined}
                 />

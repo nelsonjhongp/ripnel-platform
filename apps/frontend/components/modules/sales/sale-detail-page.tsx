@@ -2,9 +2,8 @@
 
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
-import { ArrowLeft, CreditCard, ReceiptText, RotateCcw, User } from "lucide-react"
+import { ArrowLeft, CreditCard, ReceiptText, User } from "lucide-react"
 
-import { useAuth } from "@/components/auth/AuthProvider"
 import { PermissionGuard } from "@/components/auth/PermissionGuard"
 import {
   ProtectedErrorPage,
@@ -17,6 +16,7 @@ import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Button } from "@/components/ui/button"
 import { ApiError, apiFetch } from "@/lib/api"
 import { appRoutes } from "@/lib/routes"
+import { cn } from "@/lib/utils"
 
 type SaleDetail = {
   sale_id: string
@@ -28,6 +28,7 @@ type SaleDetail = {
   customer_doc_number: string | null
   customer_address_text: string | null
   subtotal_amount: number
+  sale_discount_amount: number
   tax_amount: number
   total_amount: number
   currency: string
@@ -58,34 +59,18 @@ type SaleDetail = {
     reference: string | null
     paid_at: string
   }>
-  receipt: {
-    sales_receipt_id: string
-    sunat_status: string | null
-    sunat_code: string | null
-    sunat_message: string | null
-    pdf_url: string | null
-    issued_at: string | null
-  } | null
 }
 
-const RECEIPT_STYLES: Record<string, string> = {
-  accepted: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  pending: "border-amber-200 bg-amber-50 text-amber-700",
-  error: "border-rose-200 bg-rose-50 text-rose-700",
-  rejected: "border-rose-200 bg-rose-50 text-rose-700",
-  missing: "border-slate-200 bg-slate-100 text-slate-700",
-  unknown: "border-slate-200 bg-slate-100 text-slate-700",
-  not_applicable: "border-slate-200 bg-slate-100 text-slate-500",
+const SALE_STATUS_LABELS: Record<string, string> = {
+  confirmed: "Confirmada",
+  draft: "Borrador",
+  cancelled: "Anulada",
 }
 
-const RECEIPT_LABELS: Record<string, string> = {
-  accepted: "Aceptado",
-  pending: "Pendiente",
-  error: "Error",
-  rejected: "Rechazado",
-  missing: "Sin emitir",
-  unknown: "Sin estado",
-  not_applicable: "No aplica",
+const SALE_STATUS_CLASSES: Record<string, string> = {
+  confirmed: "sales-chip sales-chip-success",
+  draft: "sales-chip sales-chip-warning",
+  cancelled: "sales-chip sales-chip-danger",
 }
 
 function round2(value: number) {
@@ -96,41 +81,84 @@ function isCloseEnough(left: number, right: number) {
   return Math.abs(left - right) < 0.01
 }
 
-function resolveSaleDocumentPath(sale: SaleDetail) {
-  if (sale.document_type === "proforma") {
-    return `/api/sales/${sale.sale_id}/proforma-pdf`
+function formatDateTime(value: string | null, fallback?: string | null) {
+  const source = value || fallback
+  if (!source) {
+    return "-"
   }
 
-  if (sale.document_type === "boleta" || sale.document_type === "factura") {
-    return `/api/sales/${sale.sale_id}/pdf`
-  }
-
-  return null
+  return new Date(source).toLocaleString("es-PE", {
+    dateStyle: "short",
+    timeStyle: "short",
+  })
 }
 
-function isReceiptDocument(documentType: string) {
-  return documentType === "boleta" || documentType === "factura"
+function MetaPill({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
+  return (
+    <div className="inline-flex items-center gap-2 rounded-full border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] px-3 py-2">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+        {label}
+      </span>
+      <span className="text-sm font-medium text-[var(--ops-text)]">{value}</span>
+    </div>
+  )
 }
 
-function resolveReceiptStatus(sale: SaleDetail) {
-  if (!isReceiptDocument(sale.document_type)) {
-    return "not_applicable"
-  }
+function SummaryRow({
+  label,
+  value,
+  strong = false,
+}: {
+  label: string
+  value: string
+  strong?: boolean
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-4 text-sm",
+        strong ? "font-semibold text-[var(--ops-text)]" : "text-[var(--ops-text-muted)]"
+      )}
+    >
+      <span>{label}</span>
+      <span className="text-right">{value}</span>
+    </div>
+  )
+}
 
-  if (!sale.receipt) {
-    return "missing"
-  }
-
-  return sale.receipt.sunat_status || "unknown"
+function ConsistencyBadge({
+  ok,
+  okLabel,
+  warningLabel,
+}: {
+  ok: boolean
+  okLabel: string
+  warningLabel: string
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-lg border px-3 py-2 text-sm font-medium",
+        ok
+          ? "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
+          : "border-[color:color-mix(in_srgb,#f59e0b_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#b45309_82%,var(--ops-text))]"
+      )}
+    >
+      {ok ? okLabel : warningLabel}
+    </div>
+  )
 }
 
 export default function SaleDetailPage({ params }: { params: Promise<{ saleId: string }> }) {
-  const { has } = useAuth()
   const [sale, setSale] = useState<SaleDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
-  const [retryingReceipt, setRetryingReceipt] = useState(false)
-  const [retryMessage, setRetryMessage] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -184,6 +212,7 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
     const paymentTotal = round2(
       sale.payments.reduce((accumulator, payment) => accumulator + Number(payment.amount || 0), 0)
     )
+    const unitCount = sale.details.reduce((accumulator, line) => accumulator + Number(line.quantity || 0), 0)
 
     const headerMatches =
       isCloseEnough(lineSubtotal, Number(sale.subtotal_amount || 0)) &&
@@ -196,6 +225,7 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
       lineTax,
       lineTotal,
       paymentTotal,
+      unitCount,
       headerMatches,
       paymentMatches,
     }
@@ -227,53 +257,10 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
     )
   }
 
-  const documentPath = resolveSaleDocumentPath(sale)
-  const canDownloadDocument = Boolean(documentPath)
-  const downloadLabel =
-    sale.document_type === "proforma"
-      ? "Abrir proforma PDF"
-      : sale.document_type === "boleta" || sale.document_type === "factura"
-        ? "Abrir comprobante PDF"
-        : "Sin documento PDF"
-
-  const receiptStatus = resolveReceiptStatus(sale)
-  const canRetryReceipt =
-    has("sales.pos") &&
-    sale.status === "confirmed" &&
-    isReceiptDocument(sale.document_type) &&
-    ["missing", "pending", "error", "unknown"].includes(receiptStatus)
-
-  async function handleRetryReceipt() {
-    if (!canRetryReceipt || !sale) {
-      return
-    }
-
-    const saleId = sale.sale_id
-
-    setRetryingReceipt(true)
-    setRetryMessage(null)
-
-    try {
-      const refreshed = await apiFetch<SaleDetail>(`/api/sales/${saleId}/retry-receipt`, {
-        method: "POST",
-      })
-      setSale(refreshed)
-      setRetryMessage("Se ejecuto el reintento de emision del comprobante.")
-    } catch (retryError) {
-      setRetryMessage(
-        retryError instanceof ApiError
-          ? retryError.message || "No se pudo reintentar la emision del comprobante."
-          : "No se pudo reintentar la emision del comprobante."
-      )
-    } finally {
-      setRetryingReceipt(false)
-    }
-  }
-
   return (
     <PermissionGuard permission="sales.pos">
-      <section className="sales-page min-h-screen px-4 py-6 md:px-8">
-        <div className="mx-auto max-w-6xl space-y-5">
+      <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
+        <div className="mx-auto max-w-[1180px] space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Button asChild variant="outline" size="sm" className="rounded-lg">
               <Link href={appRoutes.transactionHistory}>
@@ -292,75 +279,34 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
           </div>
 
           <PosHeader
-            eyebrow="Detalle de venta"
+            eyebrow="Operacion comercial"
             title={sale.sale_number || "Sin correlativo"}
-            subtitle={`${sale.document_type} • ${sale.status} • ${new Date(
-              sale.confirmed_at || sale.created_at
-            ).toLocaleString("es-PE")}`}
-            actions={
-              canDownloadDocument ? (
-                <Button
-                  asChild
-                  variant="outline"
-                  size="sm"
-                  className="rounded-lg border-[color:color-mix(in_srgb,var(--ripnel-accent)_22%,var(--ops-border-strong))] bg-[var(--ripnel-accent-soft)] text-[var(--ripnel-accent-hover)] hover:bg-[var(--ripnel-accent-soft)]"
+            meta={
+              <div className="flex flex-wrap gap-2">
+                <MetaPill label="Documento" value={sale.document_type} />
+                <div
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium",
+                    SALE_STATUS_CLASSES[sale.status] || "sales-chip"
+                  )}
                 >
-                  <a href={documentPath || "#"} target="_blank" rel="noreferrer">
-                    <ReceiptText className="h-4 w-4" />
-                    {downloadLabel}
-                  </a>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.16em]">Estado</span>
+                  <span>{SALE_STATUS_LABELS[sale.status] || sale.status}</span>
+                </div>
+                <MetaPill
+                  label={sale.confirmed_at ? "Confirmada" : "Registrada"}
+                  value={formatDateTime(sale.confirmed_at, sale.created_at)}
+                />
+              </div>
+            }
+            actions={
+              sale.status === "confirmed" ? (
+                <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
+                  <Link href={`/postventa/${sale.sale_id}`}>Postventa</Link>
                 </Button>
-              ) : (
-                <span className="sales-chip rounded-lg px-3 py-2 text-sm font-medium text-[var(--ops-text-muted)]">
-                  <ReceiptText className="h-4 w-4" />
-                  {downloadLabel}
-                </span>
-              )
+              ) : null
             }
           />
-
-          <article className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-md backdrop-blur">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-slate-500">Estado de comprobante</p>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <span
-                    className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                      RECEIPT_STYLES[receiptStatus] || "border-slate-200 bg-slate-100 text-slate-700"
-                    }`}
-                  >
-                    {RECEIPT_LABELS[receiptStatus] || receiptStatus}
-                  </span>
-                  {sale.receipt?.sunat_code ? (
-                    <span className="text-xs text-slate-500">Codigo: {sale.receipt.sunat_code}</span>
-                  ) : null}
-                </div>
-                {sale.receipt?.sunat_message ? (
-                  <p className="mt-2 text-sm text-slate-600">{sale.receipt.sunat_message}</p>
-                ) : (
-                  <p className="mt-2 text-sm text-slate-600">
-                    {receiptStatus === "not_applicable"
-                      ? "Esta venta no requiere emision SUNAT."
-                      : "Aun no hay respuesta final del comprobante para esta venta."}
-                  </p>
-                )}
-              </div>
-
-              {canRetryReceipt ? (
-                <button
-                  type="button"
-                  onClick={handleRetryReceipt}
-                  disabled={retryingReceipt}
-                  className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  {retryingReceipt ? "Reintentando..." : "Reemitir comprobante"}
-                </button>
-              ) : null}
-            </div>
-
-            {retryMessage ? <p className="mt-3 text-sm text-slate-600">{retryMessage}</p> : null}
-          </article>
 
           {consistency && !consistency.headerMatches && (
             <InlineStatusCard
@@ -378,72 +324,154 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
             />
           )}
 
-          <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+          <div className="grid gap-5 lg:grid-cols-[1.3fr_0.95fr]">
             <div className="space-y-5">
               <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
-                <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-[var(--ops-text)]">
+                <div className="mb-4 flex items-center gap-2">
                   <ReceiptText className="h-4 w-4 text-[var(--ripnel-accent)]" />
-                  Productos vendidos
-                </h2>
-                <div className="space-y-2">
-                  {sale.details.map((line) => (
-                    <div
-                      key={line.sale_detail_id}
-                      className="sales-panel-muted rounded-lg px-4 py-3"
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <p className="font-semibold text-[var(--ops-text)]">{line.style_name}</p>
-                          <p className="text-xs text-[var(--ops-text-muted)]">
-                            {line.sku} • {line.size_code} / {line.color_code}
-                          </p>
-                        </div>
-                        <p className="text-sm font-semibold text-[var(--ops-text)]">
-                          S/. {Number(line.line_total).toFixed(2)}
-                        </p>
-                      </div>
-                      <div className="mt-2 grid gap-2 text-sm text-[var(--ops-text-muted)] md:grid-cols-4">
-                        <span>Cantidad: {line.quantity}</span>
-                        <span>Lista: S/. {Number(line.unit_price_list).toFixed(2)}</span>
-                        <span>Final: S/. {Number(line.unit_price_final).toFixed(2)}</span>
-                        <span>Subtotal: S/. {Number(line.line_subtotal).toFixed(2)}</span>
-                      </div>
-                    </div>
-                  ))}
+                  <h2 className="text-base font-semibold text-[var(--ops-text)]">Detalle comercial</h2>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <div className="min-w-[720px] border-y border-[var(--ops-border-strong)]">
+                    <table className="w-full border-collapse">
+                      <thead className="bg-[var(--ops-surface-muted)]">
+                        <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                          <th className="px-4 py-3">Producto</th>
+                          <th className="px-4 py-3">Variante</th>
+                          <th className="px-4 py-3 text-right">Cant.</th>
+                          <th className="px-4 py-3 text-right">Precio</th>
+                          <th className="px-4 py-3 text-right">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                        {sale.details.map((line) => (
+                          <tr
+                            key={line.sale_detail_id}
+                            className="transition hover:bg-[var(--ops-surface-muted)]"
+                          >
+                            <td className="px-4 py-[var(--ops-row-py)] align-top">
+                              <p className="text-sm font-semibold text-[var(--ops-text)]">{line.style_name}</p>
+                              <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                                {line.style_code || line.sku}
+                              </p>
+                            </td>
+                            <td className="px-4 py-[var(--ops-row-py)] align-top">
+                              <p className="text-sm text-[var(--ops-text)]">
+                                {line.size_code} / {line.color_code}
+                              </p>
+                              <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                                {line.sku}
+                              </p>
+                            </td>
+                            <td className="px-4 py-[var(--ops-row-py)] text-right text-sm font-medium text-[var(--ops-text)]">
+                              {line.quantity}
+                            </td>
+                            <td className="px-4 py-[var(--ops-row-py)] text-right align-top">
+                              <p className="text-sm font-medium text-[var(--ops-text)]">
+                                S/. {Number(line.unit_price_final).toFixed(2)}
+                              </p>
+                              {Number(line.unit_price_list) !== Number(line.unit_price_final) ? (
+                                <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                                  Lista S/. {Number(line.unit_price_list).toFixed(2)}
+                                </p>
+                              ) : null}
+                            </td>
+                            <td className="px-4 py-[var(--ops-row-py)] text-right align-top">
+                              <p className="text-sm font-semibold text-[var(--ops-text)]">
+                                S/. {Number(line.line_total).toFixed(2)}
+                              </p>
+                              <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                                Subtotal S/. {Number(line.line_subtotal).toFixed(2)}
+                              </p>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </article>
 
-              {sale.notes && (
+              {sale.notes ? (
                 <article className="sales-panel rounded-lg p-5 shadow-sm">
-                  <h2 className="mb-2 text-base font-semibold text-[var(--ops-text)]">Notas</h2>
+                  <h2 className="mb-2 text-base font-semibold text-[var(--ops-text)]">Notas operativas</h2>
                   <p className="text-sm text-[var(--ops-text-muted)]">{sale.notes}</p>
                 </article>
-              )}
+              ) : null}
             </div>
 
             <div className="space-y-5">
               <article className="sales-panel rounded-lg p-5 shadow-sm">
+                <h2 className="mb-4 text-base font-semibold text-[var(--ops-text)]">Resumen comercial</h2>
+
+                <div className="space-y-2">
+                  <SummaryRow label="Items vendidos" value={String(sale.details.length)} />
+                  <SummaryRow label="Unidades" value={String(consistency?.unitCount || 0)} />
+                  <SummaryRow
+                    label="Subtotal cabecera"
+                    value={`S/. ${Number(sale.subtotal_amount).toFixed(2)}`}
+                  />
+                  {Number(sale.sale_discount_amount || 0) > 0 ? (
+                    <SummaryRow
+                      label="Descuento"
+                      value={`S/. ${Number(sale.sale_discount_amount).toFixed(2)}`}
+                    />
+                  ) : null}
+                  <SummaryRow label="IGV" value={`S/. ${Number(sale.tax_amount).toFixed(2)}`} />
+                  <SummaryRow
+                    label="Pagos registrados"
+                    value={`S/. ${Number(consistency?.paymentTotal || 0).toFixed(2)}`}
+                  />
+                  <div className="border-t border-[var(--ops-border-strong)] pt-2">
+                    <SummaryRow
+                      label="Total venta"
+                      value={`S/. ${Number(sale.total_amount).toFixed(2)} ${sale.currency}`}
+                      strong
+                    />
+                  </div>
+                </div>
+
+                {consistency ? (
+                  <div className="mt-4 space-y-2">
+                    <ConsistencyBadge
+                      ok={consistency.headerMatches}
+                      okLabel="Cabecera y lineas coinciden."
+                      warningLabel="Cabecera y lineas no coinciden."
+                    />
+                    <ConsistencyBadge
+                      ok={consistency.paymentMatches}
+                      okLabel="Los pagos cubren exactamente el total."
+                      warningLabel="La suma de pagos no cubre el total."
+                    />
+                  </div>
+                ) : null}
+              </article>
+
+              <article className="sales-panel rounded-lg p-5 shadow-sm">
                 <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-[var(--ops-text)]">
                   <User className="h-4 w-4 text-[var(--ripnel-accent)]" />
-                  Cliente
+                  Trazabilidad operativa
                 </h2>
-                <div className="space-y-2 text-sm text-[var(--ops-text)]">
-                  <p>
-                    <span className="font-medium">Nombre:</span> {sale.customer_name_text || "Cliente general"}
-                  </p>
-                  <p>
-                    <span className="font-medium">Documento:</span> {sale.customer_doc_type || "-"}{" "}
-                    {sale.customer_doc_number || ""}
-                  </p>
-                  <p>
-                    <span className="font-medium">Direccion:</span> {sale.customer_address_text || "-"}
-                  </p>
-                  <p>
-                    <span className="font-medium">Ubicacion:</span> {sale.location_name}
-                  </p>
-                  <p>
-                    <span className="font-medium">Vendedor:</span> {sale.seller_name}
-                  </p>
+
+                <div className="space-y-3 text-sm">
+                  <SummaryRow label="Cliente" value={sale.customer_name_text || "Cliente general"} />
+                  <SummaryRow
+                    label="Documento cliente"
+                    value={
+                      sale.customer_doc_type || sale.customer_doc_number
+                        ? `${sale.customer_doc_type || "-"} ${sale.customer_doc_number || ""}`.trim()
+                        : "-"
+                    }
+                  />
+                  <SummaryRow label="Direccion" value={sale.customer_address_text || "-"} />
+                  <SummaryRow label="Sede" value={sale.location_name} />
+                  <SummaryRow label="Vendedor" value={sale.seller_name} />
+                  <SummaryRow label="Registrada" value={formatDateTime(sale.created_at)} />
+                  <SummaryRow
+                    label="Confirmada"
+                    value={sale.confirmed_at ? formatDateTime(sale.confirmed_at) : "Pendiente"}
+                  />
                 </div>
               </article>
 
@@ -452,81 +480,36 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
                   <CreditCard className="h-4 w-4 text-[var(--ripnel-accent)]" />
                   Pagos
                 </h2>
+
                 <div className="space-y-2 text-sm text-[var(--ops-text)]">
                   {sale.payments.length === 0 ? (
-                    <p>No hay pagos registrados.</p>
+                    <p className="text-[var(--ops-text-muted)]">No hay pagos registrados.</p>
                   ) : (
                     sale.payments.map((payment) => (
                       <div
                         key={payment.payment_id}
                         className="sales-panel-muted rounded-lg px-3 py-2"
                       >
-                        <p className="font-medium capitalize text-[var(--ops-text)]">{payment.method}</p>
-                        <p>Monto: S/. {Number(payment.amount).toFixed(2)}</p>
-                        <p className="text-xs text-[var(--ops-text-muted)]">
-                          {new Date(payment.paid_at).toLocaleString("es-PE")}
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium capitalize text-[var(--ops-text)]">{payment.method}</p>
+                            {payment.reference ? (
+                              <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                                Ref. {payment.reference}
+                              </p>
+                            ) : null}
+                          </div>
+                          <p className="text-sm font-semibold text-[var(--ops-text)]">
+                            S/. {Number(payment.amount).toFixed(2)}
+                          </p>
+                        </div>
+                        <p className="mt-2 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                          {formatDateTime(payment.paid_at)}
                         </p>
                       </div>
                     ))
                   )}
                 </div>
-              </article>
-
-              <article className="sales-panel rounded-lg p-5 shadow-sm">
-                <h2 className="mb-4 text-base font-semibold text-[var(--ops-text)]">Resumen y consistencia</h2>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between text-[var(--ops-text-muted)]">
-                    <span>Subtotal cabecera</span>
-                    <span>S/. {Number(sale.subtotal_amount).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-[var(--ops-text-muted)]">
-                    <span>IGV cabecera</span>
-                    <span>S/. {Number(sale.tax_amount).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-[var(--ops-text-muted)]">
-                    <span>Subtotal lineas</span>
-                    <span>S/. {Number(consistency?.lineSubtotal || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-[var(--ops-text-muted)]">
-                    <span>IGV lineas</span>
-                    <span>S/. {Number(consistency?.lineTax || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-[var(--ops-text-muted)]">
-                    <span>Total pagos</span>
-                    <span>S/. {Number(consistency?.paymentTotal || 0).toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between border-t border-[var(--ops-border-strong)] pt-2 text-base font-semibold text-[var(--ops-text)]">
-                    <span>Total venta</span>
-                    <span>S/. {Number(sale.total_amount).toFixed(2)}</span>
-                  </div>
-                </div>
-
-                {consistency && (
-                  <div className="mt-4 space-y-2 text-sm">
-                    <div
-                      className={`rounded-lg border px-3 py-2 ${
-                        consistency.headerMatches
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                          : "border-amber-200 bg-amber-50 text-amber-800"
-                      }`}
-                    >
-                      {consistency.headerMatches
-                        ? "Cabecera y lineas coinciden."
-                        : "Cabecera y lineas no coinciden."}
-                    </div>
-                    <div
-                      className={`rounded-lg border px-3 py-2 ${
-                        consistency.paymentMatches
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                          : "border-amber-200 bg-amber-50 text-amber-800"
-                      }`}
-                    >
-                      {consistency.paymentMatches
-                        ? "Los pagos cubren exactamente el total de la venta."
-                        : "La suma de pagos no cubre el total de la venta."}
-                    </div>
-                  </div>
-                )}
               </article>
             </div>
           </div>

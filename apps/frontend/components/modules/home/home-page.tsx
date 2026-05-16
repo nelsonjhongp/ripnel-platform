@@ -107,21 +107,18 @@ export default function InicioPage() {
   const inventory = overview?.sections.inventory ?? null
   const admin = overview?.sections.admin ?? null
 
-  const topbarActions = useMemo(
-    () =>
-      cash?.visible && !cash.closing
-        ? [
-            {
-              key: "open-cash",
-              label: "Abrir caja",
-              href: "/caja",
-              icon: <Wallet className="h-4 w-4" />,
-              variant: "outline" as const,
-            },
-          ]
-        : [],
-    [cash?.closing, cash?.visible]
-  )
+  const topbarActions =
+    cash?.visible && !cash.closing
+      ? [
+          {
+            key: "open-cash",
+            label: "Abrir caja",
+            href: "/caja",
+            icon: <Wallet className="h-4 w-4" />,
+            variant: "outline" as const,
+          },
+        ]
+      : []
 
   useSidebarTopbarActions(topbarActions)
 
