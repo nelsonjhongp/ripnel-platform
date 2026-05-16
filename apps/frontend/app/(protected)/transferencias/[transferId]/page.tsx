@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation"
-import { TransfersCreatePage } from "@/components/modules/transfers/transfers-create-page"
+import { TransfersManagePage } from "@/components/modules/transfers/transfers-manage-page"
+import { TransfersRequestPage } from "@/components/modules/transfers/transfers-request-page"
 import { TransferDetailPage } from "@/components/modules/transfers/transfers-detail-page"
 import { TransfersListPage } from "@/components/modules/transfers/transfers-list-page"
 import { TransfersPendingPage } from "@/components/modules/transfers/transfers-pending-page"
@@ -17,11 +18,11 @@ export default async function TransferPage({
   }
 
   if (transferId === transferRouteSlugs.create) {
-    return <TransfersCreatePage />
+    return <TransfersManagePage />
   }
 
   if (transferId === transferRouteSlugs.requestProducts) {
-    return <TransfersCreatePage />
+    return <TransfersRequestPage />
   }
 
   if (transferId === transferRouteSlugs.pendingReceipts) {
