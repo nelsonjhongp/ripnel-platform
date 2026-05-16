@@ -1,5 +1,81 @@
 const { query } = require('../../shared/db');
 
+async function findCommercialActivityByTimeSlot(locationIds, dateFrom, dateTo, executor = query) {
+  const result = await executor(
+    `WITH filtered_sales AS (
+       SELECT
+         s.location_id,
+         FLOOR(EXTRACT(HOUR FROM COALESCE(s.confirmed_at, s.created_at) AT TIME ZONE 'America/Lima') / 2)::int AS slot_index,
+         COALESCE(s.total_amount, 0) AS total_amount
+       FROM sales s
+       WHERE s.location_id = ANY($1::uuid[])
+         AND s.status = 'confirmed'
+         AND DATE(COALESCE(s.confirmed_at, s.created_at) AT TIME ZONE 'America/Lima') >= $2::date
+         AND DATE(COALESCE(s.confirmed_at, s.created_at) AT TIME ZONE 'America/Lima') <= $3::date
+     )
+     SELECT
+       fs.location_id,
+       fs.slot_index,
+       COUNT(*)::int AS sale_count,
+       ROUND(SUM(fs.total_amount)::numeric, 2) AS total_amount,
+       ROUND((SUM(fs.total_amount) / NULLIF(COUNT(*), 0))::numeric, 2) AS avg_ticket
+     FROM filtered_sales fs
+     GROUP BY fs.location_id, fs.slot_index
+     ORDER BY fs.location_id, fs.slot_index`,
+    [locationIds, dateFrom, dateTo]
+  );
+
+  return result.rows;
+}
+
+async function findCommercialActivityByWeekday(locationIds, dateFrom, dateTo, executor = query) {
+  const result = await executor(
+    `WITH filtered_sales AS (
+       SELECT
+         s.location_id,
+         EXTRACT(ISODOW FROM COALESCE(s.confirmed_at, s.created_at) AT TIME ZONE 'America/Lima')::int AS weekday_number,
+         COALESCE(s.total_amount, 0) AS total_amount
+       FROM sales s
+       WHERE s.location_id = ANY($1::uuid[])
+         AND s.status = 'confirmed'
+         AND DATE(COALESCE(s.confirmed_at, s.created_at) AT TIME ZONE 'America/Lima') >= $2::date
+         AND DATE(COALESCE(s.confirmed_at, s.created_at) AT TIME ZONE 'America/Lima') <= $3::date
+     )
+     SELECT
+       fs.location_id,
+       fs.weekday_number,
+       COUNT(*)::int AS sale_count,
+       ROUND(SUM(fs.total_amount)::numeric, 2) AS total_amount,
+       ROUND((SUM(fs.total_amount) / NULLIF(COUNT(*), 0))::numeric, 2) AS avg_ticket
+     FROM filtered_sales fs
+     GROUP BY fs.location_id, fs.weekday_number
+     ORDER BY fs.location_id, fs.weekday_number`,
+    [locationIds, dateFrom, dateTo]
+  );
+
+  return result.rows;
+}
+
+async function findCommercialActivityAggregate(locationIds, dateFrom, dateTo, executor = query) {
+  const result = await executor(
+    `SELECT
+       s.location_id,
+       COUNT(*)::int AS sale_count,
+       ROUND(SUM(COALESCE(s.total_amount, 0))::numeric, 2) AS total_amount,
+       ROUND((SUM(COALESCE(s.total_amount, 0)) / NULLIF(COUNT(*), 0))::numeric, 2) AS avg_ticket
+     FROM sales s
+     WHERE s.location_id = ANY($1::uuid[])
+       AND s.status = 'confirmed'
+       AND DATE(COALESCE(s.confirmed_at, s.created_at) AT TIME ZONE 'America/Lima') >= $2::date
+       AND DATE(COALESCE(s.confirmed_at, s.created_at) AT TIME ZONE 'America/Lima') <= $3::date
+     GROUP BY s.location_id
+     ORDER BY total_amount DESC, sale_count DESC`,
+    [locationIds, dateFrom, dateTo]
+  );
+
+  return result.rows;
+}
+
 async function findSalesHeadlineByLocationAndDate(locationId, dateFrom, dateToOrExecutor, executor) {
   let dateEnd, exec
   if (typeof dateToOrExecutor === "function") {
@@ -68,68 +144,6 @@ async function findPaymentTotalsByLocationAndDate(locationId, dateFrom, dateToOr
      FROM payment_movements
      GROUP BY method`,
     [locationId, dateFrom, dateEnd]
-  );
-
-  return result.rows;
-}
-
-async function findReceiptQueueCounts(locationId, executor = query) {
-  const result = await executor(
-    `WITH receipt_queue AS (
-       SELECT
-         CASE
-           WHEN sr.sales_receipt_id IS NULL THEN 'missing'
-           WHEN sr.sunat_status = 'pending' THEN 'pending'
-           WHEN sr.sunat_status = 'error' THEN 'error'
-           ELSE 'resolved'
-         END AS queue_status
-       FROM sales s
-       LEFT JOIN sales_receipts sr ON sr.sale_id = s.sale_id
-       WHERE s.location_id = $1
-         AND s.status = 'confirmed'
-         AND s.document_type IN ('boleta', 'factura')
-     )
-     SELECT
-       COUNT(*) FILTER (WHERE queue_status IN ('missing', 'pending', 'error'))::int AS open_count,
-       COUNT(*) FILTER (WHERE queue_status = 'missing')::int AS missing_count,
-       COUNT(*) FILTER (WHERE queue_status = 'pending')::int AS pending_count,
-       COUNT(*) FILTER (WHERE queue_status = 'error')::int AS error_count
-     FROM receipt_queue`,
-    [locationId]
-  );
-
-  return result.rows[0] || null;
-}
-
-async function findReceiptQueueItems(locationId, limit = 5, executor = query) {
-  const result = await executor(
-    `SELECT
-       s.sale_id,
-       s.sale_number,
-       s.document_type,
-       s.customer_name_text,
-       s.total_amount,
-       s.currency,
-       COALESCE(sr.updated_at, s.confirmed_at, s.created_at) AS queued_at,
-       CASE
-         WHEN sr.sales_receipt_id IS NULL THEN 'missing'
-         WHEN sr.sunat_status = 'pending' THEN 'pending'
-         WHEN sr.sunat_status = 'error' THEN 'error'
-         ELSE 'resolved'
-       END AS queue_status,
-       sr.sunat_message
-     FROM sales s
-     LEFT JOIN sales_receipts sr ON sr.sale_id = s.sale_id
-     WHERE s.location_id = $1
-       AND s.status = 'confirmed'
-       AND s.document_type IN ('boleta', 'factura')
-       AND (
-         sr.sales_receipt_id IS NULL
-         OR sr.sunat_status IN ('pending', 'error')
-       )
-     ORDER BY COALESCE(sr.updated_at, s.confirmed_at, s.created_at) DESC
-     LIMIT $2`,
-    [locationId, limit]
   );
 
   return result.rows;
@@ -369,38 +383,6 @@ async function findRecentSalesEvents(locationId, limit = 5, executor = query) {
   return result.rows;
 }
 
-async function findRecentReceiptEvents(locationId, limit = 5, executor = query) {
-  const result = await executor(
-    `SELECT
-       s.sale_id,
-       s.sale_number,
-       s.document_type,
-       s.customer_name_text,
-       CASE
-         WHEN sr.sales_receipt_id IS NULL THEN 'missing'
-         WHEN sr.sunat_status = 'pending' THEN 'pending'
-         WHEN sr.sunat_status = 'error' THEN 'error'
-         ELSE 'resolved'
-       END AS queue_status,
-       sr.sunat_message,
-       COALESCE(sr.updated_at, s.confirmed_at, s.created_at) AS occurred_at
-     FROM sales s
-     LEFT JOIN sales_receipts sr ON sr.sale_id = s.sale_id
-     WHERE s.location_id = $1
-       AND s.status = 'confirmed'
-       AND s.document_type IN ('boleta', 'factura')
-       AND (
-         sr.sales_receipt_id IS NULL
-         OR sr.sunat_status IN ('pending', 'error')
-       )
-     ORDER BY COALESCE(sr.updated_at, s.confirmed_at, s.created_at) DESC
-     LIMIT $2`,
-    [locationId, limit]
-  );
-
-  return result.rows;
-}
-
 async function findRecentPostsaleEvents(locationId, limit = 5, executor = query) {
   const result = await executor(
     `SELECT
@@ -541,10 +523,11 @@ async function findSalesByDepartment(locationId, dateFrom, dateTo, executor = qu
 }
 
 module.exports = {
+  findCommercialActivityByTimeSlot,
+  findCommercialActivityByWeekday,
+  findCommercialActivityAggregate,
   findSalesHeadlineByLocationAndDate,
   findPaymentTotalsByLocationAndDate,
-  findReceiptQueueCounts,
-  findReceiptQueueItems,
   findPostsalesWindowCounts,
   findPostsalesWindowItems,
   findPendingTransfersCounts,
@@ -552,7 +535,6 @@ module.exports = {
   findCriticalInventoryCounts,
   findCriticalInventoryItems,
   findRecentSalesEvents,
-  findRecentReceiptEvents,
   findRecentPostsaleEvents,
   findRecentTransferEvents,
   findRecentAdjustmentEvents,
