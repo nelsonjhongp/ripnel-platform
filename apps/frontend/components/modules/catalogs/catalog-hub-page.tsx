@@ -58,7 +58,9 @@ export function CatalogHubPage() {
   }
 
   useEffect(() => {
-    loadHub()
+    void Promise.resolve().then(() => {
+      void loadHub()
+    })
   }, [])
 
   return (
@@ -107,22 +109,22 @@ export function CatalogHubPage() {
               <Link
                 key={definition.slug}
                 href={getCatalogRoute(definition.slug)}
-                className={`group ops-surface-muted flex min-h-[88px] cursor-pointer items-center rounded-2xl border px-4 py-4 transition-[border-color,background-color,transform] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 ${definition.accentHoverClassName}`}
+                className={`group flex min-h-[88px] cursor-pointer items-center rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-4 py-4 transition hover:bg-[var(--ops-surface)] focus-visible:outline-none focus-visible:ring-2 ${definition.accentHoverClassName}`}
               >
                 <div className="flex w-full items-center gap-3">
-                  <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border bg-[var(--ops-surface)] ${definition.accentRingClassName} ${definition.accentClassName}`}>
+                    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border bg-[var(--ops-surface)] ${definition.accentRingClassName} ${definition.accentClassName}`}>
                     <Icon className="h-4 w-4" />
                   </div>
 
                   <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <h2 className="ops-title truncate text-base font-semibold">{definition.shortLabel}</h2>
+                        <h2 className="truncate text-base font-semibold text-[var(--ops-text)]">{definition.shortLabel}</h2>
                         <span className={`inline-flex min-w-7 items-center justify-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${definition.accentCountClassName}`}>
                           {count.total}
                         </span>
                       </div>
-                      <p className="ops-text-muted mt-1 text-sm">{definition.shortDescription}</p>
+                      <p className="mt-1 text-sm text-[var(--ops-text-muted)]">{definition.shortDescription}</p>
                     </div>
 
                     <div className="flex shrink-0 items-center gap-2">
@@ -131,7 +133,7 @@ export function CatalogHubPage() {
                       >
                         {status.label}
                       </span>
-                      <span className={`inline-flex h-8 w-8 items-center justify-center rounded-full border bg-[var(--ops-surface)] transition-transform group-hover:translate-x-0.5 ${definition.accentRingClassName} ${definition.accentClassName}`}>
+                      <span className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border bg-[var(--ops-surface)] transition group-hover:translate-x-0.5 ${definition.accentRingClassName} ${definition.accentClassName}`}>
                         <EntryIcon className="h-3.5 w-3.5" />
                       </span>
                     </div>

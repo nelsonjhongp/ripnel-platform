@@ -174,7 +174,7 @@ export function CatalogItemForm({
             </div>
           </AdminInlineMessage>
         ) : (
-          <div className="rounded-xl border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-4 py-3 text-sm text-[var(--ops-text-muted)]">
+          <div className="rounded-lg border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-4 py-3 text-sm text-[var(--ops-text-muted)]">
             <p className="font-medium">Coincidencias encontradas.</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {duplicateCandidates.map((item) => (

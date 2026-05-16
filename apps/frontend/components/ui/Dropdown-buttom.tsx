@@ -30,15 +30,14 @@ export function DropdownButtom({
   defaultValue = "",
   onValueChange,
 }: DropdownButtomProps) {
-  const [value, setValue] = React.useState(defaultValue)
-
-  React.useEffect(() => {
-    if (!storageKey || typeof window === "undefined") return
-    const storedValue = localStorage.getItem(storageKey)
-    if (storedValue !== null) {
-      setValue(storedValue)
+  const [value, setValue] = React.useState(() => {
+    if (!storageKey || typeof window === "undefined") {
+      return defaultValue
     }
-  }, [storageKey])
+
+    const storedValue = localStorage.getItem(storageKey)
+    return storedValue !== null ? storedValue : defaultValue
+  })
 
   React.useEffect(() => {
     if (!storageKey || typeof window === "undefined") return

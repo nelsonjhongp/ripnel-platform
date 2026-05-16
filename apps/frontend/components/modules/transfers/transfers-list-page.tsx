@@ -8,6 +8,7 @@ import {
   ClipboardList,
   Eye,
   LoaderCircle,
+  Plus,
   RefreshCw,
   RotateCcw,
   SendHorizonal,
@@ -24,6 +25,7 @@ import { ForbiddenPage, InlineStatusCard, LoadingPage } from "@/components/feedb
 import type { ApiEnvelope } from "@/lib/api";
 import { apiFetch, unwrapApiData } from "@/lib/api";
 import { resolveTransferCapabilities } from "@/lib/capabilities";
+import { buildTransferModuleRoute, transferRouteSlugs } from "@/lib/routes";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
@@ -98,7 +100,9 @@ export function TransfersListPage() {
   }
 
   useEffect(() => {
-    void loadTransfers();
+    void Promise.resolve().then(() => {
+      void loadTransfers();
+    });
   }, []);
 
   async function handleShipTransfer(transferId: string) {
@@ -210,27 +214,37 @@ export function TransfersListPage() {
           eyebrow="Seguimiento operativo"
           title="Transferencias"
           actions={
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    onClick={() => void loadTransfers()}
-                    disabled={loading}
-                    className="rounded-lg"
-                    aria-label="Actualizar transferencias"
-                  >
-                    {loading ? (
-                      <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-3.5 w-3.5" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Actualizar transferencias</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <>
+              {transferCapabilities.requestCreate && (
+                <Button asChild variant="accent" size="sm" className="rounded-lg px-3">
+                  <Link href={buildTransferModuleRoute(transferRouteSlugs.requestProducts)}>
+                    <Plus className="h-4 w-4" />
+                    Solicitar productos
+                  </Link>
+                </Button>
+              )}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      onClick={() => void loadTransfers()}
+                      disabled={loading}
+                      className="rounded-lg"
+                      aria-label="Actualizar transferencias"
+                    >
+                      {loading ? (
+                        <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Actualizar transferencias</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </>
           }
         />
 

@@ -12,6 +12,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import { AdminInlineMessage } from "@/components/admin/admin-ui";
 import { ApiEnvelope, apiFetch, unwrapApiData } from "@/lib/api";
 import { catalogPageBySlug, type CatalogFieldConfig } from "@/lib/product-master-metadata";
 import { Button } from "@/components/ui/button";
@@ -372,7 +373,7 @@ function ConfirmationDialog({
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/15 backdrop-blur-[2px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
-        <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,720px)] -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-5 shadow-xl outline-none data-open:animate-in data-open:zoom-in-95 data-closed:animate-out data-closed:zoom-out-95">
+        <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,720px)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-5 shadow-xl outline-none data-open:animate-in data-open:zoom-in-95 data-closed:animate-out data-closed:zoom-out-95">
           <div className="flex items-start justify-between gap-4 border-b border-[var(--ops-border-soft)] pb-4">
             <div className="space-y-1">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--ripnel-accent-hover)]">
@@ -390,7 +391,7 @@ function ConfirmationDialog({
           </div>
 
           <div className="mt-4 space-y-4">
-            <div className="rounded-2xl border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-4 py-3">
+            <div className="rounded-lg border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-4 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
                 Nombre final
               </p>
@@ -398,7 +399,7 @@ function ConfirmationDialog({
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-2xl border border-[var(--ops-border-soft)] px-4 py-3">
+              <div className="rounded-lg border border-[var(--ops-border-soft)] px-4 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
                   Configuracion base
                 </p>
@@ -410,7 +411,7 @@ function ConfirmationDialog({
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-[var(--ops-border-soft)] px-4 py-3">
+              <div className="rounded-lg border border-[var(--ops-border-soft)] px-4 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
                   Configuracion comercial
                 </p>
@@ -453,7 +454,7 @@ function ConfirmationDialog({
             </div>
 
             {summary.description ? (
-              <div className="rounded-2xl border border-[var(--ops-border-soft)] px-4 py-3">
+              <div className="rounded-lg border border-[var(--ops-border-soft)] px-4 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
                   Descripcion
                 </p>
@@ -899,19 +900,15 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
           />
 
           {error ? (
-            <div role="alert" aria-live="polite" className="rounded-lg border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-4 py-3 text-sm text-[color:color-mix(in_srgb,#be123c_74%,var(--ops-text))]">
-              {error}
-            </div>
+            <AdminInlineMessage tone="danger">{error}</AdminInlineMessage>
           ) : null}
 
           {createdStyle ? (
-            <div className="rounded-lg border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] px-4 py-3">
+            <AdminInlineMessage tone="success">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-[color:color-mix(in_srgb,#047857_74%,var(--ops-text))]">
-                    {createdStyle.name}
-                  </p>
-                  </div>
+                  <p className="text-sm font-semibold">{createdStyle.name}</p>
+                </div>
                 <div className="flex flex-wrap gap-2">
                   <Button asChild variant="outline" size="sm" className="rounded-lg">
                     <Link href={`/productos/variantes?style_id=${encodeURIComponent(createdStyle.style_id)}`}>
@@ -925,7 +922,7 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
                   </Button>
                 </div>
               </div>
-            </div>
+            </AdminInlineMessage>
           ) : null}
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -951,7 +948,7 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
                       onChange={(event) =>
                         setFormState((current) => ({ ...current, name: event.target.value }))
                       }
-                      className="ops-surface h-10 rounded-lg border"
+                      className="bg-[var(--ops-surface)] h-10 rounded-lg border"
                       required
                     />
                   )}
@@ -1041,7 +1038,7 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
                       }))
                     }
                     placeholder="Opcional"
-                    className="ops-surface h-10 rounded-lg border"
+                    className="bg-[var(--ops-surface)] h-10 rounded-lg border"
                   />
                 </div>
               </div>
@@ -1106,9 +1103,7 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
           </form>
 
           {!loading && !sizes.length ? (
-            <div className="rounded-lg border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] px-4 py-3 text-sm text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]">
-              Carga tallas en catalogos antes de crear productos.
-            </div>
+            <AdminInlineMessage tone="warning">Carga tallas en catalogos antes de crear productos.</AdminInlineMessage>
           ) : null}
         </div>
       </section>
@@ -1139,9 +1134,9 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
 
               <form onSubmit={handleCatalogCreate} className="flex h-full flex-col">
                 <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-                  <div className="rounded-2xl border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-4 py-3">
+                  <div className="rounded-lg border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-4 py-3">
                     <div className="flex items-start gap-3">
-                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--ops-border-soft)] bg-[var(--ops-surface)] text-[var(--ripnel-accent-hover)]">
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--ops-border-soft)] bg-[var(--ops-surface)] text-[var(--ripnel-accent-hover)]">
                         <ShoppingBag className="h-4 w-4" />
                       </span>
                       <div>
@@ -1180,7 +1175,7 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
                               )
                             }
                             placeholder={field.placeholder}
-                            className="ops-surface min-h-24 w-full rounded-lg border px-3 py-2.5 text-sm outline-none"
+                            className="bg-[var(--ops-surface)] min-h-24 w-full rounded-lg border px-3 py-2.5 text-sm outline-none"
                           />
                         ) : (
                           <Input
@@ -1211,15 +1206,11 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
                   })}
 
                   {catalogError ? (
-                    <div className="rounded-lg border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-4 py-3 text-sm text-[color:color-mix(in_srgb,#be123c_74%,var(--ops-text))]">
-                      {catalogError}
-                    </div>
+                    <AdminInlineMessage tone="danger">{catalogError}</AdminInlineMessage>
                   ) : null}
 
                   {hasCatalogNameDuplicate ? (
-                    <div className="rounded-lg border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] px-4 py-3 text-sm text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]">
-                      Ya existe un registro con ese nombre. Cambia el nombre antes de guardar.
-                    </div>
+                    <AdminInlineMessage tone="warning">Ya existe un registro con ese nombre. Cambia el nombre antes de guardar.</AdminInlineMessage>
                   ) : null}
                 </div>
 

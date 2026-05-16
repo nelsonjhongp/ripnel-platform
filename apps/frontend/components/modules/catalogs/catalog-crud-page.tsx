@@ -82,7 +82,6 @@ export function CatalogCrudPage({
   eyebrow,
   title,
   endpoint,
-  emptyTitle,
   emptyDescription,
   listFields,
   fields,
@@ -122,7 +121,9 @@ export function CatalogCrudPage({
   }, [endpoint]);
 
   useEffect(() => {
-    loadItems();
+    void Promise.resolve().then(() => {
+      void loadItems();
+    });
   }, [loadItems]);
 
   const filteredItems = useMemo(() => {
@@ -143,10 +144,6 @@ export function CatalogCrudPage({
     });
   }, [items, listFields, search, statusFilter]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [search, statusFilter]);
-
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const pageStart = (safePage - 1) * PAGE_SIZE;
@@ -156,10 +153,6 @@ export function CatalogCrudPage({
     ? Math.min(pageStart + PAGE_SIZE, filteredItems.length)
     : 0;
   const hasActiveFilters = Boolean(search.trim()) || statusFilter !== "all";
-
-  useEffect(() => {
-    if (page !== safePage) setPage(safePage);
-  }, [page, safePage]);
 
   function updateItemInList(nextItem: CatalogRecord) {
     setItems((current) =>
@@ -273,7 +266,10 @@ export function CatalogCrudPage({
             <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_auto]">
               <OpsSearchField
                 value={search}
-                onChange={setSearch}
+                onChange={(value) => {
+                  setSearch(value);
+                  setPage(1);
+                }}
                 placeholder="Buscar por nombre, codigo o detalle"
                 ariaLabel="Buscar registros"
               />
@@ -299,6 +295,7 @@ export function CatalogCrudPage({
                     onClick={() => {
                       setSearch("");
                       setStatusFilter("all");
+                      setPage(1);
                     }}
                     disabled={!hasActiveFilters}
                     aria-label="Limpiar filtros"
@@ -420,15 +417,10 @@ export function CatalogCrudPage({
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={listFields.length + 3} className="px-4 py-10 text-center">
-                        <h2 className="text-lg font-semibold text-[var(--ops-text)]">
-                          {items.length ? "No hay resultados para este filtro" : emptyTitle}
-                        </h2>
-                        <p className="mt-2 text-sm leading-6 text-[var(--ops-text-muted)]">
-                          {items.length
-                            ? "Prueba con otro texto de busqueda o cambia el filtro."
-                            : emptyDescription}
-                        </p>
+                      <td colSpan={listFields.length + 3} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                        {items.length
+                          ? "No hay resultados para este filtro."
+                          : emptyDescription}
                       </td>
                     </tr>
                   )}
