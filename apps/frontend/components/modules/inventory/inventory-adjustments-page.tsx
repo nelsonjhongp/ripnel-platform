@@ -118,8 +118,10 @@ export function InventoryAdjustmentsPage() {
   }
 
   useEffect(() => {
-    void loadAdjustments();
-    void loadLocations();
+    void Promise.resolve().then(() => {
+      void loadAdjustments();
+      void loadLocations();
+    });
   }, []);
 
   const filteredAdjustments = useMemo(() => {
@@ -141,10 +143,6 @@ export function InventoryAdjustmentsPage() {
     });
   }, [adjustments, locationFilter, query, statusFilter]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [locationFilter, query, statusFilter]);
-
   const totals = useMemo(
     () => ({
       total: adjustments.length,
@@ -164,12 +162,6 @@ export function InventoryAdjustmentsPage() {
     : 0;
   const hasActiveFilters =
     Boolean(query.trim()) || statusFilter !== "all" || locationFilter !== "all";
-
-  useEffect(() => {
-    if (page !== safePage) {
-      setPage(safePage);
-    }
-  }, [page, safePage]);
 
   async function openDetail(adjustmentId: string) {
     setDetailOpen(true);
@@ -306,7 +298,10 @@ export function InventoryAdjustmentsPage() {
           <OpsFiltersRow className="lg:grid-cols-[1.4fr_0.9fr_0.8fr_auto]">
             <OpsSearchField
               value={query}
-              onChange={setQuery}
+              onChange={(value) => {
+                setQuery(value);
+                setPage(1);
+              }}
               placeholder="Buscar por numero, sede, motivo o usuario"
               ariaLabel="Buscar ajustes de inventario"
             />
@@ -321,7 +316,10 @@ export function InventoryAdjustmentsPage() {
                   label: `${location.code} - ${location.name}`,
                 })),
               ]}
-              onChange={setLocationFilter}
+              onChange={(value) => {
+                setLocationFilter(value);
+                setPage(1);
+              }}
             />
 
             <FilterDropdown
@@ -333,7 +331,10 @@ export function InventoryAdjustmentsPage() {
                 { value: "confirmed", label: "Confirmado" },
                 { value: "cancelled", label: "Cancelado" },
               ]}
-              onChange={(value) => setStatusFilter(value as "all" | AdjustmentStatus)}
+              onChange={(value) => {
+                setStatusFilter(value as "all" | AdjustmentStatus);
+                setPage(1);
+              }}
             />
 
             <Tooltip>
@@ -347,6 +348,7 @@ export function InventoryAdjustmentsPage() {
                     setQuery("");
                     setStatusFilter("all");
                     setLocationFilter("all");
+                    setPage(1);
                   }}
                   disabled={!hasActiveFilters}
                 >

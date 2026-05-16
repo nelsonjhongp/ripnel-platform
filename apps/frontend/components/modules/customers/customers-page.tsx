@@ -118,14 +118,11 @@ export default function CustomersPage() {
     }
   }, [docFilter, query, sort])
 
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [docFilter, query, sort])
-
   function clearFilters() {
     setQuery("")
     setDocFilter("all")
     setSort("desc")
+    setCurrentPage(1)
   }
 
   function openEditModal(customer: CustomerRecord) {
@@ -240,12 +237,6 @@ export default function CustomersPage() {
   const lastVisible = paginatedCustomers.length === 0 ? 0 : firstVisible + paginatedCustomers.length - 1
   const hasActiveFilters = query.trim().length > 0 || docFilter !== "all" || sort !== "desc"
 
-  useEffect(() => {
-    if (currentPage !== safeCurrentPage) {
-      setCurrentPage(safeCurrentPage)
-    }
-  }, [currentPage, safeCurrentPage])
-
   return (
     <TooltipProvider delayDuration={120}>
       <OpsPageShell width="wide">
@@ -306,7 +297,10 @@ export default function CustomersPage() {
                     <input
                       type="text"
                       value={query}
-                      onChange={(event) => setQuery(event.target.value)}
+                      onChange={(event) => {
+                        setQuery(event.target.value)
+                        setCurrentPage(1)
+                      }}
                       placeholder="Nombre, razón social, documento, correo, teléfono o código"
                       className="h-full w-full bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
                     />
@@ -317,14 +311,20 @@ export default function CustomersPage() {
                   label="Tipo de documento"
                   value={docFilter}
                   options={docFilterOptions}
-                  onChange={setDocFilter}
+                  onChange={(value) => {
+                    setDocFilter(value)
+                    setCurrentPage(1)
+                  }}
                 />
 
                 <FilterDropdown
                   label="Orden"
                   value={sort}
                   options={sortOptions}
-                  onChange={(v) => setSort(v as "desc" | "asc")}
+                  onChange={(v) => {
+                    setSort(v as "desc" | "asc")
+                    setCurrentPage(1)
+                  }}
                 />
 
                 <Tooltip>
