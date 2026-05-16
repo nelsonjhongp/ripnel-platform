@@ -254,10 +254,6 @@ export default function UsuariosPage() {
   const userRangeStart = filteredUsers.length === 0 ? 0 : (safeUserPage - 1) * PAGE_SIZE + 1;
   const userRangeEnd = Math.min(filteredUsers.length, safeUserPage * PAGE_SIZE);
 
-  useEffect(() => {
-    setUserPage(1);
-  }, [userQuery]);
-
   const clearFilters = () => {
     setUserQuery("");
     setRoleFilter("all");
@@ -539,7 +535,10 @@ export default function UsuariosPage() {
             <OpsFiltersRow>
               <OpsSearchField
                 value={userQuery}
-                onChange={setUserQuery}
+                onChange={(value) => {
+                  setUserQuery(value);
+                  setUserPage(1);
+                }}
                 placeholder="Buscar por nombre, usuario, email o rol"
                 ariaLabel="Buscar usuarios"
               />

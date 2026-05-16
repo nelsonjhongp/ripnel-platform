@@ -5,6 +5,9 @@
   "workspaces": [
     "apps/*"
   ],
+  "devDependencies": {
+    "next": "^16.2.4"
+  },
   "scripts": {
     "dev:backend": "npm run dev --workspace @ripnel/backend",
     "dev:frontend": "npm run dev --workspace @ripnel/frontend",

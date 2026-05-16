@@ -155,12 +155,6 @@ export default function LocationsPage() {
   const totalPages = Math.max(1, Math.ceil(filteredLocations.length / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
 
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
-
   const paginatedLocations = useMemo(() => {
     const start = (safePage - 1) * PAGE_SIZE;
     return filteredLocations.slice(start, start + PAGE_SIZE);
@@ -375,21 +369,21 @@ export default function LocationsPage() {
               value={storeCount}
               tone="accent"
               active={typeFilter === "store"}
-              onClick={() => { setCurrentPage(1); handleTypeFilterChange("store"); }}
+              onClick={() => { handleTypeFilterChange("store"); }}
             />
             <OpsMetricPill
               label="Almacenes"
               value={warehouseCount}
               tone="accent"
               active={typeFilter === "warehouse"}
-              onClick={() => { setCurrentPage(1); handleTypeFilterChange("warehouse"); }}
+              onClick={() => { handleTypeFilterChange("warehouse"); }}
             />
             <OpsMetricPill
               label="Activas"
               value={activeCount}
               tone="success"
               active={statusFilter === "active"}
-              onClick={() => { setCurrentPage(1); handleStatusFilterChange("active"); }}
+              onClick={() => { handleStatusFilterChange("active"); }}
             />
           </div>
 
