@@ -29,15 +29,17 @@ import {
 
 export function InventoryAdjustmentsCreatePage() {
   const router = useRouter();
+  const initialSearchParams =
+    typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loadingLocations, setLoadingLocations] = useState(true);
   const [savingAdjustment, setSavingAdjustment] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-  const [createLocationId, setCreateLocationId] = useState("");
+  const [createLocationId, setCreateLocationId] = useState(() => initialSearchParams.get("location_id") || "");
   const [createReason, setCreateReason] = useState("");
   const [createNotes, setCreateNotes] = useState("");
   const [draftLines, setDraftLines] = useState<DraftAdjustmentLine[]>([]);
-  const [variantQuery, setVariantQuery] = useState("");
+  const [variantQuery, setVariantQuery] = useState(() => initialSearchParams.get("query") || "");
   const [variantResults, setVariantResults] = useState<AdjustmentVariant[]>([]);
   const [loadingVariants, setLoadingVariants] = useState(false);
   const [variantSearchError, setVariantSearchError] = useState<string | null>(null);
@@ -58,37 +60,14 @@ export function InventoryAdjustmentsCreatePage() {
   }
 
   useEffect(() => {
-    void loadLocations();
+    void Promise.resolve().then(() => {
+      void loadLocations();
+    });
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const initialLocationId = params.get("location_id");
-    const initialQuery = params.get("query");
-
-    if (initialLocationId) {
-      setCreateLocationId(initialLocationId);
-    }
-
-    if (initialQuery) {
-      setVariantQuery(initialQuery);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!createLocationId) {
-      setVariantResults([]);
-      setVariantSearchError(null);
-      setLoadingVariants(false);
-      return;
-    }
-
     const normalizedQuery = variantQuery.trim();
-
-    if (normalizedQuery.length < 2) {
-      setVariantResults([]);
-      setVariantSearchError(null);
-      setLoadingVariants(false);
+    if (!createLocationId || normalizedQuery.length < 2) {
       return;
     }
 
@@ -142,10 +121,10 @@ export function InventoryAdjustmentsCreatePage() {
 
   const filteredVariantResults = useMemo(
     () =>
-      variantResults.filter(
+      (createLocationId && variantQuery.trim().length >= 2 ? variantResults : []).filter(
         (variant) => !draftLines.some((line) => line.variant_id === variant.variant_id)
       ),
-    [draftLines, variantResults]
+    [createLocationId, draftLines, variantQuery, variantResults]
   );
 
   const selectedCreateLocation = useMemo(
@@ -163,6 +142,10 @@ export function InventoryAdjustmentsCreatePage() {
     }),
     [draftLines]
   );
+  const visibleVariantSearchError =
+    createLocationId && variantQuery.trim().length >= 2 ? variantSearchError : null;
+  const visibleLoadingVariants =
+    createLocationId && variantQuery.trim().length >= 2 ? loadingVariants : false;
 
   function addDraftLine(variant: AdjustmentVariant) {
     setDraftLines((current) => [
@@ -374,13 +357,13 @@ export function InventoryAdjustmentsCreatePage() {
                   </p>
                 ) : null}
 
-                {variantSearchError ? (
+                {visibleVariantSearchError ? (
                   <div className="mt-4">
-                    <InlineStatusCard title="Error al buscar variantes" description={variantSearchError} tone="danger" variant="ops" />
+                    <InlineStatusCard title="Error al buscar variantes" description={visibleVariantSearchError} tone="danger" variant="ops" />
                   </div>
                 ) : null}
 
-                {loadingVariants ? (
+                {visibleLoadingVariants ? (
                   <div className="mt-4 flex items-center gap-2 text-sm text-[var(--ops-text-muted)]">
                     <LoaderCircle className="h-4 w-4 animate-spin" />
                     Buscando variantes...
@@ -424,7 +407,7 @@ export function InventoryAdjustmentsCreatePage() {
                     </div>
                   ))}
 
-                  {!loadingVariants &&
+                  {!visibleLoadingVariants &&
                   createLocationId &&
                   variantQuery.trim().length >= 2 &&
                   !filteredVariantResults.length ? (

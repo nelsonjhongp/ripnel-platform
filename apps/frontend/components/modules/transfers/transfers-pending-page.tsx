@@ -19,6 +19,7 @@ import { apiFetch, unwrapApiData } from "@/lib/api";
 import { resolveTransferCapabilities } from "@/lib/capabilities";
 import { Button } from "@/components/ui/button";
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import { Pagination } from "@/components/ui/pagination";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
   OpsFiltersRow,
@@ -47,6 +48,7 @@ export function TransfersPendingPage() {
   const [pendingReceiveTransfer, setPendingReceiveTransfer] = useState<TransferSummary | null>(
     null
   );
+  const [currentPage, setCurrentPage] = useState(1);
 
   const transferCapabilities = useMemo(
     () => resolveTransferCapabilities({ permissions, roleName: user?.role_name }),
@@ -73,7 +75,9 @@ export function TransfersPendingPage() {
   }
 
   useEffect(() => {
-    void loadTransfers();
+    void Promise.resolve().then(() => {
+      void loadTransfers();
+    });
   }, []);
 
   async function handleReceiveTransfer(transferId: string) {
@@ -119,6 +123,16 @@ export function TransfersPendingPage() {
     }),
     [filteredTransfers]
   );
+
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredTransfers.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedTransfers = filteredTransfers.slice(
+    (safePage - 1) * pageSize,
+    safePage * pageSize
+  );
+  const firstVisible = filteredTransfers.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const lastVisible = Math.min(safePage * pageSize, filteredTransfers.length);
 
   const hasActiveFilters = query !== "";
 
@@ -176,14 +190,20 @@ export function TransfersPendingPage() {
             <OpsFiltersRow className="lg:grid-cols-[minmax(0,1.55fr)_auto]">
               <OpsSearchField
                 value={query}
-                onChange={setQuery}
+                onChange={(value) => {
+                  setQuery(value)
+                  setCurrentPage(1)
+                }}
                 placeholder="Buscar por numero, origen o destino"
                 ariaLabel="Buscar recepciones pendientes"
               />
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="outline" size="icon-sm" onClick={() => setQuery("")}
+                    <Button variant="outline" size="icon-sm" onClick={() => {
+                      setQuery("")
+                      setCurrentPage(1)
+                    }}
                       disabled={!hasActiveFilters} className="rounded-lg" aria-label="Limpiar filtros">
                       <RotateCcw className="h-3.5 w-3.5" />
                     </Button>
@@ -226,7 +246,7 @@ export function TransfersPendingPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredTransfers.map((transfer) => (
+                    paginatedTransfers.map((transfer) => (
                       <tr
                         key={transfer.transfer_id}
                         className="transition hover:bg-[var(--ops-surface-muted)]"
@@ -286,8 +306,14 @@ export function TransfersPendingPage() {
               <span className="text-sm text-[var(--ops-text-muted)]">
                 {filteredTransfers.length === 0
                   ? "0 resultados"
-                  : `1-${filteredTransfers.length} de ${filteredTransfers.length}`}
+                  : `${firstVisible}-${lastVisible} de ${filteredTransfers.length}`}
               </span>
+              <Pagination
+                page={safePage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                className="self-end md:self-auto"
+              />
             </OpsTableFooter>
           </OpsTableBlock>
         </OpsSectionDivider>

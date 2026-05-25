@@ -5,8 +5,6 @@ const { findDefaultLocationByUserId } = require('../users/users.repo');
 const { findCashClosingByLocationAndDate, countSalesByLocationAndDate } = require('../cash/cash.repo');
 const {
   findPaymentTotalsByLocationAndDate,
-  findReceiptQueueCounts,
-  findReceiptQueueItems,
   findPendingTransfersCounts,
   findPendingTransfersItems,
   findCriticalInventoryCounts,
@@ -177,33 +175,6 @@ function buildCashNotifications({ enabled, location, businessDate, generatedAt, 
   return notifications;
 }
 
-function buildSalesNotifications({ enabled, location, generatedAt, receiptCounts, receiptItems }) {
-  if (!enabled || !receiptCounts) return [];
-
-  const openCount = Number(receiptCounts.open_count || 0);
-  if (openCount <= 0) return [];
-
-  const errorCount = Number(receiptCounts.error_count || 0);
-  const pendingCount = Number(receiptCounts.pending_count || 0);
-  const missingCount = Number(receiptCounts.missing_count || 0);
-  const latestQueuedAt = receiptItems[0]?.queued_at || generatedAt;
-
-  return [
-    buildNotification({
-      id: `receipt_queue:${location.location_id}`,
-      module: 'sales',
-      kind: errorCount > 0 ? 'receipt_error' : 'receipt_pending',
-      severity: errorCount > 0 ? 'danger' : 'warning',
-      title: errorCount > 0 ? 'Comprobantes con error' : 'Comprobantes pendientes',
-      description: `${openCount} comprobante(s) abiertos: ${errorCount} con error, ${pendingCount} pendientes y ${missingCount} sin emisión.`,
-      href: '/ventas/historial',
-      actionLabel: 'Ver ventas',
-      location,
-      createdAt: latestQueuedAt,
-    }),
-  ];
-}
-
 function buildTransferNotifications({ enabled, location, generatedAt, transferCounts, transferItems }) {
   if (!enabled || !transferCounts) return [];
 
@@ -284,12 +255,10 @@ function sortNotifications(items) {
   const severityWeight = { danger: 0, warning: 1, default: 2 };
   const kindWeight = {
     cash_difference: 0,
-    receipt_error: 1,
-    cash_missing: 2,
-    pending_receipts: 3,
-    zero_stock: 4,
-    receipt_pending: 5,
-    low_stock: 6,
+    cash_missing: 1,
+    pending_receipts: 2,
+    zero_stock: 3,
+    low_stock: 4,
   };
 
   return [...items].sort((left, right) => {
@@ -322,7 +291,6 @@ async function getTopbarNotifications(input = {}) {
 
   const capabilities = {
     cash: canViewCash(roleName),
-    sales: hasPermission(permissions, 'sales.pos'),
     inventory: hasPermission(permissions, 'inventory.view'),
     transfers: hasPermission(permissions, 'transfers.manage'),
   };
@@ -331,8 +299,6 @@ async function getTopbarNotifications(input = {}) {
   let cashClosing = null;
   let salesRow = null;
   let paymentRows = [];
-  let receiptCounts = null;
-  let receiptItems = [];
   let transferCounts = null;
   let transferItems = [];
   let inventoryCounts = null;
@@ -345,11 +311,6 @@ async function getTopbarNotifications(input = {}) {
       cashClosing = await findCashClosingByLocationAndDate(location.location_id, businessDate, executor);
       salesRow = await countSalesByLocationAndDate(location.location_id, businessDate, executor);
       paymentRows = await findPaymentTotalsByLocationAndDate(location.location_id, businessDate, executor);
-    }
-
-    if (capabilities.sales) {
-      receiptCounts = await findReceiptQueueCounts(location.location_id, executor);
-      receiptItems = await findReceiptQueueItems(location.location_id, 3, executor);
     }
 
     if (capabilities.transfers) {
@@ -387,13 +348,6 @@ async function getTopbarNotifications(input = {}) {
       generatedAt,
       cashClosing,
       consistency: cashConsistency,
-    }),
-    ...buildSalesNotifications({
-      enabled: capabilities.sales,
-      location,
-      generatedAt,
-      receiptCounts,
-      receiptItems,
     }),
     ...buildTransferNotifications({
       enabled: capabilities.transfers,

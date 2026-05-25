@@ -318,10 +318,6 @@ export default function PostsalePage() {
     }
   }, [dateFrom, dateTo, search, status])
 
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [search, status, dateFrom, dateTo])
-
   const stats = useMemo(() => {
     const exchangeReady = sales.filter((sale) => sale.availability.exchange.allowed).length
     const cancelReady = sales.filter((sale) => sale.availability.cancel.allowed).length
@@ -392,7 +388,10 @@ export default function PostsalePage() {
                       <input
                         type="text"
                         value={search}
-                        onChange={(event) => setSearch(event.target.value)}
+                        onChange={(event) => {
+                          setSearch(event.target.value)
+                          setCurrentPage(1)
+                        }}
                         placeholder="Buscar por nro. venta o cliente"
                         className="sales-field h-11 w-full rounded-lg py-2.5 pl-9 pr-3 text-sm"
                         aria-label="Buscar ventas"
@@ -407,7 +406,10 @@ export default function PostsalePage() {
                       <Filter className="h-4 w-4 text-[var(--ops-text-muted)]" />
                       <select
                         value={status}
-                        onChange={(event) => setStatus(event.target.value)}
+                        onChange={(event) => {
+                          setStatus(event.target.value)
+                          setCurrentPage(1)
+                        }}
                         className="w-full bg-transparent text-sm text-[var(--ops-text)] outline-none"
                       >
                         {STATUS_OPTIONS.map((option) => (
@@ -428,7 +430,10 @@ export default function PostsalePage() {
                       <input
                         type="date"
                         value={dateFrom}
-                        onChange={(event) => setDateFrom(event.target.value)}
+                        onChange={(event) => {
+                          setDateFrom(event.target.value)
+                          setCurrentPage(1)
+                        }}
                         className="w-full bg-transparent text-sm text-[var(--ops-text)] outline-none"
                       />
                     </div>
@@ -443,7 +448,10 @@ export default function PostsalePage() {
                       <input
                         type="date"
                         value={dateTo}
-                        onChange={(event) => setDateTo(event.target.value)}
+                        onChange={(event) => {
+                          setDateTo(event.target.value)
+                          setCurrentPage(1)
+                        }}
                         className="w-full bg-transparent text-sm text-[var(--ops-text)] outline-none"
                       />
                     </div>
