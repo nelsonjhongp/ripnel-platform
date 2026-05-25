@@ -191,7 +191,7 @@ function createProformaDocument(sale) {
       React.createElement(
         Text,
         { style: styles.footer },
-        'Documento referencial de cotizacion. No reemplaza comprobante electronico SUNAT.'
+        'Documento referencial de cotizacion. No reemplaza un comprobante emitido.'
       )
     )
   );

@@ -1,5 +1,12 @@
 import { apiFetch } from "@/lib/api"
-import type { DashboardOverview, DashboardActivity, CustomerAnalytics, DepartmentSalesResponse } from "@/lib/dashboard-types"
+import type {
+  CommercialActivityMode,
+  CommercialActivityResponse,
+  DashboardOverview,
+  DashboardActivity,
+  CustomerAnalytics,
+  DepartmentSalesResponse,
+} from "@/lib/dashboard-types"
 
 export async function fetchDashboardOverview(params?: { date_from?: string; date_to?: string }): Promise<DashboardOverview> {
   const searchParams = new URLSearchParams()
@@ -33,4 +40,19 @@ export async function fetchCustomerAnalytics(params: {
   searchParams.set("date_to", params.date_to)
   if (params.limit) searchParams.set("limit", String(params.limit))
   return apiFetch<CustomerAnalytics>(`/api/sales/analytics/customers?${searchParams.toString()}`, { cache: "no-store" })
+}
+
+export async function fetchCommercialActivity(params: {
+  date_from: string
+  date_to: string
+  group: CommercialActivityMode
+}): Promise<CommercialActivityResponse> {
+  const searchParams = new URLSearchParams()
+  searchParams.set("date_from", params.date_from)
+  searchParams.set("date_to", params.date_to)
+  searchParams.set("group", params.group)
+
+  return apiFetch<CommercialActivityResponse>(`/api/dashboard/commercial-activity?${searchParams.toString()}`, {
+    cache: "no-store",
+  })
 }

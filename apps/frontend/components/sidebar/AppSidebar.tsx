@@ -176,64 +176,62 @@ export function AppSidebar({
     [permissions, user?.role_name]
   )
 
-  const visibleGroups = React.useMemo(() => {
-    if (loading) return []
-
-    return sidebarGroups
-      .map((group) => {
-        const items = group.items.filter((item) => {
-          if (item.permission && !has(item.permission)) {
-            return false
-          }
-
-          if (item.url.startsWith("/transferencias/")) {
-            if (item.url.endsWith("/crear-transferencia")) {
-              return transferCapabilities.requestCreate
+  const visibleGroups = loading
+    ? []
+    : sidebarGroups
+        .map((group) => {
+          const items = group.items.filter((item) => {
+            if (item.permission && !has(item.permission)) {
+              return false
             }
 
-            if (item.url.endsWith("/solicitar-productos")) {
-              return transferCapabilities.requestCreate
+            if (item.url.startsWith("/transferencias/")) {
+              if (item.url.endsWith("/crear-transferencia")) {
+                return transferCapabilities.requestCreate
+              }
+
+              if (item.url.endsWith("/solicitar-productos")) {
+                return transferCapabilities.requestCreate
+              }
+
+              if (item.url.endsWith("/listado-de-transferencias")) {
+                return transferCapabilities.visible
+              }
+
+              if (item.url.endsWith("/recepciones-pendientes")) {
+                return transferCapabilities.receive
+              }
             }
 
-            if (item.url.endsWith("/listado-de-transferencias")) {
-              return transferCapabilities.visible
+            if (item.onlyForRoles && user?.role_name && !item.onlyForRoles.includes(user.role_name)) {
+              return false
             }
 
-            if (item.url.endsWith("/recepciones-pendientes")) {
-              return transferCapabilities.receive
+            if (item.excludeRoles && user?.role_name && item.excludeRoles.includes(user.role_name)) {
+              return false
             }
-          }
 
-          if (item.onlyForRoles && user?.role_name && !item.onlyForRoles.includes(user.role_name)) {
-            return false
-          }
+            return true
+          })
 
-          if (item.excludeRoles && user?.role_name && item.excludeRoles.includes(user.role_name)) {
-            return false
+          return {
+            ...group,
+            items,
           }
-
-          return true
         })
+        .filter((group) => {
+          if (group.permission && !has(group.permission)) return false
 
-        return {
-          ...group,
-          items,
-        }
-      })
-      .filter((group) => {
-        if (group.permission && !has(group.permission)) return false
+          if (group.onlyForRoles && user?.role_name && !group.onlyForRoles.includes(user.role_name)) {
+            return false
+          }
 
-        if (group.onlyForRoles && user?.role_name && !group.onlyForRoles.includes(user.role_name)) {
-          return false
-        }
+          if (group.excludeRoles && user?.role_name && group.excludeRoles.includes(user.role_name)) {
+            return false
+          }
 
-        if (group.excludeRoles && user?.role_name && group.excludeRoles.includes(user.role_name)) {
-          return false
-        }
-
-        return group.items.length > 0
-      })
-  }, [loading, has, transferCapabilities, user?.role_name])
+          return group.items.length > 0
+        })
 
   const handleLogout = async () => {
     try {
