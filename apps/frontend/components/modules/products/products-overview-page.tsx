@@ -366,14 +366,14 @@ export function ProductsOverviewPage() {
             ) : null}
 
           {loading ? (
-            <div className="ops-text-muted flex min-h-40 items-center justify-center">
+            <div className="flex min-h-40 items-center justify-center text-[var(--ops-text-muted)]">
               <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
               Cargando productos…
             </div>
           ) : !selectedLocationId && !locationAssignments.length ? (
-              <div className="ops-empty-state-compact mt-4 rounded-lg p-8 text-center">
-              <h3 className="ops-title text-lg font-semibold">No hay sede operativa</h3>
-              <p className="ops-text-muted mt-2 text-sm leading-6">
+              <div className="mt-4 rounded-lg p-8 text-center">
+              <h3 className="text-lg font-semibold text-[var(--ops-text)]">No hay sede operativa</h3>
+              <p className="mt-2 text-sm leading-6 text-[var(--ops-text-muted)]">
                 Asigna al menos una sede al usuario para ver stock por talla.
               </p>
             </div>
@@ -516,11 +516,11 @@ export function ProductsOverviewPage() {
                 </table>
             </OpsTableWrap>
           ) : (
-            <div className="ops-empty-state-compact mt-4 rounded-lg p-8 text-center">
-              <h3 className="ops-title text-lg font-semibold">
+            <div className="mt-4 rounded-lg p-8 text-center">
+              <h3 className="text-lg font-semibold text-[var(--ops-text)]">
                 {totalItems ? "No hay styles para este filtro" : "No hay productos en esta sede"}
               </h3>
-              <p className="ops-text-muted mt-2 text-sm leading-6">
+              <p className="mt-2 text-sm leading-6 text-[var(--ops-text-muted)]">
                 {totalItems
                   ? "Prueba otra busqueda, sede o filtro."
                   : "La sede activa no tiene productos para los criterios seleccionados."}
@@ -530,7 +530,7 @@ export function ProductsOverviewPage() {
 
           {!loading && totalItems ? (
             <OpsTableFooter>
-              <span className="ops-secondary-text text-[var(--ops-text-muted)]">
+              <span className="text-[var(--ops-text-muted)]">
                 {visibleFrom}-{visibleTo} de {totalItems}
               </span>
               <Pagination

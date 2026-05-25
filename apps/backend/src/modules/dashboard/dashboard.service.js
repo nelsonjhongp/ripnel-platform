@@ -1,16 +1,17 @@
 const { AppError } = require('../../shared/errors');
 const { pool } = require('../../shared/db');
 const { findActiveUserById } = require('../auth/auth.repo');
-const { findDefaultLocationByUserId } = require('../users/users.repo');
+const { findDefaultLocationByUserId, findUserLocationsByUserId } = require('../users/users.repo');
 const {
   findCashClosingByLocationAndDate,
   countSalesByLocationAndDate,
 } = require('../cash/cash.repo');
 const {
+  findCommercialActivityByTimeSlot,
+  findCommercialActivityByWeekday,
+  findCommercialActivityAggregate,
   findSalesHeadlineByLocationAndDate,
   findPaymentTotalsByLocationAndDate,
-  findReceiptQueueCounts,
-  findReceiptQueueItems,
   findPostsalesWindowCounts,
   findPostsalesWindowItems,
   findPendingTransfersCounts,
@@ -18,7 +19,6 @@ const {
   findCriticalInventoryCounts,
   findCriticalInventoryItems,
   findRecentSalesEvents,
-  findRecentReceiptEvents,
   findRecentPostsaleEvents,
   findRecentTransferEvents,
   findRecentAdjustmentEvents,
@@ -28,6 +28,32 @@ const {
 
 const LOW_STOCK_THRESHOLD = 3;
 const POSTSALE_LOOKBACK_DAYS = 14;
+const TODAY_SLOT_COLUMNS = Array.from({ length: 12 }, (_, index) => {
+  const startHour = index * 2;
+  const endHour = startHour + 1;
+  const key = `slot_${String(startHour).padStart(2, '0')}`;
+
+  return {
+    key,
+    label: `${String(startHour).padStart(2, '0')}:00-${String(endHour).padStart(2, '0')}:59`,
+    short_label: `${String(startHour).padStart(2, '0')}-${String(endHour).padStart(2, '0')}`,
+    slot_index: index,
+  };
+});
+const WEEKDAY_COLUMNS = [
+  { key: 'weekday_1', label: 'Lunes', short_label: 'Lun', weekday_number: 1 },
+  { key: 'weekday_2', label: 'Martes', short_label: 'Mar', weekday_number: 2 },
+  { key: 'weekday_3', label: 'Miercoles', short_label: 'Mie', weekday_number: 3 },
+  { key: 'weekday_4', label: 'Jueves', short_label: 'Jue', weekday_number: 4 },
+  { key: 'weekday_5', label: 'Viernes', short_label: 'Vie', weekday_number: 5 },
+  { key: 'weekday_6', label: 'Sabado', short_label: 'Sab', weekday_number: 6 },
+  { key: 'weekday_7', label: 'Domingo', short_label: 'Dom', weekday_number: 7 },
+];
+const AGGREGATE_COLUMNS = [
+  { key: 'amount', label: 'Monto', short_label: 'Monto' },
+  { key: 'sales', label: 'Ventas', short_label: 'Ventas' },
+  { key: 'avg_ticket', label: 'Ticket prom.', short_label: 'Ticket' },
+];
 
 function todayPeruDate() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
@@ -57,6 +83,11 @@ function hasPermission(permissions, permissionKey) {
 
 function canViewCash(roleName) {
   return ['ADMIN', 'CAJA'].includes(String(roleName || ''));
+}
+
+function normalizeActivityGroup(group) {
+  if (group === 'today' || group === 'week' || group === 'aggregate') return group;
+  return 'aggregate';
 }
 
 function buildPaymentTotals(rows) {
@@ -93,7 +124,6 @@ function buildSections({ permissions, roleName }) {
   return {
     sales: salesOrCashVisible,
     cash: canViewCash(roleName),
-    receipts: hasPermission(permissions, 'sales.pos'),
     postsales: hasPermission(permissions, 'sales.postsale.view'),
     inventory: hasPermission(permissions, 'inventory.view'),
     transfers: hasPermission(permissions, 'transfers.manage'),
@@ -176,20 +206,6 @@ function mapSalesEvent(event) {
       event.total_amount || 0
     ).toFixed(2)} · ${event.document_type}`,
     status: 'confirmed',
-    href: `/ventas/${event.sale_id}`,
-  };
-}
-
-function mapReceiptEvent(event) {
-  return {
-    id: `receipt:${event.sale_id}:${event.queue_status}`,
-    type: 'receipt',
-    occurred_at: event.occurred_at,
-    title: `Comprobante ${event.queue_status}`,
-    subtitle: `${event.sale_number || 'Sin correlativo'} · ${
-      event.customer_name_text || 'Cliente general'
-    }${event.sunat_message ? ` · ${event.sunat_message}` : ''}`,
-    status: event.queue_status,
     href: `/ventas/${event.sale_id}`,
   };
 }
@@ -281,6 +297,19 @@ async function resolveDashboardContext(userId) {
   return { user, location };
 }
 
+async function resolveCommercialLocations(userId) {
+  const rows = await findUserLocationsByUserId(userId);
+  const activeRows = rows.filter((row) => row.active !== false);
+
+  return activeRows.map((row) => ({
+    location_id: row.location_id,
+    name: row.name,
+    code: row.code,
+    type: row.type,
+    is_default: row.is_default === true,
+  }));
+}
+
 async function getDashboardOverview(input = {}) {
   const { user, location } = await resolveDashboardContext(input.user_id);
   const permissions = Array.isArray(input.permissions) ? input.permissions : [];
@@ -296,8 +325,6 @@ async function getDashboardOverview(input = {}) {
   let paymentRows = [];
   let currentCashClosing = null;
   let salesRow = null;
-  let receiptCounts = null;
-  let receiptItems = [];
   let postsalesCounts = null;
   let postsalesItems = [];
   let transferCounts = null;
@@ -316,11 +343,6 @@ async function getDashboardOverview(input = {}) {
 
     if (sections.cash) {
       currentCashClosing = await findCashClosingByLocationAndDate(location.location_id, dateFrom, dateTo, executor);
-    }
-
-    if (sections.receipts) {
-      receiptCounts = await findReceiptQueueCounts(location.location_id, executor);
-      receiptItems = await findReceiptQueueItems(location.location_id, 5, executor);
     }
 
     if (sections.postsales) {
@@ -389,16 +411,6 @@ async function getDashboardOverview(input = {}) {
           },
         }
       : { visible: false },
-    receipts_queue: sections.receipts
-      ? {
-          visible: true,
-          open_count: Number((receiptCounts && receiptCounts.open_count) || 0),
-          missing_count: Number((receiptCounts && receiptCounts.missing_count) || 0),
-          pending_count: Number((receiptCounts && receiptCounts.pending_count) || 0),
-          error_count: Number((receiptCounts && receiptCounts.error_count) || 0),
-          latest: receiptItems,
-        }
-      : { visible: false },
     postsales: sections.postsales
       ? {
           visible: true,
@@ -464,6 +476,106 @@ async function getSalesByDepartment(input = {}) {
   };
 }
 
+async function getCommercialActivity(input = {}) {
+  const { user, location } = await resolveDashboardContext(input.user_id);
+  const permissions = Array.isArray(input.permissions) ? input.permissions : [];
+  const roleName = input.role_name || user.role_name || null;
+  const sections = buildSections({ permissions, roleName });
+  const group = normalizeActivityGroup(input.group);
+  const dateFrom = input.date_from || todayPeruDate();
+  const dateTo = input.date_to || todayPeruDate();
+  const assignedLocations = await resolveCommercialLocations(user.user_id);
+  const visible = sections.sales;
+
+  if (!visible || assignedLocations.length === 0) {
+    return {
+      visible: false,
+      context: {
+        date_from: dateFrom,
+        date_to: dateTo,
+        group,
+        default_metric: 'amount',
+        active_location_id: location.location_id,
+      },
+      rows: [],
+      columns: group === 'today' ? TODAY_SLOT_COLUMNS : group === 'week' ? WEEKDAY_COLUMNS : AGGREGATE_COLUMNS,
+      cells: [],
+    };
+  }
+
+  const locationIds = assignedLocations.map((entry) => entry.location_id);
+  let rows = [];
+
+  if (group === 'today') {
+    rows = await findCommercialActivityByTimeSlot(locationIds, dateFrom, dateTo);
+  } else if (group === 'week') {
+    rows = await findCommercialActivityByWeekday(locationIds, dateFrom, dateTo);
+  } else {
+    rows = await findCommercialActivityAggregate(locationIds, dateFrom, dateTo);
+  }
+
+  const cells =
+    group === 'today'
+      ? rows.map((row) => ({
+          location_id: row.location_id,
+          column_key: TODAY_SLOT_COLUMNS[Number(row.slot_index || 0)]?.key || 'slot_00',
+          sale_count: Number(row.sale_count || 0),
+          total_amount: round2(row.total_amount),
+          avg_ticket: round2(row.avg_ticket),
+        }))
+      : group === 'week'
+        ? rows.map((row) => ({
+            location_id: row.location_id,
+            column_key: `weekday_${Number(row.weekday_number || 1)}`,
+            sale_count: Number(row.sale_count || 0),
+            total_amount: round2(row.total_amount),
+            avg_ticket: round2(row.avg_ticket),
+          }))
+        : rows.flatMap((row) => ([
+            {
+              location_id: row.location_id,
+              column_key: 'amount',
+              sale_count: Number(row.sale_count || 0),
+              total_amount: round2(row.total_amount),
+              avg_ticket: round2(row.avg_ticket),
+            },
+            {
+              location_id: row.location_id,
+              column_key: 'sales',
+              sale_count: Number(row.sale_count || 0),
+              total_amount: round2(row.total_amount),
+              avg_ticket: round2(row.avg_ticket),
+            },
+            {
+              location_id: row.location_id,
+              column_key: 'avg_ticket',
+              sale_count: Number(row.sale_count || 0),
+              total_amount: round2(row.total_amount),
+              avg_ticket: round2(row.avg_ticket),
+            },
+          ]));
+
+  return {
+    visible: true,
+    context: {
+      date_from: dateFrom,
+      date_to: dateTo,
+      group,
+      default_metric: 'amount',
+      active_location_id: location.location_id,
+    },
+    rows: assignedLocations.map((entry) => ({
+      location_id: entry.location_id,
+      name: entry.name,
+      code: entry.code,
+      type: entry.type,
+      is_default: entry.is_default,
+    })),
+    columns: group === 'today' ? TODAY_SLOT_COLUMNS : group === 'week' ? WEEKDAY_COLUMNS : AGGREGATE_COLUMNS,
+    cells,
+  };
+}
+
 async function getDashboardActivity(input = {}) {
   const { user, location } = await resolveDashboardContext(input.user_id);
   const permissions = Array.isArray(input.permissions) ? input.permissions : [];
@@ -472,7 +584,6 @@ async function getDashboardActivity(input = {}) {
 
   const client = await pool.connect();
   let salesEvents = [];
-  let receiptEvents = [];
   let postsaleEvents = [];
   let transferEvents = [];
   let adjustmentEvents = [];
@@ -483,9 +594,6 @@ async function getDashboardActivity(input = {}) {
 
     salesEvents = sections.sales
       ? await findRecentSalesEvents(location.location_id, 5, executor)
-      : [];
-    receiptEvents = sections.receipts
-      ? await findRecentReceiptEvents(location.location_id, 5, executor)
       : [];
     postsaleEvents = sections.postsales
       ? await findRecentPostsaleEvents(location.location_id, 5, executor)
@@ -505,7 +613,6 @@ async function getDashboardActivity(input = {}) {
 
   const items = [
     ...salesEvents.map(mapSalesEvent),
-    ...receiptEvents.map(mapReceiptEvent),
     ...postsaleEvents.map(mapPostsaleEvent),
     ...transferEvents.map((event) => mapTransferEvent(event, location.location_id)),
     ...adjustmentEvents.map(mapAdjustmentEvent),
@@ -528,4 +635,5 @@ module.exports = {
   getDashboardOverview,
   getDashboardActivity,
   getSalesByDepartment,
+  getCommercialActivity,
 };

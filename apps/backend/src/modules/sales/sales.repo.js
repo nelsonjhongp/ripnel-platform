@@ -120,17 +120,6 @@ async function findAllSales(filters = {}) {
     conditions.push(`s.document_type = $${values.length}`);
   }
 
-  if (filters.receiptStatus && filters.receiptStatus !== 'all') {
-    if (filters.receiptStatus === 'open') {
-      conditions.push(`(sr.sales_receipt_id IS NULL OR sr.sunat_status IN ('pending', 'error'))`);
-    } else if (filters.receiptStatus === 'missing') {
-      conditions.push(`sr.sales_receipt_id IS NULL`);
-    } else {
-      values.push(filters.receiptStatus);
-      conditions.push(`sr.sunat_status = $${values.length}`);
-    }
-  }
-
   if (filters.dateFrom) {
     values.push(filters.dateFrom);
     conditions.push(`${businessDateExpr} >= $${values.length}::date`);
@@ -153,8 +142,7 @@ async function findAllSales(filters = {}) {
      INNER JOIN users u ON u.user_id = s.seller_user_id
      LEFT JOIN cash_closings cc
        ON cc.location_id = s.location_id
-      AND cc.business_date = ${businessDateExpr}
-     LEFT JOIN sales_receipts sr ON sr.sale_id = s.sale_id`;
+      AND cc.business_date = ${businessDateExpr}`;
 
   let totalCount = null;
   let rowsValues = values;
@@ -203,16 +191,7 @@ async function findAllSales(filters = {}) {
        l.name AS location_name,
        u.full_name AS seller_name,
        cc.cash_closing_id,
-       cc.status AS cash_closing_status,
-       sr.sales_receipt_id,
-       sr.sunat_status AS receipt_sunat_status,
-       sr.sunat_code AS receipt_sunat_code,
-       sr.sunat_message AS receipt_sunat_message,
-       CASE
-         WHEN s.document_type NOT IN ('boleta', 'factura') THEN 'not_applicable'
-         WHEN sr.sales_receipt_id IS NULL THEN 'missing'
-         ELSE COALESCE(sr.sunat_status, 'unknown')
-       END AS receipt_queue_status
+       cc.status AS cash_closing_status
      ${fromClause}
      ${whereClause}
      ORDER BY ${sortExpr} DESC, s.sale_id DESC
@@ -492,178 +471,6 @@ async function findSalePaymentsBySaleId(saleId) {
   return result.rows;
 }
 
-async function findSaleReceiptBySaleId(saleId) {
-  const result = await query(
-    `SELECT
-       sales_receipt_id,
-       sale_id,
-       document_type,
-       series,
-       correlative,
-       issued_at,
-       provider,
-       external_id,
-       sunat_status,
-       sunat_code,
-       sunat_message,
-       xml_url,
-       cdr_url,
-       pdf_url,
-       qr_payload,
-       created_at,
-       updated_at
-     FROM sales_receipts
-     WHERE sale_id = $1`,
-    [saleId]
-  );
-
-  return result.rows[0] || null;
-}
-
-async function upsertSaleReceiptBySaleId(data = {}) {
-  const result = await query(
-    `INSERT INTO sales_receipts (
-       sale_id,
-       document_type,
-       series,
-       correlative,
-       issued_at,
-       provider,
-       external_id,
-       sunat_status,
-       sunat_code,
-       sunat_message,
-       xml_url,
-       cdr_url,
-       pdf_url,
-       qr_payload
-     ) VALUES (
-       $1, $2, $3, $4, COALESCE($5, CURRENT_TIMESTAMP),
-       $6, $7, $8, $9, $10, $11, $12, $13, $14
-     )
-     ON CONFLICT (sale_id)
-     DO UPDATE SET
-       document_type = EXCLUDED.document_type,
-       series = EXCLUDED.series,
-       correlative = EXCLUDED.correlative,
-       issued_at = EXCLUDED.issued_at,
-       provider = EXCLUDED.provider,
-       external_id = EXCLUDED.external_id,
-       sunat_status = EXCLUDED.sunat_status,
-       sunat_code = EXCLUDED.sunat_code,
-       sunat_message = EXCLUDED.sunat_message,
-       xml_url = EXCLUDED.xml_url,
-       cdr_url = EXCLUDED.cdr_url,
-       pdf_url = EXCLUDED.pdf_url,
-       qr_payload = EXCLUDED.qr_payload,
-       updated_at = CURRENT_TIMESTAMP
-     RETURNING
-       sales_receipt_id,
-       sale_id,
-       document_type,
-       series,
-       correlative,
-       issued_at,
-       provider,
-       external_id,
-       sunat_status,
-       sunat_code,
-       sunat_message,
-       xml_url,
-       cdr_url,
-       pdf_url,
-       qr_payload,
-       created_at,
-       updated_at`,
-    [
-      data.sale_id,
-      data.document_type,
-      data.series,
-      data.correlative,
-      data.issued_at || null,
-      data.provider || null,
-      data.external_id || null,
-      data.sunat_status || null,
-      data.sunat_code || null,
-      data.sunat_message || null,
-      data.xml_url || null,
-      data.cdr_url || null,
-      data.pdf_url || null,
-      data.qr_payload || null,
-    ]
-  );
-
-  return result.rows[0] || null;
-}
-
-async function findReceiptQueue(filters = {}) {
-  const values = [];
-  const conditions = [
-    `s.status = 'confirmed'`,
-    `s.document_type IN ('boleta', 'factura')`,
-  ];
-
-  if (filters.locationId) {
-    values.push(filters.locationId);
-    conditions.push(`s.location_id = $${values.length}`);
-  }
-
-  const statusFilter = String(filters.status || 'open').toLowerCase();
-
-  if (statusFilter === 'pending') {
-    conditions.push(`sr.sunat_status = 'pending'`);
-  } else if (statusFilter === 'error') {
-    conditions.push(`sr.sunat_status = 'error'`);
-  } else if (statusFilter === 'missing') {
-    conditions.push(`sr.sales_receipt_id IS NULL`);
-  } else if (statusFilter === 'open') {
-    conditions.push(`(sr.sales_receipt_id IS NULL OR sr.sunat_status IN ('pending', 'error'))`);
-  }
-
-  const limit = Number.isInteger(filters.limit) ? filters.limit : 50;
-  values.push(limit);
-  const limitRef = `$${values.length}`;
-
-  const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-
-  const result = await query(
-    `SELECT
-       s.sale_id,
-       s.sale_number,
-       s.document_type,
-       s.status AS sale_status,
-       s.customer_name_text,
-       s.customer_doc_type,
-       s.customer_doc_number,
-       s.total_amount,
-       s.currency,
-       s.confirmed_at,
-       s.created_at,
-       l.location_id,
-       l.name AS location_name,
-       sr.sales_receipt_id,
-       sr.sunat_status,
-       sr.sunat_code,
-       sr.sunat_message,
-       sr.external_id,
-       sr.pdf_url,
-       sr.updated_at AS receipt_updated_at,
-       CASE
-         WHEN sr.sales_receipt_id IS NULL THEN 'missing'
-         ELSE COALESCE(sr.sunat_status, 'unknown')
-       END AS receipt_queue_status
-     FROM sales s
-     INNER JOIN locations l ON l.location_id = s.location_id
-     LEFT JOIN sales_receipts sr ON sr.sale_id = s.sale_id
-     ${whereClause}
-     ORDER BY COALESCE(sr.updated_at, s.confirmed_at, s.created_at) ASC
-     LIMIT ${limitRef}`,
-    values
-  );
-
-  return result.rows;
-}
-
 async function findLocationById(locationId) {
   const result = await query(
     `SELECT location_id, name FROM locations WHERE location_id = $1`,
@@ -893,8 +700,6 @@ module.exports = {
   findSaleById,
   findSaleDetailsBySaleId,
   findSalePaymentsBySaleId,
-  findSaleReceiptBySaleId,
-  findReceiptQueue,
   findLocationById,
   findCustomerById,
   findCustomerByInternalCode,
@@ -906,7 +711,6 @@ module.exports = {
   insertSale,
   insertSaleDetail,
   insertSalePayment,
-  upsertSaleReceiptBySaleId,
   decrementInventoryInTx,
   insertStockMovementInTx,
 };
