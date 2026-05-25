@@ -83,7 +83,6 @@ export default function LoginRipnel() {
             priority
           />
         }
-        eyebrow="ERP"
         title="Inicio de sesión"
         subtitle="Accede al sistema de gestión operativa"
       >
@@ -97,7 +96,7 @@ export default function LoginRipnel() {
                 type="text"
                 id="username"
                 name="username"
-                placeholder="ej: admin@ripnel.com"
+                placeholder="Ingresa tu usuario o correo"
                 required
                 autoComplete="username"
                 disabled={submitting}

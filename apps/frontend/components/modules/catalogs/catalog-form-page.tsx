@@ -6,6 +6,7 @@ import { LoaderCircle } from "lucide-react";
 import { fetchCatalogItems, createCatalogItem } from "@/lib/api-catalogs";
 import type { CatalogRecord } from "@/lib/api-catalogs";
 import { AdminFormPageShell } from "@/components/admin/admin-form-page-shell";
+import { AdminInlineMessage } from "@/components/admin/admin-ui";
 import { CatalogItemForm, buildInitialState } from "./catalog-item-form";
 import type { CatalogFieldConfig } from "@/lib/product-master-metadata";
 
@@ -30,18 +31,20 @@ export function CatalogFormPage({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [requestVersion, setRequestVersion] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    void Promise.resolve().then(async () => {
+      setLoading(true);
+      setLoadError(null);
 
-    setLoading(true);
-    setLoadError(null);
-
-    fetchCatalogItems(endpoint)
-      .then((data) => {
-        if (!cancelled) setItems(data);
-      })
-      .catch((requestError) => {
+      try {
+        const data = await fetchCatalogItems(endpoint);
+        if (!cancelled) {
+          setItems(data);
+        }
+      } catch (requestError) {
         if (!cancelled) {
           setLoadError(
             requestError instanceof Error
@@ -49,15 +52,17 @@ export function CatalogFormPage({
               : "No se pudo cargar el catalogo"
           );
         }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    });
 
     return () => {
       cancelled = true;
     };
-  }, [endpoint]);
+  }, [endpoint, requestVersion]);
 
   async function handleSubmit(body: Record<string, unknown>) {
     setSubmitting(true);
@@ -78,6 +83,10 @@ export function CatalogFormPage({
     }
   }
 
+  function reloadItems() {
+    setRequestVersion((current) => current + 1);
+  }
+
   const readOnlyFieldKeys = fields
     .filter((field) => field.editableOnUpdate === false)
     .map((field) => field.key);
@@ -94,8 +103,15 @@ export function CatalogFormPage({
           Cargando formulario...
         </div>
       ) : loadError ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
-          {loadError}
+        <div className="space-y-3">
+          <AdminInlineMessage tone="danger">{loadError}</AdminInlineMessage>
+          <button
+            type="button"
+            onClick={reloadItems}
+            className="inline-flex rounded-lg border border-[var(--ops-border-strong)] px-3 py-2 text-sm font-medium text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
+          >
+            Reintentar carga
+          </button>
         </div>
       ) : (
         <CatalogItemForm

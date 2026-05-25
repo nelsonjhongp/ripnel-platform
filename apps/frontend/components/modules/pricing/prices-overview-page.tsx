@@ -108,12 +108,10 @@ export function PricesOverviewPage() {
   }, [coverage, search, status])
 
   useEffect(() => {
-    void loadItems()
+    void Promise.resolve().then(() => {
+      void loadItems()
+    })
   }, [loadItems])
-
-  useEffect(() => {
-    setPage(1)
-  }, [search, coverage, status])
 
   const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
@@ -124,12 +122,6 @@ export function PricesOverviewPage() {
 
   const firstVisible = items.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1
   const lastVisible = visibleItems.length === 0 ? 0 : firstVisible + visibleItems.length - 1
-
-  useEffect(() => {
-    if (page !== safePage) {
-      setPage(safePage)
-    }
-  }, [page, safePage])
 
   const metrics = useMemo(() => {
     const totalStyles = items.length
@@ -154,6 +146,7 @@ export function PricesOverviewPage() {
     setSearch("")
     setCoverage("all")
     setStatus("all")
+    setPage(1)
   }
 
   return (
@@ -205,7 +198,10 @@ export function PricesOverviewPage() {
           <OpsFiltersRow>
             <OpsSearchField
               value={search}
-              onChange={setSearch}
+              onChange={(value) => {
+                setSearch(value)
+                setPage(1)
+              }}
               placeholder="Buscar por style, codigo o tela"
               ariaLabel="Buscar estilos de precios"
             />
@@ -214,14 +210,20 @@ export function PricesOverviewPage() {
               label="Cobertura"
               value={coverage}
               options={COVERAGE_OPTIONS}
-              onChange={setCoverage}
+              onChange={(value) => {
+                setCoverage(value)
+                setPage(1)
+              }}
             />
 
             <FilterDropdown
               label="Estado"
               value={status}
               options={STATUS_OPTIONS}
-              onChange={setStatus}
+              onChange={(value) => {
+                setStatus(value)
+                setPage(1)
+              }}
             />
 
             <Tooltip>

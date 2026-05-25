@@ -210,10 +210,6 @@ export default function RolesPage() {
   const roleRangeStart = filteredRoles.length === 0 ? 0 : (safeRolePage - 1) * PAGE_SIZE + 1;
   const roleRangeEnd = Math.min(filteredRoles.length, safeRolePage * PAGE_SIZE);
 
-  useEffect(() => {
-    setRolePage(1);
-  }, [roleQuery]);
-
   const clearFilters = () => {
     setRoleQuery("");
     setSortOrder("desc");
@@ -365,12 +361,15 @@ export default function RolesPage() {
         <OpsSectionDivider>
           <OpsTableBlock>
           <OpsFiltersRow className="lg:grid-cols-[minmax(0,1.55fr)_0.92fr_auto]">
-            <OpsSearchField
-              value={roleQuery}
-              onChange={setRoleQuery}
-              placeholder="Buscar por nombre o descripción"
-              ariaLabel="Buscar roles"
-            />
+              <OpsSearchField
+                value={roleQuery}
+                onChange={(value) => {
+                  setRoleQuery(value);
+                  setRolePage(1);
+                }}
+                placeholder="Buscar por nombre o descripción"
+                ariaLabel="Buscar roles"
+              />
             <FilterDropdown label="Orden" value={sortOrder} options={[{ value: "desc", label: "Más reciente" }, { value: "asc", label: "Más antiguo" }]} onChange={(v) => { setSortOrder(v as "desc" | "asc"); setRolePage(1); }} />
             <Tooltip>
               <TooltipTrigger asChild>

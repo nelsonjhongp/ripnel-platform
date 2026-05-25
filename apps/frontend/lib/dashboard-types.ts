@@ -20,7 +20,6 @@ export type DashboardContext = {
 export type DashboardSections = {
   sales: boolean
   cash: boolean
-  receipts: boolean
   postsales: boolean
   inventory: boolean
   transfers: boolean
@@ -71,27 +70,6 @@ export type CashSection = {
   visible: boolean
   closing?: CashClosing | null
   sales_summary?: CashSummary
-}
-
-export type ReceiptQueueItem = {
-  sale_id: string
-  sale_number: string | null
-  document_type: string
-  customer_name_text: string | null
-  total_amount: number
-  currency: string
-  queued_at: string
-  queue_status: "missing" | "pending" | "error"
-  sunat_message: string | null
-}
-
-export type ReceiptsSection = {
-  visible: boolean
-  open_count?: number
-  missing_count?: number
-  pending_count?: number
-  error_count?: number
-  latest?: ReceiptQueueItem[]
 }
 
 export type PostsalesItem = {
@@ -165,7 +143,6 @@ export type DashboardOverview = {
   sections: DashboardSections
   sales_today: SalesToday
   cash: CashSection
-  receipts_queue: ReceiptsSection
   postsales: PostsalesSection
   transfers: TransfersSection
   inventory: InventorySection
@@ -243,4 +220,43 @@ export type PressureBarData = {
   key: string
   label: string
   value: number
+}
+
+export type CommercialActivityMetric = "amount" | "sales" | "avg_ticket"
+export type CommercialActivityMode = "today" | "week" | "aggregate"
+
+export type CommercialActivityRow = {
+  location_id: string
+  name: string
+  code: string | null
+  type: string
+  is_default: boolean
+}
+
+export type CommercialActivityColumn = {
+  key: string
+  label: string
+  short_label: string
+}
+
+export type CommercialActivityCell = {
+  location_id: string
+  column_key: string
+  sale_count: number
+  total_amount: number
+  avg_ticket: number
+}
+
+export type CommercialActivityResponse = {
+  visible: boolean
+  context: {
+    date_from: string
+    date_to: string
+    group: CommercialActivityMode
+    default_metric: CommercialActivityMetric
+    active_location_id: string
+  }
+  rows: CommercialActivityRow[]
+  columns: CommercialActivityColumn[]
+  cells: CommercialActivityCell[]
 }
