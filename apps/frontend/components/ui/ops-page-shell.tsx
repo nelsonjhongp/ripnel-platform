@@ -13,7 +13,7 @@ export function OpsPageShell({
   width?: "default" | "wide"
 }) {
   return (
-    <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
+    <section className="ops-page min-h-dvh px-4 py-[var(--ops-page-py)] md:px-8">
       <div
         className={cn(
           "mx-auto space-y-4",
