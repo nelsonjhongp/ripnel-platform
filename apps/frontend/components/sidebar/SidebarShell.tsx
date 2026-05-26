@@ -118,7 +118,7 @@ export function SidebarShell({
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto w-full min-h-screen">{children}</main>
+        <main className="flex-1 overflow-auto w-full min-h-dvh">{children}</main>
       </AppSidebar>
     </SidebarTopbarActionsContext.Provider>
   )
