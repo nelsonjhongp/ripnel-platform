@@ -59,6 +59,19 @@ function canViewCash(roleName) {
   return ['ADMIN', 'CAJA'].includes(String(roleName || '').toUpperCase());
 }
 
+function normalizeTransferCapabilities(rawCapabilities = {}) {
+  return {
+    manage: Boolean(rawCapabilities.manage),
+    request_create: Boolean(rawCapabilities.request_create),
+    request_view_own: Boolean(rawCapabilities.request_view_own),
+    approve: Boolean(rawCapabilities.approve),
+    ship: Boolean(rawCapabilities.ship),
+    receive: Boolean(rawCapabilities.receive),
+    cancel: Boolean(rawCapabilities.cancel),
+    visible: Boolean(rawCapabilities.visible),
+  };
+}
+
 function buildPaymentTotals(rows) {
   const totals = { cash: 0, yape: 0, plin: 0, transfer: 0 };
 
@@ -153,7 +166,7 @@ function buildHero({
     };
   }
 
-  if (transferCapabilities.request_create && Number(transferCounts?.drafts_for_store_count || 0) > 0) {
+  if (transferCapabilities.request_create && Number(transferCounts?.open_for_store_count || 0) > 0) {
     return {
       eyebrow: defaultLocation.name,
       title: `Hola, ${firstName}`,
@@ -176,7 +189,7 @@ function buildHero({
       description: 'Hay variantes en cero en tu sede. Si otra tienda puede abastecerte, lo más útil ahora es lanzar una solicitud de productos.',
       tone: 'warning',
       cta: {
-        label: 'Solicitar productos',
+        label: 'Solicitar reposición',
         href: '/transferencias/solicitar-productos',
       },
     };
@@ -246,7 +259,7 @@ function buildQuickActions({
   if (transferCapabilities.request_create) {
     actions.push({
       key: 'request-products',
-      label: 'Solicitar productos',
+      label: 'Solicitar reposición',
       href: '/transferencias/solicitar-productos',
       description: 'Pedir reposición a otra tienda cercana.',
       tone: 'primary',
@@ -286,7 +299,7 @@ function buildQuickActions({
   if (inventoryCapability) {
     actions.push({
       key: 'inventory',
-      label: 'Inventario',
+      label: 'Stock actual',
       href: '/inventario',
       description: 'Revisar stock y quiebres de la sede.',
       tone: 'default',
@@ -336,6 +349,26 @@ function buildPriorities({
     });
   }
 
+  if (transferCapabilities.approve && Number(transferCounts?.pending_approval_count || 0) > 0) {
+    priorities.push({
+      key: 'transfer-approve',
+      title: 'Aprobar solicitudes',
+      description: `${transferCounts.pending_approval_count} solicitud(es) esperan validación del origen.`,
+      href: '/transferencias/listado-de-transferencias',
+      tone: 'default',
+    });
+  }
+
+  if (transferCapabilities.ship && Number(transferCounts?.pending_ship_count || 0) > 0) {
+    priorities.push({
+      key: 'transfer-ship',
+      title: 'Despachar reposiciones',
+      description: `${transferCounts.pending_ship_count} solicitud(es) ya aprobadas siguen pendientes por despachar.`,
+      href: '/transferencias/listado-de-transferencias',
+      tone: 'warning',
+    });
+  }
+
   if (transferCapabilities.request_create && Number(inventoryCounts?.zero_stock_count || 0) > 0) {
     priorities.push({
       key: 'request-replenishment',
@@ -379,7 +412,10 @@ function buildTransferItems(rows, locationId) {
       flow = 'receive';
       title = 'Recepción pendiente';
       href = '/transferencias/recepciones-pendientes';
-    } else if (row.status === 'draft' && row.from_location_id === locationId) {
+    } else if (row.status === 'requested' && row.from_location_id === locationId) {
+      flow = 'approve';
+      title = 'Pendiente por aprobar';
+    } else if (row.status === 'approved' && row.from_location_id === locationId) {
       flow = 'ship';
       title = 'Pendiente por despachar';
     }
@@ -412,7 +448,9 @@ async function getHomeOverview(input = {}) {
   const inventoryCapability = hasPermission(permissions, 'inventory.view');
   const adminCapability = hasPermission(permissions, 'admin.manage');
   const cashVisible = canViewCash(roleName);
-  const transferCapabilities = buildTransferCapabilities({ permissions, roleName });
+  const transferCapabilities = normalizeTransferCapabilities(
+    buildTransferCapabilities({ permissions, roleName })
+  );
 
   const [
     personalSalesSummary,
@@ -483,9 +521,9 @@ async function getHomeOverview(input = {}) {
       : null,
     transferCapabilities.request_create || transferCapabilities.request_view_own
       ? {
-          key: 'draft-requests',
+          key: 'open-requests',
           label: 'Solicitudes abiertas',
-          value: Number(transferCounts?.drafts_for_store_count || 0),
+          value: Number(transferCounts?.open_for_store_count || 0),
           meta: 'Por mi tienda',
           scope: 'location',
           tone: 'default',
@@ -589,14 +627,15 @@ async function getHomeOverview(input = {}) {
         ? {
             visible: true,
             counts: {
-              drafts_for_store_count: Number(transferCounts?.drafts_for_store_count || 0),
-              drafts_to_ship_count: Number(transferCounts?.drafts_to_ship_count || 0),
+              open_for_store_count: Number(transferCounts?.open_for_store_count || 0),
+              pending_approval_count: Number(transferCounts?.pending_approval_count || 0),
+              pending_ship_count: Number(transferCounts?.pending_ship_count || 0),
               pending_receive_count: Number(transferCounts?.pending_receive_count || 0),
             },
             latest: buildTransferItems(transferItems, defaultLocation.location_id),
             primary_action: transferCapabilities.request_create
               ? {
-                  label: 'Solicitar productos',
+                  label: 'Solicitar reposición',
                   href: '/transferencias/solicitar-productos',
                 }
               : null,

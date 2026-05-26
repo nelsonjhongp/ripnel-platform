@@ -56,6 +56,34 @@ async function findCommercialActivityByWeekday(locationIds, dateFrom, dateTo, ex
   return result.rows;
 }
 
+async function findCommercialActivityByDay(locationIds, dateFrom, dateTo, executor = query) {
+  const result = await executor(
+    `WITH filtered_sales AS (
+       SELECT
+         s.location_id,
+         DATE(COALESCE(s.confirmed_at, s.created_at) AT TIME ZONE 'America/Lima') AS business_date,
+         COALESCE(s.total_amount, 0) AS total_amount
+       FROM sales s
+       WHERE s.location_id = ANY($1::uuid[])
+         AND s.status = 'confirmed'
+         AND DATE(COALESCE(s.confirmed_at, s.created_at) AT TIME ZONE 'America/Lima') >= $2::date
+         AND DATE(COALESCE(s.confirmed_at, s.created_at) AT TIME ZONE 'America/Lima') <= $3::date
+     )
+     SELECT
+       fs.location_id,
+       fs.business_date,
+       COUNT(*)::int AS sale_count,
+       ROUND(SUM(fs.total_amount)::numeric, 2) AS total_amount,
+       ROUND((SUM(fs.total_amount) / NULLIF(COUNT(*), 0))::numeric, 2) AS avg_ticket
+     FROM filtered_sales fs
+     GROUP BY fs.location_id, fs.business_date
+     ORDER BY fs.business_date, fs.location_id`,
+    [locationIds, dateFrom, dateTo]
+  );
+
+  return result.rows;
+}
+
 async function findCommercialActivityAggregate(locationIds, dateFrom, dateTo, executor = query) {
   const result = await executor(
     `SELECT
@@ -270,8 +298,12 @@ async function findPendingTransfersCounts(locationId, executor = query) {
        )::int AS pending_receipts_count,
        COUNT(*) FILTER (
          WHERE from_location_id = $1
-           AND status = 'draft'
-       )::int AS draft_outgoing_count
+           AND status = 'requested'
+       )::int AS pending_approval_count,
+       COUNT(*) FILTER (
+         WHERE from_location_id = $1
+           AND status = 'approved'
+       )::int AS pending_dispatch_count
      FROM stock_transfers`,
     [locationId]
   );
@@ -287,28 +319,49 @@ async function findPendingTransfersItems(locationId, limit = 5, executor = query
        st.status,
        st.from_location_id,
        lf.name AS from_location_name,
+       lf.code AS from_location_code,
        st.to_location_id,
        lt.name AS to_location_name,
+        lt.code AS to_location_code,
+       st.created_at,
+       st.approved_at,
        st.shipped_at,
        st.updated_at,
+       CASE
+         WHEN st.from_location_id = $1 AND st.status = 'requested' THEN 'approval'
+         WHEN st.from_location_id = $1 AND st.status = 'approved' THEN 'dispatch'
+         WHEN st.to_location_id = $1 AND st.status = 'shipped' THEN 'receipt'
+         ELSE 'tracking'
+       END AS pending_stage,
+       COALESCE(SUM(stl.qty_requested), 0)::int AS qty_requested_total,
        COALESCE(SUM(stl.qty_shipped), 0)::int AS qty_shipped_total
      FROM stock_transfers st
      INNER JOIN locations lf ON lf.location_id = st.from_location_id
      INNER JOIN locations lt ON lt.location_id = st.to_location_id
      LEFT JOIN stock_transfer_lines stl ON stl.transfer_id = st.transfer_id
-     WHERE st.to_location_id = $1
-       AND st.status = 'shipped'
+     WHERE (
+         st.from_location_id = $1
+         AND st.status IN ('requested', 'approved')
+       )
+        OR (
+         st.to_location_id = $1
+         AND st.status = 'shipped'
+       )
      GROUP BY
        st.transfer_id,
        st.transfer_number,
        st.status,
        st.from_location_id,
        lf.name,
+       lf.code,
        st.to_location_id,
        lt.name,
+       lt.code,
+       st.created_at,
+       st.approved_at,
        st.shipped_at,
        st.updated_at
-     ORDER BY COALESCE(st.shipped_at, st.updated_at) DESC
+     ORDER BY COALESCE(st.shipped_at, st.approved_at, st.updated_at, st.created_at) DESC
      LIMIT $2`,
     [locationId, limit]
   );
@@ -443,7 +496,7 @@ async function findRecentTransferEvents(locationId, limit = 5, executor = query)
        st.to_location_id,
        lt.name AS to_location_name,
        st.updated_at,
-       COALESCE(st.received_at, st.shipped_at, st.cancelled_at, st.updated_at, st.created_at) AS occurred_at
+       COALESCE(st.received_at, st.shipped_at, st.approved_at, st.cancelled_at, st.updated_at, st.created_at) AS occurred_at
      FROM stock_transfers st
      INNER JOIN locations lf ON lf.location_id = st.from_location_id
      INNER JOIN locations lt ON lt.location_id = st.to_location_id
@@ -525,6 +578,7 @@ async function findSalesByDepartment(locationId, dateFrom, dateTo, executor = qu
 module.exports = {
   findCommercialActivityByTimeSlot,
   findCommercialActivityByWeekday,
+  findCommercialActivityByDay,
   findCommercialActivityAggregate,
   findSalesHeadlineByLocationAndDate,
   findPaymentTotalsByLocationAndDate,

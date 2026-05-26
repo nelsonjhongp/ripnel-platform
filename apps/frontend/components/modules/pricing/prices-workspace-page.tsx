@@ -56,6 +56,20 @@ function priceTypeLabel(priceType: PriceType) {
   return priceType === "retail" ? "Minorista" : "Mayorista"
 }
 
+const NEW_PRICE_RECORD_ID = "__new__"
+
+function resetPriceDraftState(
+  setPriceInput: (value: string) => void,
+  setStartDateInput: (value: string) => void,
+  setEndDateInput: (value: string) => void,
+  setActiveInput: (value: boolean) => void
+) {
+  setPriceInput("")
+  setStartDateInput(getTodayInputValue())
+  setEndDateInput("")
+  setActiveInput(true)
+}
+
 export function PricesWorkspacePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -67,7 +81,7 @@ export function PricesWorkspacePage() {
 
   const [selectedSizeId, setSelectedSizeId] = useState("")
   const [selectedPriceType, setSelectedPriceType] = useState<PriceType>("retail")
-  const [selectedPriceId, setSelectedPriceId] = useState("")
+  const [selectedPriceRecordId, setSelectedPriceRecordId] = useState("")
   const [priceInput, setPriceInput] = useState("")
   const [startDateInput, setStartDateInput] = useState(getTodayInputValue())
   const [endDateInput, setEndDateInput] = useState("")
@@ -75,6 +89,15 @@ export function PricesWorkspacePage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitMessage, setSubmitMessage] = useState<string | null>(null)
+
+  const clearSubmitFeedback = useCallback(() => {
+    setSubmitError(null)
+    setSubmitMessage(null)
+  }, [])
+
+  const resetDraft = useCallback(() => {
+    resetPriceDraftState(setPriceInput, setStartDateInput, setEndDateInput, setActiveInput)
+  }, [])
 
   const loadWorkspace = useCallback(async (styleId: string) => {
     if (!styleId) {
@@ -97,8 +120,15 @@ export function PricesWorkspacePage() {
   }, [])
 
   useEffect(() => {
-    void loadWorkspace(selectedStyleId)
-  }, [loadWorkspace, selectedStyleId])
+    void Promise.resolve().then(async () => {
+      setSelectedSizeId("")
+      setSelectedPriceType("retail")
+      setSelectedPriceRecordId("")
+      resetDraft()
+      clearSubmitFeedback()
+      await loadWorkspace(selectedStyleId)
+    })
+  }, [clearSubmitFeedback, loadWorkspace, resetDraft, selectedStyleId])
 
   useEffect(() => {
     if (!selectedStyleId) {
@@ -106,74 +136,87 @@ export function PricesWorkspacePage() {
     }
   }, [selectedStyleId, router])
 
-  useEffect(() => {
+  const resolvedSelectedSizeId = useMemo(() => {
     if (!workspace) {
-      setSelectedSizeId("")
-      return
+      return ""
     }
 
-    const firstSize = workspace.configured_sizes[0]
+    if (selectedSizeId && workspace.configured_sizes.some((size) => size.size_id === selectedSizeId)) {
+      return selectedSizeId
+    }
 
-    setSelectedSizeId((current) => {
-      if (current && workspace.configured_sizes.some((size) => size.size_id === current)) {
-        return current
-      }
-
-      return firstSize?.size_id || ""
-    })
-  }, [workspace])
+    return workspace.configured_sizes[0]?.size_id || ""
+  }, [selectedSizeId, workspace])
 
   const selectedSize = useMemo(
-    () => workspace?.configured_sizes.find((size) => size.size_id === selectedSizeId) || null,
-    [selectedSizeId, workspace]
+    () => workspace?.configured_sizes.find((size) => size.size_id === resolvedSelectedSizeId) || null,
+    [resolvedSelectedSizeId, workspace]
   )
 
   const matchingRows = useMemo(() => {
-    if (!workspace || !selectedSizeId) {
+    if (!workspace || !resolvedSelectedSizeId) {
       return []
     }
 
     return [...workspace.price_rows]
       .filter(
-        (row) => row.size_id === selectedSizeId && row.price_type === selectedPriceType
+        (row) => row.size_id === resolvedSelectedSizeId && row.price_type === selectedPriceType
       )
       .sort((left, right) => right.start_date.localeCompare(left.start_date))
-  }, [selectedPriceType, selectedSizeId, workspace])
+  }, [resolvedSelectedSizeId, selectedPriceType, workspace])
 
-  const selectedRow = useMemo(
-    () => matchingRows.find((row) => row.style_size_price_id === selectedPriceId) || null,
-    [matchingRows, selectedPriceId]
-  )
-
-  useEffect(() => {
-    setSelectedPriceId((current) => {
-      if (current && matchingRows.some((row) => row.style_size_price_id === current)) {
-        return current
-      }
-
-      return matchingRows[0]?.style_size_price_id || ""
-    })
-  }, [matchingRows])
-
-  useEffect(() => {
-    if (selectedRow) {
-      setPriceInput(String(selectedRow.price))
-      setStartDateInput(selectedRow.start_date.slice(0, 10))
-      setEndDateInput(selectedRow.end_date?.slice(0, 10) || "")
-      setActiveInput(selectedRow.active)
-      return
+  const activeSelectedPriceRecordId = useMemo(() => {
+    if (selectedPriceRecordId === NEW_PRICE_RECORD_ID) {
+      return ""
     }
 
-    setPriceInput("")
-    setStartDateInput(getTodayInputValue())
-    setEndDateInput("")
-    setActiveInput(true)
-  }, [selectedRow, selectedSizeId, selectedPriceType])
+    if (
+      selectedPriceRecordId &&
+      matchingRows.some((row) => row.style_size_price_id === selectedPriceRecordId)
+    ) {
+      return selectedPriceRecordId
+    }
 
-  useEffect(() => {
-    setSubmitError(null)
-    setSubmitMessage(null)
-  }, [selectedStyleId, selectedSizeId, selectedPriceType, selectedPriceId])
+    return matchingRows[0]?.style_size_price_id || ""
+  }, [matchingRows, selectedPriceRecordId])
+
+  const selectedRow = useMemo(
+    () =>
+      matchingRows.find((row) => row.style_size_price_id === activeSelectedPriceRecordId) || null,
+    [activeSelectedPriceRecordId, matchingRows]
+  )
+
+  const handleSelectPriceLane = useCallback(
+    (sizeId: string, priceType: PriceType) => {
+      setSelectedSizeId(sizeId)
+      setSelectedPriceType(priceType)
+      setSelectedPriceRecordId("")
+      resetDraft()
+      clearSubmitFeedback()
+    },
+    [clearSubmitFeedback, resetDraft]
+  )
+
+  const handleSelectPriceType = useCallback(
+    (priceType: PriceType) => {
+      setSelectedPriceType(priceType)
+      setSelectedPriceRecordId("")
+      resetDraft()
+      clearSubmitFeedback()
+    },
+    [clearSubmitFeedback, resetDraft]
+  )
+
+  const handleStartNewRecord = useCallback(() => {
+    setSelectedPriceRecordId(NEW_PRICE_RECORD_ID)
+    resetDraft()
+    clearSubmitFeedback()
+  }, [clearSubmitFeedback, resetDraft])
+
+  const handleRefreshWorkspace = useCallback(() => {
+    clearSubmitFeedback()
+    void loadWorkspace(selectedStyleId)
+  }, [clearSubmitFeedback, loadWorkspace, selectedStyleId])
 
   async function handleSubmit() {
     if (!workspace || !selectedSize) {
@@ -198,7 +241,7 @@ export function PricesWorkspacePage() {
       const savedRow = await createPrice(payload)
 
       await loadWorkspace(workspace.product.style_id)
-      setSelectedPriceId(savedRow.style_size_price_id)
+      setSelectedPriceRecordId(savedRow.style_size_price_id)
       setSubmitMessage("Precio creado correctamente")
     } catch (err) {
       const msg = err instanceof Error ? err.message : ""
@@ -225,7 +268,7 @@ export function PricesWorkspacePage() {
                   type="button"
                   variant="outline"
                   size="icon-sm"
-                  onClick={() => void loadWorkspace(selectedStyleId)}
+                  onClick={handleRefreshWorkspace}
                   disabled={workspaceLoading}
                   aria-label="Actualizar"
                   className="rounded-lg"
@@ -319,7 +362,7 @@ export function PricesWorkspacePage() {
                       </thead>
                       <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
                         {workspace.configured_sizes.map((size) => {
-                          const selected = size.size_id === selectedSizeId
+                          const selected = size.size_id === resolvedSelectedSizeId
 
                           return (
                             <tr
@@ -342,7 +385,7 @@ export function PricesWorkspacePage() {
                                     variant="outline"
                                     size="sm"
                                     className="rounded-lg min-w-[120px]"
-                                    onClick={() => { setSelectedSizeId(size.size_id); setSelectedPriceType("retail") }}
+                                    onClick={() => handleSelectPriceLane(size.size_id, "retail")}
                                   >
                                     S/. {size.current_retail_price.toFixed(2)}
                                     <PencilLine className="h-3.5 w-3.5" />
@@ -352,7 +395,7 @@ export function PricesWorkspacePage() {
                                     variant="outline"
                                     size="sm"
                                     className="rounded-lg border-dashed text-[var(--ops-text-muted)] opacity-80 min-w-[120px]"
-                                    onClick={() => { setSelectedSizeId(size.size_id); setSelectedPriceType("retail") }}
+                                    onClick={() => handleSelectPriceLane(size.size_id, "retail")}
                                   >
                                     Sin precio
                                     <Plus className="h-3.5 w-3.5" />
@@ -365,7 +408,7 @@ export function PricesWorkspacePage() {
                                     variant="outline"
                                     size="sm"
                                     className="rounded-lg min-w-[120px]"
-                                    onClick={() => { setSelectedSizeId(size.size_id); setSelectedPriceType("wholesale") }}
+                                    onClick={() => handleSelectPriceLane(size.size_id, "wholesale")}
                                   >
                                     S/. {size.current_wholesale_price.toFixed(2)}
                                     <PencilLine className="h-3.5 w-3.5" />
@@ -375,7 +418,7 @@ export function PricesWorkspacePage() {
                                     variant="outline"
                                     size="sm"
                                     className="rounded-lg border-dashed text-[var(--ops-text-muted)] opacity-80 min-w-[120px]"
-                                    onClick={() => { setSelectedSizeId(size.size_id); setSelectedPriceType("wholesale") }}
+                                    onClick={() => handleSelectPriceLane(size.size_id, "wholesale")}
                                   >
                                     Sin precio
                                     <Plus className="h-3.5 w-3.5" />
@@ -413,7 +456,7 @@ export function PricesWorkspacePage() {
                   <div className="inline-flex w-full rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] p-1">
                     <button
                       type="button"
-                      onClick={() => setSelectedPriceType("retail")}
+                      onClick={() => handleSelectPriceType("retail")}
                       className={`cursor-pointer inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition ${
                         selectedPriceType === "retail"
                           ? "bg-[var(--ops-surface)] text-[var(--ripnel-accent-hover)] shadow-sm"
@@ -425,7 +468,7 @@ export function PricesWorkspacePage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setSelectedPriceType("wholesale")}
+                      onClick={() => handleSelectPriceType("wholesale")}
                       className={`cursor-pointer inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition ${
                         selectedPriceType === "wholesale"
                           ? "bg-[var(--ops-surface)] text-[var(--ripnel-accent-hover)] shadow-sm"
@@ -450,7 +493,7 @@ export function PricesWorkspacePage() {
 
                   {selectedSize ? (
                     <div className="mt-4 space-y-4">
-                      {selectedPriceId ? (
+                      {activeSelectedPriceRecordId ? (
                         <>
                           {selectedRow ? (
                             <div className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4 space-y-2">
@@ -479,13 +522,7 @@ export function PricesWorkspacePage() {
 
                           <button
                             type="button"
-                            onClick={() => {
-                              setSelectedPriceId("")
-                              setPriceInput("")
-                              setStartDateInput(getTodayInputValue())
-                              setEndDateInput("")
-                              setActiveInput(true)
-                            }}
+                            onClick={handleStartNewRecord}
                             className="cursor-pointer text-xs font-semibold text-[var(--ripnel-accent-hover)] transition hover:text-[var(--ripnel-accent)]"
                           >
                             + Nuevo registro

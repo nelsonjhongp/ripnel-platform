@@ -34,7 +34,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { buildApiUrl } from "@/lib/api";
+import { apiFetch, unwrapApiData } from "@/lib/api";
+import { fetchPriceCoverageGaps } from "@/lib/api-prices";
 import { appRoutes } from "@/lib/routes";
 
 type InventoryItem = {
@@ -83,6 +84,7 @@ type InventoryGroupedRow = {
 };
 
 const PAGE_SIZE = 10;
+const ADJUSTMENT_MANAGER_ROLES = new Set(["ADMIN", "ALMACEN"]);
 
 function buildGroupedRows(items: InventoryItem[]) {
   const map = new Map<string, InventoryGroupedRow>();
@@ -175,7 +177,7 @@ function buildGroupedRows(items: InventoryItem[]) {
 
 export default function InventoryPage() {
   const router = useRouter();
-  const { defaultLocation, locationAssignments } = useAuth();
+  const { defaultLocation, locationAssignments, user } = useAuth();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [coverageGaps, setCoverageGaps] = useState<PriceCoverageGap[]>([]);
   const [loading, setLoading] = useState(true);
@@ -189,19 +191,17 @@ export default function InventoryPage() {
     setError(null);
 
     try {
-      const [inventoryResponse, coverageResponse] = await Promise.all([
-        fetch(buildApiUrl("/api/inventory"), { cache: "no-store" }),
-        fetch(buildApiUrl("/api/prices/coverage-gaps"), { cache: "no-store" }),
+      const [inventoryPayload, nextCoverageGaps] = await Promise.all([
+        apiFetch<{ ok: boolean; data: InventoryItem[] }>("/api/inventory", {
+          cache: "no-store",
+          suppressAuthEvent: true,
+        }),
+        fetchPriceCoverageGaps(),
       ]);
+      const nextItems = unwrapApiData(inventoryPayload) ?? [];
 
-      const inventoryPayload = await inventoryResponse.json();
-      if (!inventoryResponse.ok) {
-        throw new Error(inventoryPayload.message || "No se pudo cargar inventario");
-      }
-      setItems(Array.isArray(inventoryPayload.data) ? inventoryPayload.data : []);
-
-      const coveragePayload = await coverageResponse.json().catch(() => ({ data: [] }));
-      setCoverageGaps(Array.isArray(coveragePayload?.data) ? coveragePayload.data : []);
+      setItems(Array.isArray(nextItems) ? nextItems : []);
+      setCoverageGaps(Array.isArray(nextCoverageGaps) ? nextCoverageGaps : []);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -214,7 +214,7 @@ export default function InventoryPage() {
   }
 
   useEffect(() => {
-    void loadInventory();
+    void Promise.resolve().then(() => loadInventory());
   }, []);
 
   const locationOptions = useMemo(() => {
@@ -227,20 +227,18 @@ export default function InventoryPage() {
     return Array.from(map.entries()).map(([code, name]) => ({ code, name }));
   }, [items]);
 
-  useEffect(() => {
-    if (locationFilter !== "all") {
-      return;
-    }
+  const defaultLocationCode =
+    defaultLocation?.code ||
+    locationAssignments.find((assignment) => assignment.is_default)?.location.code ||
+    null;
 
-    const defaultCode =
-      defaultLocation?.code ||
-      locationAssignments.find((assignment) => assignment.is_default)?.location.code ||
-      null;
-
-    if (defaultCode && locationOptions.some((location) => location.code === defaultCode)) {
-      setLocationFilter(defaultCode);
-    }
-  }, [defaultLocation?.code, locationAssignments, locationFilter, locationOptions]);
+  const resolvedLocationFilter =
+    locationFilter !== "all"
+      ? locationFilter
+      : defaultLocationCode &&
+          locationOptions.some((location) => location.code === defaultLocationCode)
+        ? defaultLocationCode
+        : "all";
 
   const groupedRows = useMemo(() => buildGroupedRows(items), [items]);
 
@@ -248,34 +246,25 @@ export default function InventoryPage() {
     const normalizedQuery = query.trim().toLowerCase();
 
     return groupedRows.filter((row) => {
-      const matchesLocation = locationFilter === "all" || row.locationCode === locationFilter;
+      const matchesLocation =
+        resolvedLocationFilter === "all" || row.locationCode === resolvedLocationFilter;
       const matchesQuery =
         !normalizedQuery ||
         row.searchableText.includes(normalizedQuery);
 
       return matchesLocation && matchesQuery;
     });
-  }, [groupedRows, locationFilter, query]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [query, locationFilter]);
+  }, [groupedRows, query, resolvedLocationFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
   const paginatedRows = filteredRows.slice(pageStart, pageStart + PAGE_SIZE);
   const visibleFrom = filteredRows.length ? pageStart + 1 : 0;
   const visibleTo = filteredRows.length
     ? Math.min(pageStart + PAGE_SIZE, filteredRows.length)
     : 0;
-  const hasActiveFilters = Boolean(query.trim()) || locationFilter !== "all";
-
-  useEffect(() => {
-    if (page !== safePage) {
-      setPage(safePage);
-    }
-  }, [page, safePage]);
+  const hasActiveFilters = Boolean(query.trim()) || resolvedLocationFilter !== "all";
 
   const totals = useMemo(() => {
     const uniqueProducts = new Set(filteredRows.map((row) => row.styleCode)).size;
@@ -289,6 +278,7 @@ export default function InventoryPage() {
     () => new Set(coverageGaps.map((gap) => gap.style_code)),
     [coverageGaps]
   );
+  const canManageAdjustments = ADJUSTMENT_MANAGER_ROLES.has(String(user?.role_name || "").toUpperCase());
 
   function goToMovements(row: InventoryGroupedRow) {
     const params = new URLSearchParams({
@@ -310,15 +300,15 @@ export default function InventoryPage() {
     const params = new URLSearchParams({
       origin_id: row.locationId,
     });
-    router.push(`/transferencias/crear-transferencia?${params.toString()}`);
+    router.push(`/transferencias/solicitar-productos?${params.toString()}`);
   }
 
   return (
     <TooltipProvider delayDuration={120}>
       <OpsPageShell width="wide">
           <PosHeader
-            eyebrow="Control de stock"
-            title="Inventario"
+            eyebrow="Saldo operativo"
+            title="Stock actual"
             actions={
               <Button
                 type="button"
@@ -340,6 +330,12 @@ export default function InventoryPage() {
           </div>
 
           <OpsSectionDivider>
+            <InlineStatusCard
+              title="Este módulo muestra saldo actual por sede"
+              description="Desde aquí revisas disponibilidad, solicitas reposición, abres kardex o registras ajustes. Los movimientos reales se trazan en kardex y las reposiciones viajan como transferencias."
+              tone="info"
+              variant="ops"
+            />
             {coverageGaps.length > 0 ? (
               <InlineStatusCard
                 title="Hay stock sin precio comercial"
@@ -355,7 +351,10 @@ export default function InventoryPage() {
               <OpsFiltersRow className="lg:grid-cols-[minmax(0,1.4fr)_0.8fr_auto]">
                 <OpsSearchField
                   value={query}
-                  onChange={setQuery}
+                  onChange={(value) => {
+                    setQuery(value);
+                    setPage(1);
+                  }}
                   placeholder="Buscar por producto, SKU, sede o tipo"
                   ariaLabel="Buscar inventario"
                 />
@@ -367,7 +366,10 @@ export default function InventoryPage() {
                     { value: "all", label: "Todas" },
                     ...locationOptions.map((location) => ({ value: location.code, label: `${location.code} - ${location.name}` })),
                   ]}
-                  onChange={(v) => { setLocationFilter(v); setPage(1); }}
+                  onChange={(value) => {
+                    setLocationFilter(value);
+                    setPage(1);
+                  }}
                 />
 
                 <Tooltip>
@@ -379,7 +381,8 @@ export default function InventoryPage() {
                       className="h-10 w-10 self-start rounded-lg lg:self-end"
                       onClick={() => {
                         setQuery("");
-                        setLocationFilter(defaultLocation?.code || "all");
+                        setLocationFilter(defaultLocationCode || "all");
+                        setPage(1);
                       }}
                       disabled={!hasActiveFilters}
                     >
@@ -472,20 +475,24 @@ export default function InventoryPage() {
                               ariaLabel={`Acciones para ${row.styleName}`}
                               items={[
                                 {
-                                  label: "Ver movimientos",
+                                  label: "Ver kardex",
                                   icon: <ClipboardList className="h-4 w-4" />,
                                   onSelect: () => goToMovements(row),
                                 },
                                 {
-                                  label: "Ajustar stock",
-                                  icon: <PackageCheck className="h-4 w-4" />,
-                                  onSelect: () => goToAdjustment(row),
-                                },
-                                {
-                                  label: "Transferir",
+                                  label: "Solicitar reposición",
                                   icon: <ArrowRightLeft className="h-4 w-4" />,
                                   onSelect: () => goToTransfer(row),
                                 },
+                                ...(canManageAdjustments
+                                  ? [
+                                      {
+                                        label: "Registrar ajuste",
+                                        icon: <PackageCheck className="h-4 w-4" />,
+                                        onSelect: () => goToAdjustment(row),
+                                      },
+                                    ]
+                                  : []),
                               ]}
                             />
                           </td>
@@ -511,7 +518,7 @@ export default function InventoryPage() {
                   : "0 resultados"}
               </span>
               <Pagination
-                page={safePage}
+                page={currentPage}
                 totalPages={totalPages}
                 onPageChange={setPage}
                 className="self-end md:self-auto"

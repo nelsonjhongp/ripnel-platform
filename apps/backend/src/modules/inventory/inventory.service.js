@@ -65,6 +65,17 @@ function buildAdjustmentNumber() {
   return `AJ-${Date.now()}`;
 }
 
+function hasPermission(permissions, permissionKey) {
+  return (
+    Array.isArray(permissions) &&
+    (permissions.includes('admin.manage') || permissions.includes(permissionKey))
+  );
+}
+
+function canManageInventoryAdjustments(auth = {}) {
+  return hasPermission(auth.permissions, 'inventory.adjust');
+}
+
 function ensureUniqueVariantIds(lines) {
   const ids = new Set();
 
@@ -101,7 +112,11 @@ async function resolveAdjustmentActorUserId(value, fieldLabel) {
   return fallbackUser.user_id;
 }
 
-async function listInventory(input = {}) {
+async function listInventory(input = {}, auth = {}) {
+  if (!hasPermission(auth.permissions, 'inventory.view')) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
   const filters = {
     locationId: normalizeUuid(input.location_id),
     query: normalizeText(input.query),
@@ -112,17 +127,29 @@ async function listInventory(input = {}) {
   return findAllInventory(filters);
 }
 
-async function listKardex(input = {}) {
+async function listKardex(input = {}, auth = {}) {
+  if (!hasPermission(auth.permissions, 'inventory.view')) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
   const movementType = normalizeText(input.movement_type);
+  const referenceType = normalizeText(input.reference_type);
+  const referenceId = normalizeUuid(input.reference_id);
 
   if (movementType && !ALLOWED_MOVEMENT_TYPES.includes(movementType)) {
     throw new AppError('Movement type is invalid', 400);
+  }
+
+  if (input.reference_id && !referenceId) {
+    throw new AppError('Reference id is invalid', 400);
   }
 
   const filters = {
     locationId: normalizeUuid(input.location_id),
     variantId: normalizeUuid(input.variant_id),
     movementType,
+    referenceType,
+    referenceId,
     dateFrom: normalizeDateTime(input.date_from),
     dateTo: normalizeDateTime(input.date_to),
     query: normalizeText(input.query),
@@ -139,11 +166,19 @@ async function listKardex(input = {}) {
   return findAllKardex(filters);
 }
 
-async function listAdjustments() {
+async function listAdjustments(auth = {}) {
+  if (!canManageInventoryAdjustments(auth)) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
   return findAllAdjustments();
 }
 
-async function searchVariantsForAdjustment(input = {}) {
+async function searchVariantsForAdjustment(input = {}, auth = {}) {
+  if (!canManageInventoryAdjustments(auth)) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
   const locationId = normalizeUuid(input.location_id);
   const query = normalizeText(input.query);
 
@@ -164,7 +199,11 @@ async function searchVariantsForAdjustment(input = {}) {
   return findAdjustmentVariants(locationId, query);
 }
 
-async function getAdjustmentById(adjustmentId) {
+async function getAdjustmentById(adjustmentId, auth = {}) {
+  if (!canManageInventoryAdjustments(auth)) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
   const normalizedAdjustmentId = normalizeUuid(adjustmentId);
 
   if (!normalizedAdjustmentId) {
@@ -185,10 +224,14 @@ async function getAdjustmentById(adjustmentId) {
   };
 }
 
-async function createAdjustment(input) {
+async function createAdjustment(input, auth = {}) {
+  if (!canManageInventoryAdjustments(auth)) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
   const locationId = normalizeUuid(input.location_id);
   const createdBy = await resolveAdjustmentActorUserId(
-    input.created_by,
+    input.created_by || auth.sub || auth.user_id,
     'Created by'
   );
   const reason = normalizeText(input.reason);
@@ -291,13 +334,17 @@ async function createAdjustment(input) {
     client.release();
   }
 
-  return getAdjustmentById(createdAdjustmentId);
+  return getAdjustmentById(createdAdjustmentId, auth);
 }
 
-async function confirmAdjustmentById(adjustmentId, input = {}) {
+async function confirmAdjustmentById(adjustmentId, input = {}, auth = {}) {
+  if (!canManageInventoryAdjustments(auth)) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
   const normalizedAdjustmentId = normalizeUuid(adjustmentId);
   const confirmedBy = await resolveAdjustmentActorUserId(
-    input.confirmed_by,
+    input.confirmed_by || auth.sub || auth.user_id,
     'Confirmed by'
   );
 
@@ -375,13 +422,17 @@ async function confirmAdjustmentById(adjustmentId, input = {}) {
     client.release();
   }
 
-  return getAdjustmentById(normalizedAdjustmentId);
+  return getAdjustmentById(normalizedAdjustmentId, auth);
 }
 
-async function cancelAdjustmentById(adjustmentId, input = {}) {
+async function cancelAdjustmentById(adjustmentId, input = {}, auth = {}) {
+  if (!canManageInventoryAdjustments(auth)) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
   const normalizedAdjustmentId = normalizeUuid(adjustmentId);
   const cancelledBy = await resolveAdjustmentActorUserId(
-    input.cancelled_by,
+    input.cancelled_by || auth.sub || auth.user_id,
     'Cancelled by'
   );
 
@@ -407,7 +458,7 @@ async function cancelAdjustmentById(adjustmentId, input = {}) {
 
   await cancelAdjustment(normalizedAdjustmentId, cancelledBy);
 
-  return getAdjustmentById(normalizedAdjustmentId);
+  return getAdjustmentById(normalizedAdjustmentId, auth);
 }
 
 module.exports = {

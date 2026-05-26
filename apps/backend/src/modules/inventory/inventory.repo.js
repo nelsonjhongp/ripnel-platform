@@ -58,6 +58,16 @@ function buildKardexWhereClause(filters = {}) {
     conditions.push(`movement_type = $${values.length}`);
   }
 
+  if (filters.referenceType) {
+    values.push(filters.referenceType);
+    conditions.push(`coalesce(reference_type, '') = $${values.length}`);
+  }
+
+  if (filters.referenceId) {
+    values.push(filters.referenceId);
+    conditions.push(`coalesce(reference_id::text, '') = $${values.length}`);
+  }
+
   if (filters.dateFrom) {
     values.push(filters.dateFrom);
     conditions.push(`created_at >= $${values.length}::timestamptz`);
@@ -78,6 +88,7 @@ function buildKardexWhereClause(filters = {}) {
         or style_name ilike $${index}
         or coalesce(reason, '') ilike $${index}
         or coalesce(reference_type, '') ilike $${index}
+        or coalesce(reference_id::text, '') ilike $${index}
         or location_name ilike $${index}
       )`
     );

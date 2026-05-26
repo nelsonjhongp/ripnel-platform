@@ -74,22 +74,25 @@ export const sidebarGroups: SidebarGroup[] = [
     ],
   },
   {
-    title: "Inventario",
+    title: "Stock",
     icon: Boxes,
-    excludeRoles: SELLER_FOCUSED_ROLES,
     items: [
       { title: "Stock actual", url: appRoutes.inventory, permission: "inventory.view" },
-      { title: "Movimientos de stock", url: appRoutes.kardex, permission: "inventory.view" },
-      { title: "Apertura y ajustes", url: appRoutes.inventoryAdjustments, permission: "inventory.view" },
+      { title: "Kardex", url: appRoutes.kardex, permission: "inventory.view" },
+      {
+        title: "Aperturas y ajustes",
+        url: appRoutes.inventoryAdjustments,
+        permission: "inventory.view",
+        onlyForRoles: ["ADMIN", "ALMACEN"],
+      },
     ],
   },
   {
     title: "Transferencias",
     icon: ArrowRightLeft,
-    excludeRoles: SELLER_FOCUSED_ROLES,
     items: [
       {
-        title: "Solicitar productos",
+        title: "Solicitar reposición",
         url: buildTransferModuleRoute(transferRouteSlugs.requestProducts),
         icon: ArrowRightLeft,
       },
@@ -165,8 +168,8 @@ export const sidebarGroups: SidebarGroup[] = [
 
 export const inventoryIcons = {
   "Stock actual": Warehouse,
-  "Movimientos de stock": ClipboardList,
-  "Apertura y ajustes": ClipboardList,
+  Kardex: ClipboardList,
+  "Aperturas y ajustes": ClipboardList,
   "Historial de transacciones": ReceiptText,
   Dashboard: LayoutDashboard,
 }

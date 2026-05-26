@@ -33,6 +33,48 @@ import {
   type TransferDetail,
 } from "./transfers-shared";
 
+function getTransferImpactSummary(status: TransferDetail["status"]) {
+  if (status === "requested") {
+    return "Sin impacto en stock todavía. La solicitud sigue pendiente de despacho.";
+  }
+
+  if (status === "approved") {
+    return "Sin impacto en stock todavía. La solicitud ya fue aprobada y está lista para despacho.";
+  }
+
+  if (status === "shipped") {
+    return "Salida registrada en origen. El destino aún debe confirmar la recepción.";
+  }
+
+  if (status === "received") {
+    return "Salida registrada en origen y entrada registrada en destino.";
+  }
+
+  return "Documento cancelado antes de completar el flujo logístico.";
+}
+
+function getTransferStepTone(
+  status: TransferDetail["status"],
+  step: "requested" | "approved" | "shipped" | "received"
+) {
+  const order = ["requested", "approved", "shipped", "received"];
+  const currentIndex =
+    status === "cancelled" ? -1 : order.indexOf(status as (typeof order)[number]);
+  const stepIndex = order.indexOf(step);
+
+  if (status === "cancelled") {
+    return step === "requested"
+      ? "border-[color:color-mix(in_srgb,#e11d48_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#e11d48_8%,var(--ops-surface))] text-[color:color-mix(in_srgb,#be123c_82%,var(--ops-text))]"
+      : "border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]";
+  }
+
+  if (stepIndex <= currentIndex) {
+    return "border-[color:color-mix(in_srgb,var(--ripnel-accent)_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))] text-[var(--ripnel-accent-hover)]";
+  }
+
+  return "border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]";
+}
+
 function SummaryItem({
   label,
   value,
@@ -169,14 +211,14 @@ export function TransferDetailPage({
   return (
     <OpsPageShell width="wide">
       <PosHeader
-        eyebrow="Seguimiento operativo"
-        title={transfer.transfer_number || "Transferencia"}
+        eyebrow="Documento operativo"
+        title={transfer.transfer_number || "Solicitud de reposición"}
         actions={
           <div className="flex items-center gap-2">
             <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
               <Link href={buildTransferModuleRoute(transferRouteSlugs.list)}>
                 <ArrowLeft className="h-3.5 w-3.5" />
-                Volver al listado
+                Volver a transferencias
               </Link>
             </Button>
             <Button
@@ -197,8 +239,8 @@ export function TransferDetailPage({
         <OpsMetricPill label="Estado" value={formatTransferStatus(transfer.status)} tone="accent" />
         <OpsMetricPill label="Líneas" value={totals.lines} />
         <OpsMetricPill label="Solicitado" value={totals.requested} />
-        <OpsMetricPill label="Enviado" value={totals.shipped} tone="warning" />
-        <OpsMetricPill label="Recibido" value={totals.received} />
+        <OpsMetricPill label="Despachado" value={totals.shipped} tone="warning" />
+        <OpsMetricPill label="Recepcionado" value={totals.received} />
       </div>
 
       <OpsSectionDivider className="space-y-5">
@@ -221,6 +263,11 @@ export function TransferDetailPage({
                 >
                   {formatTransferStatus(transfer.status)}
                 </span>
+                <Button asChild type="button" variant="outline" size="sm" className="rounded-lg">
+                  <Link href={`/kardex?query=${encodeURIComponent(transfer.transfer_id)}`}>
+                    Ver trazabilidad en kardex
+                  </Link>
+                </Button>
               </div>
 
               <SummaryItem
@@ -234,6 +281,14 @@ export function TransferDetailPage({
               <SummaryItem
                 label="Creada"
                 value={`${transfer.created_by_name || "Sin usuario"} · ${formatDateTime(transfer.created_at)}`}
+              />
+              <SummaryItem
+                label="Aprobada"
+                value={
+                  transfer.approved_at
+                    ? `${transfer.approved_by_name || "Sin usuario"} · ${formatDateTime(transfer.approved_at)}`
+                    : "Pendiente"
+                }
               />
               <SummaryItem
                 label="Enviada"
@@ -258,6 +313,43 @@ export function TransferDetailPage({
                 />
               ) : null}
               {transfer.notes ? <SummaryItem label="Notas" value={transfer.notes} /> : null}
+              <SummaryItem
+                label="Impacto en stock"
+                value={getTransferImpactSummary(transfer.status)}
+              />
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              {[
+                { key: "requested", label: "Solicitud" },
+                { key: "approved", label: "Aprobación" },
+                { key: "shipped", label: "Despacho" },
+                { key: "received", label: "Recepción" },
+              ].map((step) => (
+                <div
+                  key={step.key}
+                  className={cn(
+                    "rounded-xl border px-3 py-3",
+                    getTransferStepTone(
+                      transfer.status,
+                      step.key as "requested" | "approved" | "shipped" | "received"
+                    )
+                  )}
+                >
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em]">
+                    {step.label}
+                  </p>
+                  <p className="mt-1 text-sm font-medium">
+                    {step.key === "requested"
+                      ? "Documento creado"
+                      : step.key === "approved"
+                        ? "Lista para despacho"
+                        : step.key === "shipped"
+                          ? "Salida registrada"
+                          : "Entrada confirmada"}
+                  </p>
+                </div>
+              ))}
             </div>
           </OpsTableBlock>
 
@@ -268,6 +360,11 @@ export function TransferDetailPage({
                 Líneas de transferencia
               </h2>
             </div>
+
+            <p className="text-sm text-[var(--ops-text-muted)]">
+              Esta vista resume el documento. El kardex mostrará la salida al despachar y la
+              entrada al recepcionar.
+            </p>
 
             <OpsTableWrap minWidth="920px">
               <table className="w-full border-collapse">

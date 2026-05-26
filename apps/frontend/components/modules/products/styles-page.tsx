@@ -214,7 +214,7 @@ export function StylesPage({
   }
 
   useEffect(() => {
-    void loadData();
+    void Promise.resolve().then(loadData);
   }, []);
 
   useEffect(() => {
@@ -234,10 +234,6 @@ export function StylesPage({
       handleEdit(matchedStyle);
     }
   }, [editingStyleId, initialStyleId, styles]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, statusFilter]);
 
   const activeCount = styles.filter((style) => style.active).length;
   const inactiveCount = styles.length - activeCount;
@@ -274,12 +270,6 @@ export function StylesPage({
 
   const totalPages = Math.max(1, Math.ceil(filteredStyles.length / PAGE_SIZE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
-
-  useEffect(() => {
-    if (currentPage !== safeCurrentPage) {
-      setCurrentPage(safeCurrentPage);
-    }
-  }, [currentPage, safeCurrentPage]);
 
   const paginatedStyles = useMemo(() => {
     const start = (safeCurrentPage - 1) * PAGE_SIZE;
@@ -461,7 +451,10 @@ export function StylesPage({
             <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_auto]">
               <OpsSearchField
                 value={search}
-                onChange={setSearch}
+                onChange={(value) => {
+                  setSearch(value);
+                  setCurrentPage(1);
+                }}
                 placeholder="Buscar por style, código o catálogos"
                 ariaLabel="Buscar styles"
               />
@@ -470,7 +463,10 @@ export function StylesPage({
                 label="Estado"
                 value={statusFilter}
                 options={STATUS_OPTIONS}
-                onChange={(value) => setStatusFilter(value as "all" | "active" | "inactive")}
+                onChange={(value) => {
+                  setStatusFilter(value as "all" | "active" | "inactive");
+                  setCurrentPage(1);
+                }}
               />
 
               <Tooltip>

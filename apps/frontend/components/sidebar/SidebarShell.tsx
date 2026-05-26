@@ -26,18 +26,56 @@ const SidebarTopbarActionsContext = React.createContext<{
   setActions: React.Dispatch<React.SetStateAction<TopbarAction[]>>
 } | null>(null)
 
+function areTopbarActionsEqual(left: TopbarAction[], right: TopbarAction[]) {
+  if (left === right) return true
+  if (left.length !== right.length) return false
+
+  for (let index = 0; index < left.length; index += 1) {
+    const leftAction = left[index]
+    const rightAction = right[index]
+
+    if (
+      leftAction.key !== rightAction.key ||
+      leftAction.label !== rightAction.label ||
+      leftAction.href !== rightAction.href ||
+      leftAction.variant !== rightAction.variant ||
+      leftAction.icon !== rightAction.icon
+    ) {
+      return false
+    }
+  }
+
+  return true
+}
+
 export function useSidebarTopbarActions(actions: TopbarAction[]) {
   const context = React.useContext(SidebarTopbarActionsContext)
 
   React.useEffect(() => {
     if (!context) return
 
-    context.setActions(actions)
+    context.setActions((currentActions) => {
+      if (areTopbarActionsEqual(currentActions, actions)) {
+        return currentActions
+      }
+
+      return actions
+    })
+  }, [actions, context])
+
+  React.useEffect(() => {
+    if (!context) return
 
     return () => {
-      context.setActions([])
+      context.setActions((currentActions) => {
+        if (currentActions.length === 0) {
+          return currentActions
+        }
+
+        return []
+      })
     }
-  }, [actions, context])
+  }, [context])
 }
 
 export function SidebarShell({
@@ -60,8 +98,8 @@ export function SidebarShell({
   }, [pathname, title])
 
   const defaultActions = React.useMemo(() => {
-    return resolveSidebarDefaultActions(has)
-  }, [has])
+    return resolveSidebarDefaultActions(pathname, has)
+  }, [has, pathname])
 
   const actions = React.useMemo(() => {
     const merged = [...defaultActions, ...contextualActions]
@@ -76,8 +114,13 @@ export function SidebarShell({
     return [...unique.values()]
   }, [contextualActions, defaultActions])
 
+  const topbarActionsContext = React.useMemo(
+    () => ({ setActions: setContextualActions }),
+    [setContextualActions]
+  )
+
   return (
-    <SidebarTopbarActionsContext.Provider value={{ setActions: setContextualActions }}>
+    <SidebarTopbarActionsContext.Provider value={topbarActionsContext}>
       <AppSidebar>
         <header className="ops-topbar flex h-14 shrink-0 items-center justify-between gap-3 border-b px-4 md:px-5">
           <div className="flex min-w-0 items-center gap-2">

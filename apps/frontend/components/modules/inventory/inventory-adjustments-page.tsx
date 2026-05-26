@@ -19,6 +19,8 @@ import {
   AdminRowActionsMenu,
 } from "@/components/admin/admin-ui";
 import { InlineStatusCard } from "@/components/feedback/status-page";
+import { ForbiddenPage } from "@/components/feedback/status-page";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
@@ -43,8 +45,10 @@ import { cn } from "@/lib/utils";
 import { appRoutes } from "@/lib/routes";
 import {
   type AdjustmentDetail,
+  inferAdjustmentIntent,
   type AdjustmentStatus,
   type AdjustmentSummary,
+  formatAdjustmentIntent,
   formatAdjustmentDateTime,
   formatAdjustmentStatus,
   getAdjustmentDifferenceClasses,
@@ -66,7 +70,22 @@ function AdjustmentStatusChip({ status }: { status: AdjustmentStatus }) {
   );
 }
 
+function AdjustmentIntentChip({ reason }: { reason: string | null }) {
+  const intent = inferAdjustmentIntent(reason);
+  const classes =
+    intent === "opening"
+      ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_26%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))] text-[var(--ripnel-accent-hover)]"
+      : "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]";
+
+  return (
+    <span className={cn("inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold", classes)}>
+      {formatAdjustmentIntent(intent)}
+    </span>
+  );
+}
+
 export function InventoryAdjustmentsPage() {
+  const { user } = useAuth();
   const [adjustments, setAdjustments] = useState<AdjustmentSummary[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loadingAdjustments, setLoadingAdjustments] = useState(true);
@@ -85,6 +104,9 @@ export function InventoryAdjustmentsPage() {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [confirmingAdjustment, setConfirmingAdjustment] = useState(false);
   const [cancellingAdjustment, setCancellingAdjustment] = useState(false);
+  const canManageAdjustments = ["ADMIN", "ALMACEN"].includes(
+    String(user?.role_name || "").toUpperCase()
+  );
 
   async function loadAdjustments() {
     setLoadingAdjustments(true);
@@ -253,10 +275,13 @@ export function InventoryAdjustmentsPage() {
 
   return (
     <TooltipProvider delayDuration={120}>
+      {!canManageAdjustments ? (
+        <ForbiddenPage variant="ops" />
+      ) : (
       <OpsPageShell width="wide">
         <PosHeader
-          eyebrow="Apertura y regularizacion"
-          title="Ajustes de inventario"
+          eyebrow="Corrección y carga inicial"
+          title="Aperturas y ajustes"
           actions={
             <div className="flex flex-wrap gap-2">
               <Button
@@ -275,7 +300,7 @@ export function InventoryAdjustmentsPage() {
               <Button asChild variant="accent" size="sm" className="rounded-lg">
                 <Link href={`${appRoutes.inventoryAdjustments}/nuevo`}>
                   <PackagePlus className="h-4 w-4" />
-                  Nuevo ajuste
+                  Registrar apertura o ajuste
                 </Link>
               </Button>
             </div>
@@ -293,6 +318,12 @@ export function InventoryAdjustmentsPage() {
           ) : null}
 
         <OpsSectionDivider>
+          <InlineStatusCard
+            title="Usa aperturas y ajustes solo para corregir o inicializar stock"
+            description="Si la mercadería se mueve desde otra sede, usa transferencias. Aquí registras conteos físicos, regularizaciones y aperturas iniciales."
+            tone="warning"
+            variant="ops"
+          />
           <OpsTableBlock>
 
           <OpsFiltersRow className="lg:grid-cols-[1.4fr_0.9fr_0.8fr_auto]">
@@ -366,6 +397,7 @@ export function InventoryAdjustmentsPage() {
                   <th className="px-4 py-3">Numero</th>
                   <th className="px-4 py-3">Sede</th>
                   <th className="px-4 py-3">Estado</th>
+                  <th className="px-4 py-3">Intención</th>
                   <th className="px-4 py-3">Motivo</th>
                   <th className="px-4 py-3 text-right">Lineas</th>
                   <th className="px-4 py-3">Creado</th>
@@ -376,7 +408,7 @@ export function InventoryAdjustmentsPage() {
                 {loadingAdjustments || loadingLocations ? (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={8}
                       className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
                     >
                       <LoaderCircle className="mr-2 inline-block h-5 w-5 animate-spin align-middle" />
@@ -385,7 +417,7 @@ export function InventoryAdjustmentsPage() {
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-6">
+                    <td colSpan={8} className="px-4 py-6">
                       <InlineStatusCard
                         title="No pudimos cargar ajustes"
                         description={error}
@@ -420,6 +452,9 @@ export function InventoryAdjustmentsPage() {
                         <AdjustmentStatusChip status={adjustment.status} />
                       </td>
                       <td className="px-4 py-[var(--ops-row-py)] align-top">
+                        <AdjustmentIntentChip reason={adjustment.reason} />
+                      </td>
+                      <td className="px-4 py-[var(--ops-row-py)] align-top">
                         <span className="block max-w-[180px] truncate text-sm text-[var(--ops-text)]">
                           {adjustment.reason || "Sin motivo"}
                         </span>
@@ -452,7 +487,7 @@ export function InventoryAdjustmentsPage() {
                 ) : (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={8}
                       className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
                     >
                       No hay ajustes para los filtros actuales.
@@ -525,7 +560,7 @@ export function InventoryAdjustmentsPage() {
                   <Button asChild type="button" variant="outline" size="sm" className="rounded-lg">
                     <Link href={`/kardex?query=${encodeURIComponent(detail.adjustment_id)}`}>
                       <Eye className="h-4 w-4" />
-                      Ver movimientos
+                      Ver trazabilidad
                     </Link>
                   </Button>
                 ) : null}
@@ -553,15 +588,21 @@ export function InventoryAdjustmentsPage() {
                       {detail.location_name} · {detail.location_code}
                     </p>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                      Estado
-                    </p>
-                    <AdjustmentStatusChip status={detail.status} />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                      Lineas
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                        Estado
+                      </p>
+                      <AdjustmentStatusChip status={detail.status} />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                        Intención
+                      </p>
+                      <AdjustmentIntentChip reason={detail.reason} />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                        Lineas
                     </p>
                     <p className="text-lg font-semibold text-[var(--ops-text)]">
                       {detail.lines.length}
@@ -617,7 +658,8 @@ export function InventoryAdjustmentsPage() {
 
                   <AdminInlineMessage tone="warning">
                     Al confirmar, cada linea ajusta la cantidad final de la sede y registra un
-                    movimiento <code>ADJUST</code>.
+                    movimiento <code>ADJUST</code>. No uses este flujo para mover stock entre
+                    sedes.
                   </AdminInlineMessage>
                 </div>
 
@@ -715,6 +757,7 @@ export function InventoryAdjustmentsPage() {
           onConfirm={() => void cancelAdjustment()}
         />
       </OpsPageShell>
+      )}
     </TooltipProvider>
   );
 }

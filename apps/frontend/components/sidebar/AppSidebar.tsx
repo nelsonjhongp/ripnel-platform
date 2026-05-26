@@ -132,7 +132,7 @@ function SidebarGroupSection({
               {visibleItems.map((item) => {
                 const IconComponent =
                   item.icon ||
-                  (title === "Inventario"
+                  (title === "Stock"
                     ? inventoryIcons[item.title as keyof typeof inventoryIcons]
                     : undefined)
 
@@ -186,10 +186,6 @@ export function AppSidebar({
             }
 
             if (item.url.startsWith("/transferencias/")) {
-              if (item.url.endsWith("/crear-transferencia")) {
-                return transferCapabilities.requestCreate
-              }
-
               if (item.url.endsWith("/solicitar-productos")) {
                 return transferCapabilities.requestCreate
               }
@@ -267,9 +263,9 @@ export function AppSidebar({
               <Image
                 src="/ripnel-logo.svg"
                 alt="Ripnel"
-                width={40}
-                height={40}
-                className="h-10 w-10 object-cover"
+                width={1271}
+                height={898}
+                className="h-10 w-auto object-contain"
               />
             </div>
             <div className="min-w-0">

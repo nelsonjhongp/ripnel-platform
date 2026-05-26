@@ -162,30 +162,19 @@ export function ProductsOverviewPage() {
   const [page, setPage] = useState(1);
   const [selectedLocationId, setSelectedLocationId] = useState("");
   const deferredSearch = useDeferredValue(search.trim());
-
-  useEffect(() => {
-    if (!locationAssignments.length) {
-      return;
+  const effectiveLocationId = useMemo(() => {
+    if (
+      selectedLocationId &&
+      locationAssignments.some((assignment) => assignment.location_id === selectedLocationId)
+    ) {
+      return selectedLocationId;
     }
 
-    const hasCurrentSelection = locationAssignments.some(
-      (assignment) => assignment.location_id === selectedLocationId
-    );
-
-    if (hasCurrentSelection) {
-      return;
-    }
-
-    const nextLocationId =
-      defaultLocation?.location_id || locationAssignments[0]?.location_id || "";
-
-    if (nextLocationId) {
-      setSelectedLocationId(nextLocationId);
-    }
+    return defaultLocation?.location_id || locationAssignments[0]?.location_id || "";
   }, [defaultLocation?.location_id, locationAssignments, selectedLocationId]);
 
   const loadProducts = useCallback(async () => {
-    if (!selectedLocationId) {
+    if (!effectiveLocationId) {
       setLoading(false);
       return;
     }
@@ -198,7 +187,7 @@ export function ProductsOverviewPage() {
         page: String(page),
         page_size: String(PAGE_SIZE),
         filter_mode: filterMode,
-        location_id: selectedLocationId,
+        location_id: effectiveLocationId,
       });
 
       if (deferredSearch) {
@@ -211,13 +200,6 @@ export function ProductsOverviewPage() {
       const payload = unwrapApiData(apiResponse);
 
       setResponse(payload);
-      if (payload.pagination?.page && payload.pagination.page !== page) {
-        setPage(payload.pagination.page);
-      }
-
-      if (!selectedLocationId && payload.active_location?.location_id) {
-        setSelectedLocationId(payload.active_location.location_id);
-      }
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -227,10 +209,10 @@ export function ProductsOverviewPage() {
     } finally {
       setLoading(false);
     }
-  }, [deferredSearch, filterMode, page, selectedLocationId]);
+  }, [deferredSearch, effectiveLocationId, filterMode, page]);
 
   useEffect(() => {
-    void loadProducts();
+    void Promise.resolve().then(loadProducts);
   }, [loadProducts]);
 
   const products = useMemo(() => response?.items ?? [], [response?.items]);
@@ -279,7 +261,7 @@ export function ProductsOverviewPage() {
                       size="icon-sm"
                       className="rounded-lg"
                       onClick={loadProducts}
-                      disabled={loading || !selectedLocationId}
+                      disabled={loading || !effectiveLocationId}
                       aria-label="Actualizar"
                     >
                       <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
@@ -326,7 +308,7 @@ export function ProductsOverviewPage() {
 
               <FilterDropdown
                 label="Sede activa"
-                value={selectedLocationId}
+                value={effectiveLocationId}
                 options={locationAssignments.map((assignment) => ({
                   value: assignment.location_id,
                   label: `${assignment.location.name}${assignment.is_default ? " · Predeterminada" : ""}`,
@@ -370,7 +352,7 @@ export function ProductsOverviewPage() {
               <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
               Cargando productos…
             </div>
-          ) : !selectedLocationId && !locationAssignments.length ? (
+          ) : !effectiveLocationId && !locationAssignments.length ? (
               <div className="mt-4 rounded-lg p-8 text-center">
               <h3 className="text-lg font-semibold text-[var(--ops-text)]">No hay sede operativa</h3>
               <p className="mt-2 text-sm leading-6 text-[var(--ops-text-muted)]">

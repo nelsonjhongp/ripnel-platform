@@ -57,6 +57,8 @@ async function findAllTransfers(filters = {}) {
          st.notes,
          st.created_by,
          created_user.full_name as created_by_name,
+         st.approved_by,
+         approved_user.full_name as approved_by_name,
          st.shipped_by,
          shipped_user.full_name as shipped_by_name,
          st.received_by,
@@ -64,6 +66,7 @@ async function findAllTransfers(filters = {}) {
          st.cancelled_by,
          cancelled_user.full_name as cancelled_by_name,
          st.created_at,
+         st.approved_at,
          st.shipped_at,
          st.received_at,
          st.cancelled_at,
@@ -76,6 +79,7 @@ async function findAllTransfers(filters = {}) {
        inner join locations lf on lf.location_id = st.from_location_id
        inner join locations lt on lt.location_id = st.to_location_id
        left join users created_user on created_user.user_id = st.created_by
+       left join users approved_user on approved_user.user_id = st.approved_by
        left join users shipped_user on shipped_user.user_id = st.shipped_by
        left join users received_user on received_user.user_id = st.received_by
        left join users cancelled_user on cancelled_user.user_id = st.cancelled_by
@@ -93,6 +97,8 @@ async function findAllTransfers(filters = {}) {
          st.notes,
          st.created_by,
          created_user.full_name,
+         st.approved_by,
+         approved_user.full_name,
          st.shipped_by,
          shipped_user.full_name,
          st.received_by,
@@ -100,6 +106,7 @@ async function findAllTransfers(filters = {}) {
          st.cancelled_by,
          cancelled_user.full_name,
          st.created_at,
+         st.approved_at,
          st.shipped_at,
          st.received_at,
          st.cancelled_at,
@@ -118,6 +125,8 @@ async function findAllTransfers(filters = {}) {
        notes,
        created_by,
        created_by_name,
+       approved_by,
+       approved_by_name,
        shipped_by,
        shipped_by_name,
        received_by,
@@ -125,6 +134,7 @@ async function findAllTransfers(filters = {}) {
        cancelled_by,
        cancelled_by_name,
        created_at,
+       approved_at,
        shipped_at,
        received_at,
        cancelled_at,
@@ -157,6 +167,8 @@ async function findTransferHeaderById(transferId, executor = query) {
        st.notes,
        st.created_by,
        created_user.full_name as created_by_name,
+       st.approved_by,
+       approved_user.full_name as approved_by_name,
        st.shipped_by,
        shipped_user.full_name as shipped_by_name,
        st.received_by,
@@ -164,6 +176,7 @@ async function findTransferHeaderById(transferId, executor = query) {
        st.cancelled_by,
        cancelled_user.full_name as cancelled_by_name,
        st.created_at,
+       st.approved_at,
        st.shipped_at,
        st.received_at,
        st.cancelled_at,
@@ -172,6 +185,7 @@ async function findTransferHeaderById(transferId, executor = query) {
      inner join locations lf on lf.location_id = st.from_location_id
      inner join locations lt on lt.location_id = st.to_location_id
      left join users created_user on created_user.user_id = st.created_by
+     left join users approved_user on approved_user.user_id = st.approved_by
      left join users shipped_user on shipped_user.user_id = st.shipped_by
      left join users received_user on received_user.user_id = st.received_by
      left join users cancelled_user on cancelled_user.user_id = st.cancelled_by
@@ -288,10 +302,12 @@ async function insertTransfer(payload, executor = query) {
        status,
        notes,
        created_by,
+       approved_by,
        shipped_by,
        received_by,
        cancelled_by,
        created_at,
+       approved_at,
        shipped_at,
        received_at,
        cancelled_at,
@@ -379,6 +395,39 @@ async function updateTransferLineReceipt(transferLineId, qtyReceived, executor =
   return result.rows[0] || null;
 }
 
+async function markTransferApproved(transferId, approvedBy, executor = query) {
+  const result = await executor(
+    `update stock_transfers
+     set
+       status = 'approved',
+       approved_by = $2,
+       approved_at = current_timestamp,
+       updated_at = current_timestamp
+     where transfer_id = $1
+     returning
+       transfer_id,
+       transfer_number,
+       from_location_id,
+       to_location_id,
+       status,
+       notes,
+       created_by,
+       approved_by,
+       shipped_by,
+       received_by,
+       cancelled_by,
+       created_at,
+       approved_at,
+       shipped_at,
+       received_at,
+       cancelled_at,
+       updated_at`,
+    [transferId, approvedBy]
+  );
+
+  return result.rows[0] || null;
+}
+
 async function markTransferShipped(transferId, shippedBy, executor = query) {
   const result = await executor(
     `update stock_transfers
@@ -396,10 +445,12 @@ async function markTransferShipped(transferId, shippedBy, executor = query) {
        status,
        notes,
        created_by,
+       approved_by,
        shipped_by,
        received_by,
        cancelled_by,
        created_at,
+       approved_at,
        shipped_at,
        received_at,
        cancelled_at,
@@ -419,19 +470,21 @@ async function markTransferReceived(transferId, receivedBy, executor = query) {
        received_at = current_timestamp,
        updated_at = current_timestamp
      where transfer_id = $1
-     returning
-       transfer_id,
-       transfer_number,
-       from_location_id,
-       to_location_id,
-       status,
-       notes,
-       created_by,
-       shipped_by,
-       received_by,
-       cancelled_by,
-       created_at,
-       shipped_at,
+    returning
+      transfer_id,
+      transfer_number,
+      from_location_id,
+      to_location_id,
+      status,
+      notes,
+      created_by,
+      approved_by,
+      shipped_by,
+      received_by,
+      cancelled_by,
+      created_at,
+      approved_at,
+      shipped_at,
        received_at,
        cancelled_at,
        updated_at`,
@@ -450,19 +503,21 @@ async function markTransferCancelled(transferId, cancelledBy, executor = query) 
        cancelled_at = current_timestamp,
        updated_at = current_timestamp
      where transfer_id = $1
-     returning
-       transfer_id,
-       transfer_number,
-       from_location_id,
-       to_location_id,
-       status,
-       notes,
-       created_by,
-       shipped_by,
-       received_by,
-       cancelled_by,
-       created_at,
-       shipped_at,
+    returning
+      transfer_id,
+      transfer_number,
+      from_location_id,
+      to_location_id,
+      status,
+      notes,
+      created_by,
+      approved_by,
+      shipped_by,
+      received_by,
+      cancelled_by,
+      created_at,
+      approved_at,
+      shipped_at,
        received_at,
        cancelled_at,
        updated_at`,
@@ -481,6 +536,7 @@ module.exports = {
   insertTransferLine,
   updateTransferLineShipment,
   updateTransferLineReceipt,
+  markTransferApproved,
   markTransferShipped,
   markTransferReceived,
   markTransferCancelled,
