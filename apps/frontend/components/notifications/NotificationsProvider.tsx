@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { usePathname } from "next/navigation"
-import { ApiError, apiFetch } from "@/lib/api"
+import { ApiError, AUTH_ERROR_EVENT, apiFetch } from "@/lib/api"
 
 export type TopbarNotificationSeverity = "danger" | "warning" | "default"
 
@@ -67,12 +67,28 @@ function explainNotificationsError(error: unknown) {
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const hasLoadedRef = React.useRef(false)
+  const unauthRef = React.useRef(false)
   const [notifications, setNotifications] = React.useState<TopbarNotificationsResponse | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [refreshing, setRefreshing] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
+  React.useEffect(() => {
+    function handleAuthError() {
+      unauthRef.current = true
+      setError("Tu sesión ya no es válida.")
+      setNotifications(null)
+      setLoading(false)
+      setRefreshing(false)
+    }
+
+    window.addEventListener(AUTH_ERROR_EVENT, handleAuthError)
+    return () => window.removeEventListener(AUTH_ERROR_EVENT, handleAuthError)
+  }, [])
+
   const refresh = React.useCallback(async (options: { silent?: boolean } = {}) => {
+    if (unauthRef.current) return
+
     const isSilent = options.silent === true
 
     if (isSilent) {
@@ -86,10 +102,18 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     try {
       const payload = await apiFetch<TopbarNotificationsResponse>("/api/notifications/topbar", {
         cache: "no-store",
+        suppressAuthEvent: true,
       })
       setNotifications(payload)
       hasLoadedRef.current = true
     } catch (loadError) {
+      const apiErr = loadError instanceof ApiError ? loadError : null
+      if (apiErr?.status === 401) {
+        unauthRef.current = true
+        setLoading(false)
+        setRefreshing(false)
+        return
+      }
       setError(explainNotificationsError(loadError))
       setNotifications((current) => current)
     } finally {

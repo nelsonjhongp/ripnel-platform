@@ -113,6 +113,7 @@ function isLocalRequest(origin) {
 }
 
 const app = express();
+app.set('trust proxy', 1);
 const allowedOrigins = new Set();
 const configuredFrontendOrigin = normalizeOrigin(env.frontendUrl);
 

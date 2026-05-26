@@ -243,7 +243,7 @@ export function AppSidebar({
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-1 bg-background">
+    <div className="flex min-h-dvh w-full flex-1 bg-background">
       <Sidebar
         variant="sidebar"
         className="border-sidebar-border bg-sidebar text-sidebar-foreground"
