@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/tooltip";
 import { apiFetch, unwrapApiData } from "@/lib/api";
 import { fetchPriceCoverageGaps } from "@/lib/api-prices";
+import type { PriceCoverageGap } from "@/lib/prices-types";
 import { appRoutes } from "@/lib/routes";
 
 type InventoryItem = {
@@ -53,15 +54,6 @@ type InventoryItem = {
   color_id: string;
   color_name: string;
   qty: number;
-};
-
-type PriceCoverageGap = {
-  style_id: string;
-  style_code: string;
-  style_name: string;
-  variant_count: number;
-  inventory_row_count: number;
-  price_row_count: number;
 };
 
 type InventoryGroupedRow = {
@@ -333,7 +325,7 @@ export default function InventoryPage() {
             <InlineStatusCard
               title="Este módulo muestra saldo actual por sede"
               description="Desde aquí revisas disponibilidad, solicitas reposición, abres kardex o registras ajustes. Los movimientos reales se trazan en kardex y las reposiciones viajan como transferencias."
-              tone="info"
+              tone="neutral"
               variant="ops"
             />
             {coverageGaps.length > 0 ? (

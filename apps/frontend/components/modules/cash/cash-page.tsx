@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react"
 
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary"
 import { PermissionGuard } from "@/components/auth/PermissionGuard"
 import { InlineStatusCard } from "@/components/feedback/status-page"
 import { useAuth } from "@/components/auth/AuthProvider"
@@ -125,7 +126,7 @@ export default function CajaPage() {
   }, [fetchCurrent])
 
   async function handleOpen() {
-    if (!locationId) return
+    if (!locationId || actionLoading) return
 
     setActionLoading(true)
     setError(null)
@@ -144,7 +145,7 @@ export default function CajaPage() {
   }
 
   async function handleClose() {
-    if (!current?.closing) return
+    if (!current?.closing || actionLoading) return
 
     setActionLoading(true)
     setError(null)
@@ -166,8 +167,9 @@ export default function CajaPage() {
 
   if (!locationId) {
     return (
+      <ErrorBoundary>
       <PermissionGuard allowedRoles={CASH_ALLOWED_ROLES}>
-        <section className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
+        <section className="sales-page min-h-dvh px-4 py-[var(--ops-page-py)] md:px-8">
           <div className="mx-auto max-w-4xl">
             <InlineStatusCard
               title="Sin sede asignada"
@@ -178,6 +180,7 @@ export default function CajaPage() {
           </div>
         </section>
       </PermissionGuard>
+    </ErrorBoundary>
     )
   }
 
@@ -189,9 +192,10 @@ export default function CajaPage() {
   const consistencyOk = summary?.consistency.is_consistent ?? true
 
   return (
-    <PermissionGuard allowedRoles={CASH_ALLOWED_ROLES}>
+    <ErrorBoundary>
+      <PermissionGuard allowedRoles={CASH_ALLOWED_ROLES}>
       <TooltipProvider delayDuration={120}>
-        <section className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
+        <section className="sales-page min-h-dvh px-4 py-[var(--ops-page-py)] md:px-8">
           <div className="mx-auto max-w-5xl space-y-5">
             <header className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
               <p className="text-xs uppercase tracking-wide text-[var(--ripnel-accent-hover)]">Operaciones de caja</p>
@@ -514,5 +518,6 @@ export default function CajaPage() {
         </section>
       </TooltipProvider>
     </PermissionGuard>
+    </ErrorBoundary>
   )
 }

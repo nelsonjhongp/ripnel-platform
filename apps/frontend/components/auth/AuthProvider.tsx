@@ -131,10 +131,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const isSessionExpired = detail?.code === "SESSION_EXPIRED";
 
       if (isSessionExpired) {
-        fetch("/api/auth/logout", {
+        apiFetch<void>("/api/auth/logout", {
           method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
+          suppressAuthEvent: true,
         }).catch(() => {});
       }
 
