@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Link from "next/link"
 import { Dialog as DialogPrimitive } from "radix-ui"
-import type { LucideIcon } from "lucide-react"
 import {
   Banknote,
   BadgeCheck,
@@ -132,20 +131,19 @@ function SemanticChip({ tone = "neutral", children, className = "" }: { tone?: s
 
 // All utility functions above are now imported from ./pos-utils
 
-function getDocumentIcon(documentType: string): LucideIcon {
-  if (documentType === "factura") return Receipt
-  if (documentType === "boleta") return CreditCard
-  if (documentType === "proforma") return BadgeCheck
-  return CircleAlert
+function renderDocumentIcon(documentType: string, className: string) {
+  if (documentType === "factura") return <Receipt className={className} />
+  if (documentType === "boleta") return <CreditCard className={className} />
+  if (documentType === "proforma") return <BadgeCheck className={className} />
+  return <CircleAlert className={className} />
 }
 
-function getPaymentMethodIcon(method: string): LucideIcon {
-  if (method === "cash") return Banknote
-  if (method === "transfer") return Landmark
-  return Smartphone
+function renderPaymentMethodIcon(method: string, className: string) {
+  if (method === "cash") return <Banknote className={className} />
+  if (method === "transfer") return <Landmark className={className} />
+  return <Smartphone className={className} />
 }
 
-// getDocumentIcon and getPaymentMethodIcon stay inline (need direct icon imports)
 // All other utility functions are now imported from ./pos-utils
 
 export default function NuevaVentaPage() {
@@ -309,14 +307,16 @@ export default function NuevaVentaPage() {
   }, [defaultLocation?.location_id, query])
 
   useEffect(() => {
-    refreshPosContext()
+    void Promise.resolve().then(() => refreshPosContext())
   }, [refreshPosContext])
 
   useEffect(() => {
     const normalizedCustomerQuery = customerQuery.trim()
     if (!customerPickerOpen && !normalizedCustomerQuery) {
-      setCustomerResults([])
-      setLoadingCustomers(false)
+      void Promise.resolve().then(() => {
+        setCustomerResults([])
+        setLoadingCustomers(false)
+      })
       return
     }
 
@@ -467,14 +467,16 @@ export default function NuevaVentaPage() {
   }, [productPickerOpen])
 
   useEffect(() => {
-    if (!searchableStyles.length) {
-      setHighlightedProductIndex(0)
-      return
-    }
+    void Promise.resolve().then(() => {
+      if (!searchableStyles.length) {
+        setHighlightedProductIndex(0)
+        return
+      }
 
-    setHighlightedProductIndex((current) =>
-      Math.min(Math.max(current, 0), searchableStyles.length - 1)
-    )
+      setHighlightedProductIndex((current) =>
+        Math.min(Math.max(current, 0), searchableStyles.length - 1)
+      )
+    })
   }, [searchableStyles])
 
   useEffect(() => {
@@ -512,14 +514,16 @@ export default function NuevaVentaPage() {
   }, [documentPickerOpen])
 
   useEffect(() => {
-    if (!customerResults.length) {
-      setHighlightedCustomerIndex(0)
-      return
-    }
+    void Promise.resolve().then(() => {
+      if (!customerResults.length) {
+        setHighlightedCustomerIndex(0)
+        return
+      }
 
-    setHighlightedCustomerIndex((current) =>
-      Math.min(Math.max(current, 0), customerResults.length - 1)
-    )
+      setHighlightedCustomerIndex((current) =>
+        Math.min(Math.max(current, 0), customerResults.length - 1)
+      )
+    })
   }, [customerResults])
 
   useEffect(() => {
@@ -531,37 +535,41 @@ export default function NuevaVentaPage() {
       catalogStyles.find((style) => style.style_id === selectedProductStyle.style_id) || null
 
     if (refreshedStyle) {
-      setSelectedProductStyle(refreshedStyle)
+      void Promise.resolve().then(() => setSelectedProductStyle(refreshedStyle))
     }
   }, [catalogStyles, selectedProductStyle?.style_id])
 
   useEffect(() => {
-    if (!selectedProductStyle) {
-      setSelectedSizeCode("")
-      setSelectedColorCode("")
-      return
-    }
-
-    setSelectedSizeCode((current) => {
-      if (current && sizeOptions.includes(current)) {
-        return current
+    void Promise.resolve().then(() => {
+      if (!selectedProductStyle) {
+        setSelectedSizeCode("")
+        setSelectedColorCode("")
+        return
       }
 
-      return sizeOptions.length === 1 ? sizeOptions[0] : ""
+      setSelectedSizeCode((current) => {
+        if (current && sizeOptions.includes(current)) {
+          return current
+        }
+
+        return sizeOptions.length === 1 ? sizeOptions[0] : ""
+      })
     })
   }, [selectedProductStyle, sizeOptions])
 
   useEffect(() => {
-    if (!selectedProductStyle) {
-      return
-    }
-
-    setSelectedColorCode((current) => {
-      if (current && colorOptions.includes(current)) {
-        return current
+    void Promise.resolve().then(() => {
+      if (!selectedProductStyle) {
+        return
       }
 
-      return colorOptions.length === 1 ? colorOptions[0] : ""
+      setSelectedColorCode((current) => {
+        if (current && colorOptions.includes(current)) {
+          return current
+        }
+
+        return colorOptions.length === 1 ? colorOptions[0] : ""
+      })
     })
   }, [colorOptions, selectedProductStyle])
 
@@ -746,7 +754,6 @@ export default function NuevaVentaPage() {
     selectedCustomer?.customer_id !== genericCustomer?.customer_id
   const activeDocumentOption =
     DOC_TYPES.find((docType) => docType.value === documentType) || DOC_TYPES[0]
-  const ActiveDocumentIcon = getDocumentIcon(activeDocumentOption.value)
   const productInputValue =
     productPickerOpen || query ? query : selectedProductStyle?.style_name || ""
   const productInputPlaceholder =
@@ -880,7 +887,9 @@ export default function NuevaVentaPage() {
 
   useEffect(() => {
     if (paymentMode === "mixed" && mixedPayments.length === 0) {
-      setMixedPayments(createDefaultMixedPayments(totals.total, paymentMethod))
+      void Promise.resolve().then(() =>
+        setMixedPayments(createDefaultMixedPayments(totals.total, paymentMethod))
+      )
     }
   }, [mixedPayments.length, paymentMethod, paymentMode, totals.total])
 
@@ -1909,7 +1918,10 @@ export default function NuevaVentaPage() {
                               className="sales-field sales-field-interactive flex h-full w-full items-center justify-between rounded-xl px-3 py-2 text-sm"
                             >
                               <span className="flex min-w-0 items-center gap-2">
-                                <ActiveDocumentIcon className="h-4 w-4 shrink-0 text-[var(--ripnel-accent)]" />
+                                {renderDocumentIcon(
+                                  activeDocumentOption.value,
+                                  "h-4 w-4 shrink-0 text-[var(--ripnel-accent)]"
+                                )}
                                 <span className="truncate">{activeDocumentOption.label}</span>
                               </span>
                               <ChevronDown className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
@@ -1919,7 +1931,6 @@ export default function NuevaVentaPage() {
                               <CompactPickerPopover className="absolute left-0 right-0 top-[calc(100%+0.45rem)] z-30">
                                 <CompactPickerList>
                                   {DOC_TYPES.map((docType) => {
-                                    const Icon = getDocumentIcon(docType.value)
                                     const selected = documentType === docType.value
                                     return (
                                       <CompactPickerOption
@@ -1932,7 +1943,7 @@ export default function NuevaVentaPage() {
                                         }}
                                         className="flex items-center gap-2 text-sm"
                                       >
-                                        <Icon className="h-4 w-4 shrink-0" />
+                                        {renderDocumentIcon(docType.value, "h-4 w-4 shrink-0")}
                                         <span>{docType.label}</span>
                                       </CompactPickerOption>
                                     )
@@ -2242,7 +2253,6 @@ export default function NuevaVentaPage() {
                           {paymentMode === "single" ? (
                             <div className="grid grid-cols-2 gap-2">
                               {PAYMENT_METHODS.map((method) => {
-                                const Icon = getPaymentMethodIcon(method.value)
                                 const selected = paymentMethod === method.value
 
                                 return (
@@ -2257,7 +2267,7 @@ export default function NuevaVentaPage() {
                                     }`}
                                   >
                                     <div className="flex items-center justify-center gap-2">
-                                      <Icon className="h-4 w-4" />
+                                      {renderPaymentMethodIcon(method.value, "h-4 w-4")}
                                       <span>{method.label}</span>
                                     </div>
                                   </button>
@@ -2582,14 +2592,16 @@ export default function NuevaVentaPage() {
                           {paymentMode === "mixed" ? (
                             <div className="mt-3 divide-y divide-[var(--ops-border-strong)] border-y border-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
                               {mixedPayments.map((payment) => {
-                                const PaymentMethodIcon = getPaymentMethodIcon(payment.method)
                                 return (
                                   <div
                                     key={payment.id}
                                     className="grid gap-2 px-3 py-2.5 text-sm md:grid-cols-[minmax(0,1fr)_112px_minmax(0,1fr)] md:items-center"
                                   >
                                     <div className="flex items-center gap-2 font-medium text-[var(--ops-text)]">
-                                      <PaymentMethodIcon className="h-4 w-4 text-[var(--ripnel-accent)]" />
+                                      {renderPaymentMethodIcon(
+                                        payment.method,
+                                        "h-4 w-4 text-[var(--ripnel-accent)]"
+                                      )}
                                       {getPaymentMethodLabel(payment.method)}
                                     </div>
                                     <span className="font-medium text-[var(--ops-text)]">

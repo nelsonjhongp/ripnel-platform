@@ -84,7 +84,7 @@ async function findAssignedNetworkSummary(locationIds, businessDate, executor = 
        SELECT COUNT(*)::int AS pending_requests_count
        FROM stock_transfers st
        WHERE st.to_location_id IN (SELECT location_id FROM assigned_locations)
-         AND st.status = 'draft'
+         AND st.status IN ('requested', 'approved')
      )
      SELECT
        (SELECT COUNT(*)::int FROM active_users) AS active_user_count,
@@ -103,12 +103,16 @@ async function findTransferRequestCounts(locationId, executor = query) {
     `SELECT
        COUNT(*) FILTER (
          WHERE st.to_location_id = $1
-           AND st.status = 'draft'
-       )::int AS drafts_for_store_count,
+           AND st.status IN ('requested', 'approved')
+       )::int AS open_for_store_count,
        COUNT(*) FILTER (
          WHERE st.from_location_id = $1
-           AND st.status = 'draft'
-       )::int AS drafts_to_ship_count,
+           AND st.status = 'requested'
+       )::int AS pending_approval_count,
+       COUNT(*) FILTER (
+         WHERE st.from_location_id = $1
+           AND st.status = 'approved'
+       )::int AS pending_ship_count,
        COUNT(*) FILTER (
          WHERE st.to_location_id = $1
            AND st.status = 'shipped'
@@ -143,11 +147,11 @@ async function findTransferRequestItems(locationId, limit = 5, executor = query)
      LEFT JOIN stock_transfer_lines stl ON stl.transfer_id = st.transfer_id
      WHERE (
          st.to_location_id = $1
-         AND st.status IN ('draft', 'shipped')
+         AND st.status IN ('requested', 'approved', 'shipped')
        )
        OR (
          st.from_location_id = $1
-         AND st.status = 'draft'
+         AND st.status IN ('requested', 'approved')
        )
      GROUP BY
        st.transfer_id,

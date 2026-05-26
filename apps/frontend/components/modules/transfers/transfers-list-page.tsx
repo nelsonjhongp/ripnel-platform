@@ -5,10 +5,12 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowRightLeft,
+  CheckCheck,
   ClipboardList,
   Eye,
   LoaderCircle,
   Plus,
+  ShieldCheck,
   RefreshCw,
   RotateCcw,
   SendHorizonal,
@@ -58,20 +60,24 @@ import {
 
 export function TransfersListPage() {
   const router = useRouter();
-  const { loading: authLoading, permissions, user } = useAuth();
+  const { loading: authLoading, permissions, user, defaultLocation } = useAuth();
   const [transfers, setTransfers] = useState<TransferSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<TransferStatusFilter>("all");
   const [shippingId, setShippingId] = useState<string | null>(null);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [receivingId, setReceivingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [stageFilter, setStageFilter] = useState<TransferStatusFilter>("all");
   const [pendingShipTransfer, setPendingShipTransfer] = useState<TransferSummary | null>(null);
   const [pendingCancelTransfer, setPendingCancelTransfer] = useState<TransferSummary | null>(
     null
   );
+  const [pendingReceiveTransfer, setPendingReceiveTransfer] = useState<TransferSummary | null>(null);
 
   const transferCapabilities = useMemo(
     () => resolveTransferCapabilities({ permissions, roleName: user?.role_name }),
@@ -105,6 +111,26 @@ export function TransfersListPage() {
     });
   }, []);
 
+  async function handleApproveTransfer(transferId: string) {
+    setApprovingId(transferId);
+    setError(null);
+    setNotice(null);
+    try {
+      await apiFetch(`/api/transfers/${transferId}/approve`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      setNotice("Solicitud aprobada para despacho.");
+      await loadTransfers();
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error ? requestError.message : "No se pudo aprobar la solicitud"
+      );
+    } finally {
+      setApprovingId(null);
+    }
+  }
+
   async function handleShipTransfer(transferId: string) {
     setShippingId(transferId);
     setError(null);
@@ -114,7 +140,7 @@ export function TransfersListPage() {
         method: "POST",
         body: JSON.stringify({}),
       });
-      setNotice("Transferencia enviada.");
+      setNotice("Transferencia despachada.");
       await loadTransfers();
     } catch (requestError) {
       setError(
@@ -149,10 +175,33 @@ export function TransfersListPage() {
     }
   }
 
+  async function handleReceiveTransfer(transferId: string) {
+    setReceivingId(transferId);
+    setError(null);
+    setNotice(null);
+    try {
+      await apiFetch(`/api/transfers/${transferId}/receive`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      setNotice("Transferencia recepcionada.");
+      await loadTransfers();
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "No se pudo recepcionar la transferencia"
+      );
+    } finally {
+      setReceivingId(null);
+    }
+  }
+
   const filteredTransfers = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return transfers.filter((transfer) => {
-      const matchesStatus = statusFilter === "all" || transfer.status === statusFilter;
+      const activeStatusFilter = statusFilter === "all" ? stageFilter : statusFilter;
+      const matchesStatus = activeStatusFilter === "all" || transfer.status === activeStatusFilter;
       const matchesQuery =
         !normalizedQuery ||
         (transfer.transfer_number || "").toLowerCase().includes(normalizedQuery) ||
@@ -163,12 +212,13 @@ export function TransfersListPage() {
 
       return matchesStatus && matchesQuery;
     });
-  }, [query, statusFilter, transfers]);
+  }, [query, stageFilter, statusFilter, transfers]);
 
   const totals = useMemo(
     () => ({
       total: filteredTransfers.length,
-      drafts: filteredTransfers.filter((transfer) => transfer.status === "draft").length,
+      requested: filteredTransfers.filter((transfer) => transfer.status === "requested").length,
+      approved: filteredTransfers.filter((transfer) => transfer.status === "approved").length,
       shipped: filteredTransfers.filter((transfer) => transfer.status === "shipped").length,
       requestedUnits: filteredTransfers.reduce(
         (accumulator, transfer) => accumulator + transfer.qty_requested_total,
@@ -176,6 +226,18 @@ export function TransfersListPage() {
       ),
     }),
     [filteredTransfers]
+  );
+
+  const stageTotals = useMemo(
+    () => ({
+      all: transfers.length,
+      requested: transfers.filter((transfer) => transfer.status === "requested").length,
+      approved: transfers.filter((transfer) => transfer.status === "approved").length,
+      shipped: transfers.filter((transfer) => transfer.status === "shipped").length,
+      received: transfers.filter((transfer) => transfer.status === "received").length,
+      cancelled: transfers.filter((transfer) => transfer.status === "cancelled").length,
+    }),
+    [transfers]
   );
 
   const pageSize = 10;
@@ -187,7 +249,7 @@ export function TransfersListPage() {
   );
   const firstVisible = filteredTransfers.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
   const lastVisible = Math.min(safePage * pageSize, filteredTransfers.length);
-  const hasActiveFilters = query !== "" || statusFilter !== "all";
+  const hasActiveFilters = query !== "" || statusFilter !== "all" || stageFilter !== "all";
 
   function handleFilterChange(fn: () => void) {
     fn();
@@ -199,7 +261,7 @@ export function TransfersListPage() {
       <LoadingPage
         variant="ops"
         title="Preparando seguimiento de transferencias"
-        description="Validando capacidades visibles para mostrar solicitudes y movimientos entre tiendas."
+        description="Validando capacidades visibles para mostrar solicitudes, despachos y recepciones entre sedes."
       />
     );
   }
@@ -211,15 +273,15 @@ export function TransfersListPage() {
   return (
     <OpsPageShell width="wide">
         <PosHeader
-          eyebrow="Seguimiento operativo"
-          title="Transferencias"
+          eyebrow="Logística entre sedes"
+          title="Solicitudes y transferencias"
           actions={
             <>
               {transferCapabilities.requestCreate && (
                 <Button asChild variant="accent" size="sm" className="rounded-lg px-3">
                   <Link href={buildTransferModuleRoute(transferRouteSlugs.requestProducts)}>
                     <Plus className="h-4 w-4" />
-                    Solicitar productos
+                    Solicitar reposición
                   </Link>
                 </Button>
               )}
@@ -250,18 +312,52 @@ export function TransfersListPage() {
 
         <div className="flex flex-wrap items-center gap-2">
           <OpsMetricPill label="Total" value={totals.total} tone="accent" />
-          <OpsMetricPill label="Borradores" value={totals.drafts} />
-          <OpsMetricPill label="Enviadas" value={totals.shipped} tone="warning" />
-          <OpsMetricPill label="Unidades" value={totals.requestedUnits} />
+          <OpsMetricPill label="Solicitadas" value={totals.requested} />
+          <OpsMetricPill label="Aprobadas" value={totals.approved} />
+          <OpsMetricPill label="Despachadas" value={totals.shipped} tone="warning" />
+          <OpsMetricPill label="Unidades solicitadas" value={totals.requestedUnits} />
         </div>
 
         <OpsSectionDivider>
+          <InlineStatusCard
+            title="Este módulo gestiona la reposición entre sedes"
+            description="Aquí nacen las solicitudes y se hace seguimiento al documento operativo. El stock solo cambia cuando una transferencia se despacha o se recepciona."
+            tone="info"
+            variant="ops"
+          />
+          <div className="flex flex-wrap gap-2">
+            {[
+              { value: "all", label: "Todas", count: stageTotals.all },
+              { value: "requested", label: "Solicitadas", count: stageTotals.requested },
+              { value: "approved", label: "Aprobadas", count: stageTotals.approved },
+              { value: "shipped", label: "Despachadas", count: stageTotals.shipped },
+              { value: "received", label: "Recepcionadas", count: stageTotals.received },
+              { value: "cancelled", label: "Canceladas", count: stageTotals.cancelled },
+            ].map((stage) => (
+              <button
+                key={stage.value}
+                type="button"
+                onClick={() => handleFilterChange(() => setStageFilter(stage.value as TransferStatusFilter))}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+                  stageFilter === stage.value
+                    ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_34%,var(--ops-border-strong))] bg-[var(--ripnel-accent-soft)] text-[var(--ripnel-accent-hover)]"
+                    : "border-[var(--ops-border-strong)] bg-[var(--ops-surface)] text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
+                )}
+              >
+                {stage.label}
+                <span className="rounded-full bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_78%,transparent)] px-2 py-0.5 text-[11px]">
+                  {stage.count}
+                </span>
+              </button>
+            ))}
+          </div>
           <OpsTableBlock>
             <OpsFiltersRow className="lg:grid-cols-[minmax(0,1.55fr)_0.92fr_auto]">
               <OpsSearchField
                 value={query}
                 onChange={(value) => handleFilterChange(() => setQuery(value))}
-                placeholder="Buscar por numero, origen o destino"
+                placeholder="Buscar por solicitud, origen o destino"
                 ariaLabel="Buscar transferencias"
               />
 
@@ -284,6 +380,7 @@ export function TransfersListPage() {
                         handleFilterChange(() => {
                           setQuery("");
                           setStatusFilter("all");
+                          setStageFilter("all");
                         })
                       }
                       disabled={!hasActiveFilters}
@@ -302,13 +399,13 @@ export function TransfersListPage() {
               <table className="w-full border-collapse">
                 <thead className="bg-[var(--ops-surface-muted)]">
                   <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                    <th className="px-4 py-3">Numero</th>
+                    <th className="px-4 py-3">Documento</th>
                     <th className="px-4 py-3">Origen</th>
                     <th className="px-4 py-3">Destino</th>
                     <th className="px-4 py-3">Estado</th>
                     <th className="px-4 py-3 text-right">Lineas</th>
                     <th className="px-4 py-3 text-right">Solicitado</th>
-                    <th className="px-4 py-3">Creada</th>
+                    <th className="px-4 py-3">Solicitada</th>
                     <th className="px-4 py-3 text-right">Acciones</th>
                   </tr>
                 </thead>
@@ -341,10 +438,17 @@ export function TransfersListPage() {
                   ) : (
                     paginatedTransfers.map((transfer) => {
                         const canCancel =
-                          transfer.status === "draft" &&
+                          (transfer.status === "requested" || transfer.status === "approved") &&
                           (transferCapabilities.requestCreate || transferCapabilities.manage);
+                        const canApprove =
+                          transfer.status === "requested" && transferCapabilities.ship;
                         const canShip =
-                          transfer.status === "draft" && transferCapabilities.ship;
+                          transfer.status === "approved" && transferCapabilities.ship;
+                        const canReceive =
+                          transfer.status === "shipped" &&
+                          transferCapabilities.receive &&
+                          (transferCapabilities.manage ||
+                            transfer.to_location_id === defaultLocation?.location_id);
                         const menuItems: Array<{
                           label: string;
                           icon: ReactNode;
@@ -360,9 +464,26 @@ export function TransfersListPage() {
                           disabled: false,
                         });
 
+                        if (canApprove) {
+                          menuItems.push({
+                            label: "Aprobar",
+                            icon:
+                              approvingId === transfer.transfer_id ? (
+                                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <ShieldCheck className="h-3.5 w-3.5" />
+                              ),
+                            onSelect: () => void handleApproveTransfer(transfer.transfer_id),
+                            disabled:
+                              approvingId === transfer.transfer_id ||
+                              shippingId === transfer.transfer_id ||
+                              cancellingId === transfer.transfer_id,
+                          });
+                        }
+
                         if (canShip) {
                           menuItems.push({
-                            label: "Enviar",
+                            label: "Despachar",
                             icon:
                               shippingId === transfer.transfer_id ? (
                                 <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
@@ -371,8 +492,27 @@ export function TransfersListPage() {
                               ),
                             onSelect: () => setPendingShipTransfer(transfer),
                             disabled:
+                              approvingId === transfer.transfer_id ||
                               shippingId === transfer.transfer_id ||
                               cancellingId === transfer.transfer_id,
+                          });
+                        }
+
+                        if (canReceive) {
+                          menuItems.push({
+                            label: "Recepcionar",
+                            icon:
+                              receivingId === transfer.transfer_id ? (
+                                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <CheckCheck className="h-3.5 w-3.5" />
+                              ),
+                            onSelect: () => setPendingReceiveTransfer(transfer),
+                            disabled:
+                              approvingId === transfer.transfer_id ||
+                              shippingId === transfer.transfer_id ||
+                              cancellingId === transfer.transfer_id ||
+                              receivingId === transfer.transfer_id,
                           });
                         }
 
@@ -388,6 +528,7 @@ export function TransfersListPage() {
                             onSelect: () => setPendingCancelTransfer(transfer),
                             tone: "danger",
                             disabled:
+                              approvingId === transfer.transfer_id ||
                               shippingId === transfer.transfer_id ||
                               cancellingId === transfer.transfer_id,
                           });
@@ -453,18 +594,22 @@ export function TransfersListPage() {
                                 <div className="flex justify-end">
                                   <span className="inline-flex items-center gap-1 rounded-full border border-[color:color-mix(in_srgb,#f59e0b_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[color:color-mix(in_srgb,#d97706_72%,var(--ops-text))]">
                                     <Truck className="h-3 w-3" />
-                                    Pendiente
+                                    Por recepcionar
                                   </span>
                                 </div>
                               ) : (
                                 <div className="flex justify-end">
                                   <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium text-[var(--ops-text-muted)]">
-                                    {transfer.status === "draft" ? (
+                                    {transfer.status === "requested" ? (
                                       <ClipboardList className="h-3 w-3" />
                                     ) : (
                                       <ArrowRightLeft className="h-3 w-3" />
                                     )}
-                                    {transfer.status === "received" ? "Completada" : "Seguimiento"}
+                                    {transfer.status === "received"
+                                      ? "Completada"
+                                      : transfer.status === "approved"
+                                        ? "Por despachar"
+                                        : "Seguimiento"}
                                   </span>
                                 </div>
                               )}
@@ -497,11 +642,11 @@ export function TransfersListPage() {
 
       <AdminConfirmModal
         open={Boolean(pendingShipTransfer)}
-        title="Enviar transferencia"
+        title="Despachar transferencia"
         description={
           pendingShipTransfer ? (
             <>
-              Se enviará la transferencia{" "}
+              Se despachará la transferencia{" "}
               <strong>{pendingShipTransfer.transfer_number || "sin numero"}</strong> y quedará
               lista para recepción en destino.
             </>
@@ -509,7 +654,7 @@ export function TransfersListPage() {
             ""
           )
         }
-        confirmLabel="Enviar transferencia"
+        confirmLabel="Despachar transferencia"
         confirmTone="accent"
         busy={Boolean(
           pendingShipTransfer && shippingId === pendingShipTransfer.transfer_id
@@ -546,6 +691,34 @@ export function TransfersListPage() {
           if (pendingCancelTransfer) {
             void handleCancelTransfer(pendingCancelTransfer.transfer_id);
             setPendingCancelTransfer(null);
+          }
+        }}
+      />
+
+      <AdminConfirmModal
+        open={Boolean(pendingReceiveTransfer)}
+        title="Confirmar recepción"
+        description={
+          pendingReceiveTransfer ? (
+            <>
+              Se confirmará la recepción de la transferencia{" "}
+              <strong>{pendingReceiveTransfer.transfer_number || "sin numero"}</strong> y el
+              stock ingresará en destino.
+            </>
+          ) : (
+            ""
+          )
+        }
+        confirmLabel="Recepcionar transferencia"
+        confirmTone="accent"
+        busy={Boolean(
+          pendingReceiveTransfer && receivingId === pendingReceiveTransfer.transfer_id
+        )}
+        onCancel={() => setPendingReceiveTransfer(null)}
+        onConfirm={() => {
+          if (pendingReceiveTransfer) {
+            void handleReceiveTransfer(pendingReceiveTransfer.transfer_id);
+            setPendingReceiveTransfer(null);
           }
         }}
       />

@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation"
-import { TransfersManagePage } from "@/components/modules/transfers/transfers-manage-page"
 import { TransfersRequestPage } from "@/components/modules/transfers/transfers-request-page"
 import { TransferDetailPage } from "@/components/modules/transfers/transfers-detail-page"
 import { TransfersListPage } from "@/components/modules/transfers/transfers-list-page"
@@ -18,7 +17,7 @@ export default async function TransferPage({
   }
 
   if (transferId === transferRouteSlugs.create) {
-    return <TransfersManagePage />
+    notFound()
   }
 
   if (transferId === transferRouteSlugs.requestProducts) {

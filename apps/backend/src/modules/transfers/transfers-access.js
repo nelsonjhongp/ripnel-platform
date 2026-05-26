@@ -7,41 +7,32 @@ function hasPermission(permissions, permissionKey) {
   );
 }
 
-function normalizeRoleName(roleName) {
-  return String(roleName || '').trim().toUpperCase();
-}
-
-function buildTransferCapabilities({ permissions, roleName } = {}) {
-  const normalizedRoleName = normalizeRoleName(roleName);
+function buildTransferCapabilities({ permissions } = {}) {
   const manage = hasPermission(permissions, 'transfers.manage');
 
   const requestCreate =
-    manage ||
-    hasPermission(permissions, 'transfers.request.create') ||
-    ['TIENDA', 'VENTAS'].includes(normalizedRoleName);
+    manage || hasPermission(permissions, 'transfers.request.create');
 
   const requestViewOwn =
-    manage ||
-    hasPermission(permissions, 'transfers.request.view_own') ||
-    requestCreate;
+    manage || hasPermission(permissions, 'transfers.request.view_own') || requestCreate;
 
-  const ship =
-    manage ||
-    hasPermission(permissions, 'transfers.ship') ||
-    ['ALMACEN', 'TIENDA'].includes(normalizedRoleName);
+  const approve = manage || hasPermission(permissions, 'transfers.approve');
 
-  const receive =
-    manage ||
-    hasPermission(permissions, 'transfers.receive') ||
-    ['ALMACEN', 'TIENDA'].includes(normalizedRoleName);
+  const ship = manage || hasPermission(permissions, 'transfers.ship');
+
+  const receive = manage || hasPermission(permissions, 'transfers.receive');
+
+  const cancel = manage || hasPermission(permissions, 'transfers.cancel');
 
   return {
     manage,
     request_create: requestCreate,
     request_view_own: requestViewOwn,
+    approve,
     ship,
     receive,
-    visible: manage || requestCreate || requestViewOwn || ship || receive,
+    cancel,
+    visible: manage || requestCreate || requestViewOwn || approve || ship || receive || cancel,
   };
 }
 
@@ -49,7 +40,6 @@ function requireTransferCapability(capabilityKey) {
   return function requireTransferCapabilityMiddleware(req, _res, next) {
     const capabilities = buildTransferCapabilities({
       permissions: req.auth?.permissions,
-      roleName: req.auth?.role_name,
     });
 
     if (capabilities[capabilityKey]) {

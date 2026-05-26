@@ -15,6 +15,7 @@ import {
   Store,
   Ticket,
   Truck,
+  Users,
   Wallet,
 } from "lucide-react"
 import {
@@ -44,15 +45,15 @@ import { useAuth } from "@/components/auth/AuthProvider"
 import { ErrorPage, ProtectedLoadingPage } from "@/components/feedback/status-page"
 import { useSidebarTopbarActions } from "@/components/sidebar"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { fetchCommercialActivity, fetchCustomerAnalytics, fetchDashboardOverview } from "@/lib/api-dashboard"
 import { ApiError } from "@/lib/api"
 import type {
   CashSection,
-  CommercialActivityMode,
   CommercialActivityResponse,
   CustomerAnalytics,
+  DashboardMetricComparison,
   DashboardOverview,
   InventorySection,
   PostsalesSection,
@@ -118,15 +119,28 @@ function resolveDifferenceTone(value: number | null | undefined): DashboardKpiTo
   return "danger"
 }
 
-function resolveDifferenceLabel(value: number | null | undefined) {
-  if (value == null) return "Sin resumen de caja"
-  if (value === 0) return "Caja conciliada"
-  if (value > 0) return "Pagos por debajo de ventas"
-  return "Pagos por encima de ventas"
-}
-
 function paymentMethodTone(amount: number) {
   return amount > 0 ? "text-[var(--ops-text)]" : "text-[var(--ops-text-muted)]"
+}
+
+function invertComparisonDirection(direction: DashboardMetricComparison["direction"]) {
+  if (direction === "up") return "down"
+  if (direction === "down") return "up"
+  return "neutral"
+}
+
+function normalizeComparison(
+  comparison: DashboardMetricComparison | undefined | null,
+  options: { lowerIsBetter?: boolean } = {}
+) {
+  if (!comparison?.valid) return null
+
+  return {
+    ...comparison,
+    direction: options.lowerIsBetter
+      ? invertComparisonDirection(comparison.direction)
+      : comparison.direction,
+  }
 }
 
 export default function DashboardPage() {
@@ -138,12 +152,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [period, setPeriod] = useState<"today" | "week" | "month" | "quarter">("today")
+  const [period, setPeriod] = useState<"week" | "month" | "quarter">("week")
 
   const dateRange = useMemo(() => {
     const today = todayPeruISO()
-    if (period === "today") return { date_from: today, date_to: today }
-
     const date = new Date()
     if (period === "week") date.setDate(date.getDate() - 6)
     else if (period === "month") date.setDate(date.getDate() - 29)
@@ -157,8 +169,7 @@ export default function DashboardPage() {
 
   const loadAll = useCallback(async (options: { silent?: boolean } = {}) => {
     const silent = options.silent === true
-    const activityGroup: CommercialActivityMode =
-      period === "today" ? "today" : period === "week" ? "week" : "aggregate"
+    const activityGroup = "daily"
 
     if (silent) setRefreshing(true)
     else setLoading(true)
@@ -193,7 +204,7 @@ export default function DashboardPage() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [dateRange.date_from, dateRange.date_to, period])
+  }, [dateRange.date_from, dateRange.date_to])
 
   useEffect(() => {
     void Promise.resolve().then(() => loadAll())
@@ -262,7 +273,7 @@ export default function DashboardPage() {
     {
       label: "Diferencia de caja",
       value: cashConsistency ? formatCurrencyPEN(cashDifference) : "—",
-      description: resolveDifferenceLabel(cashDifference),
+      trend: null,
       icon: Wallet,
       tone: resolveDifferenceTone(cashDifference),
       href: appRoutes.cash,
@@ -270,7 +281,7 @@ export default function DashboardPage() {
     {
       label: "Ventas totales",
       value: formatCurrencyPEN(totalRevenue),
-      description: "Monto confirmado",
+      trend: normalizeComparison(sales?.comparisons?.total_amount),
       icon: CircleDollarSign,
       tone: "purple" as const,
       href: appRoutes.transactionHistory,
@@ -278,7 +289,7 @@ export default function DashboardPage() {
     {
       label: "Ventas confirmadas",
       value: formatNumber(saleCount),
-      description: saleCount > 0 ? "Ventas registradas" : "Sin ventas registradas",
+      trend: normalizeComparison(sales?.comparisons?.sale_count),
       icon: ShoppingCart,
       tone: "neutral" as const,
       href: appRoutes.transactionHistory,
@@ -286,7 +297,7 @@ export default function DashboardPage() {
     {
       label: "Ticket promedio",
       value: averageTicket == null ? "—" : formatCurrencyPEN(averageTicket),
-      description: averageTicket == null ? "Sin base suficiente" : "Promedio por venta",
+      trend: normalizeComparison(sales?.comparisons?.avg_ticket),
       icon: Ticket,
       tone: "danger" as const,
       href: appRoutes.transactionHistory,
@@ -294,7 +305,7 @@ export default function DashboardPage() {
     {
       label: "Pagos registrados",
       value: formatCurrencyPEN(totalPayments),
-      description: cashConsistency ? "Pagos conciliados" : "Sin resumen de caja",
+      trend: normalizeComparison(cash?.sales_summary?.comparisons?.payment_total),
       icon: CreditCard,
       tone: (cashConsistency ? "success" : "neutral") as DashboardKpiTone,
       href: appRoutes.cash,
@@ -302,7 +313,7 @@ export default function DashboardPage() {
     {
       label: "Stock critico",
       value: formatNumber(criticalStockCount),
-      description: criticalStockCount > 0 ? "Variantes comprometidas" : "Sin alertas de stock",
+      trend: null,
       icon: PackageSearch,
       tone: (criticalStockCount > 0 ? "warning" : "neutral") as DashboardKpiTone,
       href: appRoutes.inventory,
@@ -366,16 +377,22 @@ export default function DashboardPage() {
     }
 
     if (transfers) {
-      const pendingTransfers = Number(transfers.pending_receipts_count || 0)
+      const pendingTransfers =
+        Number(transfers.pending_receipts_count || 0) +
+        Number(transfers.pending_approval_count || 0) +
+        Number(transfers.pending_dispatch_count || 0)
       items.push({
         key: "transfers",
         label: "Transferencias pendientes",
-        value: pendingTransfers > 0 ? "Por recibir o enviar" : "Flujo de transferencias al dia",
+        value:
+          pendingTransfers > 0
+            ? "Solicitudes por aprobar, despachar o recepcionar"
+            : "Flujo de transferencias al dia",
         numericValue: pendingTransfers,
         highlightValue: formatNumber(pendingTransfers),
         badge: buildAttentionBadge(pendingTransfers, pendingTransfers > 0 ? "warning" : "success"),
         cta: "Ver transferencias",
-        href: buildTransferModuleRoute(transferRouteSlugs.pendingReceipts),
+        href: buildTransferModuleRoute(transferRouteSlugs.list),
         icon: Truck,
         tone: pendingTransfers > 0 ? "warning" : "success",
       })
@@ -428,7 +445,7 @@ export default function DashboardPage() {
   const periodActions = (
     <div className="flex flex-wrap items-center gap-2">
       <div className="flex rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1 shadow-sm">
-        {(["today", "week", "month", "quarter"] as const).map((item) => (
+        {(["week", "month", "quarter"] as const).map((item) => (
           <button
             key={item}
             type="button"
@@ -440,7 +457,7 @@ export default function DashboardPage() {
                 : "text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)]"
             )}
           >
-            {item === "today" ? "Hoy" : item === "week" ? "7d" : item === "month" ? "30d" : "90d"}
+            {item === "week" ? "7d" : item === "month" ? "30d" : "90d"}
           </button>
         ))}
       </div>
@@ -469,7 +486,7 @@ export default function DashboardPage() {
               key={kpi.label}
               label={kpi.label}
               value={kpi.value}
-              description={kpi.description}
+              trend={kpi.trend}
               icon={kpi.icon}
               tone={kpi.tone}
               href={kpi.href}
@@ -477,7 +494,7 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-12 xl:items-start">
+        <div className="grid gap-4 xl:grid-cols-12">
           <div className="xl:col-span-8">
             <CommercialActivityCard data={commercialActivity} />
           </div>
@@ -491,8 +508,9 @@ export default function DashboardPage() {
           <div className="xl:col-span-4">
             <DashboardChartCard
               title="Top productos"
-              subtitle="Los productos con mayor salida por cantidad vendida."
+              icon={<PackageSearch className="h-4 w-4" />}
               height={280}
+              contentClassName="p-3"
             >
               {topProductsChart.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -532,8 +550,9 @@ export default function DashboardPage() {
           <div className="xl:col-span-4">
             <DashboardChartCard
               title="Clientes que mas compran"
-              subtitle="Top clientes por monto acumulado."
+              icon={<Users className="h-4 w-4" />}
               height={280}
+              contentClassName="p-3"
             >
               {topCustomersChart.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -573,8 +592,9 @@ export default function DashboardPage() {
           <div className="md:col-span-2 xl:col-span-4">
             <DashboardChartCard
               title="Mezcla de cobro"
-              subtitle="Distribucion del total cobrado por metodo de pago."
+              icon={<Wallet className="h-4 w-4" />}
               height={280}
+              contentClassName="p-3"
             >
               {paymentPieData.length > 0 ? (
                 <div className="grid h-full gap-3 lg:grid-cols-[minmax(0,1fr)_148px] lg:items-center">
@@ -652,30 +672,22 @@ export default function DashboardPage() {
 
 function DashboardInfoCard({
   title,
-  subtitle,
   icon: Icon,
   children,
 }: {
   title: string
-  subtitle: string
   icon: LucideIcon
   children: ReactNode
 }) {
   return (
-    <Card className="border border-[color:color-mix(in_srgb,var(--ops-border-soft)_86%,transparent)] bg-[color:color-mix(in_srgb,var(--ops-surface)_97%,white)] py-0 shadow-[0_10px_30px_rgb(15_23_42/0.04)]">
-      <CardHeader className="border-b border-[color:color-mix(in_srgb,var(--ops-border-soft)_70%,transparent)] px-5 py-4">
-        <div className="flex items-start gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-[14px] border border-[color:color-mix(in_srgb,var(--ops-border-soft)_72%,transparent)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_56%,var(--ops-surface))] text-[var(--ripnel-accent-hover)]">
-            <Icon className="h-[18px] w-[18px]" />
-          </span>
-          <div>
-            <CardTitle className="text-[15px] font-semibold text-[var(--ops-text)]">{title}</CardTitle>
-            <p className="mt-1 text-xs text-[var(--ops-text-muted)]">{subtitle}</p>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="px-5 py-4">{children}</CardContent>
-    </Card>
+    <DashboardChartCard
+      title={title}
+      icon={<Icon className="h-4 w-4" />}
+      height="auto"
+      contentClassName="p-4"
+    >
+      {children}
+    </DashboardChartCard>
   )
 }
 
@@ -686,28 +698,10 @@ function InlineBadge({
   label: string
   tone?: "neutral" | "success" | "warning" | "danger" | "purple"
 }) {
-  const tones = {
-    neutral:
-      "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]",
-    success:
-      "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-emerald-700",
-    warning:
-      "border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-amber-700",
-    danger:
-      "border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] text-rose-700",
-    purple:
-      "border-[color:color-mix(in_srgb,var(--ripnel-accent)_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_84%,var(--ops-surface))] text-[var(--ripnel-accent-hover)]",
-  }
-
   return (
-    <span
-      className={cn(
-        "inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]",
-        tones[tone]
-      )}
-    >
+    <OpsStatusBadge tone={tone === "purple" ? "accent" : tone} size="xs" className="uppercase tracking-[0.12em]">
       {label}
-    </span>
+    </OpsStatusBadge>
   )
 }
 
@@ -763,7 +757,6 @@ function SalesPerformanceCard({ section }: { section: SalesToday | null }) {
   return (
     <DashboardInfoCard
       title="Ritmo comercial"
-      subtitle="Resumen confirmado del periodo activo para la sede."
       icon={ShoppingCart}
     >
       {!section ? (
@@ -822,7 +815,6 @@ function InventoryCard({ section }: { section: InventorySection | null }) {
   return (
     <DashboardInfoCard
       title="Inventario critico"
-      subtitle="Variantes con stock en cero o por debajo del minimo operativo."
       icon={PackageSearch}
     >
       {!section ? (
@@ -897,11 +889,10 @@ function OperationsCard({
   return (
     <DashboardInfoCard
       title="Caja, postventa y transferencias"
-      subtitle="Accesos directos a los frentes operativos del dia."
       icon={Store}
     >
       <div className="space-y-4">
-        <div className="rounded-xl border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] p-3">
+        <div className="space-y-3 border-b border-[var(--ops-border-soft)] pb-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-[var(--ops-text)]">Caja</p>
@@ -928,7 +919,7 @@ function OperationsCard({
           </div>
         </div>
 
-        <div className="rounded-xl border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] p-3">
+        <div className="space-y-3 border-b border-[var(--ops-border-soft)] pb-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-[var(--ops-text)]">Postventa</p>
@@ -951,26 +942,38 @@ function OperationsCard({
           </div>
         </div>
 
-        <div className="rounded-xl border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] p-3">
+        <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-[var(--ops-text)]">Transferencias</p>
               <p className="text-[11px] text-[var(--ops-text-muted)]">
-                Recepciones pendientes para la sede activa.
+                Reposición entre sedes con aprobación, despacho y recepción.
               </p>
             </div>
             <InlineBadge
-              label={`${formatNumber(Number(transfers?.pending_receipts_count || 0))} pendientes`}
-              tone={Number(transfers?.pending_receipts_count || 0) > 0 ? "warning" : "neutral"}
+              label={`${formatNumber(
+                Number(transfers?.pending_receipts_count || 0) +
+                  Number(transfers?.pending_approval_count || 0) +
+                  Number(transfers?.pending_dispatch_count || 0)
+              )} pendientes`}
+              tone={
+                Number(transfers?.pending_receipts_count || 0) +
+                  Number(transfers?.pending_approval_count || 0) +
+                  Number(transfers?.pending_dispatch_count || 0) >
+                0
+                  ? "warning"
+                  : "neutral"
+              }
             />
           </div>
           <div className="mt-3 space-y-1.5">
             <MetricRow label="Por recibir" value={formatNumber(Number(transfers?.pending_receipts_count || 0))} />
-            <MetricRow label="Borradores salida" value={formatNumber(Number(transfers?.draft_outgoing_count || 0))} />
+            <MetricRow label="Por aprobar" value={formatNumber(Number(transfers?.pending_approval_count || 0))} />
+            <MetricRow label="Por despachar" value={formatNumber(Number(transfers?.pending_dispatch_count || 0))} />
           </div>
           <div className="mt-3">
             <CardActionLink
-              href={buildTransferModuleRoute(transferRouteSlugs.pendingReceipts)}
+              href={buildTransferModuleRoute(transferRouteSlugs.list)}
               label="Ver transferencias"
             />
           </div>

@@ -1,4 +1,5 @@
 const express = require('express');
+const { requireAuth, requirePermission } = require('../../middlewares/auth');
 const {
   getInventory,
   getKardex,
@@ -12,13 +13,15 @@ const {
 
 const router = express.Router();
 
-router.get('/', getInventory);
-router.get('/kardex', getKardex);
-router.get('/adjustment-variants', getAdjustmentVariants);
-router.get('/adjustments', getAdjustments);
-router.get('/adjustments/:adjustmentId', getAdjustment);
-router.post('/adjustments', postAdjustment);
-router.post('/adjustments/:adjustmentId/confirm', postConfirmAdjustment);
-router.post('/adjustments/:adjustmentId/cancel', postCancelAdjustment);
+router.use(requireAuth);
+
+router.get('/', requirePermission('inventory.view'), getInventory);
+router.get('/kardex', requirePermission('inventory.view'), getKardex);
+router.get('/adjustment-variants', requirePermission('inventory.adjust'), getAdjustmentVariants);
+router.get('/adjustments', requirePermission('inventory.adjust'), getAdjustments);
+router.get('/adjustments/:adjustmentId', requirePermission('inventory.adjust'), getAdjustment);
+router.post('/adjustments', requirePermission('inventory.adjust'), postAdjustment);
+router.post('/adjustments/:adjustmentId/confirm', requirePermission('inventory.adjust'), postConfirmAdjustment);
+router.post('/adjustments/:adjustmentId/cancel', requirePermission('inventory.adjust'), postCancelAdjustment);
 
 module.exports = router;

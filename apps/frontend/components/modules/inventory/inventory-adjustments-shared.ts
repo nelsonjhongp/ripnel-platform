@@ -16,6 +16,7 @@ export type Location = {
 };
 
 export type AdjustmentStatus = "draft" | "confirmed" | "cancelled";
+export type AdjustmentIntent = "opening" | "adjustment";
 
 export type AdjustmentSummary = {
   adjustment_id: string;
@@ -69,6 +70,32 @@ export type AdjustmentVariant = {
 export type DraftAdjustmentLine = AdjustmentVariant & {
   counted_qty: number;
 };
+
+export function inferAdjustmentIntent(reason: string | null | undefined): AdjustmentIntent {
+  return /apertura|inicial/i.test(String(reason || "")) ? "opening" : "adjustment";
+}
+
+export function formatAdjustmentIntent(intent: AdjustmentIntent) {
+  return intent === "opening" ? "Apertura inicial" : "Ajuste";
+}
+
+export function buildAdjustmentReason(intent: AdjustmentIntent, rawReason: string) {
+  const normalized = rawReason.trim();
+
+  if (intent === "opening") {
+    if (!normalized) {
+      return "Apertura inicial";
+    }
+
+    return /^apertura/i.test(normalized) ? normalized : `Apertura inicial - ${normalized}`;
+  }
+
+  if (!normalized) {
+    return "Ajuste por conteo";
+  }
+
+  return normalized;
+}
 
 export async function requestAdjustmentJson<T>(path: string, init?: RequestInit) {
   const response = await fetch(buildApiUrl(path), {

@@ -33,12 +33,26 @@ export type PaymentTotals = {
   all: number
 }
 
+export type DashboardMetricComparison = {
+  current: number
+  previous: number | null
+  delta: number | null
+  delta_pct: number | null
+  direction: "up" | "down" | "neutral"
+  valid: boolean
+}
+
 export type SalesToday = {
   visible: boolean
   sale_count?: number
   total_amount?: number
   last_confirmed_at?: string | null
   by_method?: PaymentTotals
+  comparisons?: {
+    sale_count?: DashboardMetricComparison
+    total_amount?: DashboardMetricComparison
+    avg_ticket?: DashboardMetricComparison
+  }
 }
 
 export type CashClosing = {
@@ -57,6 +71,9 @@ export type CashSummary = {
   grand_total: number
   by_method: PaymentTotals
   consistency: CashConsistency
+  comparisons?: {
+    payment_total?: DashboardMetricComparison
+  }
 }
 
 export type CashConsistency = {
@@ -109,7 +126,8 @@ export type TransferItem = {
 export type TransfersSection = {
   visible: boolean
   pending_receipts_count?: number
-  draft_outgoing_count?: number
+  pending_approval_count?: number
+  pending_dispatch_count?: number
   latest?: TransferItem[]
 }
 
@@ -223,7 +241,7 @@ export type PressureBarData = {
 }
 
 export type CommercialActivityMetric = "amount" | "sales" | "avg_ticket"
-export type CommercialActivityMode = "today" | "week" | "aggregate"
+export type CommercialActivityMode = "today" | "daily"
 
 export type CommercialActivityRow = {
   location_id: string

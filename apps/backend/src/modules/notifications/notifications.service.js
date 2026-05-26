@@ -10,6 +10,7 @@ const {
   findCriticalInventoryCounts,
   findCriticalInventoryItems,
 } = require('../dashboard/dashboard.repo');
+const { buildTransferCapabilities } = require('../transfers/transfers-access');
 
 const LOW_STOCK_THRESHOLD = 3;
 const MAX_VISIBLE_ITEMS = 6;
@@ -38,6 +39,19 @@ function hasPermission(permissions, permissionKey) {
 
 function canViewCash(roleName) {
   return ['ADMIN', 'CAJA'].includes(String(roleName || '').toUpperCase());
+}
+
+function normalizeTransferCapabilities(rawCapabilities = {}) {
+  return {
+    manage: Boolean(rawCapabilities.manage),
+    request_create: Boolean(rawCapabilities.request_create),
+    request_view_own: Boolean(rawCapabilities.request_view_own),
+    approve: Boolean(rawCapabilities.approve),
+    ship: Boolean(rawCapabilities.ship),
+    receive: Boolean(rawCapabilities.receive),
+    cancel: Boolean(rawCapabilities.cancel),
+    visible: Boolean(rawCapabilities.visible),
+  };
 }
 
 function round2(value) {
@@ -175,29 +189,83 @@ function buildCashNotifications({ enabled, location, businessDate, generatedAt, 
   return notifications;
 }
 
-function buildTransferNotifications({ enabled, location, generatedAt, transferCounts, transferItems }) {
-  if (!enabled || !transferCounts) return [];
+function resolveLatestTransferTimestamp(items, stage, generatedAt) {
+  const candidate = (items || []).find((item) => item.pending_stage === stage);
+  return (
+    candidate?.shipped_at ||
+    candidate?.approved_at ||
+    candidate?.created_at ||
+    candidate?.updated_at ||
+    generatedAt
+  );
+}
 
+function buildTransferNotifications({
+  capabilities,
+  location,
+  generatedAt,
+  transferCounts,
+  transferItems,
+}) {
+  if (!capabilities?.visible || !transferCounts) return [];
+
+  const notifications = [];
+  const pendingApprovalCount = Number(transferCounts.pending_approval_count || 0);
+  const pendingDispatchCount = Number(transferCounts.pending_dispatch_count || 0);
   const pendingReceiptsCount = Number(transferCounts.pending_receipts_count || 0);
-  if (pendingReceiptsCount <= 0) return [];
 
-  const latestTransferAt =
-    transferItems[0]?.shipped_at || transferItems[0]?.updated_at || generatedAt;
+  if (capabilities.approve && pendingApprovalCount > 0) {
+    notifications.push(
+      buildNotification({
+        id: `pending_approval:${location.location_id}`,
+        module: 'transfers',
+        kind: 'pending_approval',
+        severity: 'warning',
+        title: 'Solicitudes pendientes por aprobar',
+        description: `${pendingApprovalCount} solicitud(es) siguen esperando validación desde ${location.name}.`,
+        href: '/transferencias/listado-de-transferencias',
+        actionLabel: 'Aprobar',
+        location,
+        createdAt: resolveLatestTransferTimestamp(transferItems, 'approval', generatedAt),
+      })
+    );
+  }
 
-  return [
-    buildNotification({
-      id: `pending_receipts:${location.location_id}`,
-      module: 'transfers',
-      kind: 'pending_receipts',
-      severity: 'warning',
-      title: 'Recepciones pendientes en tienda',
-      description: `${pendingReceiptsCount} transferencia(s) siguen en tránsito hacia ${location.name}.`,
-      href: '/transferencias/recepciones-pendientes',
-      actionLabel: 'Recepcionar',
-      location,
-      createdAt: latestTransferAt,
-    }),
-  ];
+  if (capabilities.ship && pendingDispatchCount > 0) {
+    notifications.push(
+      buildNotification({
+        id: `pending_dispatch:${location.location_id}`,
+        module: 'transfers',
+        kind: 'pending_dispatch',
+        severity: 'warning',
+        title: 'Reposiciones pendientes por despachar',
+        description: `${pendingDispatchCount} transferencia(s) aprobadas aún no salen de ${location.name}.`,
+        href: '/transferencias/listado-de-transferencias',
+        actionLabel: 'Despachar',
+        location,
+        createdAt: resolveLatestTransferTimestamp(transferItems, 'dispatch', generatedAt),
+      })
+    );
+  }
+
+  if (capabilities.receive && pendingReceiptsCount > 0) {
+    notifications.push(
+      buildNotification({
+        id: `pending_receipts:${location.location_id}`,
+        module: 'transfers',
+        kind: 'pending_receipts',
+        severity: 'warning',
+        title: 'Recepciones pendientes en tienda',
+        description: `${pendingReceiptsCount} transferencia(s) siguen en tránsito hacia ${location.name}.`,
+        href: '/transferencias/recepciones-pendientes',
+        actionLabel: 'Recepcionar',
+        location,
+        createdAt: resolveLatestTransferTimestamp(transferItems, 'receipt', generatedAt),
+      })
+    );
+  }
+
+  return notifications;
 }
 
 function buildInventoryNotifications({ enabled, location, generatedAt, inventoryCounts, inventoryItems }) {
@@ -256,9 +324,11 @@ function sortNotifications(items) {
   const kindWeight = {
     cash_difference: 0,
     cash_missing: 1,
-    pending_receipts: 2,
-    zero_stock: 3,
-    low_stock: 4,
+    pending_approval: 2,
+    pending_dispatch: 3,
+    pending_receipts: 4,
+    zero_stock: 5,
+    low_stock: 6,
   };
 
   return [...items].sort((left, right) => {
@@ -289,10 +359,14 @@ async function getTopbarNotifications(input = {}) {
   const businessDate = todayPeruDate();
   const generatedAt = new Date().toISOString();
 
+  const transferCapabilities = normalizeTransferCapabilities(
+    buildTransferCapabilities({ permissions, roleName })
+  );
+
   const capabilities = {
     cash: canViewCash(roleName),
     inventory: hasPermission(permissions, 'inventory.view'),
-    transfers: hasPermission(permissions, 'transfers.manage'),
+    transfers: transferCapabilities,
   };
 
   const client = await pool.connect();
@@ -313,7 +387,7 @@ async function getTopbarNotifications(input = {}) {
       paymentRows = await findPaymentTotalsByLocationAndDate(location.location_id, businessDate, executor);
     }
 
-    if (capabilities.transfers) {
+    if (capabilities.transfers.visible) {
       transferCounts = await findPendingTransfersCounts(location.location_id, executor);
       transferItems = await findPendingTransfersItems(location.location_id, 3, executor);
     }
@@ -350,7 +424,7 @@ async function getTopbarNotifications(input = {}) {
       consistency: cashConsistency,
     }),
     ...buildTransferNotifications({
-      enabled: capabilities.transfers,
+      capabilities: capabilities.transfers,
       location,
       generatedAt,
       transferCounts,

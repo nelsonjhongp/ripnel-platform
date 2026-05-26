@@ -9,6 +9,7 @@ const {
   insertTransferLine,
   updateTransferLineShipment,
   updateTransferLineReceipt,
+  markTransferApproved,
   markTransferShipped,
   markTransferReceived,
   markTransferCancelled,
@@ -27,7 +28,7 @@ const {
 } = require('../users/users.repo');
 const { buildTransferCapabilities } = require('./transfers-access');
 
-const ALLOWED_TRANSFER_STATUSES = ['draft', 'shipped', 'received', 'cancelled'];
+const ALLOWED_TRANSFER_STATUSES = ['requested', 'approved', 'shipped', 'received', 'cancelled'];
 
 function normalizeUuid(value) {
   const normalized = String(value || '').trim();
@@ -236,13 +237,9 @@ async function listTransferRequestCandidates(input = {}, auth = {}) {
     });
   }
 
-  if (!query || query.length < 2) {
-    return [];
-  }
-
   const rows = await findTransferRequestCandidateRows({
     destinationLocationId: actor.default_location_id,
-    searchQuery: query,
+    searchQuery: query || '',
     sourceLocationId,
   });
 
@@ -345,7 +342,7 @@ async function createTransfer(input, auth = {}) {
         transfer_number: buildTransferNumber(),
         from_location_id: fromLocationId,
         to_location_id: toLocationId,
-        status: 'draft',
+        status: 'requested',
         notes,
         created_by: actor.user_id,
       },
@@ -409,8 +406,8 @@ async function shipTransferById(transferId, input = {}, auth = {}) {
     throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
   }
 
-  if (transfer.status !== 'draft') {
-    throw new AppError('Only draft transfers can be shipped', 400);
+  if (transfer.status !== 'approved') {
+    throw new AppError('Only approved transfers can be shipped', 400);
   }
   const shippedBy = actor.user_id;
 
@@ -610,10 +607,51 @@ async function cancelTransferById(transferId, input = {}, auth = {}) {
     throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
   }
 
-  if (transfer.status !== 'draft') {
-    throw new AppError('Only draft transfers can be cancelled', 400);
+  if (
+    !actor.capabilities.manage &&
+    !actor.location_ids.includes(transfer.from_location_id)
+  ) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
+  if (!['requested', 'approved'].includes(transfer.status)) {
+    throw new AppError('Only requested or approved transfers can be cancelled', 400);
   }
   await markTransferCancelled(normalizedTransferId, actor.user_id);
+
+  return getTransferById(normalizedTransferId, auth);
+}
+
+async function approveTransferById(transferId, input = {}, auth = {}) {
+  const actor = await resolveTransferActorContext(auth);
+  const normalizedTransferId = normalizeUuid(transferId);
+
+  if (!normalizedTransferId) {
+    throw new AppError('Transfer id is required', 400);
+  }
+
+  const transfer = await findTransferHeaderById(normalizedTransferId);
+
+  if (!transfer) {
+    throw new AppError('Transfer not found', 404);
+  }
+
+  if (!canAccessTransferHeader(transfer, actor)) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
+  if (
+    !actor.capabilities.manage &&
+    !actor.location_ids.includes(transfer.from_location_id)
+  ) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
+  if (transfer.status !== 'requested') {
+    throw new AppError('Only requested transfers can be approved', 400);
+  }
+
+  await markTransferApproved(normalizedTransferId, actor.user_id);
 
   return getTransferById(normalizedTransferId, auth);
 }
@@ -624,6 +662,7 @@ module.exports = {
   listTransferRequestCandidates,
   getTransferById,
   createTransfer,
+  approveTransferById,
   shipTransferById,
   receiveTransferById,
   cancelTransferById,

@@ -3,16 +3,11 @@
 import Link from "next/link"
 import { type ReactNode, useEffect, useMemo, useState } from "react"
 import {
-  CalendarRange,
   CheckCircle2,
   CircleAlert,
   Eye,
-  Filter,
-  LayoutGrid,
-  List,
   ReceiptText,
   RotateCcw,
-  Search,
   Wallet,
   XCircle,
 } from "lucide-react"
@@ -20,6 +15,10 @@ import {
 import { useAuth } from "@/components/auth/AuthProvider"
 import { PermissionGuard } from "@/components/auth/PermissionGuard"
 import { InlineStatusCard } from "@/components/feedback/status-page"
+import { Button } from "@/components/ui/button"
+import { DateFilterPicker } from "@/components/ui/date-filter-picker"
+import { FilterDropdown } from "@/components/ui/filter-dropdown"
+import { OpsSearchField } from "@/components/ui/ops-page-shell"
 import { Pagination } from "@/components/ui/pagination"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import {
@@ -61,24 +60,19 @@ type EligibleSale = {
   availability: PostsaleAvailability
 }
 
-type ViewMode = "table" | "cards"
-
 const PAGE_SIZE = 10
 
 const STATUS_OPTIONS = [
-  { value: "all", label: "Todos" },
+  { value: "all", label: "Todas" },
   { value: "confirmed", label: "Confirmadas" },
   { value: "cancelled", label: "Anuladas" },
   { value: "draft", label: "Borradores" },
-]
+] as const
 
 const STATUS_STYLES: Record<string, string> = {
-  confirmed:
-    "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300",
-  cancelled:
-    "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/15 dark:text-rose-300",
-  draft:
-    "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300",
+  confirmed: "sales-chip sales-chip-success",
+  cancelled: "sales-chip sales-chip-danger",
+  draft: "sales-chip sales-chip-warning",
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -87,27 +81,15 @@ const STATUS_LABELS: Record<string, string> = {
   draft: "Borrador",
 }
 
-const STATUS_SHORT_LABELS: Record<string, string> = {
-  confirmed: "Conf.",
-  cancelled: "Anul.",
-  draft: "Borr.",
-}
-
 const CASH_STYLES: Record<string, string> = {
-  open: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300",
-  closed: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/15 dark:text-rose-300",
-  missing: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300",
+  open: "sales-chip sales-chip-success",
+  closed: "sales-chip sales-chip-danger",
+  missing: "sales-chip sales-chip-warning",
 }
 
 const CASH_LABELS: Record<string, string> = {
   open: "Caja abierta",
   closed: "Caja cerrada",
-  missing: "Sin caja",
-}
-
-const CASH_SHORT_LABELS: Record<string, string> = {
-  open: "Caja ok",
-  closed: "Caja cerr.",
   missing: "Sin caja",
 }
 
@@ -134,12 +116,6 @@ function formatDateLabel(value: string | null, fallback: string) {
   })
 }
 
-function buildPostsaleSummary(sale: EligibleSale) {
-  const exchangeLabel = sale.availability.exchange.allowed ? "Cambio ok" : "Cambio bloq."
-  const cancelLabel = sale.availability.cancel.allowed ? "Anulación ok" : "Anulación bloq."
-  return `${exchangeLabel} · ${cancelLabel}`
-}
-
 function MetricPill({
   label,
   value,
@@ -147,56 +123,51 @@ function MetricPill({
 }: {
   label: string
   value: number
-  tone?: "default" | "emerald" | "sky"
+  tone?: "default" | "accent" | "warning"
 }) {
   const toneClass =
-    tone === "emerald"
-      ? "border-emerald-300/70 bg-emerald-50 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-300"
-      : tone === "sky"
-        ? "border-sky-300/70 bg-sky-50 text-sky-800 dark:border-sky-500/30 dark:bg-sky-500/15 dark:text-sky-300"
-        : "border-[var(--ops-border-strong)] bg-[var(--ops-surface)] text-[var(--ops-text)]"
+    tone === "accent"
+      ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))] text-[var(--ops-text)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--ripnel-accent)_14%,transparent)]"
+      : tone === "warning"
+        ? "border-[color:color-mix(in_srgb,#f59e0b_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
+        : "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text)]"
+  const labelClass =
+    tone === "accent"
+      ? "text-[color:color-mix(in_srgb,var(--ripnel-accent)_72%,var(--ops-text))]"
+      : tone === "warning"
+        ? "text-[color:color-mix(in_srgb,#f59e0b_82%,var(--ops-text))]"
+        : "text-[var(--ops-text-muted)]"
+  const valueClass =
+    tone === "accent"
+      ? "text-[var(--ops-text)]"
+      : tone === "warning"
+        ? "text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
+        : "text-[var(--ops-text)]"
 
   return (
-    <div
-      className={cn(
-        "inline-flex items-center gap-3 rounded-2xl border px-[var(--ops-metric-px)] py-[var(--ops-metric-py)] shadow-sm",
-        toneClass
-      )}
-    >
-      <span className="text-[11px] font-semibold uppercase tracking-wide opacity-80">{label}</span>
-      <span className="text-lg font-semibold leading-none">{value}</span>
+    <div className={cn("inline-flex items-center gap-2.5 rounded-full border px-3 py-2", toneClass)}>
+      <span className={cn("text-[11px] font-semibold uppercase tracking-[0.16em]", labelClass)}>
+        {label}
+      </span>
+      <span className={cn("text-base font-semibold leading-none", valueClass)}>{value}</span>
     </div>
   )
 }
 
-function IconStatusBadge({
+function MiniBadge({
   label,
-  shortLabel,
   toneClass,
   icon,
 }: {
   label: string
-  shortLabel: string
   toneClass: string
-  icon: ReactNode
+  icon?: ReactNode
 }) {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span
-          className={cn(
-            "inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold",
-            toneClass
-          )}
-        >
-          {icon}
-          <span>{shortLabel}</span>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent side="top" sideOffset={8}>
-        {label}
-      </TooltipContent>
-    </Tooltip>
+    <span className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold", toneClass)}>
+      {icon}
+      <span>{label}</span>
+    </span>
   )
 }
 
@@ -208,16 +179,14 @@ function SaleActions({
   canOpenSale: boolean
 }) {
   return (
-    <div className="flex items-center justify-end gap-2">
+    <div className="flex items-center justify-end gap-1.5">
       <Tooltip>
         <TooltipTrigger asChild>
-          <Link
-            href={`/postventa/${saleId}`}
-            className="sales-field sales-field-interactive inline-flex h-9 w-9 items-center justify-center rounded-lg"
-            aria-label="Ver detalle"
-          >
-            <Eye className="h-4 w-4" />
-          </Link>
+          <Button asChild variant="outline" size="icon-sm" className="rounded-lg" aria-label="Ver detalle">
+            <Link href={`/postventa/${saleId}`}>
+              <Eye className="h-4 w-4" />
+            </Link>
+          </Button>
         </TooltipTrigger>
         <TooltipContent side="top" sideOffset={8}>
           Ver detalle
@@ -227,13 +196,11 @@ function SaleActions({
       {canOpenSale ? (
         <Tooltip>
           <TooltipTrigger asChild>
-            <Link
-              href={buildSaleDetailRoute(saleId)}
-              className="sales-field sales-field-interactive inline-flex h-9 w-9 items-center justify-center rounded-lg"
-              aria-label="Ver venta"
-            >
-              <ReceiptText className="h-4 w-4" />
-            </Link>
+            <Button asChild variant="outline" size="icon-sm" className="rounded-lg" aria-label="Ver venta">
+              <Link href={buildSaleDetailRoute(saleId)}>
+                <ReceiptText className="h-4 w-4" />
+              </Link>
+            </Button>
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={8}>
             Ver venta
@@ -241,12 +208,9 @@ function SaleActions({
         </Tooltip>
       ) : null}
 
-      <Link
-        href={`/postventa/${saleId}`}
-        className="inline-flex items-center justify-center rounded-lg bg-[var(--ripnel-accent)] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)]"
-      >
-        Abrir
-      </Link>
+      <Button asChild variant="accent" size="sm" className="rounded-lg px-3">
+        <Link href={`/postventa/${saleId}`}>Abrir</Link>
+      </Button>
     </div>
   )
 }
@@ -260,14 +224,12 @@ export default function PostsalePage() {
   const [dateTo, setDateTo] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<ViewMode>("table")
   const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     let active = true
     const controller = new AbortController()
 
-    // defer scheduling the load to avoid synchronous setState inside effect
     const timeoutWrapper = Promise.resolve().then(() => {
       const timeoutId = window.setTimeout(async () => {
         setLoading(true)
@@ -337,6 +299,8 @@ export default function PostsalePage() {
 
   const hasActiveFilters =
     Boolean(search.trim()) || status !== "confirmed" || Boolean(dateFrom) || Boolean(dateTo)
+  const firstVisible = sales.length === 0 ? 0 : (safeCurrentPage - 1) * PAGE_SIZE + 1
+  const lastVisible = sales.length === 0 ? 0 : firstVisible + paginatedSales.length - 1
 
   function clearFilters() {
     setSearch("")
@@ -350,339 +314,238 @@ export default function PostsalePage() {
     <PermissionGuard permission="sales.postsale.view">
       <TooltipProvider delayDuration={120}>
         <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
-          <div className="mx-auto max-w-7xl space-y-[var(--ops-stack-gap)]">
+          <div className="mx-auto max-w-[1180px] space-y-4">
             <PosHeader
               eyebrow="Postventa"
               title="Postventa controlada"
               actions={
                 <>
-                  <Link
-                    href={appRoutes.transactionHistory}
-                    className="sales-field sales-field-interactive inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium"
-                  >
-                    Historial
-                  </Link>
+                  <Button asChild variant="outline" size="sm" className="rounded-lg">
+                    <Link href={appRoutes.transactionHistory}>Historial</Link>
+                  </Button>
                   {has("sales.pos") ? (
-                    <Link
-                      href={appRoutes.purchaseSystem}
-                      className="inline-flex items-center justify-center rounded-lg bg-[var(--ripnel-accent)] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)]"
-                    >
-                      Nueva venta
-                    </Link>
+                    <Button asChild variant="accent" size="sm" className="rounded-lg">
+                      <Link href={appRoutes.purchaseSystem}>Nueva venta</Link>
+                    </Button>
                   ) : null}
                 </>
               }
             />
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <MetricPill label="Evaluadas" value={stats.count} />
-              <MetricPill label="Cambio" value={stats.exchangeReady} tone="emerald" />
-              <MetricPill label="Anulación" value={stats.cancelReady} tone="sky" />
+              <MetricPill label="Cambio habilitado" value={stats.exchangeReady} tone="accent" />
+              <MetricPill label="Anulación habilitada" value={stats.cancelReady} tone="warning" />
             </div>
 
-            <article className="sales-panel rounded-lg p-[var(--ops-panel-padding)] shadow-sm">
-              <div className="flex flex-col gap-[var(--ops-stack-gap)]">
-                <div className="grid gap-3 lg:grid-cols-[1.4fr_0.8fr_0.9fr_0.9fr_auto] lg:items-end">
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
-                      <input
-                        type="text"
-                        value={search}
-                        onChange={(event) => {
-                          setSearch(event.target.value)
-                          setCurrentPage(1)
-                        }}
-                        placeholder="Buscar por nro. venta o cliente"
-                        className="sales-field h-11 w-full rounded-lg py-2.5 pl-9 pr-3 text-sm"
-                        aria-label="Buscar ventas"
-                      />
-                  </div>
+            <div className="space-y-4 border-t border-[var(--ops-border-strong)] pt-4">
+              <div className="grid gap-2.5 lg:grid-cols-[1.45fr_0.84fr_0.84fr_0.84fr_auto] lg:items-end">
+                <OpsSearchField
+                  value={search}
+                  onChange={(value) => {
+                    setSearch(value)
+                    setCurrentPage(1)
+                  }}
+                  placeholder="Buscar por nro. venta o cliente"
+                  ariaLabel="Buscar ventas elegibles"
+                />
 
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                      Estado
-                    </label>
-                    <div className="sales-field flex h-11 items-center gap-2 rounded-lg px-3">
-                      <Filter className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                      <select
-                        value={status}
-                        onChange={(event) => {
-                          setStatus(event.target.value)
-                          setCurrentPage(1)
-                        }}
-                        className="w-full bg-transparent text-sm text-[var(--ops-text)] outline-none"
-                      >
-                        {STATUS_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
+                <FilterDropdown
+                  label="Estado"
+                  value={status}
+                  options={STATUS_OPTIONS}
+                  onChange={(value) => {
+                    setStatus(value)
+                    setCurrentPage(1)
+                  }}
+                />
 
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                      Fecha desde
-                    </label>
-                    <div className="sales-field flex h-11 items-center gap-2 rounded-lg px-3">
-                      <CalendarRange className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                      <input
-                        type="date"
-                        value={dateFrom}
-                        onChange={(event) => {
-                          setDateFrom(event.target.value)
-                          setCurrentPage(1)
-                        }}
-                        className="w-full bg-transparent text-sm text-[var(--ops-text)] outline-none"
-                      />
-                    </div>
-                  </div>
+                <DateFilterPicker
+                  label="Fecha desde"
+                  value={dateFrom}
+                  onChange={(value) => {
+                    setDateFrom(value)
+                    setCurrentPage(1)
+                  }}
+                  ariaLabel="Fecha desde"
+                  max={dateTo || undefined}
+                />
 
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                      Fecha hasta
-                    </label>
-                    <div className="sales-field flex h-11 items-center gap-2 rounded-lg px-3">
-                      <CalendarRange className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                      <input
-                        type="date"
-                        value={dateTo}
-                        onChange={(event) => {
-                          setDateTo(event.target.value)
-                          setCurrentPage(1)
-                        }}
-                        className="w-full bg-transparent text-sm text-[var(--ops-text)] outline-none"
-                      />
-                    </div>
-                  </div>
+                <DateFilterPicker
+                  label="Fecha hasta"
+                  value={dateTo}
+                  onChange={(value) => {
+                    setDateTo(value)
+                    setCurrentPage(1)
+                  }}
+                  ariaLabel="Fecha hasta"
+                  min={dateFrom || undefined}
+                />
 
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        onClick={clearFilters}
-                        disabled={!hasActiveFilters}
-                        className="sales-field sales-field-interactive inline-flex h-11 w-11 items-center justify-center rounded-lg disabled:cursor-not-allowed disabled:opacity-50"
-                        aria-label="Limpiar filtros"
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" sideOffset={8}>Limpiar filtros</TooltipContent>
-                  </Tooltip>
-                </div>
-
-                <div className="flex flex-col gap-3 border-t border-[var(--ops-border-strong)] pt-3 md:flex-row md:items-center md:justify-between">
-                  <div className="sales-field inline-flex w-fit rounded-lg p-1">
-                    <button
-                      type="button"
-                      onClick={() => setViewMode("table")}
-                      className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition ${
-                        viewMode === "table"
-                          ? "bg-[var(--ops-surface)] text-[var(--ops-text)] shadow-sm"
-                          : "text-[var(--ops-text-muted)] hover:text-[var(--ops-text)]"
-                      }`}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={clearFilters}
+                      disabled={!hasActiveFilters}
+                      variant="outline"
+                      size="icon-sm"
+                      className="h-10 w-10 rounded-lg"
+                      aria-label="Limpiar filtros"
                     >
-                      <List className="h-4 w-4" />
-                      Tabla
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setViewMode("cards")}
-                      className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition ${
-                        viewMode === "cards"
-                          ? "bg-[var(--ops-surface)] text-[var(--ops-text)] shadow-sm"
-                          : "text-[var(--ops-text-muted)] hover:text-[var(--ops-text)]"
-                      }`}
-                    >
-                      <LayoutGrid className="h-4 w-4" />
-                      Tarjetas
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="ops-secondary-text text-[var(--ops-text-muted)]">
-                      {sales.length === 0
-                        ? "0 resultados"
-                        : `${(safeCurrentPage - 1) * PAGE_SIZE + 1}-${Math.min(
-                            safeCurrentPage * PAGE_SIZE,
-                            sales.length
-                          )} de ${sales.length}`}
-                    </span>
-                    <Pagination
-                      page={safeCurrentPage}
-                      totalPages={totalPages}
-                      onPageChange={setCurrentPage}
-                    />
-                  </div>
-                </div>
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={8}>
+                    Limpiar filtros
+                  </TooltipContent>
+                </Tooltip>
               </div>
 
-              <div className="mt-4">
-                {loading ? (
-                  <div className="ops-surface-muted rounded-2xl border px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                    Cargando ventas elegibles...
-                  </div>
-                ) : error ? (
-                  <InlineStatusCard
-                    title="No pudimos cargar la cola de postventa"
-                    description={error}
-                    tone="danger"
-                  />
-                ) : sales.length === 0 ? (
-                  <div className="ops-surface-muted rounded-2xl border px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                    No se encontraron ventas para los filtros aplicados.
-                  </div>
-                ) : viewMode === "table" ? (
-                  <div className="overflow-hidden rounded-lg border border-[var(--ops-border-strong)]">
-                    <div className="sales-panel-muted hidden grid-cols-[1fr_1.15fr_0.95fr_0.95fr_1fr_0.8fr_1.05fr_auto] gap-3 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)] lg:grid">
-                      <span>Venta</span>
-                      <span>Cliente</span>
-                      <span>Fecha</span>
-                      <span>Sede</span>
-                      <span>Estado</span>
-                      <span>Total</span>
-                      <span>Postventa</span>
-                      <span className="text-right">Acciones</span>
-                    </div>
-
-                    <div className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                      {paginatedSales.map((sale) => (
-                        <div
-                          key={sale.sale_id}
-                          className="grid gap-[var(--ops-row-gap)] px-4 py-[var(--ops-row-py)] transition hover:bg-[var(--ops-surface-muted)] lg:grid-cols-[1fr_1.15fr_0.95fr_0.95fr_1fr_0.8fr_1.05fr_auto] lg:items-center"
-                        >
-                          <div className="min-w-0">
-                            <p className="font-semibold text-[var(--ops-text)]">
-                              {sale.sale_number || "Sin correlativo"}
-                            </p>
-                            <span className="sales-chip sales-chip-accent mt-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
-                              {sale.document_type}
-                            </span>
-                          </div>
-
-                          <div className="text-xs text-[var(--ops-text)]">
-                            {sale.customer_name_text || "Cliente general"}
-                          </div>
-
-                          <div className="text-xs text-[var(--ops-text)]">
-                            {formatDateLabel(sale.confirmed_at, sale.created_at)}
-                          </div>
-
-                          <div className="text-xs text-[var(--ops-text)]">
-                            {sale.location_name}
-                          </div>
-
-                          <div className="flex flex-wrap gap-2">
-                            <IconStatusBadge
-                              label={STATUS_LABELS[sale.status] || sale.status}
-                              shortLabel={STATUS_SHORT_LABELS[sale.status] || sale.status}
-                              toneClass={
-                                STATUS_STYLES[sale.status] ||
-                                "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                              }
-                              icon={
-                                sale.status === "confirmed" ? (
-                                  <CheckCircle2 className="h-3.5 w-3.5" />
-                                ) : sale.status === "cancelled" ? (
-                                  <XCircle className="h-3.5 w-3.5" />
-                                ) : (
-                                  <CircleAlert className="h-3.5 w-3.5" />
-                                )
-                              }
+              <div className="overflow-x-auto">
+                <div className="min-w-[1080px] border-y border-[var(--ops-border-strong)]">
+                  <table className="w-full border-collapse">
+                    <thead className="bg-[var(--ops-surface-muted)]">
+                      <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                        <th className="px-4 py-3">Venta</th>
+                        <th className="px-4 py-3">Fecha</th>
+                        <th className="px-4 py-3">Cliente</th>
+                        <th className="px-4 py-3">Sede</th>
+                        <th className="px-4 py-3">Estado</th>
+                        <th className="px-4 py-3">Total</th>
+                        <th className="px-4 py-3">Postventa</th>
+                        <th className="px-4 py-3 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                      {loading ? (
+                        <tr>
+                          <td colSpan={8} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                            Cargando ventas elegibles...
+                          </td>
+                        </tr>
+                      ) : error ? (
+                        <tr>
+                          <td colSpan={8} className="px-4 py-6">
+                            <InlineStatusCard
+                              title="No pudimos cargar la cola de postventa"
+                              description={error}
+                              tone="danger"
                             />
-                            <IconStatusBadge
-                              label={CASH_LABELS[sale.cash_status] || CASH_LABELS.missing}
-                              shortLabel={CASH_SHORT_LABELS[sale.cash_status] || CASH_LABELS.missing}
-                              toneClass={CASH_STYLES[sale.cash_status] || CASH_STYLES.missing}
-                              icon={<Wallet className="h-3.5 w-3.5" />}
-                            />
-                          </div>
-
-                          <div>
-                            <p className="text-sm font-semibold text-[var(--ops-text)]">
-                              S/. {Number(sale.total_amount || 0).toFixed(2)}
-                            </p>
-                            <p className="ops-secondary-text text-[var(--ops-text-muted)]">
-                              {sale.currency}
-                            </p>
-                          </div>
-
-                          <div className="text-xs text-[var(--ops-text)]">
-                            {buildPostsaleSummary(sale)}
-                          </div>
-
-                          <SaleActions saleId={sale.sale_id} canOpenSale={has("sales.pos")} />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {paginatedSales.map((sale) => (
-                      <article
-                        key={sale.sale_id}
-                        className="ops-surface overflow-hidden rounded-2xl border shadow-sm"
-                      >
-                        <div className="grid gap-3 px-4 py-[var(--ops-row-py)] lg:grid-cols-[1.5fr_auto] lg:items-center">
-                          <div className="min-w-0 space-y-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h2 className="text-lg font-semibold text-[var(--ops-text)]">
+                          </td>
+                        </tr>
+                      ) : paginatedSales.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                            No se encontraron ventas para los filtros aplicados.
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedSales.map((sale) => (
+                          <tr key={sale.sale_id} className="transition hover:bg-[var(--ops-surface-muted)]">
+                            <td className="px-4 py-[var(--ops-row-py)]">
+                              <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
                                 {sale.sale_number || "Sin correlativo"}
-                              </h2>
-                              <IconStatusBadge
-                                label={STATUS_LABELS[sale.status] || sale.status}
-                                shortLabel={STATUS_SHORT_LABELS[sale.status] || sale.status}
-                                toneClass={
-                                  STATUS_STYLES[sale.status] ||
-                                  "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                                }
-                                icon={
-                                  sale.status === "confirmed" ? (
-                                    <CheckCircle2 className="h-3.5 w-3.5" />
-                                  ) : sale.status === "cancelled" ? (
-                                    <XCircle className="h-3.5 w-3.5" />
-                                  ) : (
-                                    <CircleAlert className="h-3.5 w-3.5" />
-                                  )
-                                }
-                              />
-                              <IconStatusBadge
-                                label={CASH_LABELS[sale.cash_status] || CASH_LABELS.missing}
-                                shortLabel={CASH_SHORT_LABELS[sale.cash_status] || CASH_LABELS.missing}
-                                toneClass={CASH_STYLES[sale.cash_status] || CASH_STYLES.missing}
-                                icon={<Wallet className="h-3.5 w-3.5" />}
-                              />
-                            </div>
-
-                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--ops-text)]">
-                              <p>{sale.customer_name_text || "Cliente general"}</p>
-                              <p>{sale.location_name}</p>
-                              <p>{formatDateLabel(sale.confirmed_at, sale.created_at)}</p>
-                            </div>
-
-                            <div className="flex flex-wrap gap-2">
-                              <span className="sales-chip sales-chip-accent rounded-full px-2.5 py-1 text-xs font-medium">
+                              </p>
+                              <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                                 {sale.document_type}
-                              </span>
-                              <span className="sales-chip rounded-full px-2.5 py-1 text-xs font-medium">
-                                S/. {Number(sale.total_amount || 0).toFixed(2)}
-                              </span>
-                              <span className="sales-chip rounded-full px-2.5 py-1 text-xs font-medium">
-                                {buildPostsaleSummary(sale)}
-                              </span>
-                            </div>
-                          </div>
+                              </p>
+                            </td>
 
-                          <SaleActions saleId={sale.sale_id} canOpenSale={has("sales.pos")} />
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                )}
+                            <td className="px-4 py-[var(--ops-row-py)] text-xs leading-5 text-[var(--ops-text-muted)]">
+                              <p>{formatDateLabel(sale.confirmed_at, sale.created_at)}</p>
+                              <p className="mt-1 uppercase tracking-[0.12em]">{sale.business_date}</p>
+                            </td>
+
+                            <td className="px-4 py-[var(--ops-row-py)]">
+                              <p className="text-sm font-medium leading-5 text-[var(--ops-text)]">
+                                {sale.customer_name_text || "Cliente general"}
+                              </p>
+                              <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
+                                {sale.seller_name}
+                              </p>
+                            </td>
+
+                            <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                              {sale.location_name}
+                            </td>
+
+                            <td className="px-4 py-[var(--ops-row-py)]">
+                              <div className="flex flex-wrap gap-1.5">
+                                <MiniBadge
+                                  label={STATUS_LABELS[sale.status] || sale.status}
+                                  toneClass={STATUS_STYLES[sale.status] || "sales-chip sales-chip-neutral"}
+                                  icon={
+                                    sale.status === "confirmed" ? (
+                                      <CheckCircle2 className="h-3.5 w-3.5" />
+                                    ) : sale.status === "cancelled" ? (
+                                      <XCircle className="h-3.5 w-3.5" />
+                                    ) : (
+                                      <CircleAlert className="h-3.5 w-3.5" />
+                                    )
+                                  }
+                                />
+                                <MiniBadge
+                                  label={CASH_LABELS[sale.cash_status] || CASH_LABELS.missing}
+                                  toneClass={CASH_STYLES[sale.cash_status] || CASH_STYLES.missing}
+                                  icon={<Wallet className="h-3.5 w-3.5" />}
+                                />
+                              </div>
+                            </td>
+
+                            <td className="px-4 py-[var(--ops-row-py)]">
+                              <p className="text-sm font-semibold text-[var(--ops-text)]">
+                                S/. {Number(sale.total_amount || 0).toFixed(2)}
+                              </p>
+                              <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
+                                {sale.currency}
+                              </p>
+                            </td>
+
+                            <td className="px-4 py-[var(--ops-row-py)]">
+                              <div className="flex flex-wrap gap-1.5">
+                                <MiniBadge
+                                  label={sale.availability.exchange.allowed ? "Cambio ok" : "Cambio bloqueado"}
+                                  toneClass={
+                                    sale.availability.exchange.allowed
+                                      ? "sales-chip sales-chip-success"
+                                      : "sales-chip sales-chip-neutral"
+                                  }
+                                />
+                                <MiniBadge
+                                  label={sale.availability.cancel.allowed ? "Anulación ok" : "Anulación bloqueada"}
+                                  toneClass={
+                                    sale.availability.cancel.allowed
+                                      ? "sales-chip sales-chip-warning"
+                                      : "sales-chip sales-chip-neutral"
+                                  }
+                                />
+                              </div>
+                            </td>
+
+                            <td className="px-4 py-[var(--ops-row-py)]">
+                              <SaleActions saleId={sale.sale_id} canOpenSale={has("sales.pos")} />
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </article>
+
+              <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between">
+                <span className="text-sm text-[var(--ops-text-muted)]">
+                  {sales.length === 0 ? "0 resultados" : `${firstVisible}-${lastVisible} de ${sales.length}`}
+                </span>
+
+                <Pagination
+                  page={safeCurrentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  className="self-end md:self-auto"
+                />
+              </div>
+            </div>
           </div>
         </section>
       </TooltipProvider>
