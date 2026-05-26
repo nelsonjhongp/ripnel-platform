@@ -64,9 +64,9 @@ export function useSidebarTopbarActions(actions: TopbarAction[]) {
   }, [actions, context])
 
   React.useEffect(() => {
-    if (!context) return
-
     return () => {
+      if (!context) return
+
       context.setActions((currentActions) => {
         if (currentActions.length === 0) {
           return currentActions
@@ -114,10 +114,7 @@ export function SidebarShell({
     return [...unique.values()]
   }, [contextualActions, defaultActions])
 
-  const topbarActionsContext = React.useMemo(
-    () => ({ setActions: setContextualActions }),
-    [setContextualActions]
-  )
+  const topbarActionsContext = React.useMemo(() => ({ setActions: setContextualActions }), [])
 
   return (
     <SidebarTopbarActionsContext.Provider value={topbarActionsContext}>
@@ -161,7 +158,7 @@ export function SidebarShell({
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto w-full min-h-screen">{children}</main>
+        <main className="flex-1 overflow-auto w-full min-h-dvh">{children}</main>
       </AppSidebar>
     </SidebarTopbarActionsContext.Provider>
   )

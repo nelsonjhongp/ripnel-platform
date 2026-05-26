@@ -322,7 +322,7 @@ export function TransfersListPage() {
           <InlineStatusCard
             title="Este módulo gestiona la reposición entre sedes"
             description="Aquí nacen las solicitudes y se hace seguimiento al documento operativo. El stock solo cambia cuando una transferencia se despacha o se recepciona."
-            tone="info"
+            tone="neutral"
             variant="ops"
           />
           <div className="flex flex-wrap gap-2">

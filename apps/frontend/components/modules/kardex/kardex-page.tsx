@@ -446,7 +446,7 @@ function KardexPageContent({
         <InlineStatusCard
           title="Kardex de trazabilidad"
           description="Aquí revisas por qué cambió el stock. No inicia operaciones: las reposiciones se solicitan en transferencias y las correcciones se registran en aperturas o ajustes."
-          tone="info"
+          tone="neutral"
           variant="ops"
         />
 
@@ -543,14 +543,7 @@ function KardexPageContent({
                       setOriginFilter("ALL");
                       setDateFrom("");
                       setDateTo("");
-                      if (
-                        searchParams.get("query") ||
-                        searchParams.get("reference_type") ||
-                        searchParams.get("reference_id") ||
-                        searchParams.get("movement_type") ||
-                        searchParams.get("date_from") ||
-                        searchParams.get("date_to")
-                      ) {
+                      if (hasSearchContext) {
                         router.replace(pathname);
                       }
                     })}

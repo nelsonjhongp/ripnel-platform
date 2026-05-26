@@ -49,8 +49,8 @@ export function StatusPage({
     <section
       className={
         isOps
-          ? "ops-page flex min-h-[calc(100vh-3.5rem)] w-full items-center px-4 py-8 md:px-6"
-          : "flex min-h-[calc(100vh-3.5rem)] w-full items-center bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_30%,#f8fafc_65%,#eef2ff_100%)] px-4 py-10 md:px-8"
+          ? "ops-page flex min-h-[calc(100dvh-3.5rem)] w-full items-center px-4 py-8 md:px-6"
+          : "flex min-h-[calc(100dvh-3.5rem)] w-full items-center bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_30%,#f8fafc_65%,#eef2ff_100%)] px-4 py-10 md:px-8"
       }
     >
       <div className={isOps ? "mx-auto w-full max-w-4xl" : "mx-auto w-full max-w-5xl"}>
