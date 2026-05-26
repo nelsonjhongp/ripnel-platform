@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary"
 import Link from "next/link"
 import { Dialog as DialogPrimitive } from "radix-ui"
 import type { LucideIcon } from "lucide-react"
@@ -1262,10 +1263,11 @@ export default function NuevaVentaPage() {
   }
 
   return (
+    <ErrorBoundary>
     <PermissionGuard permission="sales.pos">
       <Sheet open={customerSheetOpen} onOpenChange={setCustomerSheetOpen}>
         <TooltipProvider delayDuration={120}>
-          <div className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
+          <div className="sales-page min-h-dvh px-4 py-[var(--ops-page-py)] md:px-8">
             <div className="mx-auto max-w-[1180px] space-y-4">
               <PosHeader
                 eyebrow="Punto de venta"
@@ -3298,5 +3300,6 @@ export default function NuevaVentaPage() {
         </SheetContent>
       </Sheet>
     </PermissionGuard>
+    </ErrorBoundary>
   )
 }
