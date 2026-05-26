@@ -28,16 +28,27 @@ const SidebarTopbarActionsContext = React.createContext<{
 
 export function useSidebarTopbarActions(actions: TopbarAction[]) {
   const context = React.useContext(SidebarTopbarActionsContext)
+  const prevRef = React.useRef<TopbarAction[]>(actions)
 
   React.useEffect(() => {
     if (!context) return
 
-    context.setActions(actions)
+    const prev = prevRef.current
+    const changed =
+      actions.length !== prev.length ||
+      actions.some((a, i) => a.key !== prev[i]?.key)
 
-    return () => {
-      context.setActions([])
+    if (changed) {
+      context.setActions(actions)
+      prevRef.current = actions
     }
   }, [actions, context])
+
+  React.useEffect(() => {
+    return () => {
+      if (context) context.setActions([])
+    }
+  }, [context])
 }
 
 export function SidebarShell({
@@ -76,8 +87,10 @@ export function SidebarShell({
     return [...unique.values()]
   }, [contextualActions, defaultActions])
 
+  const contextValue = React.useMemo(() => ({ setActions: setContextualActions }), [])
+
   return (
-    <SidebarTopbarActionsContext.Provider value={{ setActions: setContextualActions }}>
+    <SidebarTopbarActionsContext.Provider value={contextValue}>
       <AppSidebar>
         <header className="ops-topbar flex h-14 shrink-0 items-center justify-between gap-3 border-b px-4 md:px-5">
           <div className="flex min-w-0 items-center gap-2">
