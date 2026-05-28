@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Info, Search, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
@@ -30,12 +30,7 @@ import {
 } from "@/components/ui/compact-picker";
 import { Button } from "@/components/ui/button";
 import { OpsPageShell } from "@/components/ui/ops-page-shell";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   DraftSummaryPanel,
   RequestProductComposer,
@@ -77,20 +72,6 @@ function RequestHeaderMeta({
       <span className="inline-flex items-center rounded-full border border-[color:color-mix(in_srgb,#f97316_18%,#E7E2EE)] bg-[color:color-mix(in_srgb,#f97316_10%,white)] px-3 py-1.5 font-semibold text-[#C96C1D]">
         {originLabel}
       </span>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            className="inline-flex h-8 w-8 cursor-help items-center justify-center rounded-full border border-[#E7E2EE] bg-white text-[#8A8098] transition hover:border-[color:color-mix(in_srgb,var(--ripnel-accent)_24%,#E7E2EE)] hover:text-[var(--ripnel-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:color-mix(in_srgb,var(--ripnel-accent)_18%,transparent)]"
-            aria-label="Información sobre el movimiento de stock"
-          >
-            <Info className="h-3.5 w-3.5" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" sideOffset={8} className="max-w-72">
-          El stock se descuenta recién al despachar y recepcionar la reposición.
-        </TooltipContent>
-      </Tooltip>
     </div>
   );
 }

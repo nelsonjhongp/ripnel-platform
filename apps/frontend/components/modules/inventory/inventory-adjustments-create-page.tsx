@@ -276,12 +276,6 @@ export function InventoryAdjustmentsCreatePage() {
 
       <OpsSectionDivider>
         <form id="inventory-adjustment-create-form" onSubmit={submitAdjustment} className="space-y-4">
-          <InlineStatusCard
-            title="Este flujo no reemplaza una transferencia"
-            description="Úsalo para aperturas iniciales, conteos físicos y regularizaciones. Si el stock vino de otra sede, corresponde una transferencia."
-            tone="warning"
-            variant="ops"
-          />
           {createError ? (
             <InlineStatusCard title="Error al crear ajuste" description={createError} tone="danger" variant="ops" />
           ) : null}
@@ -353,15 +347,10 @@ export function InventoryAdjustmentsCreatePage() {
                   value={createNotes}
                   onChange={(event) => setCreateNotes(event.target.value)}
                   rows={3}
-                  placeholder="Notas de conteo, apertura o contexto del ajuste"
+                  placeholder="Notas del ajuste"
                   className="min-h-[92px]"
                 />
               </div>
-            </div>
-            <div className="mt-4 rounded-lg border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-4 py-3 text-sm text-[var(--ops-text-muted)]">
-              {adjustmentIntent === "opening"
-                ? "La apertura inicial sirve para cargar stock existente antes de operar con el sistema. No reemplaza una transferencia."
-                : "El ajuste corrige diferencias de conteo o regularización. Si la mercadería vino de otra sede, usa transferencias."}
             </div>
           </section>
 

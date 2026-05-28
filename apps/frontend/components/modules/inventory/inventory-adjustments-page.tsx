@@ -318,12 +318,6 @@ export function InventoryAdjustmentsPage() {
           ) : null}
 
         <OpsSectionDivider>
-          <InlineStatusCard
-            title="Usa aperturas y ajustes solo para corregir o inicializar stock"
-            description="Si la mercadería se mueve desde otra sede, usa transferencias. Aquí registras conteos físicos, regularizaciones y aperturas iniciales."
-            tone="warning"
-            variant="ops"
-          />
           <OpsTableBlock>
 
           <OpsFiltersRow className="lg:grid-cols-[1.4fr_0.9fr_0.8fr_auto]">

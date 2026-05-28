@@ -12,8 +12,9 @@ export interface OpsAttentionRowProps {
   ctaLabel: string
   href: string
   highlightValue: string
-  badge: string
+  badge?: string | null
   tone?: "neutral" | "success" | "warning" | "danger" | "accent"
+  embedded?: boolean
 }
 
 const iconToneClasses: Record<NonNullable<OpsAttentionRowProps["tone"]>, string> = {
@@ -65,43 +66,55 @@ export function OpsAttentionRow({
   highlightValue,
   badge,
   tone = "neutral",
+  embedded = false,
 }: OpsAttentionRowProps) {
   return (
     <div
       className={cn(
-        "rounded-xl border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_22%,var(--ops-surface))] px-3 py-2.5",
+        embedded
+          ? "bg-transparent px-4 py-2.5"
+          : "rounded-xl border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_18%,var(--ops-surface))] px-3 py-2",
         "border-l-2",
         borderToneClasses[tone]
       )}
     >
-      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-3">
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-2.5">
         <div
           className={cn(
-            "mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg",
+            "mt-0.5 flex h-7 w-7 items-center justify-center rounded-lg",
             iconToneClasses[tone]
           )}
         >
           {icon}
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-semibold leading-tight text-[var(--ops-text)]">{title}</p>
-          <p className="mt-0.5 text-[11px] leading-[1.35] text-[var(--ops-text-muted)]">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-semibold leading-tight text-[var(--ops-text)]">{title}</p>
+          </div>
+          <p className="mt-0.5 text-[11px] leading-[1.3] text-[var(--ops-text-muted)]">
             {description}
           </p>
           <Link
             href={href}
-            className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--ripnel-accent-hover)] transition hover:text-[var(--ripnel-accent)]"
+            className={cn(
+              "mt-1 inline-flex items-center gap-1 font-semibold transition",
+              embedded
+                ? "text-[12px] text-[var(--ripnel-accent-hover)] hover:text-[var(--ripnel-accent)]"
+                : "text-[11px] text-[var(--ripnel-accent-hover)] hover:text-[var(--ripnel-accent)]"
+            )}
           >
             {ctaLabel}
           </Link>
         </div>
-        <div className="flex min-w-[74px] flex-col items-end justify-start gap-1">
-          <p className={cn("text-right text-base font-semibold tracking-[-0.02em]", highlightToneClasses[tone])}>
+        <div className="flex min-w-[72px] flex-col items-end justify-start gap-1">
+          <p className={cn("text-right text-[15px] font-semibold tracking-[-0.02em]", highlightToneClasses[tone])}>
             {highlightValue}
           </p>
-          <OpsStatusBadge tone={badgeToneMap[tone]} size="xs">
-            {badge}
-          </OpsStatusBadge>
+          {badge ? (
+            <OpsStatusBadge tone={badgeToneMap[tone]} size="xs">
+              {badge}
+            </OpsStatusBadge>
+          ) : null}
         </div>
       </div>
     </div>

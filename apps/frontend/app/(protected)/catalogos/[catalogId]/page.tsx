@@ -16,7 +16,7 @@ export default async function CatalogPage({
 
   return (
     <CatalogCrudPage
-      eyebrow="Catalogos"
+      eyebrow="Catálogos"
       title={page.label}
       endpoint={page.endpoint}
       emptyTitle={page.emptyTitle}

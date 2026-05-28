@@ -1,38 +1,54 @@
-"use client"
+"use client";
 
-import type { ReactNode } from "react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
+import type { ReactNode } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export interface HomeHeaderAction {
-  key: string
-  label: string
-  href: string
-  icon: ReactNode
-  variant?: "accent" | "outline"
+  key: string;
+  label: string;
+  href: string;
+  icon: ReactNode;
+  variant?: "accent" | "outline";
 }
 
 export function HomeHeader({
+  eyebrow,
   title,
-  subtitle,
+  metadata,
   actions,
 }: {
-  title: string
-  subtitle: string
-  actions: HomeHeaderAction[]
+  eyebrow: string;
+  title: string;
+  metadata: string[];
+  actions: HomeHeaderAction[];
 }) {
   return (
-    <header className="flex flex-wrap items-center justify-between gap-4">
+    <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--ops-text)] md:text-[1.75rem]">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ripnel-accent-hover)]">
+          {eyebrow}
+        </p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--ops-text)] md:text-[1.75rem]">
           {title}
         </h1>
-        <p className="mt-1 text-sm text-[var(--ops-text-muted)]">{subtitle}</p>
+        {metadata.length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {metadata.map((item) => (
+              <span
+                key={item}
+                className="sales-chip rounded-full px-3 py-1.5 text-[12px] font-medium text-[var(--ops-text-muted)]"
+              >
+                {item}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {actions.length > 0 && (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
           {actions.map((action) => (
             <Button
               key={action.key}
@@ -52,5 +68,5 @@ export function HomeHeader({
         </div>
       )}
     </header>
-  )
+  );
 }

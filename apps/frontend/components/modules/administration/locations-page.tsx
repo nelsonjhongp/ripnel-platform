@@ -10,7 +10,7 @@ import {
   RefreshCw,
   RotateCcw,
 } from "lucide-react";
-import { buildApiUrl } from "@/lib/api";
+import { apiFetchData } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
@@ -106,16 +106,10 @@ export default function LocationsPage() {
     setError(null);
 
     try {
-      const response = await fetch(buildApiUrl("/api/locations"), {
+      const data = await apiFetchData<LocationItem[]>("/api/locations", {
         cache: "no-store",
       });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo cargar ubicaciones");
-      }
-
-      setLocations(payload.data || []);
+      setLocations(data || []);
     } catch (requestError) {
       setError(
         requestError instanceof Error ? requestError.message : "No se pudo cargar ubicaciones"
@@ -208,26 +202,20 @@ export default function LocationsPage() {
     setSavingActiveChange(true);
 
     try {
-      const response = await fetch(buildApiUrl(`/api/locations/${activeChangeLocation.location_id}`), {
+      const data = await apiFetchData<LocationItem>(`/api/locations/${activeChangeLocation.location_id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ active: !activeChangeLocation.active }),
       });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo actualizar la ubicación");
-      }
-
-      updateLocationInList(payload.data);
+      updateLocationInList(data);
 
       if (editingLocationId === activeChangeLocation.location_id) {
-        setFormState((current) => ({ ...current, active: payload.data.active }));
+        setFormState((current) => ({ ...current, active: data.active }));
       }
 
-      setSuccessMessage(payload.data.active ? "Ubicación activada." : "Ubicación inactivada.");
+      setSuccessMessage(data.active ? "Ubicación activada." : "Ubicación inactivada.");
       setActiveChangeLocation(null);
     } catch (requestError) {
       setError(
@@ -246,8 +234,8 @@ export default function LocationsPage() {
 
     try {
       const isEditing = Boolean(editingLocationId);
-      const response = await fetch(
-        buildApiUrl(isEditing ? `/api/locations/${editingLocationId}` : "/api/locations"),
+      const data = await apiFetchData<LocationItem>(
+        isEditing ? `/api/locations/${editingLocationId}` : "/api/locations",
         {
           method: isEditing ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
@@ -269,20 +257,11 @@ export default function LocationsPage() {
         }
       );
 
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          payload.message ||
-            (isEditing ? "No se pudo actualizar la ubicación" : "No se pudo crear la ubicación")
-        );
-      }
-
       if (isEditing) {
-        updateLocationInList(payload.data);
+        updateLocationInList(data);
         setSuccessMessage("Ubicación actualizada.");
       } else {
-        setLocations((current) => [payload.data, ...current]);
+        setLocations((current) => [data, ...current]);
         setSuccessMessage("Ubicación creada.");
       }
 

@@ -31,7 +31,7 @@ export function DashboardChartCard({
       <OpsSectionHeader icon={icon} title={title} action={action} className={headerClassName} />
       <div
         className={cn(
-          "rounded-xl border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_24%,var(--ops-surface))] p-4",
+          "rounded-xl border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_20%,var(--ops-surface))] p-3.5",
           contentClassName
         )}
       >

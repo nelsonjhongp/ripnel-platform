@@ -5,10 +5,12 @@ import { useAuth } from "./AuthProvider";
 
 export function PermissionGuard({
   permission,
+  anyPermissions,
   allowedRoles,
   children,
 }: {
   permission?: string;
+  anyPermissions?: string[];
   allowedRoles?: string[];
   children: React.ReactNode;
 }) {
@@ -19,12 +21,16 @@ export function PermissionGuard({
   }
 
   const permissionAllowed = permission ? has(permission) : true;
+  const anyPermissionAllowed =
+    !anyPermissions ||
+    anyPermissions.length === 0 ||
+    anyPermissions.some((permissionKey) => has(permissionKey));
   const roleAllowed =
     !allowedRoles ||
     allowedRoles.length === 0 ||
     allowedRoles.includes(String(user?.role_name || ""));
 
-  if (!permissionAllowed || !roleAllowed) {
+  if (!permissionAllowed || !anyPermissionAllowed || !roleAllowed) {
     return <ForbiddenPage />;
   }
 

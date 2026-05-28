@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import type { ReactNode } from "react"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { LucideIcon } from "lucide-react"
 import {
   ArrowRight,
@@ -45,8 +45,10 @@ import { useAuth } from "@/components/auth/AuthProvider"
 import { ErrorPage, ProtectedLoadingPage } from "@/components/feedback/status-page"
 import { useSidebarTopbarActions } from "@/components/sidebar"
 import { Button } from "@/components/ui/button"
+import { FilterDropdown } from "@/components/ui/filter-dropdown"
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { fetchCommercialActivity, fetchCustomerAnalytics, fetchDashboardOverview } from "@/lib/api-dashboard"
 import { ApiError } from "@/lib/api"
 import type {
@@ -67,7 +69,14 @@ import {
 } from "@/lib/routes"
 import { cn } from "@/lib/utils"
 
-const PIE_COLORS = ["#b07ae4", "#0ea5e9", "#10b981", "#f59e0b", "#f43f5e", "#7c3aed"]
+const PIE_COLORS = [
+  "var(--ops-chart-1)",
+  "var(--ops-chart-2)",
+  "var(--ops-chart-3)",
+  "var(--ops-chart-4)",
+  "var(--ops-chart-5)",
+  "var(--ops-chart-6)",
+]
 
 const chartTooltipStyle = {
   background: "var(--ops-surface)",
@@ -77,6 +86,8 @@ const chartTooltipStyle = {
   fontSize: 12,
   color: "var(--ops-text)",
 }
+
+const ALL_LOCATIONS_VALUE = "all"
 
 function todayPeruISO() {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/Lima" })
@@ -98,10 +109,28 @@ function formatDateTime(value: string | null | undefined) {
 }
 
 function buildAttentionBadge(value: number, tone: AttentionPanelItem["tone"]) {
-  if (value === 0) return "Al dia"
+  if (value === 0) return null
   if (tone === "danger") return "Urgente"
   if (tone === "warning") return "Atender"
   return "Revisar"
+}
+
+function buildDashboardScopeParams(locationValue: string) {
+  if (!locationValue) {
+    return {}
+  }
+
+  if (locationValue === ALL_LOCATIONS_VALUE) {
+    return {
+      location_scope: "all" as const,
+      location_id: null,
+    }
+  }
+
+  return {
+    location_scope: "single" as const,
+    location_id: locationValue,
+  }
 }
 
 function attentionTonePriority(tone: AttentionPanelItem["tone"]) {
@@ -153,6 +182,8 @@ export default function DashboardPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [period, setPeriod] = useState<"week" | "month" | "quarter">("week")
+  const [selectedLocation, setSelectedLocation] = useState<string>("")
+  const latestLoadIdRef = useRef(0)
 
   const dateRange = useMemo(() => {
     const today = todayPeruISO()
@@ -170,6 +201,9 @@ export default function DashboardPage() {
   const loadAll = useCallback(async (options: { silent?: boolean } = {}) => {
     const silent = options.silent === true
     const activityGroup = "daily"
+    const scopeParams = buildDashboardScopeParams(selectedLocation)
+    const loadId = latestLoadIdRef.current + 1
+    latestLoadIdRef.current = loadId
 
     if (silent) setRefreshing(true)
     else setLoading(true)
@@ -177,23 +211,33 @@ export default function DashboardPage() {
 
     try {
       const [overviewData, analyticsData, activityData] = await Promise.all([
-        fetchDashboardOverview({ date_from: dateRange.date_from, date_to: dateRange.date_to }),
+        fetchDashboardOverview({
+          date_from: dateRange.date_from,
+          date_to: dateRange.date_to,
+          ...scopeParams,
+        }),
         fetchCustomerAnalytics({
           date_from: dateRange.date_from,
           date_to: dateRange.date_to,
           limit: 8,
+          ...scopeParams,
         }),
         fetchCommercialActivity({
           date_from: dateRange.date_from,
           date_to: dateRange.date_to,
           group: activityGroup,
+          ...scopeParams,
         }),
       ])
+
+      if (latestLoadIdRef.current !== loadId) return
 
       setOverview(overviewData)
       setAnalytics(analyticsData)
       setCommercialActivity(activityData)
     } catch (loadError) {
+      if (latestLoadIdRef.current !== loadId) return
+
       setError(explainDashboardError(loadError))
       if (!silent) {
         setOverview(null)
@@ -201,19 +245,45 @@ export default function DashboardPage() {
         setCommercialActivity(null)
       }
     } finally {
+      if (latestLoadIdRef.current !== loadId) return
+
       setLoading(false)
       setRefreshing(false)
     }
-  }, [dateRange.date_from, dateRange.date_to])
+  }, [dateRange.date_from, dateRange.date_to, selectedLocation])
 
   useEffect(() => {
     void Promise.resolve().then(() => loadAll())
   }, [loadAll])
 
+  useEffect(() => {
+    const availableLocations = overview?.context.scope.available_locations ?? []
+    if (!availableLocations.length) return
+
+    const selectedOptionExists =
+      selectedLocation === ALL_LOCATIONS_VALUE ||
+      availableLocations.some((location) => location.location_id === selectedLocation)
+
+    if (selectedOptionExists) return
+
+    const nextSelected =
+      overview?.context.scope.mode === "all"
+        ? ALL_LOCATIONS_VALUE
+        : overview?.context.scope.selected_location_id || availableLocations[0]?.location_id || null
+
+    if (nextSelected && nextSelected !== selectedLocation) {
+      const timer = window.setTimeout(() => {
+        setSelectedLocation(nextSelected)
+      }, 0)
+
+      return () => window.clearTimeout(timer)
+    }
+  }, [overview, selectedLocation])
+
   const dashboardTopbarActions = useMemo(() => [
     {
       key: "quick-sale",
-      label: "Venta rapida",
+      label: "Venta rápida",
       href: appRoutes.purchaseSystem,
       icon: null,
       variant: "accent" as const,
@@ -295,7 +365,7 @@ export default function DashboardPage() {
       href: appRoutes.transactionHistory,
     },
     {
-      label: "Ticket promedio",
+      label: "Venta promedio",
       value: averageTicket == null ? "—" : formatCurrencyPEN(averageTicket),
       trend: normalizeComparison(sales?.comparisons?.avg_ticket),
       icon: Ticket,
@@ -316,7 +386,12 @@ export default function DashboardPage() {
       trend: null,
       icon: PackageSearch,
       tone: (criticalStockCount > 0 ? "warning" : "neutral") as DashboardKpiTone,
-      href: appRoutes.inventory,
+      href:
+        Number(inventory?.zero_stock_count || 0) > 0
+          ? `${appRoutes.inventory}?status=sin-stock`
+          : Number(inventory?.low_stock_count || 0) > 0
+            ? `${appRoutes.inventory}?status=stock-bajo`
+            : appRoutes.inventory,
     },
   ]
 
@@ -354,7 +429,7 @@ export default function DashboardPage() {
         highlightValue: formatNumber(criticalStockCount),
         badge: buildAttentionBadge(criticalStockCount, criticalStockCount > 0 ? "warning" : "success"),
         cta: "Ver stock",
-        href: appRoutes.inventory,
+        href: criticalStockCount > 0 ? `${appRoutes.inventory}?status=con-alertas` : appRoutes.inventory,
         icon: PackageSearch,
         tone: criticalStockCount > 0 ? "warning" : "success",
       })
@@ -384,10 +459,7 @@ export default function DashboardPage() {
       items.push({
         key: "transfers",
         label: "Transferencias pendientes",
-        value:
-          pendingTransfers > 0
-            ? "Solicitudes por aprobar, despachar o recepcionar"
-            : "Flujo de transferencias al dia",
+        value: pendingTransfers > 0 ? "Solicitudes por destrabar" : "Sin cola pendiente",
         numericValue: pendingTransfers,
         highlightValue: formatNumber(pendingTransfers),
         badge: buildAttentionBadge(pendingTransfers, pendingTransfers > 0 ? "warning" : "success"),
@@ -420,7 +492,20 @@ export default function DashboardPage() {
     })
   }, [cash, cashConsistency, criticalStockCount, inventory, postsales, transfers])
 
-  const location = overview?.context.location.name ?? "Sede activa"
+  const locationLabel = overview?.context.scope.label ?? "Sede activa"
+  const locationOptions = useMemo(() => {
+    const availableLocations = overview?.context.scope.available_locations ?? []
+    const options = availableLocations.map((location) => ({
+      value: location.location_id,
+      label: location.name,
+    }))
+
+    if (availableLocations.length > 1) {
+      return [{ value: ALL_LOCATIONS_VALUE, label: "Todas las sedes" }, ...options]
+    }
+
+    return options
+  }, [overview])
 
   if ((loading || authLoading) && !overview) {
     return (
@@ -444,6 +529,22 @@ export default function DashboardPage() {
 
   const periodActions = (
     <div className="flex flex-wrap items-center gap-2">
+      {locationOptions.length > 0 ? (
+        <div className="flex items-center gap-2">
+          <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+            Cobertura
+          </span>
+          <div className="min-w-[180px] max-w-[220px]">
+            <FilterDropdown
+              label=""
+              value={selectedLocation}
+              options={locationOptions}
+              onChange={setSelectedLocation}
+              triggerClassName="h-10 rounded-xl"
+            />
+          </div>
+        </div>
+      ) : null}
       <div className="flex rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1 shadow-sm">
         {(["week", "month", "quarter"] as const).map((item) => (
           <button
@@ -476,40 +577,36 @@ export default function DashboardPage() {
   )
 
   return (
-    <section className="ops-page min-h-screen py-[var(--ops-page-py)]">
-      <div className="mx-auto max-w-[1580px] space-y-5 px-3 lg:px-4">
-        <PosHeader eyebrow={location} title="Dashboard general" actions={periodActions} />
+    <TooltipProvider delayDuration={120}>
+      <section className="ops-page min-h-screen py-[var(--ops-page-py)]">
+        <div className="mx-auto max-w-[1480px] space-y-4 px-3 lg:px-4">
+          <PosHeader eyebrow={locationLabel} title="Dashboard general" actions={periodActions} />
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-          {kpis.map((kpi) => (
-            <DashboardKpiCard
-              key={kpi.label}
-              label={kpi.label}
-              value={kpi.value}
-              trend={kpi.trend}
-              icon={kpi.icon}
-              tone={kpi.tone}
-              href={kpi.href}
-            />
-          ))}
-        </div>
-
-        <div className="grid gap-4 xl:grid-cols-12">
-          <div className="xl:col-span-8">
-            <CommercialActivityCard data={commercialActivity} />
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+            {kpis.map((kpi) => (
+              <DashboardKpiCard
+                key={kpi.label}
+                label={kpi.label}
+                value={kpi.value}
+                trend={kpi.trend}
+                icon={kpi.icon}
+                tone={kpi.tone}
+                href={kpi.href}
+              />
+            ))}
           </div>
 
-          <div className="xl:col-span-4">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_360px]">
+            <CommercialActivityCard data={commercialActivity} />
             <AttentionPanel items={attentionItems} />
           </div>
-        </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-12">
-          <div className="xl:col-span-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-12">
+            <div className="xl:col-span-4">
             <DashboardChartCard
-              title="Top productos"
+              title="Productos mas vendidos"
               icon={<PackageSearch className="h-4 w-4" />}
-              height={280}
+              height={240}
               contentClassName="p-3"
             >
               {topProductsChart.length > 0 ? (
@@ -538,20 +635,20 @@ export default function DashboardPage() {
                       ]}
                       contentStyle={chartTooltipStyle}
                     />
-                    <Bar dataKey="qtySold" name="qtySold" fill="#b07ae4" radius={[0, 8, 8, 0]} />
+                    <Bar dataKey="qtySold" name="qtySold" fill="var(--ops-chart-1)" radius={[0, 8, 8, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <DashboardEmptyState description="Sin productos vendidos para destacar en este periodo." />
+                <DashboardEmptyState compact description="Sin productos vendidos para destacar en este periodo." />
               )}
             </DashboardChartCard>
-          </div>
+            </div>
 
-          <div className="xl:col-span-4">
+            <div className="xl:col-span-4">
             <DashboardChartCard
-              title="Clientes que mas compran"
+              title="Clientes con mas compras"
               icon={<Users className="h-4 w-4" />}
-              height={280}
+              height={240}
               contentClassName="p-3"
             >
               {topCustomersChart.length > 0 ? (
@@ -580,67 +677,93 @@ export default function DashboardPage() {
                       ]}
                       contentStyle={chartTooltipStyle}
                     />
-                    <Bar dataKey="totalAmount" name="totalAmount" fill="#0ea5e9" radius={[0, 8, 8, 0]} />
+                    <Bar dataKey="totalAmount" name="totalAmount" fill="var(--ops-chart-2)" radius={[0, 8, 8, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <DashboardEmptyState description="Sin clientes suficientes para construir un ranking en este periodo." />
+                <DashboardEmptyState compact description="Sin clientes suficientes para construir un ranking en este periodo." />
               )}
             </DashboardChartCard>
-          </div>
+            </div>
 
-          <div className="md:col-span-2 xl:col-span-4">
+            <div className="md:col-span-2 xl:col-span-4">
             <DashboardChartCard
-              title="Mezcla de cobro"
+              title="Metodos de cobro"
               icon={<Wallet className="h-4 w-4" />}
-              height={280}
+              height="auto"
               contentClassName="p-3"
             >
               {paymentPieData.length > 0 ? (
-                <div className="grid h-full gap-3 lg:grid-cols-[minmax(0,1fr)_148px] lg:items-center">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={paymentPieData}
-                        dataKey="amount"
-                        nameKey="label"
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={54}
-                        outerRadius={84}
-                        paddingAngle={2}
-                      >
-                        {paymentPieData.map((item, index) => (
-                          <Cell key={item.key} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <text x="50%" y="48%" textAnchor="middle" className="fill-[var(--ops-text)] text-[15px] font-semibold">
-                        {formatCurrencyPEN(totalPayments)}
-                      </text>
-                      <text x="50%" y="58%" textAnchor="middle" className="fill-[var(--ops-text-muted)] text-[11px]">
-                        Pagos registrados
-                      </text>
-                      <RechartsTooltip
-                        formatter={(value: number) => [formatCurrencyPEN(value), "Monto"]}
-                        contentStyle={chartTooltipStyle}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
+                <div className="space-y-3">
+                  <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_158px] lg:items-center">
+                    <div className="mx-auto h-[188px] w-full max-w-[280px] sm:h-[208px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={paymentPieData}
+                            dataKey="amount"
+                            nameKey="label"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={54}
+                            outerRadius={84}
+                            paddingAngle={2}
+                          >
+                            {paymentPieData.map((item, index) => (
+                              <Cell key={item.key} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <text x="50%" y="48%" textAnchor="middle" className="fill-[var(--ops-text)] text-[15px] font-semibold">
+                            {formatCurrencyPEN(totalPayments)}
+                          </text>
+                          <text x="50%" y="58%" textAnchor="middle" className="fill-[var(--ops-text-muted)] text-[11px]">
+                            Pagos registrados
+                          </text>
+                          <RechartsTooltip
+                            formatter={(value: number) => [formatCurrencyPEN(value), "Monto"]}
+                            contentStyle={chartTooltipStyle}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
 
-                  <div className="space-y-1.5">
+                    <div className="hidden lg:block">
+                      <div className="space-y-2">
+                        {paymentMix.map((item, index) => (
+                          <div
+                            key={item.key}
+                            className="flex items-center justify-between gap-3 border-b border-[var(--ops-border-soft)] pb-2 last:border-b-0 last:pb-0"
+                          >
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span
+                                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}
+                              />
+                              <span className="truncate text-xs font-medium text-[var(--ops-text)]">{item.label}</span>
+                            </div>
+                            <span className={cn("shrink-0 text-xs font-semibold", paymentMethodTone(item.amount))}>
+                              {item.amount > 0 ? formatCurrencyPEN(item.amount) : "—"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 lg:hidden">
                     {paymentMix.map((item, index) => (
                       <div
                         key={item.key}
-                        className="flex items-center justify-between gap-3 rounded-[14px] border border-[color:color-mix(in_srgb,var(--ops-border-soft)_74%,transparent)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_44%,var(--ops-surface))] px-3 py-2"
+                        className="flex items-center justify-between gap-3 border-b border-[var(--ops-border-soft)] pb-2 last:border-b-0 last:pb-0"
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
                           <span
-                            className="h-2.5 w-2.5 rounded-full"
+                            className="h-2.5 w-2.5 shrink-0 rounded-full"
                             style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}
                           />
-                          <span className="text-xs font-medium text-[var(--ops-text)]">{item.label}</span>
+                          <span className="truncate text-sm text-[var(--ops-text)]">{item.label}</span>
                         </div>
-                        <span className={cn("text-xs font-semibold", paymentMethodTone(item.amount))}>
+                        <span className={cn("shrink-0 text-sm font-semibold", paymentMethodTone(item.amount))}>
                           {item.amount > 0 ? formatCurrencyPEN(item.amount) : "—"}
                         </span>
                       </div>
@@ -648,25 +771,31 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ) : (
-                <DashboardEmptyState description="Sin pagos registrados para construir la mezcla de cobro." />
+                <DashboardEmptyState compact description="Sin pagos registrados para construir la mezcla de cobro." />
               )}
             </DashboardChartCard>
+            </div>
           </div>
-        </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-12">
-          <div className="xl:col-span-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-12">
+            <div className="xl:col-span-4">
             <SalesPerformanceCard section={sales} />
-          </div>
-          <div className="xl:col-span-4">
+            </div>
+            <div className="xl:col-span-4">
             <InventoryCard section={inventory} />
-          </div>
-          <div className="xl:col-span-4">
-            <OperationsCard cash={cash} postsales={postsales} transfers={transfers} />
+            </div>
+            <div className="xl:col-span-4">
+            <OperationsCard
+              cash={cash}
+              postsales={postsales}
+              transfers={transfers}
+              isSingleLocationScope={overview.context.scope.mode === "single"}
+            />
+            </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </TooltipProvider>
   )
 }
 
@@ -684,7 +813,7 @@ function DashboardInfoCard({
       title={title}
       icon={<Icon className="h-4 w-4" />}
       height="auto"
-      contentClassName="p-4"
+      contentClassName="p-3.5"
     >
       {children}
     </DashboardChartCard>
@@ -716,12 +845,12 @@ function MetricRow({
 }) {
   return (
     <div className="flex items-center justify-between gap-3 text-sm">
-      <span className="text-[var(--ops-text-muted)]">{label}</span>
+      <span className="text-[13px] text-[var(--ops-text-muted)]">{label}</span>
       <span
         className={cn(
           "font-semibold",
-          tone === "warning" && "text-amber-700",
-          tone === "danger" && "text-rose-700",
+          tone === "warning" && "text-[var(--ops-chart-4)]",
+          tone === "danger" && "text-[var(--ops-chart-5)]",
           tone === "default" && "text-[var(--ops-text)]"
         )}
       >
@@ -762,7 +891,7 @@ function SalesPerformanceCard({ section }: { section: SalesToday | null }) {
       {!section ? (
         <DashboardEmptyState compact description="No tienes visibilidad comercial para este periodo." />
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3.5">
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-xl border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-3 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
@@ -783,23 +912,39 @@ function SalesPerformanceCard({ section }: { section: SalesToday | null }) {
           </div>
 
           <div className="space-y-1.5">
-            <MetricRow
-              label="Ticket promedio"
-              value={averageTicket == null ? "—" : formatCurrencyPEN(averageTicket)}
-            />
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[13px] text-[var(--ops-text-muted)]">Venta promedio</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[var(--ops-text-muted)] transition hover:text-[var(--ops-text)]"
+                      aria-label="Explicar venta promedio"
+                    >
+                      <Ticket className="h-3 w-3" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={8}>
+                    Monto promedio por venta confirmada en el periodo.
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <span className="font-semibold text-[var(--ops-text)]">
+                {averageTicket == null ? "—" : formatCurrencyPEN(averageTicket)}
+              </span>
+            </div>
             <MetricRow label="Ultima venta" value={formatDateTime(section.last_confirmed_at)} />
           </div>
 
           <div className="space-y-1">
-            {paymentRows.map((item) => (
+            {paymentRows.filter((item) => item.amount > 0).map((item) => (
               <div
                 key={item.key}
-                className="flex items-center justify-between gap-3 rounded-[14px] border border-transparent px-2.5 py-2"
+                className="flex items-center justify-between gap-3 rounded-[14px] border border-transparent px-2 py-1.5"
               >
                 <span className="text-sm text-[var(--ops-text-muted)]">{item.label}</span>
-                <span className={cn("text-sm font-semibold", paymentMethodTone(item.amount))}>
-                  {item.amount > 0 ? formatCurrencyPEN(item.amount) : "—"}
-                </span>
+                <span className={cn("text-sm font-semibold", paymentMethodTone(item.amount))}>{formatCurrencyPEN(item.amount)}</span>
               </div>
             ))}
           </div>
@@ -820,7 +965,7 @@ function InventoryCard({ section }: { section: InventorySection | null }) {
       {!section ? (
         <DashboardEmptyState compact description="No hay visibilidad de inventario para este usuario." />
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3.5">
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-xl border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-3 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
@@ -830,8 +975,8 @@ function InventoryCard({ section }: { section: InventorySection | null }) {
                 {formatNumber(Number(section.zero_stock_count || 0))}
               </p>
             </div>
-            <div className="rounded-xl border border-[color:color-mix(in_srgb,#f59e0b_24%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] px-3 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
+            <div className="rounded-xl border border-[color:color-mix(in_srgb,var(--ops-chart-4)_24%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ops-chart-4)_10%,var(--ops-surface))] px-3 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-chart-4)]">
                 Bajo minimo
               </p>
               <p className="mt-1 text-xl font-semibold text-[var(--ops-text)]">
@@ -843,8 +988,9 @@ function InventoryCard({ section }: { section: InventorySection | null }) {
           {section.critical_variants && section.critical_variants.length > 0 ? (
             <div className="space-y-1">
               {section.critical_variants.slice(0, 4).map((item) => (
-                <div
+                <Link
                   key={item.variant_id}
+                  href={`${appRoutes.inventory}?focus_variant_id=${encodeURIComponent(item.variant_id)}`}
                   className="flex items-center justify-between gap-3 rounded-xl px-2.5 py-2"
                 >
                   <div className="min-w-0">
@@ -854,21 +1000,18 @@ function InventoryCard({ section }: { section: InventorySection | null }) {
                     </p>
                   </div>
                   <span
-                    className={cn(
-                      "shrink-0 text-sm font-semibold",
-                      Number(item.qty || 0) === 0 ? "text-rose-700" : "text-amber-700"
-                    )}
+                    className={cn("shrink-0 text-sm font-semibold", Number(item.qty || 0) === 0 ? "text-[var(--ops-chart-5)]" : "text-[var(--ops-chart-4)]")}
                   >
                     {formatNumber(item.qty)} und
                   </span>
-                </div>
+                </Link>
               ))}
             </div>
           ) : (
-            <DashboardEmptyState compact description="No hay variantes criticas en la sede activa." />
+            <DashboardEmptyState compact description="No hay variantes criticas en el alcance seleccionado." />
           )}
 
-          <CardActionLink href={appRoutes.inventory} label="Ver stock" />
+          <CardActionLink href={`${appRoutes.inventory}?status=con-alertas`} label="Ver stock" />
         </div>
       )}
     </DashboardInfoCard>
@@ -879,10 +1022,12 @@ function OperationsCard({
   cash,
   postsales,
   transfers,
+  isSingleLocationScope,
 }: {
   cash: CashSection | null
   postsales: PostsalesSection | null
   transfers: TransfersSection | null
+  isSingleLocationScope: boolean
 }) {
   const cashDifference = cash?.sales_summary?.consistency?.difference
 
@@ -891,21 +1036,31 @@ function OperationsCard({
       title="Caja, postventa y transferencias"
       icon={Store}
     >
-      <div className="space-y-4">
-        <div className="space-y-3 border-b border-[var(--ops-border-soft)] pb-4">
+      <div className="space-y-3.5">
+        <div className="space-y-2.5 rounded-xl border border-[var(--ops-border-soft)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_24%,var(--ops-surface))] p-3">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-[var(--ops-text)]">Caja</p>
               <p className="text-[11px] text-[var(--ops-text-muted)]">
-                {cash?.closing ? `Estado ${formatCashStatus(cash.closing.status).toLowerCase()}.` : "Sin apertura registrada."}
+                {cash?.closing
+                  ? `Estado ${formatCashStatus(cash.closing.status).toLowerCase()}.`
+                  : isSingleLocationScope
+                    ? "Sin apertura registrada."
+                    : "Resumen consolidado del alcance seleccionado."}
               </p>
             </div>
             <InlineBadge
-              label={cash?.closing ? formatCashStatus(cash.closing.status) : "Sin datos"}
+              label={
+                cash?.closing
+                  ? formatCashStatus(cash.closing.status)
+                  : isSingleLocationScope
+                    ? "Sin datos"
+                    : "Consolidado"
+              }
               tone={!cash?.closing ? "neutral" : cash.closing.status === "open" ? "success" : "neutral"}
             />
           </div>
-          <div className="mt-3 space-y-1.5">
+          <div className="space-y-1.5">
             <MetricRow label="Ventas" value={formatCurrencyPEN(cash?.sales_summary?.consistency?.sales_total)} />
             <MetricRow label="Pagos" value={formatCurrencyPEN(cash?.sales_summary?.consistency?.payment_total)} />
             <MetricRow
@@ -914,17 +1069,17 @@ function OperationsCard({
               tone={!cash?.sales_summary ? "default" : cashDifference === 0 ? "default" : cashDifference && cashDifference > 0 ? "warning" : "danger"}
             />
           </div>
-          <div className="mt-3">
+          <div>
             <CardActionLink href={appRoutes.cash} label="Ver caja" />
           </div>
         </div>
 
-        <div className="space-y-3 border-b border-[var(--ops-border-soft)] pb-4">
+        <div className="space-y-2.5 rounded-xl border border-[var(--ops-border-soft)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_24%,var(--ops-surface))] p-3">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-[var(--ops-text)]">Postventa</p>
               <p className="text-[11px] text-[var(--ops-text-muted)]">
-                Cambios y anulaciones permitidas por reglas del sistema.
+                Casos disponibles segun reglas activas.
               </p>
             </div>
             <InlineBadge
@@ -932,22 +1087,22 @@ function OperationsCard({
               tone={Number(postsales?.eligible_exchange_count || 0) > 0 ? "warning" : "neutral"}
             />
           </div>
-          <div className="mt-3 space-y-1.5">
+          <div className="space-y-1.5">
             <MetricRow label="Elegibles" value={formatNumber(Number(postsales?.eligible_exchange_count || 0))} />
             <MetricRow label="Anulables" value={formatNumber(Number(postsales?.eligible_cancel_count || 0))} />
             <MetricRow label="Bloqueadas" value={formatNumber(Number(postsales?.blocked_cancel_count || 0))} />
           </div>
-          <div className="mt-3">
+          <div>
             <CardActionLink href={appRoutes.postsales} label="Revisar postventa" />
           </div>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2.5 rounded-xl border border-[var(--ops-border-soft)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_24%,var(--ops-surface))] p-3">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-[var(--ops-text)]">Transferencias</p>
               <p className="text-[11px] text-[var(--ops-text-muted)]">
-                Reposición entre sedes con aprobación, despacho y recepción.
+                Flujo de aprobación, despacho y recepción entre sedes.
               </p>
             </div>
             <InlineBadge
@@ -966,12 +1121,12 @@ function OperationsCard({
               }
             />
           </div>
-          <div className="mt-3 space-y-1.5">
+          <div className="space-y-1.5">
             <MetricRow label="Por recibir" value={formatNumber(Number(transfers?.pending_receipts_count || 0))} />
             <MetricRow label="Por aprobar" value={formatNumber(Number(transfers?.pending_approval_count || 0))} />
             <MetricRow label="Por despachar" value={formatNumber(Number(transfers?.pending_dispatch_count || 0))} />
           </div>
-          <div className="mt-3">
+          <div>
             <CardActionLink
               href={buildTransferModuleRoute(transferRouteSlugs.list)}
               label="Ver transferencias"
