@@ -1,8 +1,14 @@
 const { AppError } = require('../../shared/errors');
 const { pool } = require('../../shared/db');
+const { findActiveUserById } = require('../auth/auth.repo');
 const { findUserByEmail } = require('../users/users.repo');
+const { findDefaultLocationByUserId, findUserLocationsByUserId } = require('../users/users.repo');
+const { findAllLocations } = require('../locations/locations.repo');
 const {
   findAllInventory,
+  findInventoryProductSummary,
+  findInventoryLocationSummary,
+  findInventoryStyleRows,
   findAllKardex,
   findAllAdjustments,
   findAdjustmentVariants,
@@ -22,10 +28,19 @@ const {
 
 const ALLOWED_MOVEMENT_TYPES = ['IN', 'OUT', 'ADJUST'];
 const DEVELOPMENT_ACTOR_EMAIL = 'nelson@ripnel.com';
+const LOW_STOCK_THRESHOLD = 3;
 
 function normalizeUuid(value) {
   const normalized = String(value || '').trim();
-  return normalized || null;
+  if (!normalized) {
+    return null;
+  }
+
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    normalized
+  )
+    ? normalized
+    : null;
 }
 
 function normalizeText(value) {
@@ -63,6 +78,157 @@ function normalizeNonNegativeInteger(value) {
 
 function buildAdjustmentNumber() {
   return `AJ-${Date.now()}`;
+}
+
+function normalizeStockStatus(value) {
+  if (value === 'available' || value === 'low' || value === 'out' || value === 'incomplete') {
+    return value;
+  }
+
+  return null;
+}
+
+function hasAdminInventoryScope(auth = {}) {
+  return hasPermission(auth.permissions, 'admin.manage');
+}
+
+async function resolveInventoryScope(auth = {}, options = {}) {
+  const normalizedUserId = normalizeUuid(auth.sub || auth.user_id);
+
+  if (!normalizedUserId) {
+    throw new AppError('Not authenticated', 401, { code: 'AUTH_REQUIRED' });
+  }
+
+  const user = await findActiveUserById(normalizedUserId);
+  if (!user) {
+    throw new AppError('Not authenticated', 401, { code: 'AUTH_REQUIRED' });
+  }
+
+  const [defaultLocation, assignedRows, allLocations] = await Promise.all([
+    findDefaultLocationByUserId(normalizedUserId),
+    findUserLocationsByUserId(normalizedUserId),
+    findAllLocations(),
+  ]);
+
+  if (!defaultLocation) {
+    throw new AppError('Authenticated user has no default location assigned', 409, {
+      code: 'DEFAULT_LOCATION_REQUIRED',
+    });
+  }
+
+  if (!defaultLocation.active) {
+    throw new AppError('Default location is inactive', 409, {
+      code: 'DEFAULT_LOCATION_INACTIVE',
+    });
+  }
+
+  const canViewGlobal = hasAdminInventoryScope(auth);
+  const assignedLocations = assignedRows.filter((row) => row.active !== false);
+  const availableLocations = (canViewGlobal ? allLocations : assignedLocations).filter(
+    (location) => location && location.active !== false
+  );
+
+  if (!availableLocations.length) {
+    throw new AppError('No active locations are available for inventory', 409, {
+      code: 'INVENTORY_LOCATIONS_REQUIRED',
+    });
+  }
+
+  const requestedLocationId = normalizeUuid(options.location_id || options.locationId);
+  const availableLocationMap = new Map(
+    availableLocations.map((location) => [location.location_id, location])
+  );
+
+  if (requestedLocationId && !availableLocationMap.has(requestedLocationId)) {
+    throw new AppError('Selected location is not available for this inventory', 403, {
+      code: 'INVENTORY_LOCATION_FORBIDDEN',
+    });
+  }
+
+  const selectedLocation =
+    (requestedLocationId && availableLocationMap.get(requestedLocationId)) ||
+    availableLocationMap.get(defaultLocation.location_id) ||
+    availableLocations[0] ||
+    defaultLocation;
+
+  const shouldRestrictToRequestedLocation = options.restrictToRequestedLocation !== false;
+  const activeLocations = requestedLocationId && shouldRestrictToRequestedLocation
+    ? [selectedLocation].filter(Boolean)
+    : availableLocations;
+
+  return {
+    user,
+    canViewGlobal,
+    defaultLocation,
+    selectedLocation,
+    activeLocationIds: activeLocations.map((location) => location.location_id),
+    availableLocations: availableLocations.map((location) => ({
+      location_id: location.location_id,
+      name: location.name,
+      code: location.code,
+      type: location.type,
+      active: location.active !== false,
+      is_default: location.location_id === defaultLocation.location_id,
+    })),
+  };
+}
+
+function resolveProductStatus(totalQty, threshold = LOW_STOCK_THRESHOLD, hasZeroVariant = false) {
+  if (totalQty === 0) {
+    return 'out';
+  }
+
+  if (hasZeroVariant) {
+    return 'incomplete';
+  }
+
+  if (totalQty <= threshold) {
+    return 'low';
+  }
+
+  return 'available';
+}
+
+function resolveLocationStatus(totalQty, threshold = LOW_STOCK_THRESHOLD) {
+  return resolveProductStatus(totalQty, threshold);
+}
+
+function getProductStatusLabel(status) {
+  if (status === 'out') return 'Sin stock';
+  if (status === 'incomplete') return 'Stock incompleto';
+  if (status === 'low') return 'Bajo stock';
+  return 'Disponible';
+}
+
+function summarizeInventoryItems(items = [], threshold = LOW_STOCK_THRESHOLD) {
+  const stockTotal = items.reduce((accumulator, item) => accumulator + Number(item.qty || 0), 0);
+  const hasZeroVariant = stockTotal > 0 && items.some((item) => Number(item.qty || 0) === 0);
+  const locationsWithStock = new Set(
+    items.filter((item) => Number(item.qty || 0) > 0).map((item) => item.location_id)
+  ).size;
+  const availableSizes = new Set(
+    items.filter((item) => Number(item.qty || 0) > 0).map((item) => item.size_id)
+  ).size;
+  const availableColors = new Set(
+    items.filter((item) => Number(item.qty || 0) > 0).map((item) => item.color_id)
+  ).size;
+  const status = resolveProductStatus(stockTotal, threshold, hasZeroVariant);
+
+  return {
+    stock_total: stockTotal,
+    locations_with_stock: locationsWithStock,
+    sizes_available: availableSizes,
+    colors_available: availableColors,
+    status,
+    status_label: getProductStatusLabel(status),
+    low_stock_threshold: threshold,
+  };
+}
+
+function getLocationSummaryLabel(status) {
+  if (status === 'critical') return 'Crítico';
+  if (status === 'attention') return 'Revisar';
+  return 'Normal';
 }
 
 function hasPermission(permissions, permissionKey) {
@@ -124,7 +290,273 @@ async function listInventory(input = {}, auth = {}) {
     sku: normalizeText(input.sku),
   };
 
+  if (input.location_id && !filters.locationId) {
+    throw new AppError('Location id is invalid', 400);
+  }
+
   return findAllInventory(filters);
+}
+
+async function listInventoryProductSummary(input = {}, auth = {}) {
+  if (!hasPermission(auth.permissions, 'inventory.view')) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
+  const scope = await resolveInventoryScope(auth, input);
+  const garmentType = normalizeText(input.garment_type);
+  const status = normalizeStockStatus(normalizeText(input.status));
+  const requestedLocationId = normalizeUuid(input.location_id);
+
+  if (input.location_id && !requestedLocationId) {
+    throw new AppError('Location id is invalid', 400);
+  }
+
+  const rows = await findInventoryProductSummary({
+    locationIds: scope.activeLocationIds,
+    locationId: requestedLocationId,
+    query: normalizeText(input.query),
+    garmentType,
+    lowStockThreshold: LOW_STOCK_THRESHOLD,
+  });
+
+  const filteredRows = status ? rows.filter((row) => row.status === status) : rows;
+
+  return {
+    rows: filteredRows.map((row) => ({
+      style_id: row.style_id,
+      style_code: row.style_code,
+      style_name: row.style_name,
+      garment_type_name: row.garment_type_name,
+      stock_total: Number(row.total_qty || 0),
+      sizes_count: Number(row.sizes_count || 0),
+      colors_count: Number(row.colors_count || 0),
+      locations_count: Number(row.locations_with_stock || 0),
+      status: row.status,
+      status_label: getProductStatusLabel(row.status),
+    })),
+    meta: {
+      low_stock_threshold: LOW_STOCK_THRESHOLD,
+      available_locations: scope.availableLocations,
+      selected_location_id: requestedLocationId,
+      can_view_all_locations: scope.canViewGlobal,
+      scope_label: requestedLocationId
+        ? `Stock en sede`
+        : scope.availableLocations.length > 1
+          ? 'Todas las sedes'
+          : 'Stock en sede',
+    },
+  };
+}
+
+async function listInventoryLocationSummary(input = {}, auth = {}) {
+  if (!hasPermission(auth.permissions, 'inventory.view')) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
+  const scope = await resolveInventoryScope(auth, input);
+  const status = normalizeText(input.status);
+  const requestedLocationId = normalizeUuid(input.location_id);
+
+  if (input.location_id && !requestedLocationId) {
+    throw new AppError('Location id is invalid', 400);
+  }
+
+  const rows = await findInventoryLocationSummary({
+    locationIds: scope.activeLocationIds,
+    locationId: requestedLocationId,
+    query: normalizeText(input.query),
+    lowStockThreshold: LOW_STOCK_THRESHOLD,
+  });
+
+  const filteredRows = status
+    ? rows.filter((row) => {
+        if (status === 'normal') return row.status === 'normal';
+        if (status === 'attention') return row.status === 'attention';
+        if (status === 'critical') return row.status === 'critical';
+        return true;
+      })
+    : rows;
+
+  return {
+    rows: filteredRows.map((row) => ({
+      location_id: row.location_id,
+      location_name: row.location_name,
+      stock_total: Number(row.stock_total || 0),
+      products_count: Number(row.products_count || 0),
+      low_stock_count: Number(row.low_stock_count || 0),
+      out_of_stock_count: Number(row.out_of_stock_count || 0),
+      status: row.status,
+      status_label: getLocationSummaryLabel(row.status),
+    })),
+    meta: {
+      low_stock_threshold: LOW_STOCK_THRESHOLD,
+      available_locations: scope.availableLocations,
+      can_view_all_locations: scope.canViewGlobal,
+    },
+  };
+}
+
+function buildLocationTableRows(items, threshold) {
+  const grouped = new Map();
+
+  for (const item of items) {
+    const current = grouped.get(item.location_id) || {
+      location_id: item.location_id,
+      location_name: item.location_name,
+      location_code: item.location_code,
+      stock_total: 0,
+      variantIdsWithStock: new Set(),
+      hasZeroVariant: false,
+    };
+
+    current.stock_total += Number(item.qty || 0);
+    if (Number(item.qty || 0) > 0) {
+      current.variantIdsWithStock.add(item.variant_id);
+    }
+    if (Number(item.qty || 0) === 0) {
+      current.hasZeroVariant = true;
+    }
+
+    grouped.set(item.location_id, current);
+  }
+
+  return Array.from(grouped.values())
+    .map((row) => {
+      const status = resolveProductStatus(row.stock_total, threshold, row.hasZeroVariant);
+      return {
+        location_id: row.location_id,
+        location_name: row.location_name,
+        location_code: row.location_code,
+        stock_total: row.stock_total,
+        variants_with_stock: row.variantIdsWithStock.size,
+        status,
+        status_label: getProductStatusLabel(status),
+      };
+    })
+    .sort((left, right) => left.location_name.localeCompare(right.location_name, 'es'));
+}
+
+function buildMatrix(items, selectedLocationId, threshold) {
+  const selectedItems = items.filter((item) => item.location_id === selectedLocationId);
+  const sizes = Array.from(
+    new Map(
+      selectedItems.map((item) => [
+        item.size_id,
+        {
+          size_id: item.size_id,
+          size_code: item.size_code,
+          sort_order: Number(item.size_sort_order || 0),
+        },
+      ])
+    ).values()
+  ).sort((left, right) => left.sort_order - right.sort_order || left.size_code.localeCompare(right.size_code, 'es'));
+
+  const colorMap = new Map();
+
+  for (const item of selectedItems) {
+    const current = colorMap.get(item.color_id) || {
+      color_id: item.color_id,
+      color_name: item.color_name,
+      total_qty: 0,
+      cells: new Map(),
+    };
+
+    current.total_qty += Number(item.qty || 0);
+    current.cells.set(item.size_id, Number(item.qty || 0));
+    colorMap.set(item.color_id, current);
+  }
+
+  const rows = Array.from(colorMap.values())
+    .map((row) => {
+      const hasZeroVariant = row.total_qty > 0 && sizes.some((size) => Number(row.cells.get(size.size_id) || 0) === 0);
+      const status = resolveProductStatus(row.total_qty, threshold, hasZeroVariant);
+      return {
+        color_id: row.color_id,
+        color_name: row.color_name,
+        total_qty: row.total_qty,
+        status,
+        status_label: getProductStatusLabel(status),
+        cells: sizes.map((size) => ({
+          size_id: size.size_id,
+          size_code: size.size_code,
+          qty: Number(row.cells.get(size.size_id) || 0),
+        })),
+      };
+    })
+    .sort((left, right) => left.color_name.localeCompare(right.color_name, 'es'));
+
+  return {
+    selected_location_id: selectedLocationId,
+    sizes: sizes.map((size) => ({
+      size_id: size.size_id,
+      size_code: size.size_code,
+    })),
+    rows,
+  };
+}
+
+async function getInventoryStyleDetail(styleId, input = {}, auth = {}) {
+  if (!hasPermission(auth.permissions, 'inventory.view')) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
+  const normalizedStyleId = normalizeUuid(styleId);
+
+  if (!normalizedStyleId) {
+    throw new AppError('Style id is invalid', 400);
+  }
+
+  const scope = await resolveInventoryScope(auth, { ...input, restrictToRequestedLocation: false });
+  const requestedLocationId = normalizeUuid(input.location_id);
+
+  if (input.location_id && !requestedLocationId) {
+    throw new AppError('Location id is invalid', 400);
+  }
+
+  const items = await findInventoryStyleRows({
+    locationIds: scope.activeLocationIds,
+    styleId: normalizedStyleId,
+  });
+
+  if (!items.length) {
+    throw new AppError('Style inventory not found', 404);
+  }
+
+  const styleItem = items[0];
+  const detailLocationRows = buildLocationTableRows(items, LOW_STOCK_THRESHOLD);
+  const preferredLocationId = requestedLocationId || scope.selectedLocation?.location_id || null;
+  const selectedLocationId =
+    detailLocationRows.find((location) => location.location_id === preferredLocationId)?.location_id ||
+    detailLocationRows[0]?.location_id ||
+    null;
+  const scopedSummaryItems = selectedLocationId
+    ? items.filter((item) => item.location_id === selectedLocationId)
+    : items;
+  const matrix = selectedLocationId
+    ? buildMatrix(items, selectedLocationId, LOW_STOCK_THRESHOLD)
+    : { selected_location_id: null, sizes: [], rows: [] };
+  const summary = summarizeInventoryItems(scopedSummaryItems, LOW_STOCK_THRESHOLD);
+
+  return {
+    style: {
+      style_id: styleItem.style_id,
+      style_code: styleItem.style_code,
+      style_name: styleItem.style_name,
+      garment_type_name: styleItem.garment_type_name,
+    },
+    summary,
+    locations: detailLocationRows,
+    matrix,
+    movements: {
+      enabled: false,
+      message: 'El historial de movimientos estará disponible próximamente.',
+    },
+    meta: {
+      available_locations: scope.availableLocations,
+      selected_location_id: selectedLocationId,
+      can_view_all_locations: scope.canViewGlobal,
+    },
+  };
 }
 
 async function listKardex(input = {}, auth = {}) {
@@ -463,6 +895,9 @@ async function cancelAdjustmentById(adjustmentId, input = {}, auth = {}) {
 
 module.exports = {
   listInventory,
+  listInventoryProductSummary,
+  listInventoryLocationSummary,
+  getInventoryStyleDetail,
   listKardex,
   listAdjustments,
   searchVariantsForAdjustment,

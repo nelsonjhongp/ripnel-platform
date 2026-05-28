@@ -1,5 +1,8 @@
 const {
   listInventory,
+  listInventoryProductSummary,
+  listInventoryLocationSummary,
+  getInventoryStyleDetail,
   listKardex,
   listAdjustments,
   searchVariantsForAdjustment,
@@ -13,6 +16,33 @@ async function getInventory(req, res, next) {
   try {
     const inventory = await listInventory(req.query, req.auth);
     res.json({ ok: true, data: inventory });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getInventoryProductSummary(req, res, next) {
+  try {
+    const summary = await listInventoryProductSummary(req.query, req.auth);
+    res.json({ ok: true, data: summary });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getInventoryLocationSummary(req, res, next) {
+  try {
+    const summary = await listInventoryLocationSummary(req.query, req.auth);
+    res.json({ ok: true, data: summary });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getInventoryStyle(req, res, next) {
+  try {
+    const detail = await getInventoryStyleDetail(req.params.styleId, req.query, req.auth);
+    res.json({ ok: true, data: detail });
   } catch (error) {
     next(error);
   }
@@ -83,6 +113,9 @@ async function postCancelAdjustment(req, res, next) {
 
 module.exports = {
   getInventory,
+  getInventoryProductSummary,
+  getInventoryLocationSummary,
+  getInventoryStyle,
   getKardex,
   getAdjustments,
   getAdjustmentVariants,

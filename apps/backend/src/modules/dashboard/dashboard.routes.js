@@ -1,5 +1,5 @@
 const express = require('express');
-const { requireAuth } = require('../../middlewares/auth');
+const { requireAuth, requirePermission } = require('../../middlewares/auth');
 const {
   getOverview,
   getActivity,
@@ -10,6 +10,7 @@ const {
 const router = express.Router();
 
 router.use(requireAuth);
+router.use(requirePermission('dashboard.view'));
 
 router.get('/overview', getOverview);
 router.get('/activity', getActivity);

@@ -1,5 +1,13 @@
 const { query } = require('../../shared/db');
 
+function normalizeLocationIds(locationIdOrIds) {
+  if (Array.isArray(locationIdOrIds)) {
+    return locationIdOrIds.filter(Boolean);
+  }
+
+  return locationIdOrIds ? [locationIdOrIds] : [];
+}
+
 async function findCommercialActivityByTimeSlot(locationIds, dateFrom, dateTo, executor = query) {
   const result = await executor(
     `WITH filtered_sales AS (
@@ -105,6 +113,7 @@ async function findCommercialActivityAggregate(locationIds, dateFrom, dateTo, ex
 }
 
 async function findSalesHeadlineByLocationAndDate(locationId, dateFrom, dateToOrExecutor, executor) {
+  const locationIds = normalizeLocationIds(locationId);
   let dateEnd, exec
   if (typeof dateToOrExecutor === "function") {
     dateEnd = dateFrom
@@ -117,22 +126,23 @@ async function findSalesHeadlineByLocationAndDate(locationId, dateFrom, dateToOr
     exec = query
   }
   const result = await exec(
-    `SELECT
+     `SELECT
        COUNT(*)::int AS sale_count,
        COALESCE(SUM(total_amount), 0)::numeric(12,2) AS total_amount,
        MAX(confirmed_at) AS last_confirmed_at
      FROM sales
-     WHERE location_id = $1
+     WHERE location_id = ANY($1::uuid[])
        AND status = 'confirmed'
        AND DATE(confirmed_at AT TIME ZONE 'America/Lima') >= $2::date
        AND DATE(confirmed_at AT TIME ZONE 'America/Lima') <= $3::date`,
-    [locationId, dateFrom, dateEnd]
+    [locationIds, dateFrom, dateEnd]
   );
 
   return result.rows[0] || null;
 }
 
 async function findPaymentTotalsByLocationAndDate(locationId, dateFrom, dateToOrExecutor, executor) {
+  const locationIds = normalizeLocationIds(locationId);
   let dateEnd, exec
   if (typeof dateToOrExecutor === "function") {
     dateEnd = dateFrom
@@ -151,7 +161,7 @@ async function findPaymentTotalsByLocationAndDate(locationId, dateFrom, dateToOr
          sp.amount AS signed_amount
        FROM sales_payments sp
        INNER JOIN sales s ON s.sale_id = sp.sale_id
-       WHERE s.location_id = $1
+       WHERE s.location_id = ANY($1::uuid[])
          AND s.status = 'confirmed'
          AND DATE(s.confirmed_at AT TIME ZONE 'America/Lima') >= $2::date
          AND DATE(s.confirmed_at AT TIME ZONE 'America/Lima') <= $3::date
@@ -162,7 +172,7 @@ async function findPaymentTotalsByLocationAndDate(locationId, dateFrom, dateToOr
          spr.method,
          -spr.amount AS signed_amount
        FROM sales_payment_reversals spr
-       WHERE spr.location_id = $1
+       WHERE spr.location_id = ANY($1::uuid[])
          AND DATE(spr.reversed_at AT TIME ZONE 'America/Lima') >= $2::date
          AND DATE(spr.reversed_at AT TIME ZONE 'America/Lima') <= $3::date
      )
@@ -171,7 +181,7 @@ async function findPaymentTotalsByLocationAndDate(locationId, dateFrom, dateToOr
        COALESCE(SUM(signed_amount), 0)::numeric(12,2) AS total
      FROM payment_movements
      GROUP BY method`,
-    [locationId, dateFrom, dateEnd]
+    [locationIds, dateFrom, dateEnd]
   );
 
   return result.rows;
@@ -183,6 +193,7 @@ async function findPostsalesWindowCounts(
   lookbackDays = 14,
   executor = query
 ) {
+  const locationIds = normalizeLocationIds(locationId);
   const result = await executor(
     `WITH recent_sales AS (
        SELECT
@@ -201,7 +212,7 @@ async function findPostsalesWindowCounts(
          WHERE e.sale_id = s.sale_id
            AND e.status = 'confirmed'
        ) ex ON TRUE
-       WHERE s.location_id = $1
+       WHERE s.location_id = ANY($1::uuid[])
          AND s.status = 'confirmed'
          AND DATE(COALESCE(s.confirmed_at, s.created_at) AT TIME ZONE 'America/Lima') >= ($2::date - ($3::int - 1))
      )
@@ -222,7 +233,7 @@ async function findPostsalesWindowCounts(
             OR cash_status <> 'open'
        )::int AS blocked_cancel_count
      FROM recent_sales`,
-    [locationId, businessDate, lookbackDays]
+    [locationIds, businessDate, lookbackDays]
   );
 
   return result.rows[0] || null;
@@ -235,6 +246,7 @@ async function findPostsalesWindowItems(
   limit = 5,
   executor = query
 ) {
+  const locationIds = normalizeLocationIds(locationId);
   const result = await executor(
     `WITH recent_sales AS (
        SELECT
@@ -259,7 +271,7 @@ async function findPostsalesWindowItems(
          WHERE e.sale_id = s.sale_id
            AND e.status = 'confirmed'
        ) ex ON TRUE
-       WHERE s.location_id = $1
+       WHERE s.location_id = ANY($1::uuid[])
          AND s.status = 'confirmed'
          AND DATE(COALESCE(s.confirmed_at, s.created_at) AT TIME ZONE 'America/Lima') >= ($2::date - ($3::int - 1))
      )
@@ -283,35 +295,37 @@ async function findPostsalesWindowItems(
        AND confirmed_exchange_count = 0
      ORDER BY occurred_at DESC
      LIMIT $4`,
-    [locationId, businessDate, lookbackDays, limit]
+    [locationIds, businessDate, lookbackDays, limit]
   );
 
   return result.rows;
 }
 
 async function findPendingTransfersCounts(locationId, executor = query) {
+  const locationIds = normalizeLocationIds(locationId);
   const result = await executor(
     `SELECT
        COUNT(*) FILTER (
-         WHERE to_location_id = $1
+         WHERE to_location_id = ANY($1::uuid[])
            AND status = 'shipped'
        )::int AS pending_receipts_count,
        COUNT(*) FILTER (
-         WHERE from_location_id = $1
+         WHERE from_location_id = ANY($1::uuid[])
            AND status = 'requested'
        )::int AS pending_approval_count,
        COUNT(*) FILTER (
-         WHERE from_location_id = $1
+         WHERE from_location_id = ANY($1::uuid[])
            AND status = 'approved'
        )::int AS pending_dispatch_count
      FROM stock_transfers`,
-    [locationId]
+    [locationIds]
   );
 
   return result.rows[0] || null;
 }
 
 async function findPendingTransfersItems(locationId, limit = 5, executor = query) {
+  const locationIds = normalizeLocationIds(locationId);
   const result = await executor(
     `SELECT
        st.transfer_id,
@@ -328,9 +342,9 @@ async function findPendingTransfersItems(locationId, limit = 5, executor = query
        st.shipped_at,
        st.updated_at,
        CASE
-         WHEN st.from_location_id = $1 AND st.status = 'requested' THEN 'approval'
-         WHEN st.from_location_id = $1 AND st.status = 'approved' THEN 'dispatch'
-         WHEN st.to_location_id = $1 AND st.status = 'shipped' THEN 'receipt'
+         WHEN st.from_location_id = ANY($1::uuid[]) AND st.status = 'requested' THEN 'approval'
+         WHEN st.from_location_id = ANY($1::uuid[]) AND st.status = 'approved' THEN 'dispatch'
+         WHEN st.to_location_id = ANY($1::uuid[]) AND st.status = 'shipped' THEN 'receipt'
          ELSE 'tracking'
        END AS pending_stage,
        COALESCE(SUM(stl.qty_requested), 0)::int AS qty_requested_total,
@@ -340,11 +354,11 @@ async function findPendingTransfersItems(locationId, limit = 5, executor = query
      INNER JOIN locations lt ON lt.location_id = st.to_location_id
      LEFT JOIN stock_transfer_lines stl ON stl.transfer_id = st.transfer_id
      WHERE (
-         st.from_location_id = $1
+         st.from_location_id = ANY($1::uuid[])
          AND st.status IN ('requested', 'approved')
        )
         OR (
-         st.to_location_id = $1
+         st.to_location_id = ANY($1::uuid[])
          AND st.status = 'shipped'
        )
      GROUP BY
@@ -363,20 +377,21 @@ async function findPendingTransfersItems(locationId, limit = 5, executor = query
        st.updated_at
      ORDER BY COALESCE(st.shipped_at, st.approved_at, st.updated_at, st.created_at) DESC
      LIMIT $2`,
-    [locationId, limit]
+    [locationIds, limit]
   );
 
   return result.rows;
 }
 
 async function findCriticalInventoryCounts(locationId, lowStockThreshold = 3, executor = query) {
+  const locationIds = normalizeLocationIds(locationId);
   const result = await executor(
     `SELECT
        COUNT(*) FILTER (WHERE qty = 0)::int AS zero_stock_count,
        COUNT(*) FILTER (WHERE qty > 0 AND qty <= $2)::int AS low_stock_count
      FROM inventory
-     WHERE location_id = $1`,
-    [locationId, lowStockThreshold]
+     WHERE location_id = ANY($1::uuid[])`,
+    [locationIds, lowStockThreshold]
   );
 
   return result.rows[0] || null;
@@ -388,6 +403,7 @@ async function findCriticalInventoryItems(
   limit = 6,
   executor = query
 ) {
+  const locationIds = normalizeLocationIds(locationId);
   const result = await executor(
     `SELECT
        i.variant_id,
@@ -405,17 +421,18 @@ async function findCriticalInventoryItems(
      ) ps ON ps.style_id = pv.style_id
      INNER JOIN sizes s ON s.size_id = pv.size_id
      INNER JOIN colors c ON c.color_id = pv.color_id
-     WHERE i.location_id = $1
+     WHERE i.location_id = ANY($1::uuid[])
        AND i.qty <= $2
      ORDER BY i.qty ASC, ps.style_name ASC, s.sort_order ASC, c.name ASC
      LIMIT $3`,
-    [locationId, lowStockThreshold, limit]
+    [locationIds, lowStockThreshold, limit]
   );
 
   return result.rows;
 }
 
 async function findRecentSalesEvents(locationId, limit = 5, executor = query) {
+  const locationIds = normalizeLocationIds(locationId);
   const result = await executor(
     `SELECT
        sale_id,
@@ -426,17 +443,18 @@ async function findRecentSalesEvents(locationId, limit = 5, executor = query) {
        confirmed_at AS occurred_at,
        document_type
      FROM sales
-     WHERE location_id = $1
+     WHERE location_id = ANY($1::uuid[])
        AND status = 'confirmed'
      ORDER BY confirmed_at DESC
      LIMIT $2`,
-    [locationId, limit]
+    [locationIds, limit]
   );
 
   return result.rows;
 }
 
 async function findRecentPostsaleEvents(locationId, limit = 5, executor = query) {
+  const locationIds = normalizeLocationIds(locationId);
   const result = await executor(
     `SELECT
        event_id,
@@ -459,7 +477,7 @@ async function findRecentPostsaleEvents(locationId, limit = 5, executor = query)
          sc.cancelled_at AS occurred_at
        FROM sale_cancellations sc
        INNER JOIN sales s ON s.sale_id = sc.sale_id
-       WHERE sc.location_id = $1
+       WHERE sc.location_id = ANY($1::uuid[])
 
        UNION ALL
 
@@ -474,18 +492,19 @@ async function findRecentPostsaleEvents(locationId, limit = 5, executor = query)
          COALESCE(e.confirmed_at, e.created_at) AS occurred_at
        FROM exchanges e
        INNER JOIN sales s ON s.sale_id = e.sale_id
-       WHERE e.location_id = $1
+       WHERE e.location_id = ANY($1::uuid[])
          AND e.status = 'confirmed'
      ) events
      ORDER BY occurred_at DESC
      LIMIT $2`,
-    [locationId, limit]
+    [locationIds, limit]
   );
 
   return result.rows;
 }
 
 async function findRecentTransferEvents(locationId, limit = 5, executor = query) {
+  const locationIds = normalizeLocationIds(locationId);
   const result = await executor(
     `SELECT
        st.transfer_id,
@@ -500,17 +519,18 @@ async function findRecentTransferEvents(locationId, limit = 5, executor = query)
      FROM stock_transfers st
      INNER JOIN locations lf ON lf.location_id = st.from_location_id
      INNER JOIN locations lt ON lt.location_id = st.to_location_id
-     WHERE st.from_location_id = $1
-        OR st.to_location_id = $1
+     WHERE st.from_location_id = ANY($1::uuid[])
+        OR st.to_location_id = ANY($1::uuid[])
      ORDER BY occurred_at DESC
      LIMIT $2`,
-    [locationId, limit]
+    [locationIds, limit]
   );
 
   return result.rows;
 }
 
 async function findRecentAdjustmentEvents(locationId, limit = 5, executor = query) {
+  const locationIds = normalizeLocationIds(locationId);
   const result = await executor(
     `SELECT
        adjustment_id,
@@ -520,16 +540,17 @@ async function findRecentAdjustmentEvents(locationId, limit = 5, executor = quer
        updated_at,
        COALESCE(confirmed_at, cancelled_at, updated_at, created_at) AS occurred_at
      FROM inventory_adjustments
-     WHERE location_id = $1
+     WHERE location_id = ANY($1::uuid[])
      ORDER BY occurred_at DESC
      LIMIT $2`,
-    [locationId, limit]
+    [locationIds, limit]
   );
 
   return result.rows;
 }
 
 async function findRecentCashEvents(locationId, limit = 5, executor = query) {
+  const locationIds = normalizeLocationIds(locationId);
   const result = await executor(
     `SELECT
        cash_closing_id,
@@ -544,16 +565,17 @@ async function findRecentCashEvents(locationId, limit = 5, executor = query) {
          ELSE COALESCE(updated_at, created_at)
        END AS occurred_at
      FROM cash_closings
-     WHERE location_id = $1
+     WHERE location_id = ANY($1::uuid[])
      ORDER BY occurred_at DESC
      LIMIT $2`,
-    [locationId, limit]
+    [locationIds, limit]
   );
 
   return result.rows;
 }
 
 async function findSalesByDepartment(locationId, dateFrom, dateTo, executor = query) {
+  const locationIds = normalizeLocationIds(locationId);
   const result = await executor(
     `SELECT
        c.department,
@@ -561,7 +583,7 @@ async function findSalesByDepartment(locationId, dateFrom, dateTo, executor = qu
        COALESCE(SUM(s.total_amount), 0)::numeric(12,2) AS total_amount
      FROM sales s
      INNER JOIN customers c ON c.customer_id = s.customer_id
-     WHERE s.location_id = $1
+     WHERE s.location_id = ANY($1::uuid[])
        AND s.status = 'confirmed'
        AND c.department IS NOT NULL
        AND c.department <> ''
@@ -569,7 +591,7 @@ async function findSalesByDepartment(locationId, dateFrom, dateTo, executor = qu
        AND DATE(s.confirmed_at AT TIME ZONE 'America/Lima') <= $3::date
      GROUP BY c.department
      ORDER BY total_amount DESC`,
-    [locationId, dateFrom, dateTo]
+    [locationIds, dateFrom, dateTo]
   );
 
   return result.rows;
