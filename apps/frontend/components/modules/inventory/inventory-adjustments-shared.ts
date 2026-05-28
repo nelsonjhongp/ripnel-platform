@@ -1,4 +1,4 @@
-import { buildApiUrl } from "@/lib/api";
+import { apiFetchData } from "@/lib/api";
 
 export type ApiResponse<T> = {
   ok: boolean;
@@ -98,7 +98,7 @@ export function buildAdjustmentReason(intent: AdjustmentIntent, rawReason: strin
 }
 
 export async function requestAdjustmentJson<T>(path: string, init?: RequestInit) {
-  const response = await fetch(buildApiUrl(path), {
+  return apiFetchData<T>(path, {
     headers: {
       "Content-Type": "application/json",
       ...(init?.headers || {}),
@@ -106,14 +106,6 @@ export async function requestAdjustmentJson<T>(path: string, init?: RequestInit)
     cache: "no-store",
     ...init,
   });
-
-  const payload = (await response.json().catch(() => null)) as ApiResponse<T> | null;
-
-  if (!response.ok || !payload?.ok) {
-    throw new Error(payload?.message || "Request failed");
-  }
-
-  return payload.data;
 }
 
 export function formatAdjustmentDateTime(value: string | null) {

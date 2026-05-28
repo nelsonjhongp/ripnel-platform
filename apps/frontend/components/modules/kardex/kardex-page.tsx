@@ -10,7 +10,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { InlineStatusCard } from "@/components/feedback/status-page";
-import { buildApiUrl } from "@/lib/api";
+import { apiFetchData } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { Button } from "@/components/ui/button";
@@ -301,14 +301,10 @@ function KardexPageContent({
         params.set("date_to", `${dateTo}T23:59:59`);
       }
 
-      const response = await fetch(buildApiUrl(`/api/inventory/kardex?${params.toString()}`), {
+      const data = await apiFetchData<KardexMovement[]>(`/api/inventory/kardex?${params.toString()}`, {
         cache: "no-store",
       });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo cargar movimientos de stock");
-      }
-      setMovements(payload.data || []);
+      setMovements(data || []);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -441,13 +437,6 @@ function KardexPageContent({
               Actualizar
             </Button>
           }
-        />
-
-        <InlineStatusCard
-          title="Kardex de trazabilidad"
-          description="Aquí revisas por qué cambió el stock. No inicia operaciones: las reposiciones se solicitan en transferencias y las correcciones se registran en aperturas o ajustes."
-          tone="neutral"
-          variant="ops"
         />
 
         <div className="flex flex-wrap items-center gap-2">

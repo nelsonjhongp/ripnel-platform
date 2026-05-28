@@ -13,7 +13,7 @@ export type AttentionPanelItem = {
   value: string
   numericValue: number
   highlightValue: string
-  badge: string
+  badge: string | null
   cta: string
   href: string
   icon: LucideIcon
@@ -34,21 +34,26 @@ export function AttentionPanel({
       {items.length === 0 ? (
         <DashboardEmptyState compact dashed={false} description="No hay alertas visibles para tu perfil en este momento." />
       ) : (
-        <div className="min-h-[356px] space-y-2 pr-0.5">
+        <div className="overflow-hidden rounded-xl border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_30%,var(--ops-surface))]">
           {items.map((item) => {
             const Icon = item.icon
             return (
-              <OpsAttentionRow
+              <div
                 key={item.key}
-                icon={<Icon className="h-[14px] w-[14px]" />}
-                title={item.label}
-                description={item.value}
-                ctaLabel={item.cta}
-                href={item.href}
-                highlightValue={item.highlightValue}
-                badge={item.badge}
-                tone={item.tone === "purple" ? "accent" : item.tone}
-              />
+                className="border-b border-[var(--ops-border-soft)] last:border-b-0"
+              >
+                <OpsAttentionRow
+                  icon={<Icon className="h-[14px] w-[14px]" />}
+                  title={item.label}
+                  description={item.value}
+                  ctaLabel={item.cta}
+                  href={item.href}
+                  highlightValue={item.highlightValue}
+                  badge={item.badge}
+                  tone={item.tone === "purple" ? "accent" : item.tone}
+                  embedded
+                />
+              </div>
             )
           })}
         </div>

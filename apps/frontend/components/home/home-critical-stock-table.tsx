@@ -91,7 +91,11 @@ export function HomeCriticalStockTable({
                 </OpsStatusBadge>
               </td>
               <td className="px-4 py-2.5">
-                <OpsActionLink href="/inventario" tone="warning" size="sm">
+                <OpsActionLink
+                  href={`/inventario?focus_variant_id=${encodeURIComponent(item.variant_id)}`}
+                  tone="warning"
+                  size="sm"
+                >
                   Reponer
                 </OpsActionLink>
               </td>

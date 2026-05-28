@@ -66,14 +66,14 @@ function DashboardKpiCardInner({
   }
 
   return (
-    <OpsMetricCard
+      <OpsMetricCard
       icon={<Icon className="h-[18px] w-[18px]" />}
       label={label}
       value={value}
       tone={METRIC_TONE_MAP[tone]}
       href={href}
-      className="min-h-[128px] px-4 py-4 shadow-[0_8px_24px_rgb(15_23_42/0.03)]"
-      valueClassName="text-[1.55rem] font-semibold tracking-[-0.035em]"
+      className="min-h-[108px] px-4 py-3.5 shadow-[0_8px_24px_rgb(15_23_42/0.03)]"
+      valueClassName="text-[1.42rem] font-semibold tracking-[-0.03em]"
       footer={
         showTrend && trendLabel ? (
           <span

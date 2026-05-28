@@ -137,6 +137,14 @@ export function unwrapApiData<T>(payload: T | ApiEnvelope<T>): T {
   return payload as T;
 }
 
+export async function apiFetchData<T>(
+  path: string,
+  init: ApiFetchInit = {}
+): Promise<T> {
+  const payload = await apiFetch<T | ApiEnvelope<T>>(path, init);
+  return unwrapApiData(payload);
+}
+
 const apiBaseUrl = getApiBaseUrl();
 
 export function buildApiUrl(path: string) {

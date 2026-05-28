@@ -68,8 +68,8 @@ export function CatalogHubPage() {
     <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
       <div className="mx-auto flex max-w-[1180px] flex-col gap-4">
         <PosHeader
-          eyebrow="Catalogos"
-          title="Catalogos maestros"
+          eyebrow="Catálogos"
+          title="Catálogos maestros"
           actions={
             <Tooltip>
               <TooltipTrigger asChild>

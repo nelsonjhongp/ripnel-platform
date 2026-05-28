@@ -319,12 +319,6 @@ export function TransfersListPage() {
         </div>
 
         <OpsSectionDivider>
-          <InlineStatusCard
-            title="Este módulo gestiona la reposición entre sedes"
-            description="Aquí nacen las solicitudes y se hace seguimiento al documento operativo. El stock solo cambia cuando una transferencia se despacha o se recepciona."
-            tone="neutral"
-            variant="ops"
-          />
           <div className="flex flex-wrap gap-2">
             {[
               { value: "all", label: "Todas", count: stageTotals.all },

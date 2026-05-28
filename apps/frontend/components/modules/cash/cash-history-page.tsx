@@ -1,19 +1,24 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { ChevronRight, History, Info, RefreshCw } from "lucide-react"
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronRight, History, Info, RefreshCw } from "lucide-react";
 
-import { Pagination } from "@/components/ui/pagination"
+import { Pagination } from "@/components/ui/pagination";
 
-import { PermissionGuard } from "@/components/auth/PermissionGuard"
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import {
   ErrorPage,
   InlineStatusCard,
   LoadingPage,
-} from "@/components/feedback/status-page"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { ApiError, apiFetch } from "@/lib/api"
+} from "@/components/feedback/status-page";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { ApiError, apiFetch } from "@/lib/api";
 import {
   CashClosing,
   formatAmount,
@@ -21,24 +26,22 @@ import {
   formatDateTime,
   getCashStatusLabel,
   getCashStatusTone,
-} from "@/lib/cash"
+} from "@/lib/cash";
+const PAGE_SIZE = 10;
 
-const CASH_ALLOWED_ROLES = ["ADMIN", "CAJA"]
-const PAGE_SIZE = 10
-
-type RangeFilter = "7d" | "30d"
-type StatusFilter = "all" | "open" | "closed"
+type RangeFilter = "7d" | "30d";
+type StatusFilter = "all" | "open" | "closed";
 
 function explainCashHistoryError(error: unknown) {
   if (!(error instanceof ApiError)) {
-    return "No se pudo cargar el historial de caja."
+    return "No se pudo cargar el historial de caja.";
   }
 
   if (error.status === 403) {
-    return "Tu rol no tiene acceso al historial de caja."
+    return "Tu rol no tiene acceso al historial de caja.";
   }
 
-  return error.message || "No se pudo cargar el historial de caja."
+  return error.message || "No se pudo cargar el historial de caja.";
 }
 
 function HelpTooltip({ content }: { content: string }) {
@@ -57,7 +60,7 @@ function HelpTooltip({ content }: { content: string }) {
         {content}
       </TooltipContent>
     </Tooltip>
-  )
+  );
 }
 
 function CashStatusBadge({ status }: { status: CashClosing["status"] }) {
@@ -67,7 +70,7 @@ function CashStatusBadge({ status }: { status: CashClosing["status"] }) {
     >
       {getCashStatusLabel(status)}
     </span>
-  )
+  );
 }
 
 function SummaryMetric({
@@ -75,84 +78,97 @@ function SummaryMetric({
   value,
   valueClassName = "text-[var(--ops-text)]",
 }: {
-  label: string
-  value: string | number
-  valueClassName?: string
+  label: string;
+  value: string | number;
+  valueClassName?: string;
 }) {
   return (
     <div className="flex items-baseline gap-2">
-      <span className="text-[11px] uppercase tracking-wide text-[var(--ops-text-muted)]">{label}</span>
+      <span className="text-[11px] uppercase tracking-wide text-[var(--ops-text-muted)]">
+        {label}
+      </span>
       <span className={`text-sm font-semibold ${valueClassName}`}>{value}</span>
     </div>
-  )
+  );
 }
 
 export default function CashHistoryPage() {
-  const [history, setHistory] = useState<CashClosing[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [range, setRange] = useState<RangeFilter>("7d")
-  const [status, setStatus] = useState<StatusFilter>("all")
-  const [page, setPage] = useState(1)
+  const [history, setHistory] = useState<CashClosing[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [range, setRange] = useState<RangeFilter>("7d");
+  const [status, setStatus] = useState<StatusFilter>("all");
+  const [page, setPage] = useState(1);
 
-  const loadHistory = useCallback(async (nextRange = range, nextStatus = status) => {
-    setLoading(true)
-    setError(null)
+  const loadHistory = useCallback(
+    async (nextRange = range, nextStatus = status) => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      const params = new URLSearchParams({ range: nextRange })
-      if (nextStatus !== "all") {
-        params.set("status", nextStatus)
+      try {
+        const params = new URLSearchParams({ range: nextRange });
+        if (nextStatus !== "all") {
+          params.set("status", nextStatus);
+        }
+
+        const data = await apiFetch<CashClosing[]>(
+          `/api/cash?${params.toString()}`,
+          {
+            cache: "no-store",
+          },
+        );
+        setHistory(Array.isArray(data) ? data : []);
+      } catch (loadError) {
+        setHistory([]);
+        setError(explainCashHistoryError(loadError));
+      } finally {
+        setLoading(false);
       }
-
-      const data = await apiFetch<CashClosing[]>(`/api/cash?${params.toString()}`, {
-        cache: "no-store",
-      })
-      setHistory(Array.isArray(data) ? data : [])
-    } catch (loadError) {
-      setHistory([])
-      setError(explainCashHistoryError(loadError))
-    } finally {
-      setLoading(false)
-    }
-  }, [range, status])
+    },
+    [range, status],
+  );
 
   useEffect(() => {
     // defer loadHistory to avoid synchronous setState inside effect
     void Promise.resolve().then(() => loadHistory(range, status));
-  }, [range, status, loadHistory])
+  }, [range, status, loadHistory]);
 
   useEffect(() => {
     // defer setPage to avoid synchronous setState inside effect
     void Promise.resolve().then(() => setPage(1));
-  }, [range, status])
+  }, [range, status]);
 
   const stats = useMemo(() => {
-    const openCount = history.filter((item) => item.status === "open").length
-    const closedCount = history.filter((item) => item.status === "closed").length
-    const totalRegistered = history.reduce((acc, item) => acc + Number(item.total_all || 0), 0)
+    const openCount = history.filter((item) => item.status === "open").length;
+    const closedCount = history.filter(
+      (item) => item.status === "closed",
+    ).length;
+    const totalRegistered = history.reduce(
+      (acc, item) => acc + Number(item.total_all || 0),
+      0,
+    );
 
     return {
       count: history.length,
       openCount,
       closedCount,
       totalRegistered,
-    }
-  }, [history])
+    };
+  }, [history]);
 
-  const totalPages = Math.max(Math.ceil(history.length / PAGE_SIZE), 1)
+  const totalPages = Math.max(Math.ceil(history.length / PAGE_SIZE), 1);
   const visibleRows = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE
-    return history.slice(start, start + PAGE_SIZE)
-  }, [history, page])
+    const start = (page - 1) * PAGE_SIZE;
+    return history.slice(start, start + PAGE_SIZE);
+  }, [history, page]);
 
   useEffect(() => {
     void Promise.resolve().then(() => {
       if (page > totalPages) {
-        setPage(totalPages)
+        setPage(totalPages);
       }
-    })
-  }, [page, totalPages])
+    });
+  }, [page, totalPages]);
 
   if (loading) {
     return (
@@ -161,7 +177,7 @@ export default function CashHistoryPage() {
         description="Estamos recuperando las sesiones de caja registradas para tu sede operativa."
         variant="ops"
       />
-    )
+    );
   }
 
   if (error) {
@@ -171,11 +187,11 @@ export default function CashHistoryPage() {
         description={error}
         variant="ops"
       />
-    )
+    );
   }
 
   return (
-    <PermissionGuard allowedRoles={CASH_ALLOWED_ROLES}>
+    <PermissionGuard anyPermissions={["cash.view", "cash.operate"]}>
       <TooltipProvider delayDuration={120}>
         <section className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
           <div className="mx-auto max-w-6xl space-y-5">
@@ -183,7 +199,9 @@ export default function CashHistoryPage() {
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ripnel-accent-hover)]">Caja</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ripnel-accent-hover)]">
+                      Caja
+                    </p>
                     <HelpTooltip content="Aquí revisas las sesiones diarias registradas de la sede actual, con su estado y total consolidado." />
                   </div>
                   <h1 className="mt-1 text-2xl font-semibold text-[var(--ops-text)] md:text-[1.75rem]">
@@ -246,38 +264,40 @@ export default function CashHistoryPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-                <SummaryMetric label="Sesiones" value={stats.count} />
-                <SummaryMetric
-                  label="Pendientes"
-                  value={stats.openCount}
-                  valueClassName="text-[color:color-mix(in_srgb,#d97706_78%,var(--ops-text))]"
-                />
-                <SummaryMetric label="Cerradas" value={stats.closedCount} />
-                <SummaryMetric
-                  label="Total registrado"
-                  value={formatAmount(stats.totalRegistered)}
-                  valueClassName="text-[var(--ripnel-accent-hover)]"
-                />
-              </div>
+              <SummaryMetric label="Sesiones" value={stats.count} />
+              <SummaryMetric
+                label="Pendientes"
+                value={stats.openCount}
+                valueClassName="text-[color:color-mix(in_srgb,#d97706_78%,var(--ops-text))]"
+              />
+              <SummaryMetric label="Cerradas" value={stats.closedCount} />
+              <SummaryMetric
+                label="Total registrado"
+                value={formatAmount(stats.totalRegistered)}
+                valueClassName="text-[var(--ripnel-accent-hover)]"
+              />
+            </div>
 
             <article>
               <div className="flex items-center gap-2">
                 <History className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />
-                <p className="text-sm font-semibold text-[var(--ops-text)]">Sesiones registradas</p>
+                <p className="text-sm font-semibold text-[var(--ops-text)]">
+                  Sesiones registradas
+                </p>
               </div>
 
               {history.length === 0 ? (
                 <div className="mt-4">
-                    <InlineStatusCard
-                      title="Sin sesiones registradas"
-                      description="No se encontraron aperturas o cierres de caja para los filtros elegidos."
-                      tone="neutral"
-                      variant="ops"
-                    />
-                  </div>
-                ) : (
-                  <>
-                    <div className="mt-4 hidden grid-cols-[1.15fr_1fr_1fr_0.7fr_28px] items-center gap-3 border-b border-[var(--ops-border-strong)] px-3 pb-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)] md:grid">
+                  <InlineStatusCard
+                    title="Sin sesiones registradas"
+                    description="No se encontraron aperturas o cierres de caja para los filtros elegidos."
+                    tone="neutral"
+                    variant="ops"
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="mt-4 hidden grid-cols-[1.15fr_1fr_1fr_0.7fr_28px] items-center gap-3 border-b border-[var(--ops-border-strong)] px-3 pb-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)] md:grid">
                     <span>Sesión</span>
                     <span>Movimiento</span>
                     <span>Responsable</span>
@@ -285,7 +305,7 @@ export default function CashHistoryPage() {
                     <span />
                   </div>
 
-                    <div className="divide-y divide-[var(--ops-border-strong)]">
+                  <div className="divide-y divide-[var(--ops-border-strong)]">
                     {visibleRows.map((closing) => (
                       <Link
                         key={closing.cash_closing_id}
@@ -299,13 +319,15 @@ export default function CashHistoryPage() {
                             </p>
                             <CashStatusBadge status={closing.status} />
                           </div>
-                          <p className="text-sm text-[var(--ops-text)]">{closing.location_name}</p>
+                          <p className="text-sm text-[var(--ops-text)]">
+                            {closing.location_name}
+                          </p>
                         </div>
 
                         <div className="space-y-1 text-sm text-[var(--ops-text-muted)]">
                           <p>
                             Apertura:{" "}
-                              <span className="font-medium text-[var(--ops-text)]">
+                            <span className="font-medium text-[var(--ops-text)]">
                               {formatDateTime(closing.created_at)}
                             </span>
                           </p>
@@ -325,14 +347,17 @@ export default function CashHistoryPage() {
 
                         <div className="space-y-1 text-sm text-[var(--ops-text-muted)]">
                           <p className="font-medium text-[var(--ops-text)]">
-                            {closing.opened_by_name || "Usuario no identificado"}
+                            {closing.opened_by_name ||
+                              "Usuario no identificado"}
                           </p>
                           {closing.is_consistent === false ? (
                             <p className="text-[color:color-mix(in_srgb,#d97706_78%,var(--ops-text))]">
                               Diferencia {formatAmount(closing.difference)}
                             </p>
                           ) : (
-                            <p className="text-[color:color-mix(in_srgb,#059669_80%,var(--ops-text))]">Consistencia OK</p>
+                            <p className="text-[color:color-mix(in_srgb,#059669_80%,var(--ops-text))]">
+                              Consistencia OK
+                            </p>
                           )}
                         </div>
 
@@ -363,5 +388,5 @@ export default function CashHistoryPage() {
         </section>
       </TooltipProvider>
     </PermissionGuard>
-  )
+  );
 }

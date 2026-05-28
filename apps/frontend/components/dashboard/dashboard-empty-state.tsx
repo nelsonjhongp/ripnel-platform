@@ -18,9 +18,9 @@ export function DashboardEmptyState({
   return (
     <div
       className={cn(
-        "flex h-full min-h-[120px] flex-col items-center justify-center rounded-xl border border-[var(--ops-border-soft)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_74%,var(--ops-surface))] px-4 text-center",
+        "flex h-full min-h-[88px] flex-col items-center justify-center rounded-xl border border-[var(--ops-border-soft)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_74%,var(--ops-surface))] px-4 text-center",
         dashed && "border-dashed",
-        compact ? "py-5" : "py-8"
+        compact ? "py-4" : "py-6"
       )}
     >
       {title ? (
@@ -29,7 +29,7 @@ export function DashboardEmptyState({
       <p className={cn("max-w-[26rem] text-[var(--ops-text-muted)]", title ? "mt-1 text-xs" : "text-sm")}>
         {description}
       </p>
-      {action ? <div className="mt-4">{action}</div> : null}
+      {action ? <div className="mt-3">{action}</div> : null}
     </div>
   )
 }

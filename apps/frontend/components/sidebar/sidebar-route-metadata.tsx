@@ -62,7 +62,7 @@ export function resolveSidebarDefaultActions(
   if (pathname !== appRoutes.home && hasPermission("sales.pos")) {
     actions.push({
       key: "quick-sale",
-      label: "Venta rapida",
+      label: "Venta rápida",
       href: appRoutes.purchaseSystem,
       icon: <ShoppingCart className="h-4 w-4" />,
       variant: "accent",
