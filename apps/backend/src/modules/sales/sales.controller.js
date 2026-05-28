@@ -59,9 +59,13 @@ async function getCustomersAnalytics(req, res, next) {
   try {
     const analytics = await getCustomerAnalytics({
       user_id: req.auth?.sub,
+      permissions: req.auth?.permissions,
+      role_name: req.auth?.role_name,
       date_from: req.query.date_from,
       date_to: req.query.date_to,
       limit: req.query.limit,
+      location_scope: req.query.location_scope,
+      location_id: req.query.location_id,
     });
     return res.json(analytics);
   } catch (error) {

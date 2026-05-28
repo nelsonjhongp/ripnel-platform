@@ -2,6 +2,9 @@ const express = require('express');
 const { requireAuth, requirePermission } = require('../../middlewares/auth');
 const {
   getInventory,
+  getInventoryProductSummary,
+  getInventoryLocationSummary,
+  getInventoryStyle,
   getKardex,
   getAdjustments,
   getAdjustmentVariants,
@@ -16,6 +19,9 @@ const router = express.Router();
 router.use(requireAuth);
 
 router.get('/', requirePermission('inventory.view'), getInventory);
+router.get('/summary/products', requirePermission('inventory.view'), getInventoryProductSummary);
+router.get('/summary/locations', requirePermission('inventory.view'), getInventoryLocationSummary);
+router.get('/styles/:styleId', requirePermission('inventory.view'), getInventoryStyle);
 router.get('/kardex', requirePermission('inventory.view'), getKardex);
 router.get('/adjustment-variants', requirePermission('inventory.adjust'), getAdjustmentVariants);
 router.get('/adjustments', requirePermission('inventory.adjust'), getAdjustments);
