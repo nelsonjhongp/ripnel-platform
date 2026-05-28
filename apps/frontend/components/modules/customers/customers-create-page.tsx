@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
-import { buildApiUrl } from "@/lib/api"
+import { apiFetchData } from "@/lib/api"
 import { AdminFormPageShell } from "@/components/admin/admin-form-page-shell"
 import {
   buildCustomerPayload,
@@ -31,16 +31,11 @@ export default function CustomersCreatePage() {
     setSubmitting(true)
 
     try {
-      const response = await fetch(buildApiUrl("/api/customers"), {
+      await apiFetchData("/api/customers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildCustomerPayload(state)),
       })
-
-      const payload = await response.json()
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo crear el cliente")
-      }
 
       router.push("/clientes")
     } catch (submitError: unknown) {

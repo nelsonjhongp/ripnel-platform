@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 
-import { buildApiUrl } from "@/lib/api"
+import { apiFetchData } from "@/lib/api"
 import { AdminFormPageShell } from "@/components/admin/admin-form-page-shell"
 import {
   AdminActionButton,
@@ -51,7 +51,7 @@ export default function LocationsCreatePage() {
     setError(null)
 
     try {
-      const response = await fetch(buildApiUrl("/api/locations"), {
+      await apiFetchData("/api/locations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -62,12 +62,6 @@ export default function LocationsCreatePage() {
           active: formState.active,
         }),
       })
-
-      const payload = await response.json()
-
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo crear la ubicación")
-      }
 
       router.push("/administracion/ubicaciones")
     } catch (submitError) {

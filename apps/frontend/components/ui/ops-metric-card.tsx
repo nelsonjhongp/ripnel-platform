@@ -1,0 +1,140 @@
+"use client"
+
+import Link from "next/link"
+
+import { cn } from "@/lib/utils"
+
+export interface OpsMetricCardProps {
+  icon: React.ReactNode
+  label: string
+  value: string | number
+  detail?: string
+  state?: string
+  footer?: React.ReactNode
+  tone?: "default" | "accent" | "success" | "warning" | "danger" | "neutral"
+  href?: string
+  className?: string
+  valueClassName?: string
+}
+
+const toneClasses: Record<
+  NonNullable<OpsMetricCardProps["tone"]>,
+  { bg: string; text: string; badge: string; badgeText: string }
+> = {
+  accent: {
+    bg: "bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))]",
+    text: "text-[var(--ripnel-accent-hover)]",
+    badge:
+      "border-[color:color-mix(in_srgb,var(--ripnel-accent)_26%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_72%,var(--ops-surface))]",
+    badgeText: "text-[var(--ripnel-accent-hover)]",
+  },
+  success: {
+    bg: "bg-[color:color-mix(in_srgb,#14b8a6_12%,var(--ops-surface))]",
+    text: "text-teal-700 dark:text-teal-400",
+    badge:
+      "border-[color:color-mix(in_srgb,#14b8a6_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#14b8a6_12%,var(--ops-surface))]",
+    badgeText: "text-teal-700 dark:text-teal-400",
+  },
+  warning: {
+    bg: "bg-[color:color-mix(in_srgb,#f59e0b_12%,var(--ops-surface))]",
+    text: "text-amber-700 dark:text-amber-400",
+    badge:
+      "border-[color:color-mix(in_srgb,#f59e0b_24%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_12%,var(--ops-surface))]",
+    badgeText: "text-amber-700 dark:text-amber-400",
+  },
+  danger: {
+    bg: "bg-[color:color-mix(in_srgb,#f43f5e_10%,var(--ops-surface))]",
+    text: "text-rose-700 dark:text-rose-400",
+    badge:
+      "border-[color:color-mix(in_srgb,#f43f5e_22%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_10%,var(--ops-surface))]",
+    badgeText: "text-rose-700 dark:text-rose-400",
+  },
+  neutral: {
+    bg: "bg-[color:color-mix(in_srgb,#38bdf8_10%,var(--ops-surface))]",
+    text: "text-sky-700 dark:text-sky-400",
+    badge:
+      "border-[color:color-mix(in_srgb,#38bdf8_22%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#38bdf8_10%,var(--ops-surface))]",
+    badgeText: "text-sky-700 dark:text-sky-400",
+  },
+  default: {
+    bg: "bg-[var(--ops-surface-muted)]",
+    text: "text-[var(--ops-text-muted)]",
+    badge: "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)]",
+    badgeText: "text-[var(--ops-text-muted)]",
+  },
+}
+
+export function OpsMetricCard({
+  icon,
+  label,
+  value,
+  detail,
+  state,
+  footer,
+  tone = "default",
+  href,
+  className,
+  valueClassName,
+}: OpsMetricCardProps) {
+  const toneStyle = toneClasses[tone]
+
+  const content = (
+    <div className="flex items-start gap-3">
+      <div
+        className={cn(
+          "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+          toneStyle.bg,
+          toneStyle.text
+        )}
+      >
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+          {label}
+        </p>
+        <p className={cn("mt-1 text-2xl font-bold leading-none text-[var(--ops-text)]", valueClassName)}>
+          {value}
+        </p>
+
+        {(footer || detail || state) && (
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            {footer ? (
+              footer
+            ) : detail ? (
+              <p className="text-[12px] leading-5 text-[var(--ops-text-muted)]">{detail}</p>
+            ) : null}
+            {!footer && state && (
+              <span
+                className={cn(
+                  "inline-flex shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.12em]",
+                  toneStyle.badge,
+                  toneStyle.badgeText
+                )}
+              >
+                {state}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
+  const sharedClasses = cn(
+    "block rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-4 py-3.5",
+    href &&
+      "transition hover:border-[var(--ops-border-soft)] hover:bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_56%,var(--ops-surface))]",
+    className
+  )
+
+  if (href) {
+    return (
+      <Link href={href} className={sharedClasses}>
+        {content}
+      </Link>
+    )
+  }
+
+  return <div className={sharedClasses}>{content}</div>
+}

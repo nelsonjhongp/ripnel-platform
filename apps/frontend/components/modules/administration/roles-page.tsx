@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { PencilLine, Plus, Power, RefreshCw, RotateCcw } from "lucide-react";
-import { buildApiUrl } from "@/lib/api";
+import { apiFetchData } from "@/lib/api";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
   AdminActionButton,
@@ -40,12 +40,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-type ApiResponse<T> = {
-  ok: boolean;
-  data: T;
-  message?: string;
-};
-
 type Role = {
   role_id: string;
   name: string;
@@ -64,23 +58,14 @@ type RoleFormState = {
 };
 
 async function requestJson<T>(path: string, init?: RequestInit) {
-  const response = await fetch(buildApiUrl(path), {
+  return apiFetchData<T>(path, {
     headers: {
       "Content-Type": "application/json",
       ...(init?.headers || {}),
     },
     cache: "no-store",
-    credentials: "include",
     ...init,
   });
-
-  const payload = (await response.json().catch(() => null)) as ApiResponse<T> | null;
-
-  if (!response.ok || !payload?.ok) {
-    throw new Error(payload?.message || "Request failed");
-  }
-
-  return payload.data;
 }
 
 const emptyRoleForm: RoleFormState = {

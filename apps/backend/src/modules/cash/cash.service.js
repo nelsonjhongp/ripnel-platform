@@ -1,4 +1,4 @@
-const { AppError } = require('../../shared/errors');
+const { AppError } = require("../../shared/errors");
 const {
   findCashClosingByLocationAndDate,
   findCashClosingById,
@@ -9,22 +9,21 @@ const {
   countSalesByLocationAndDate,
   getAdminCashSummary,
   findAdminCashSessions,
-} = require('./cash.repo');
-const { query } = require('../../shared/db');
-const { findActiveUserById } = require('../auth/auth.repo');
-const { findDefaultLocationByUserId } = require('../users/users.repo');
-
-const ALLOWED_CASH_ROLES = new Set(['ADMIN', 'CAJA']);
+} = require("./cash.repo");
+const { resolveCashCapabilities } = require("./cash-access");
+const { query } = require("../../shared/db");
+const { findActiveUserById } = require("../auth/auth.repo");
+const { findDefaultLocationByUserId } = require("../users/users.repo");
 
 function todayPeruDate() {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Lima" });
 }
 
 function normalizeBusinessDateValue(value) {
   if (!value) return null;
 
   if (value instanceof Date) {
-    return value.toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+    return value.toLocaleDateString("en-CA", { timeZone: "America/Lima" });
   }
 
   const normalized = String(value).trim();
@@ -34,7 +33,7 @@ function normalizeBusinessDateValue(value) {
 
   const parsed = new Date(normalized);
   if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+    return parsed.toLocaleDateString("en-CA", { timeZone: "America/Lima" });
   }
 
   return normalized;
@@ -49,11 +48,11 @@ function toNumber(value) {
 }
 
 function normalizeUuid(value) {
-  const normalized = String(value || '').trim();
+  const normalized = String(value || "").trim();
   if (!normalized) return null;
 
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    normalized
+    normalized,
   )
     ? normalized
     : null;
@@ -73,19 +72,20 @@ function addDays(dateString, days) {
 }
 
 function normalizeRange(value) {
-  const normalized = String(value || '').trim();
-  if (!normalized) return '7d';
-  return ['7d', '30d'].includes(normalized) ? normalized : null;
+  const normalized = String(value || "").trim();
+  if (!normalized) return "7d";
+  return ["7d", "30d"].includes(normalized) ? normalized : null;
 }
 
 function buildRangeFilter(range) {
   const normalizedRange = normalizeRange(range);
   if (!normalizedRange) {
-    throw new AppError('Invalid range value', 400, { code: 'INVALID_RANGE' });
+    throw new AppError("Invalid range value", 400, { code: "INVALID_RANGE" });
   }
 
   const endDate = todayPeruDate();
-  const startDate = normalizedRange === '30d' ? addDays(endDate, -29) : addDays(endDate, -6);
+  const startDate =
+    normalizedRange === "30d" ? addDays(endDate, -29) : addDays(endDate, -6);
 
   return {
     range: normalizedRange,
@@ -134,12 +134,20 @@ function serializeCashClosing(closing) {
     total_plin: toNumber(closing.total_plin),
     total_transfer: toNumber(closing.total_transfer),
     total_all: toNumber(closing.total_all),
-    sale_count: closing.sale_count == null ? undefined : Number(closing.sale_count || 0),
-    grand_total: closing.grand_total == null ? undefined : toNumber(closing.grand_total),
-    payment_total: closing.payment_total == null ? undefined : toNumber(closing.payment_total),
-    difference: closing.difference == null ? undefined : toNumber(closing.difference),
+    sale_count:
+      closing.sale_count == null ? undefined : Number(closing.sale_count || 0),
+    grand_total:
+      closing.grand_total == null ? undefined : toNumber(closing.grand_total),
+    payment_total:
+      closing.payment_total == null
+        ? undefined
+        : toNumber(closing.payment_total),
+    difference:
+      closing.difference == null ? undefined : toNumber(closing.difference),
     is_consistent:
-      closing.is_consistent == null ? undefined : Boolean(closing.is_consistent),
+      closing.is_consistent == null
+        ? undefined
+        : Boolean(closing.is_consistent),
   };
 }
 
@@ -165,11 +173,16 @@ function serializeCashSummaryRow(row) {
     open_count: Number(row.open_count || 0),
     closed_count: Number(row.closed_count || 0),
     open_location_count:
-      row.open_location_count == null ? undefined : Number(row.open_location_count || 0),
-    total_registered: row.total_registered == null ? undefined : toNumber(row.total_registered),
+      row.open_location_count == null
+        ? undefined
+        : Number(row.open_location_count || 0),
+    total_registered:
+      row.total_registered == null ? undefined : toNumber(row.total_registered),
     total_all: row.total_all == null ? undefined : toNumber(row.total_all),
-    grand_total: row.grand_total == null ? undefined : toNumber(row.grand_total),
-    payment_total: row.payment_total == null ? undefined : toNumber(row.payment_total),
+    grand_total:
+      row.grand_total == null ? undefined : toNumber(row.grand_total),
+    payment_total:
+      row.payment_total == null ? undefined : toNumber(row.payment_total),
     difference: row.difference == null ? undefined : toNumber(row.difference),
     is_consistent:
       row.is_consistent == null ? undefined : Boolean(row.is_consistent),
@@ -179,46 +192,59 @@ function serializeCashSummaryRow(row) {
 async function validateLocationExists(locationId) {
   const result = await query(
     `SELECT location_id FROM locations WHERE location_id = $1`,
-    [locationId]
+    [locationId],
   );
   return result.rows.length > 0;
 }
 
-async function resolveCashContext(userId, requestedLocationId = null) {
+async function resolveCashContext(
+  userId,
+  permissions,
+  requestedLocationId = null,
+) {
   const normalizedUserId = normalizeUuid(userId);
 
   if (!normalizedUserId) {
-    throw new AppError('Not authenticated', 401, { code: 'AUTH_REQUIRED' });
+    throw new AppError("Not authenticated", 401, { code: "AUTH_REQUIRED" });
   }
 
   const user = await findActiveUserById(normalizedUserId);
   if (!user) {
-    throw new AppError('Not authenticated', 401, { code: 'AUTH_REQUIRED' });
+    throw new AppError("Not authenticated", 401, { code: "AUTH_REQUIRED" });
   }
 
-  if (!ALLOWED_CASH_ROLES.has(String(user.role_name || ''))) {
-    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN_ROLE' });
+  const capabilities = resolveCashCapabilities({ permissions });
+  if (!capabilities.visible) {
+    throw new AppError("Forbidden", 403, { code: "FORBIDDEN" });
   }
 
   const defaultLocation = await findDefaultLocationByUserId(normalizedUserId);
   if (!defaultLocation) {
-    throw new AppError('Authenticated user has no default location assigned', 409, {
-      code: 'DEFAULT_LOCATION_REQUIRED',
-    });
+    throw new AppError(
+      "Authenticated user has no default location assigned",
+      409,
+      {
+        code: "DEFAULT_LOCATION_REQUIRED",
+      },
+    );
   }
 
   if (!defaultLocation.active) {
-    throw new AppError('Default location is inactive', 409, {
-      code: 'DEFAULT_LOCATION_INACTIVE',
+    throw new AppError("Default location is inactive", 409, {
+      code: "DEFAULT_LOCATION_INACTIVE",
     });
   }
 
-  if (requestedLocationId && requestedLocationId !== defaultLocation.location_id) {
-    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN_LOCATION' });
+  if (
+    requestedLocationId &&
+    requestedLocationId !== defaultLocation.location_id
+  ) {
+    throw new AppError("Forbidden", 403, { code: "FORBIDDEN_LOCATION" });
   }
 
   return {
     user,
+    capabilities,
     locationId: requestedLocationId || defaultLocation.location_id,
   };
 }
@@ -228,18 +254,35 @@ async function openCash(input) {
   const businessDate = normalizeDate(input.business_date) || todayPeruDate();
   const notes = input.notes ? String(input.notes).trim() : null;
 
-  const { user, locationId } = await resolveCashContext(input.user_id, requestedLocationId);
+  const { user, capabilities, locationId } = await resolveCashContext(
+    input.user_id,
+    input.permissions,
+    requestedLocationId,
+  );
+  if (!capabilities.operate) {
+    throw new AppError("Forbidden", 403, { code: "FORBIDDEN" });
+  }
 
   const locationExists = await validateLocationExists(locationId);
-  if (!locationExists) throw new AppError('Location not found', 404, { code: 'LOCATION_NOT_FOUND' });
+  if (!locationExists)
+    throw new AppError("Location not found", 404, {
+      code: "LOCATION_NOT_FOUND",
+    });
 
-  const existing = await findCashClosingByLocationAndDate(locationId, businessDate);
+  const existing = await findCashClosingByLocationAndDate(
+    locationId,
+    businessDate,
+  );
 
   if (existing) {
-    if (existing.status === 'open') return serializeCashClosing(existing);
-    throw new AppError('La caja operativa de la sede ya fue cerrada para esa fecha.', 409, {
-      code: 'CASH_ALREADY_CLOSED_FOR_DATE',
-    });
+    if (existing.status === "open") return serializeCashClosing(existing);
+    throw new AppError(
+      "La caja operativa de la sede ya fue cerrada para esa fecha.",
+      409,
+      {
+        code: "CASH_ALREADY_CLOSED_FOR_DATE",
+      },
+    );
   }
 
   const record = await insertCashClosing({
@@ -249,44 +292,63 @@ async function openCash(input) {
     notes,
   });
 
-  return serializeCashClosing(await findCashClosingById(record.cash_closing_id));
+  return serializeCashClosing(
+    await findCashClosingById(record.cash_closing_id),
+  );
 }
 
-async function resolveCashAdminContext(userId) {
+async function resolveCashAdminContext(userId, permissions) {
   const normalizedUserId = normalizeUuid(userId);
 
   if (!normalizedUserId) {
-    throw new AppError('Not authenticated', 401, { code: 'AUTH_REQUIRED' });
+    throw new AppError("Not authenticated", 401, { code: "AUTH_REQUIRED" });
   }
 
   const user = await findActiveUserById(normalizedUserId);
   if (!user) {
-    throw new AppError('Not authenticated', 401, { code: 'AUTH_REQUIRED' });
+    throw new AppError("Not authenticated", 401, { code: "AUTH_REQUIRED" });
   }
 
-  if (String(user.role_name || '') !== 'ADMIN') {
-    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN_ROLE' });
+  const capabilities = resolveCashCapabilities({ permissions });
+  if (!capabilities.admin) {
+    throw new AppError("Forbidden", 403, { code: "FORBIDDEN" });
   }
 
-  return { user };
+  return { user, capabilities };
 }
 
 async function closeCash(input) {
   const normalizedId = normalizeUuid(input.cash_closing_id);
-  if (!normalizedId) throw new AppError('cash_closing_id is required', 400, { code: 'INVALID_CASH_CLOSING_ID' });
+  if (!normalizedId)
+    throw new AppError("cash_closing_id is required", 400, {
+      code: "INVALID_CASH_CLOSING_ID",
+    });
 
-  const { user, locationId } = await resolveCashContext(input.user_id, normalizeUuid(input.location_id));
+  const { user, capabilities, locationId } = await resolveCashContext(
+    input.user_id,
+    input.permissions,
+    normalizeUuid(input.location_id),
+  );
+  if (!capabilities.operate) {
+    throw new AppError("Forbidden", 403, { code: "FORBIDDEN" });
+  }
 
   const closing = await findCashClosingById(normalizedId);
-  if (!closing) throw new AppError('Caja no encontrada', 404, { code: 'CASH_CLOSING_NOT_FOUND' });
+  if (!closing)
+    throw new AppError("Caja no encontrada", 404, {
+      code: "CASH_CLOSING_NOT_FOUND",
+    });
   if (closing.location_id !== locationId) {
-    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN_LOCATION' });
+    throw new AppError("Forbidden", 403, { code: "FORBIDDEN_LOCATION" });
   }
-  if (closing.status === 'closed') throw new AppError('La caja operativa de la sede ya fue cerrada.', 409, { code: 'CASH_ALREADY_CLOSED' });
+  if (closing.status === "closed")
+    throw new AppError("La caja operativa de la sede ya fue cerrada.", 409, {
+      code: "CASH_ALREADY_CLOSED",
+    });
 
   const paymentRows = await sumSalesPaymentsByLocationAndDate(
     closing.location_id,
-    closing.business_date
+    closing.business_date,
   );
   const totals = buildPaymentTotals(paymentRows);
 
@@ -307,12 +369,22 @@ async function getCurrentCash(input) {
   const requestedLocationId = normalizeUuid(input.location_id);
   const businessDate = normalizeDate(input.business_date) || todayPeruDate();
 
-  const { locationId } = await resolveCashContext(input.user_id, requestedLocationId);
+  const { locationId } = await resolveCashContext(
+    input.user_id,
+    input.permissions,
+    requestedLocationId,
+  );
 
   const locationExists = await validateLocationExists(locationId);
-  if (!locationExists) throw new AppError('Location not found', 404, { code: 'LOCATION_NOT_FOUND' });
+  if (!locationExists)
+    throw new AppError("Location not found", 404, {
+      code: "LOCATION_NOT_FOUND",
+    });
 
-  const closing = await findCashClosingByLocationAndDate(locationId, businessDate);
+  const closing = await findCashClosingByLocationAndDate(
+    locationId,
+    businessDate,
+  );
 
   const [paymentRows, salesRow] = await Promise.all([
     sumSalesPaymentsByLocationAndDate(locationId, businessDate),
@@ -330,10 +402,14 @@ async function listCashClosings(input = {}) {
   const requestedLocationId = normalizeUuid(input.location_id);
   const status = input.status ? String(input.status).trim() : null;
   const rangeFilter = buildRangeFilter(input.range);
-  const { locationId } = await resolveCashContext(input.user_id, requestedLocationId);
+  const { locationId } = await resolveCashContext(
+    input.user_id,
+    input.permissions,
+    requestedLocationId,
+  );
 
-  if (status && !['open', 'closed'].includes(status)) {
-    throw new AppError('Invalid status value', 400, { code: 'INVALID_STATUS' });
+  if (status && !["open", "closed"].includes(status)) {
+    throw new AppError("Invalid status value", 400, { code: "INVALID_STATUS" });
   }
 
   const closings = await findAllCashClosings({
@@ -348,19 +424,31 @@ async function listCashClosings(input = {}) {
 async function getCashClosing(input = {}) {
   const normalizedId = normalizeUuid(input.cash_closing_id);
   if (!normalizedId) {
-    throw new AppError('cash_closing_id is required', 400, { code: 'INVALID_CASH_CLOSING_ID' });
+    throw new AppError("cash_closing_id is required", 400, {
+      code: "INVALID_CASH_CLOSING_ID",
+    });
   }
 
   const closing = await findCashClosingById(normalizedId);
-  if (!closing) throw new AppError('Caja no encontrada', 404, { code: 'CASH_CLOSING_NOT_FOUND' });
+  if (!closing)
+    throw new AppError("Caja no encontrada", 404, {
+      code: "CASH_CLOSING_NOT_FOUND",
+    });
 
-  const { locationId } = await resolveCashContext(input.user_id, closing.location_id);
+  const { locationId } = await resolveCashContext(
+    input.user_id,
+    input.permissions,
+    closing.location_id,
+  );
   if (closing.location_id !== locationId) {
-    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN_LOCATION' });
+    throw new AppError("Forbidden", 403, { code: "FORBIDDEN_LOCATION" });
   }
 
   const [paymentRows, salesRow] = await Promise.all([
-    sumSalesPaymentsByLocationAndDate(closing.location_id, closing.business_date),
+    sumSalesPaymentsByLocationAndDate(
+      closing.location_id,
+      closing.business_date,
+    ),
     countSalesByLocationAndDate(closing.location_id, closing.business_date),
   ]);
 
@@ -375,16 +463,18 @@ async function getCashAdminSummary(input = {}) {
   const status = input.status ? String(input.status).trim() : null;
   const rangeFilter = buildRangeFilter(input.range);
 
-  await resolveCashAdminContext(input.user_id);
+  await resolveCashAdminContext(input.user_id, input.permissions);
 
-  if (status && !['open', 'closed'].includes(status)) {
-    throw new AppError('Invalid status value', 400, { code: 'INVALID_STATUS' });
+  if (status && !["open", "closed"].includes(status)) {
+    throw new AppError("Invalid status value", 400, { code: "INVALID_STATUS" });
   }
 
   if (requestedLocationId) {
     const locationExists = await validateLocationExists(requestedLocationId);
     if (!locationExists) {
-      throw new AppError('Location not found', 404, { code: 'LOCATION_NOT_FOUND' });
+      throw new AppError("Location not found", 404, {
+        code: "LOCATION_NOT_FOUND",
+      });
     }
   }
 
@@ -398,7 +488,7 @@ async function getCashAdminSummary(input = {}) {
   return {
     filters: {
       range: rangeFilter.range,
-      status: status || 'all',
+      status: status || "all",
       location_id: requestedLocationId || null,
     },
     stats: serializeCashSummary(summary.stats),
@@ -406,7 +496,8 @@ async function getCashAdminSummary(input = {}) {
     by_location: summary.by_location.map(serializeCashSummaryRow),
     alerts: {
       open_locations: summary.open_locations.map(serializeCashSummaryRow),
-      inconsistent_sessions: summary.inconsistent_sessions.map(serializeCashClosing),
+      inconsistent_sessions:
+        summary.inconsistent_sessions.map(serializeCashClosing),
     },
   };
 }
@@ -418,16 +509,18 @@ async function listCashAdminSessions(input = {}) {
   const page = Number(input.page || 1);
   const pageSize = Number(input.page_size || input.pageSize || 20);
 
-  await resolveCashAdminContext(input.user_id);
+  await resolveCashAdminContext(input.user_id, input.permissions);
 
-  if (status && !['open', 'closed'].includes(status)) {
-    throw new AppError('Invalid status value', 400, { code: 'INVALID_STATUS' });
+  if (status && !["open", "closed"].includes(status)) {
+    throw new AppError("Invalid status value", 400, { code: "INVALID_STATUS" });
   }
 
   if (requestedLocationId) {
     const locationExists = await validateLocationExists(requestedLocationId);
     if (!locationExists) {
-      throw new AppError('Location not found', 404, { code: 'LOCATION_NOT_FOUND' });
+      throw new AppError("Location not found", 404, {
+        code: "LOCATION_NOT_FOUND",
+      });
     }
   }
 
@@ -440,12 +533,13 @@ async function listCashAdminSessions(input = {}) {
     pageSize,
   });
 
-  const totalPages = result.totalItems > 0 ? Math.ceil(result.totalItems / result.pageSize) : 0;
+  const totalPages =
+    result.totalItems > 0 ? Math.ceil(result.totalItems / result.pageSize) : 0;
 
   return {
     filters: {
       range: rangeFilter.range,
-      status: status || 'all',
+      status: status || "all",
       location_id: requestedLocationId || null,
     },
     items: result.rows.map(serializeCashClosing),

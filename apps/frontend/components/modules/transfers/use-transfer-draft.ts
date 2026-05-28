@@ -187,9 +187,9 @@ export function useTransferDraft({
         const data = unwrapApiData(payload);
 
         setSuccessMessage(
-          `${
-            isStoreRequestMode ? "Solicitud" : "Transferencia"
-          } ${data.transfer_number || "creada"} registrada en borrador`
+          isStoreRequestMode
+            ? `Solicitud ${data.transfer_number || "creada"} enviada correctamente.`
+            : `Transferencia ${data.transfer_number || "creada"} registrada correctamente.`
         );
         setDraftLines([]);
         setPendingQuantities({});
@@ -206,7 +206,9 @@ export function useTransferDraft({
         setError(
           requestError instanceof Error
             ? requestError.message
-            : "No se pudo crear la transferencia"
+            : isStoreRequestMode
+              ? "No se pudo enviar la solicitud"
+              : "No se pudo crear la transferencia"
         );
       } finally {
         setSubmitting(false);

@@ -1,29 +1,34 @@
-const { pool } = require('../../shared/db');
-const { AppError } = require('../../shared/errors');
-const { findActiveUserById } = require('../auth/auth.repo');
-const { findDefaultLocationByUserId } = require('../users/users.repo');
-const { findCashClosingByLocationAndDate, countSalesByLocationAndDate } = require('../cash/cash.repo');
+const { pool } = require("../../shared/db");
+const { AppError } = require("../../shared/errors");
+const { findActiveUserById } = require("../auth/auth.repo");
+const { findDefaultLocationByUserId } = require("../users/users.repo");
+const {
+  findCashClosingByLocationAndDate,
+  countSalesByLocationAndDate,
+} = require("../cash/cash.repo");
+const { resolveCashCapabilities } = require("../cash/cash-access");
 const {
   findPaymentTotalsByLocationAndDate,
   findPendingTransfersCounts,
   findPendingTransfersItems,
   findCriticalInventoryCounts,
   findCriticalInventoryItems,
-} = require('../dashboard/dashboard.repo');
+} = require("../dashboard/dashboard.repo");
+const { buildTransferCapabilities } = require("../transfers/transfers-access");
 
 const LOW_STOCK_THRESHOLD = 3;
 const MAX_VISIBLE_ITEMS = 6;
 
 function todayPeruDate() {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Lima" });
 }
 
 function normalizeUuid(value) {
-  const normalized = String(value || '').trim();
+  const normalized = String(value || "").trim();
   if (!normalized) return null;
 
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    normalized
+    normalized,
   )
     ? normalized
     : null;
@@ -32,12 +37,22 @@ function normalizeUuid(value) {
 function hasPermission(permissions, permissionKey) {
   return (
     Array.isArray(permissions) &&
-    (permissions.includes('admin.manage') || permissions.includes(permissionKey))
+    (permissions.includes("admin.manage") ||
+      permissions.includes(permissionKey))
   );
 }
 
-function canViewCash(roleName) {
-  return ['ADMIN', 'CAJA'].includes(String(roleName || '').toUpperCase());
+function normalizeTransferCapabilities(rawCapabilities = {}) {
+  return {
+    manage: Boolean(rawCapabilities.manage),
+    request_create: Boolean(rawCapabilities.request_create),
+    request_view_own: Boolean(rawCapabilities.request_view_own),
+    approve: Boolean(rawCapabilities.approve),
+    ship: Boolean(rawCapabilities.ship),
+    receive: Boolean(rawCapabilities.receive),
+    cancel: Boolean(rawCapabilities.cancel),
+    visible: Boolean(rawCapabilities.visible),
+  };
 }
 
 function round2(value) {
@@ -76,24 +91,28 @@ async function resolveNotificationsContext(userId) {
   const normalizedUserId = normalizeUuid(userId);
 
   if (!normalizedUserId) {
-    throw new AppError('Not authenticated', 401, { code: 'AUTH_REQUIRED' });
+    throw new AppError("Not authenticated", 401, { code: "AUTH_REQUIRED" });
   }
 
   const user = await findActiveUserById(normalizedUserId);
   if (!user) {
-    throw new AppError('Not authenticated', 401, { code: 'AUTH_REQUIRED' });
+    throw new AppError("Not authenticated", 401, { code: "AUTH_REQUIRED" });
   }
 
   const location = await findDefaultLocationByUserId(normalizedUserId);
   if (!location) {
-    throw new AppError('Authenticated user has no default location assigned', 409, {
-      code: 'DEFAULT_LOCATION_REQUIRED',
-    });
+    throw new AppError(
+      "Authenticated user has no default location assigned",
+      409,
+      {
+        code: "DEFAULT_LOCATION_REQUIRED",
+      },
+    );
   }
 
   if (!location.active) {
-    throw new AppError('Default location is inactive', 409, {
-      code: 'DEFAULT_LOCATION_INACTIVE',
+    throw new AppError("Default location is inactive", 409, {
+      code: "DEFAULT_LOCATION_INACTIVE",
     });
   }
 
@@ -131,7 +150,14 @@ function buildNotification({
   };
 }
 
-function buildCashNotifications({ enabled, location, businessDate, generatedAt, cashClosing, consistency }) {
+function buildCashNotifications({
+  enabled,
+  location,
+  businessDate,
+  generatedAt,
+  cashClosing,
+  consistency,
+}) {
   if (!enabled) return [];
 
   const notifications = [];
@@ -140,16 +166,16 @@ function buildCashNotifications({ enabled, location, businessDate, generatedAt, 
     notifications.push(
       buildNotification({
         id: `cash_missing:${location.location_id}:${businessDate}`,
-        module: 'cash',
-        kind: 'cash_missing',
-        severity: 'warning',
-        title: 'Caja del dia sin apertura',
+        module: "cash",
+        kind: "cash_missing",
+        severity: "warning",
+        title: "Caja del dia sin apertura",
         description: `La sede ${location.name} todavía no abrió caja para ${businessDate}.`,
-        href: '/caja',
-        actionLabel: 'Abrir caja',
+        href: "/caja",
+        actionLabel: "Abrir caja",
         location,
         createdAt: generatedAt,
-      })
+      }),
     );
   }
 
@@ -157,50 +183,129 @@ function buildCashNotifications({ enabled, location, businessDate, generatedAt, 
     notifications.push(
       buildNotification({
         id: `cash_difference:${location.location_id}:${businessDate}`,
-        module: 'cash',
-        kind: 'cash_difference',
-        severity: 'danger',
-        title: 'Diferencia entre ventas y pagos',
+        module: "cash",
+        kind: "cash_difference",
+        severity: "danger",
+        title: "Diferencia entre ventas y pagos",
         description: `Hay una diferencia de S/. ${consistency.difference.toFixed(
-          2
+          2,
         )} que requiere revisión antes del cierre.`,
-        href: '/caja',
-        actionLabel: 'Revisar caja',
+        href: "/caja",
+        actionLabel: "Revisar caja",
         location,
-        createdAt: cashClosing.updated_at || cashClosing.created_at || generatedAt,
-      })
+        createdAt:
+          cashClosing.updated_at || cashClosing.created_at || generatedAt,
+      }),
     );
   }
 
   return notifications;
 }
 
-function buildTransferNotifications({ enabled, location, generatedAt, transferCounts, transferItems }) {
-  if (!enabled || !transferCounts) return [];
-
-  const pendingReceiptsCount = Number(transferCounts.pending_receipts_count || 0);
-  if (pendingReceiptsCount <= 0) return [];
-
-  const latestTransferAt =
-    transferItems[0]?.shipped_at || transferItems[0]?.updated_at || generatedAt;
-
-  return [
-    buildNotification({
-      id: `pending_receipts:${location.location_id}`,
-      module: 'transfers',
-      kind: 'pending_receipts',
-      severity: 'warning',
-      title: 'Recepciones pendientes en tienda',
-      description: `${pendingReceiptsCount} transferencia(s) siguen en tránsito hacia ${location.name}.`,
-      href: '/transferencias/recepciones-pendientes',
-      actionLabel: 'Recepcionar',
-      location,
-      createdAt: latestTransferAt,
-    }),
-  ];
+function resolveLatestTransferTimestamp(items, stage, generatedAt) {
+  const candidate = (items || []).find((item) => item.pending_stage === stage);
+  return (
+    candidate?.shipped_at ||
+    candidate?.approved_at ||
+    candidate?.created_at ||
+    candidate?.updated_at ||
+    generatedAt
+  );
 }
 
-function buildInventoryNotifications({ enabled, location, generatedAt, inventoryCounts, inventoryItems }) {
+function buildTransferNotifications({
+  capabilities,
+  location,
+  generatedAt,
+  transferCounts,
+  transferItems,
+}) {
+  if (!capabilities?.visible || !transferCounts) return [];
+
+  const notifications = [];
+  const pendingApprovalCount = Number(
+    transferCounts.pending_approval_count || 0,
+  );
+  const pendingDispatchCount = Number(
+    transferCounts.pending_dispatch_count || 0,
+  );
+  const pendingReceiptsCount = Number(
+    transferCounts.pending_receipts_count || 0,
+  );
+
+  if (capabilities.approve && pendingApprovalCount > 0) {
+    notifications.push(
+      buildNotification({
+        id: `pending_approval:${location.location_id}`,
+        module: "transfers",
+        kind: "pending_approval",
+        severity: "warning",
+        title: "Solicitudes pendientes por aprobar",
+        description: `${pendingApprovalCount} solicitud(es) siguen esperando validación desde ${location.name}.`,
+        href: "/transferencias/listado-de-transferencias",
+        actionLabel: "Aprobar",
+        location,
+        createdAt: resolveLatestTransferTimestamp(
+          transferItems,
+          "approval",
+          generatedAt,
+        ),
+      }),
+    );
+  }
+
+  if (capabilities.ship && pendingDispatchCount > 0) {
+    notifications.push(
+      buildNotification({
+        id: `pending_dispatch:${location.location_id}`,
+        module: "transfers",
+        kind: "pending_dispatch",
+        severity: "warning",
+        title: "Reposiciones pendientes por despachar",
+        description: `${pendingDispatchCount} transferencia(s) aprobadas aún no salen de ${location.name}.`,
+        href: "/transferencias/listado-de-transferencias",
+        actionLabel: "Despachar",
+        location,
+        createdAt: resolveLatestTransferTimestamp(
+          transferItems,
+          "dispatch",
+          generatedAt,
+        ),
+      }),
+    );
+  }
+
+  if (capabilities.receive && pendingReceiptsCount > 0) {
+    notifications.push(
+      buildNotification({
+        id: `pending_receipts:${location.location_id}`,
+        module: "transfers",
+        kind: "pending_receipts",
+        severity: "warning",
+        title: "Recepciones pendientes en tienda",
+        description: `${pendingReceiptsCount} transferencia(s) siguen en tránsito hacia ${location.name}.`,
+        href: "/transferencias/recepciones-pendientes",
+        actionLabel: "Recepcionar",
+        location,
+        createdAt: resolveLatestTransferTimestamp(
+          transferItems,
+          "receipt",
+          generatedAt,
+        ),
+      }),
+    );
+  }
+
+  return notifications;
+}
+
+function buildInventoryNotifications({
+  enabled,
+  location,
+  generatedAt,
+  inventoryCounts,
+  inventoryItems,
+}) {
   if (!enabled || !inventoryCounts) return [];
 
   const zeroStockCount = Number(inventoryCounts.zero_stock_count || 0);
@@ -216,18 +321,18 @@ function buildInventoryNotifications({ enabled, location, generatedAt, inventory
     notifications.push(
       buildNotification({
         id: `zero_stock:${location.location_id}`,
-        module: 'inventory',
-        kind: 'zero_stock',
-        severity: 'danger',
-        title: 'Variantes sin stock',
+        module: "inventory",
+        kind: "zero_stock",
+        severity: "danger",
+        title: "Variantes sin stock",
         description: primaryItemLabel
           ? `${zeroStockCount} variante(s) están en cero. Prioriza ${primaryItemLabel}.`
           : `${zeroStockCount} variante(s) están en cero en la sede activa.`,
-        href: '/inventario',
-        actionLabel: 'Ver inventario',
+        href: "/inventario?status=sin-stock",
+        actionLabel: "Ver inventario",
         location,
         createdAt: generatedAt,
-      })
+      }),
     );
   }
 
@@ -235,16 +340,16 @@ function buildInventoryNotifications({ enabled, location, generatedAt, inventory
     notifications.push(
       buildNotification({
         id: `low_stock:${location.location_id}`,
-        module: 'inventory',
-        kind: 'low_stock',
-        severity: 'warning',
-        title: 'Stock bajo mínimo',
+        module: "inventory",
+        kind: "low_stock",
+        severity: "warning",
+        title: "Stock bajo mínimo",
         description: `${lowStockCount} variante(s) están por debajo del umbral de ${LOW_STOCK_THRESHOLD} unidades.`,
-        href: '/inventario',
-        actionLabel: 'Revisar stock',
+        href: "/inventario?status=stock-bajo",
+        actionLabel: "Revisar stock",
         location,
         createdAt: generatedAt,
-      })
+      }),
     );
   }
 
@@ -256,29 +361,35 @@ function sortNotifications(items) {
   const kindWeight = {
     cash_difference: 0,
     cash_missing: 1,
-    pending_receipts: 2,
-    zero_stock: 3,
-    low_stock: 4,
+    pending_approval: 2,
+    pending_dispatch: 3,
+    pending_receipts: 4,
+    zero_stock: 5,
+    low_stock: 6,
   };
 
   return [...items].sort((left, right) => {
     const severityDiff =
-      (severityWeight[left.severity] ?? 99) - (severityWeight[right.severity] ?? 99);
+      (severityWeight[left.severity] ?? 99) -
+      (severityWeight[right.severity] ?? 99);
     if (severityDiff !== 0) return severityDiff;
 
-    const kindDiff = (kindWeight[left.kind] ?? 99) - (kindWeight[right.kind] ?? 99);
+    const kindDiff =
+      (kindWeight[left.kind] ?? 99) - (kindWeight[right.kind] ?? 99);
     if (kindDiff !== 0) return kindDiff;
 
-    return new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
+    return (
+      new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
+    );
   });
 }
 
 function buildSummary(items) {
   return {
     total: items.length,
-    danger_count: items.filter((item) => item.severity === 'danger').length,
-    warning_count: items.filter((item) => item.severity === 'warning').length,
-    default_count: items.filter((item) => item.severity === 'default').length,
+    danger_count: items.filter((item) => item.severity === "danger").length,
+    warning_count: items.filter((item) => item.severity === "warning").length,
+    default_count: items.filter((item) => item.severity === "default").length,
   };
 }
 
@@ -289,10 +400,15 @@ async function getTopbarNotifications(input = {}) {
   const businessDate = todayPeruDate();
   const generatedAt = new Date().toISOString();
 
+  const transferCapabilities = normalizeTransferCapabilities(
+    buildTransferCapabilities({ permissions, roleName }),
+  );
+  const cashCapabilities = resolveCashCapabilities({ permissions });
+
   const capabilities = {
-    cash: canViewCash(roleName),
-    inventory: hasPermission(permissions, 'inventory.view'),
-    transfers: hasPermission(permissions, 'transfers.manage'),
+    cash: cashCapabilities.visible,
+    inventory: hasPermission(permissions, "inventory.view"),
+    transfers: transferCapabilities,
   };
 
   const client = await pool.connect();
@@ -308,27 +424,46 @@ async function getTopbarNotifications(input = {}) {
     const executor = client.query.bind(client);
 
     if (capabilities.cash) {
-      cashClosing = await findCashClosingByLocationAndDate(location.location_id, businessDate, executor);
-      salesRow = await countSalesByLocationAndDate(location.location_id, businessDate, executor);
-      paymentRows = await findPaymentTotalsByLocationAndDate(location.location_id, businessDate, executor);
+      cashClosing = await findCashClosingByLocationAndDate(
+        location.location_id,
+        businessDate,
+        executor,
+      );
+      salesRow = await countSalesByLocationAndDate(
+        location.location_id,
+        businessDate,
+        executor,
+      );
+      paymentRows = await findPaymentTotalsByLocationAndDate(
+        location.location_id,
+        businessDate,
+        executor,
+      );
     }
 
-    if (capabilities.transfers) {
-      transferCounts = await findPendingTransfersCounts(location.location_id, executor);
-      transferItems = await findPendingTransfersItems(location.location_id, 3, executor);
+    if (capabilities.transfers.visible) {
+      transferCounts = await findPendingTransfersCounts(
+        location.location_id,
+        executor,
+      );
+      transferItems = await findPendingTransfersItems(
+        location.location_id,
+        3,
+        executor,
+      );
     }
 
     if (capabilities.inventory) {
       inventoryCounts = await findCriticalInventoryCounts(
         location.location_id,
         LOW_STOCK_THRESHOLD,
-        executor
+        executor,
       );
       inventoryItems = await findCriticalInventoryItems(
         location.location_id,
         LOW_STOCK_THRESHOLD,
         3,
-        executor
+        executor,
       );
     }
   } finally {
@@ -350,7 +485,7 @@ async function getTopbarNotifications(input = {}) {
       consistency: cashConsistency,
     }),
     ...buildTransferNotifications({
-      enabled: capabilities.transfers,
+      capabilities: capabilities.transfers,
       location,
       generatedAt,
       transferCounts,

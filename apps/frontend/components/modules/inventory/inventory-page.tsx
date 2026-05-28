@@ -1,22 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  ArrowRightLeft,
-  ClipboardList,
-  LoaderCircle,
-  MapPin,
-  PackageCheck,
-  RefreshCw,
-  RotateCcw,
-} from "lucide-react";
-import { AdminRowActionsMenu } from "@/components/admin/admin-ui";
-import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { LoaderCircle, RefreshCw, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FilterDropdown } from "@/components/ui/filter-dropdown";
-import { Pagination } from "@/components/ui/pagination";
-import { InlineStatusCard } from "@/components/feedback/status-page";
+import { FilterDropdown, type FilterDropdownOption } from "@/components/ui/filter-dropdown";
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
 import {
   OpsFiltersRow,
@@ -27,347 +15,567 @@ import {
   OpsTableFooter,
   OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
-import { useAuth } from "@/components/auth/AuthProvider";
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
+import { Pagination } from "@/components/ui/pagination";
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { buildApiUrl } from "@/lib/api";
-import { appRoutes } from "@/lib/routes";
-
-type InventoryItem = {
-  location_id: string;
-  location_code: string;
-  location_name: string;
-  variant_id: string;
-  sku: string;
-  style_id: string;
-  style_code: string;
-  style_name: string;
-  garment_type_name: string | null;
-  size_id: string;
-  size_code: string;
-  color_id: string;
-  color_name: string;
-  qty: number;
-};
-
-type PriceCoverageGap = {
-  style_id: string;
-  style_code: string;
-  style_name: string;
-  variant_count: number;
-  inventory_row_count: number;
-  price_row_count: number;
-};
-
-type InventoryGroupedRow = {
-  rowKey: string;
-  styleCode: string;
-  styleName: string;
-  garmentTypeName: string | null;
-  locationId: string;
-  locationCode: string;
-  locationName: string;
-  variantsCount: number;
-  totalQty: number;
-  sizeStock: Array<{
-    sizeCode: string;
-    totalQty: number;
-    variantCount: number;
-    colorCount: number;
-  }>;
-  searchableText: string;
-};
+import { apiFetch, unwrapApiData } from "@/lib/api";
+import { buildInventoryDetailRoute } from "@/lib/routes";
+import { cn } from "@/lib/utils";
+import {
+  formatInventoryVariantsSummary,
+  type InventoryLocationSummaryResponse,
+  type InventoryProductSummaryResponse,
+  type InventoryView,
+  getLocationStatusTone,
+  getProductStatusTone,
+  normalizeInventoryView,
+  normalizeLocationStatusFilter,
+  normalizeProductStatusFilter,
+  type LocationStatusFilter,
+  type ProductStatusFilter,
+} from "./inventory-summary-shared";
 
 const PAGE_SIZE = 10;
 
-function buildGroupedRows(items: InventoryItem[]) {
-  const map = new Map<string, InventoryGroupedRow>();
-  const variantsByRow = new Map<string, Set<string>>();
-  const searchTermsByRow = new Map<string, Set<string>>();
-  const sizeStockByRow = new Map<
-    string,
-    Map<string, { totalQty: number; variantIds: Set<string>; colorIds: Set<string> }>
-  >();
+const PRODUCT_STATUS_OPTIONS: FilterDropdownOption[] = [
+  { value: "all", label: "Todos" },
+  { value: "available", label: "Disponible" },
+  { value: "incomplete", label: "Stock incompleto" },
+  { value: "low", label: "Bajo stock" },
+  { value: "out", label: "Sin stock" },
+];
 
-  for (const item of items) {
-    const rowKey = `${item.style_id}|${item.location_id}`;
-    const existing = map.get(rowKey);
-    const searchableTerms = [
-      item.style_code,
-      item.style_name,
-      item.location_code,
-      item.location_name,
-      item.garment_type_name || "",
-      item.sku,
-      item.size_code,
-      item.color_name,
-    ];
+const LOCATION_STATUS_OPTIONS: FilterDropdownOption[] = [
+  { value: "all", label: "Todos" },
+  { value: "normal", label: "Normal" },
+  { value: "attention", label: "Revisar" },
+  { value: "critical", label: "Crítico" },
+];
 
-    if (!existing) {
-      map.set(rowKey, {
-        rowKey,
-        styleCode: item.style_code,
-        styleName: item.style_name,
-        garmentTypeName: item.garment_type_name,
-        locationId: item.location_id,
-        locationCode: item.location_code,
-        locationName: item.location_name,
-        variantsCount: 1,
-        totalQty: 0,
-        sizeStock: [],
-        searchableText: searchableTerms.join(" ").toLowerCase(),
-      });
-      variantsByRow.set(rowKey, new Set([item.variant_id]));
-      searchTermsByRow.set(rowKey, new Set(searchableTerms.filter(Boolean)));
-    }
+function buildLocationOptions(
+  availableLocations: InventoryProductSummaryResponse["meta"]["available_locations"]
+): FilterDropdownOption[] {
+  return [
+    { value: "all", label: "Todas las sedes" },
+    ...availableLocations.map((location) => ({
+      value: location.location_id,
+      label: location.name,
+      badge: location.is_default ? "Actual" : undefined,
+      tone: location.is_default ? ("accent" as const) : undefined,
+    })),
+  ];
+}
 
-    const row = map.get(rowKey);
-    if (!row) {
-      continue;
-    }
+function buildProductSummaryParams(input: {
+  query: string;
+  locationId: string;
+  status: ProductStatusFilter;
+  garmentType: string;
+}) {
+  const params = new URLSearchParams();
 
-    const rowVariants = variantsByRow.get(rowKey) || new Set<string>();
-    rowVariants.add(item.variant_id);
-    variantsByRow.set(rowKey, rowVariants);
-
-    const rowTerms = searchTermsByRow.get(rowKey) || new Set<string>();
-    for (const term of searchableTerms) {
-      if (term) {
-        rowTerms.add(term);
-      }
-    }
-    searchTermsByRow.set(rowKey, rowTerms);
-
-    const sizeMap = sizeStockByRow.get(rowKey) || new Map();
-    const sizeEntry =
-      sizeMap.get(item.size_code) || {
-        totalQty: 0,
-        variantIds: new Set<string>(),
-        colorIds: new Set<string>(),
-      };
-    sizeEntry.totalQty += item.qty;
-    sizeEntry.variantIds.add(item.variant_id);
-    sizeEntry.colorIds.add(item.color_id);
-    sizeMap.set(item.size_code, sizeEntry);
-    sizeStockByRow.set(rowKey, sizeMap);
-
-    row.variantsCount = rowVariants.size;
-    row.totalQty += item.qty;
-    row.searchableText = Array.from(rowTerms).join(" ").toLowerCase();
+  if (input.query.trim()) {
+    params.set("query", input.query.trim());
   }
 
-  return Array.from(map.values()).map((row) => ({
-    ...row,
-    sizeStock: Array.from(sizeStockByRow.get(row.rowKey)?.entries() || []).map(
-      ([sizeCode, value]) => ({
-        sizeCode,
-        totalQty: value.totalQty,
-        variantCount: value.variantIds.size,
-        colorCount: value.colorIds.size,
-      })
-    ),
-  }));
+  if (input.locationId !== "all") {
+    params.set("location_id", input.locationId);
+  }
+
+  if (input.status !== "all") {
+    params.set("status", input.status);
+  }
+
+  if (input.garmentType !== "all") {
+    params.set("garment_type", input.garmentType);
+  }
+
+  return params;
+}
+
+function buildLocationSummaryParams(input: {
+  query: string;
+  status: LocationStatusFilter;
+}) {
+  const params = new URLSearchParams();
+
+  if (input.query.trim()) {
+    params.set("query", input.query.trim());
+  }
+
+  if (input.status !== "all") {
+    params.set("status", input.status);
+  }
+
+  return params;
 }
 
 export default function InventoryPage() {
   const router = useRouter();
-  const { defaultLocation, locationAssignments } = useAuth();
-  const [items, setItems] = useState<InventoryItem[]>([]);
-  const [coverageGaps, setCoverageGaps] = useState<PriceCoverageGap[]>([]);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const [view, setView] = useState<InventoryView>(normalizeInventoryView(searchParams.get("view")));
+  const [query, setQuery] = useState(searchParams.get("query") || "");
+  const [locationFilter, setLocationFilter] = useState(searchParams.get("location_id") || "all");
+  const [productStatus, setProductStatus] = useState<ProductStatusFilter>(
+    normalizeProductStatusFilter(searchParams.get("status"))
+  );
+  const [garmentType, setGarmentType] = useState(searchParams.get("garment_type") || "all");
+  const [locationQuery, setLocationQuery] = useState(searchParams.get("location_query") || "");
+  const [locationStatus, setLocationStatus] = useState<LocationStatusFilter>(
+    normalizeLocationStatusFilter(searchParams.get("location_health"))
+  );
+  const [productPage, setProductPage] = useState(1);
+  const [locationPage, setLocationPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [locationFilter, setLocationFilter] = useState("all");
-  const [page, setPage] = useState(1);
+  const [productSummary, setProductSummary] = useState<InventoryProductSummaryResponse | null>(null);
+  const [locationSummary, setLocationSummary] = useState<InventoryLocationSummaryResponse | null>(null);
+  const [refreshNonce, setRefreshNonce] = useState(0);
 
-  async function loadInventory() {
+  const productParams = useMemo(
+    () =>
+      buildProductSummaryParams({
+        query,
+        locationId: locationFilter,
+        status: productStatus,
+        garmentType,
+      }),
+    [garmentType, locationFilter, productStatus, query]
+  );
+
+  const locationParams = useMemo(
+    () =>
+      buildLocationSummaryParams({
+        query: locationQuery,
+        status: locationStatus,
+      }),
+    [locationQuery, locationStatus]
+  );
+
+  const loadSummaries = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const [inventoryResponse, coverageResponse] = await Promise.all([
-        fetch(buildApiUrl("/api/inventory"), { cache: "no-store" }),
-        fetch(buildApiUrl("/api/prices/coverage-gaps"), { cache: "no-store" }),
+      const [productsPayload, locationsPayload] = await Promise.all([
+        apiFetch<{ ok: boolean; data: InventoryProductSummaryResponse }>(
+          `/api/inventory/summary/products?${productParams.toString()}`,
+          {
+            cache: "no-store",
+            suppressAuthEvent: true,
+          }
+        ),
+        apiFetch<{ ok: boolean; data: InventoryLocationSummaryResponse }>(
+          `/api/inventory/summary/locations?${locationParams.toString()}`,
+          {
+            cache: "no-store",
+            suppressAuthEvent: true,
+          }
+        ),
       ]);
 
-      const inventoryPayload = await inventoryResponse.json();
-      if (!inventoryResponse.ok) {
-        throw new Error(inventoryPayload.message || "No se pudo cargar inventario");
-      }
-      setItems(Array.isArray(inventoryPayload.data) ? inventoryPayload.data : []);
-
-      const coveragePayload = await coverageResponse.json().catch(() => ({ data: [] }));
-      setCoverageGaps(Array.isArray(coveragePayload?.data) ? coveragePayload.data : []);
+      setProductSummary(unwrapApiData(productsPayload) ?? null);
+      setLocationSummary(unwrapApiData(locationsPayload) ?? null);
     } catch (requestError) {
       setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "No se pudo cargar inventario"
+        requestError instanceof Error ? requestError.message : "No se pudo cargar el stock actual."
       );
     } finally {
       setLoading(false);
     }
-  }
+  }, [locationParams, productParams]);
 
   useEffect(() => {
-    void loadInventory();
-  }, []);
+    const timer = window.setTimeout(() => {
+      void loadSummaries();
+    }, 0);
 
-  const locationOptions = useMemo(() => {
-    const map = new Map<string, string>();
+    return () => window.clearTimeout(timer);
+  }, [loadSummaries, refreshNonce]);
 
-    for (const item of items) {
-      map.set(item.location_code, item.location_name);
+  useEffect(() => {
+    const params = new URLSearchParams();
+
+    if (view !== "product") {
+      params.set("view", view);
     }
 
-    return Array.from(map.entries()).map(([code, name]) => ({ code, name }));
-  }, [items]);
+    if (query.trim()) {
+      params.set("query", query.trim());
+    }
 
-  useEffect(() => {
     if (locationFilter !== "all") {
-      return;
+      params.set("location_id", locationFilter);
     }
 
-    const defaultCode =
-      defaultLocation?.code ||
-      locationAssignments.find((assignment) => assignment.is_default)?.location.code ||
-      null;
-
-    if (defaultCode && locationOptions.some((location) => location.code === defaultCode)) {
-      setLocationFilter(defaultCode);
+    if (productStatus !== "all") {
+      params.set("status", productStatus);
     }
-  }, [defaultLocation?.code, locationAssignments, locationFilter, locationOptions]);
 
-  const groupedRows = useMemo(() => buildGroupedRows(items), [items]);
-
-  const filteredRows = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-
-    return groupedRows.filter((row) => {
-      const matchesLocation = locationFilter === "all" || row.locationCode === locationFilter;
-      const matchesQuery =
-        !normalizedQuery ||
-        row.searchableText.includes(normalizedQuery);
-
-      return matchesLocation && matchesQuery;
-    });
-  }, [groupedRows, locationFilter, query]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [query, locationFilter]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const pageStart = (safePage - 1) * PAGE_SIZE;
-  const paginatedRows = filteredRows.slice(pageStart, pageStart + PAGE_SIZE);
-  const visibleFrom = filteredRows.length ? pageStart + 1 : 0;
-  const visibleTo = filteredRows.length
-    ? Math.min(pageStart + PAGE_SIZE, filteredRows.length)
-    : 0;
-  const hasActiveFilters = Boolean(query.trim()) || locationFilter !== "all";
-
-  useEffect(() => {
-    if (page !== safePage) {
-      setPage(safePage);
+    if (garmentType !== "all") {
+      params.set("garment_type", garmentType);
     }
-  }, [page, safePage]);
 
-  const totals = useMemo(() => {
-    const uniqueProducts = new Set(filteredRows.map((row) => row.styleCode)).size;
-    const totalUnits = filteredRows.reduce((acc, row) => acc + row.totalQty, 0);
-    const uniqueLocations = new Set(filteredRows.map((row) => row.locationId)).size;
+    if (locationQuery.trim()) {
+      params.set("location_query", locationQuery.trim());
+    }
 
-    return { uniqueProducts, totalUnits, uniqueLocations };
-  }, [filteredRows]);
+    if (locationStatus !== "all") {
+      params.set("location_health", locationStatus);
+    }
 
-  const stylesWithoutCommercialPrice = useMemo(
-    () => new Set(coverageGaps.map((gap) => gap.style_code)),
-    [coverageGaps]
+    const nextUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
+    router.replace(nextUrl, { scroll: false });
+  }, [
+    garmentType,
+    locationFilter,
+    locationQuery,
+    locationStatus,
+    pathname,
+    productStatus,
+    query,
+    router,
+    view,
+  ]);
+
+  const productRows = useMemo(() => productSummary?.rows || [], [productSummary]);
+  const locationRows = useMemo(() => locationSummary?.rows || [], [locationSummary]);
+  const availableLocations = useMemo(
+    () => productSummary?.meta.available_locations || [],
+    [productSummary]
+  );
+  const locationOptions = useMemo(() => buildLocationOptions(availableLocations), [availableLocations]);
+  const showLocationsColumn = locationFilter === "all" && availableLocations.length > 1;
+  const garmentTypeOptions = useMemo<FilterDropdownOption[]>(() => {
+    const values = Array.from(
+      new Set(productRows.map((row) => row.garment_type_name).filter(Boolean))
+    ).sort((left, right) => String(left).localeCompare(String(right), "es"));
+
+    return [{ value: "all", label: "Todos" }].concat(
+      values.map((value) => ({ value: String(value), label: String(value) }))
+    );
+  }, [productRows]);
+
+  const selectedLocation = availableLocations.find((location) => location.location_id === locationFilter) || null;
+  const productTotals = useMemo(() => {
+    return {
+      stockTotal: productRows.reduce((sum, row) => sum + row.stock_total, 0),
+      productsWithStock: productRows.filter((row) => row.stock_total > 0).length,
+      lowStock: productRows.filter((row) => row.status === "low" || row.status === "incomplete").length,
+      outOfStock: productRows.filter((row) => row.status === "out").length,
+    };
+  }, [productRows]);
+
+  const locationTotals = useMemo(() => {
+    return {
+      stockTotal: locationRows.reduce((sum, row) => sum + row.stock_total, 0),
+      products: locationRows.reduce((sum, row) => sum + row.products_count, 0),
+      lowStock: locationRows.reduce((sum, row) => sum + row.low_stock_count, 0),
+      outOfStock: locationRows.reduce((sum, row) => sum + row.out_of_stock_count, 0),
+    };
+  }, [locationRows]);
+
+  const productTotalPages = Math.max(1, Math.ceil(productRows.length / PAGE_SIZE));
+  const safeProductPage = Math.min(productPage, productTotalPages);
+  const paginatedProducts = productRows.slice(
+    (safeProductPage - 1) * PAGE_SIZE,
+    safeProductPage * PAGE_SIZE
   );
 
-  function goToMovements(row: InventoryGroupedRow) {
-    const params = new URLSearchParams({
-      query: row.styleCode,
-      location: row.locationCode,
-    });
-    router.push(`/kardex?${params.toString()}`);
+  const locationTotalPages = Math.max(1, Math.ceil(locationRows.length / PAGE_SIZE));
+  const safeLocationPage = Math.min(locationPage, locationTotalPages);
+  const paginatedLocations = locationRows.slice(
+    (safeLocationPage - 1) * PAGE_SIZE,
+    safeLocationPage * PAGE_SIZE
+  );
+
+  const hasProductFilters =
+    Boolean(query.trim()) ||
+    locationFilter !== "all" ||
+    productStatus !== "all" ||
+    garmentType !== "all";
+  const hasLocationFilters = Boolean(locationQuery.trim()) || locationStatus !== "all";
+
+  function resetProductFilters() {
+    setQuery("");
+    setLocationFilter("all");
+    setProductStatus("all");
+    setGarmentType("all");
+    setProductPage(1);
   }
 
-  function goToAdjustment(row: InventoryGroupedRow) {
-    const params = new URLSearchParams({
-      location_id: row.locationId,
-      query: row.styleCode,
-    });
-    router.push(`${appRoutes.inventoryAdjustments}/nuevo?${params.toString()}`);
+  function resetLocationFilters() {
+    setLocationQuery("");
+    setLocationStatus("all");
+    setLocationPage(1);
   }
 
-  function goToTransfer(row: InventoryGroupedRow) {
-    const params = new URLSearchParams({
-      origin_id: row.locationId,
-    });
-    router.push(`/transferencias/crear-transferencia?${params.toString()}`);
+  function goToProductDetail(styleId: string) {
+    router.push(buildInventoryDetailRoute(styleId, locationFilter === "all" ? null : locationFilter));
+  }
+
+  function goToLocationView(locationId: string) {
+    setView("product");
+    setLocationFilter(locationId);
+    setProductPage(1);
   }
 
   return (
     <TooltipProvider delayDuration={120}>
       <OpsPageShell width="wide">
-          <PosHeader
-            eyebrow="Control de stock"
-            title="Inventario"
-            actions={
+        <PosHeader
+          eyebrow="INVENTARIO"
+          title="Stock actual"
+          description="Consulta el stock disponible por producto, sede, talla y color."
+          actions={
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Tabs
+                value={view}
+                onValueChange={(nextValue) => {
+                  setView(nextValue as InventoryView);
+                }}
+                className="gap-0"
+              >
+                <TabsList variant="ops" className="max-w-full">
+                  <TabsTrigger value="product">Por producto</TabsTrigger>
+                  <TabsTrigger value="location">Por sede</TabsTrigger>
+                </TabsList>
+              </Tabs>
+
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
+                size="icon-sm"
                 className="rounded-lg"
-                onClick={loadInventory}
+                onClick={() => setRefreshNonce((current) => current + 1)}
+                aria-label="Actualizar stock actual"
               >
-                <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
-                Actualizar
+                <RefreshCw className="h-3.5 w-3.5" />
               </Button>
-            }
-          />
+            </div>
+          }
+        />
 
-          <div className="flex flex-wrap items-center gap-2">
-            <OpsMetricPill label="Productos" value={totals.uniqueProducts} />
-            <OpsMetricPill label="Unidades" value={totals.totalUnits} tone="accent" />
-            <OpsMetricPill label="Sedes" value={totals.uniqueLocations} />
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {view === "product" ? (
+            <>
+              <OpsMetricPill label="Stock total" value={productTotals.stockTotal} tone="accent" />
+              <OpsMetricPill label="Productos con stock" value={productTotals.productsWithStock} />
+              <OpsMetricPill label="Bajo stock" value={productTotals.lowStock} tone="warning" />
+              <OpsMetricPill label="Sin stock" value={productTotals.outOfStock} tone="warning" />
+            </>
+          ) : (
+            <>
+              <OpsMetricPill label="Stock total" value={locationTotals.stockTotal} tone="accent" />
+              <OpsMetricPill label="Productos" value={locationTotals.products} />
+              <OpsMetricPill label="Bajo stock" value={locationTotals.lowStock} tone="warning" />
+              <OpsMetricPill label="Sin stock" value={locationTotals.outOfStock} tone="warning" />
+            </>
+          )}
+        </div>
 
-          <OpsSectionDivider>
-            {coverageGaps.length > 0 ? (
-              <InlineStatusCard
-                title="Hay stock sin precio comercial"
-                description={`Revisar ${coverageGaps.length} style${coverageGaps.length === 1 ? "" : "s"}: ${coverageGaps
-                  .map((gap) => gap.style_code)
-                  .join(", ")}`}
-                tone="warning"
-                variant="ops"
-              />
-            ) : null}
-
+        <OpsSectionDivider>
+          {view === "product" ? (
             <OpsTableBlock>
-              <OpsFiltersRow className="lg:grid-cols-[minmax(0,1.4fr)_0.8fr_auto]">
+              <OpsFiltersRow
+                className={cn(
+                  "lg:grid-cols-[minmax(0,1.55fr)_0.95fr_0.92fr_auto]",
+                  garmentTypeOptions.length > 1
+                    ? "xl:grid-cols-[minmax(0,1.55fr)_0.95fr_0.92fr_0.9fr_auto]"
+                    : ""
+                )}
+              >
                 <OpsSearchField
                   value={query}
-                  onChange={setQuery}
-                  placeholder="Buscar por producto, SKU, sede o tipo"
-                  ariaLabel="Buscar inventario"
+                  onChange={(value) => {
+                    setQuery(value);
+                    setProductPage(1);
+                  }}
+                  placeholder="Buscar producto"
+                  ariaLabel="Buscar producto"
                 />
 
                 <FilterDropdown
-                  label="Ubicacion"
+                  label="Sede"
                   value={locationFilter}
-                  options={[
-                    { value: "all", label: "Todas" },
-                    ...locationOptions.map((location) => ({ value: location.code, label: `${location.code} - ${location.name}` })),
-                  ]}
-                  onChange={(v) => { setLocationFilter(v); setPage(1); }}
+                  options={locationOptions}
+                  onChange={(value) => {
+                    setLocationFilter(value);
+                    setProductPage(1);
+                  }}
+                />
+
+                <FilterDropdown
+                  label="Estado"
+                  value={productStatus}
+                  options={PRODUCT_STATUS_OPTIONS}
+                  onChange={(value) => {
+                    setProductStatus(value as ProductStatusFilter);
+                    setProductPage(1);
+                  }}
+                />
+
+                {garmentTypeOptions.length > 1 ? (
+                  <FilterDropdown
+                    label="Tipo de prenda"
+                    value={garmentType}
+                    options={garmentTypeOptions}
+                    onChange={(value) => {
+                      setGarmentType(value);
+                      setProductPage(1);
+                    }}
+                  />
+                ) : null}
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      className="h-10 w-10 self-start rounded-lg lg:self-end"
+                      onClick={resetProductFilters}
+                      disabled={!hasProductFilters}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Limpiar filtros</TooltipContent>
+                </Tooltip>
+              </OpsFiltersRow>
+
+              <OpsTableWrap minWidth={showLocationsColumn ? "1020px" : "920px"}>
+                <table className="w-full border-collapse">
+                  <thead className="bg-[var(--ops-surface-muted)]">
+                    <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                      <th className="px-4 py-3">Producto</th>
+                      <th className="px-4 py-3">Tipo</th>
+                      <th className="px-4 py-3">Stock</th>
+                      <th className="px-4 py-3">Variantes</th>
+                      {showLocationsColumn ? <th className="px-4 py-3">Sedes</th> : null}
+                      <th className="px-4 py-3">Estado</th>
+                      <th className="px-4 py-3 text-right">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                    {loading ? (
+                      <tr>
+                        <td
+                          colSpan={showLocationsColumn ? 7 : 6}
+                          className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
+                        >
+                          <LoaderCircle className="mr-2 inline-block h-5 w-5 animate-spin" />
+                          Cargando stock actual...
+                        </td>
+                      </tr>
+                    ) : error ? (
+                      <tr>
+                        <td
+                          colSpan={showLocationsColumn ? 7 : 6}
+                          className="px-4 py-8 text-center text-sm text-[var(--ops-text-muted)]"
+                        >
+                          {error}
+                        </td>
+                      </tr>
+                    ) : paginatedProducts.length === 0 ? (
+                      <tr>
+                        <td colSpan={showLocationsColumn ? 7 : 6} className="px-4 py-10">
+                          <div className="rounded-xl border border-dashed border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-4 py-6 text-center text-sm text-[var(--ops-text-muted)]">
+                            No encontramos productos para los filtros actuales.
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedProducts.map((row) => (
+                        <tr key={row.style_id} className="transition hover:bg-[var(--ops-surface-muted)]">
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <div className="space-y-1">
+                              <p className="text-sm font-semibold text-[var(--ops-text)]">{row.style_name}</p>
+                              <p className="text-[11px] uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">
+                                {row.style_code}
+                              </p>
+                            </div>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                            {row.garment_type_name || "Sin tipo"}
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)] text-sm font-semibold text-[var(--ops-text)]">
+                            {row.stock_total}
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                            {formatInventoryVariantsSummary(row.sizes_count, row.colors_count)}
+                          </td>
+                          {showLocationsColumn ? (
+                            <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                              {row.locations_count} sedes
+                            </td>
+                          ) : null}
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <OpsStatusBadge tone={getProductStatusTone(row.status)} size="xs">
+                              {row.status_label}
+                            </OpsStatusBadge>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)] text-right">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="rounded-lg px-3"
+                              onClick={() => goToProductDetail(row.style_id)}
+                            >
+                              Ver stock
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </OpsTableWrap>
+
+              <OpsTableFooter>
+                <p className="text-[13px] text-[var(--ops-text-muted)]">
+                  {selectedLocation
+                    ? `Stock en sede: ${selectedLocation.name}`
+                    : productSummary?.meta.scope_label || "Todas las sedes"}
+                </p>
+                <Pagination
+                  page={safeProductPage}
+                  totalPages={productTotalPages}
+                  onPageChange={setProductPage}
+                />
+              </OpsTableFooter>
+            </OpsTableBlock>
+          ) : (
+            <OpsTableBlock>
+              <OpsFiltersRow className="lg:grid-cols-[minmax(0,1.4fr)_0.92fr_auto]">
+                <OpsSearchField
+                  value={locationQuery}
+                  onChange={(value) => {
+                    setLocationQuery(value);
+                    setLocationPage(1);
+                  }}
+                  placeholder="Buscar sede"
+                  ariaLabel="Buscar sede"
+                />
+
+                <FilterDropdown
+                  label="Estado"
+                  value={locationStatus}
+                  options={LOCATION_STATUS_OPTIONS}
+                  onChange={(value) => {
+                    setLocationStatus(value as LocationStatusFilter);
+                    setLocationPage(1);
+                  }}
                 />
 
                 <Tooltip>
@@ -377,11 +585,8 @@ export default function InventoryPage() {
                       variant="outline"
                       size="icon-sm"
                       className="h-10 w-10 self-start rounded-lg lg:self-end"
-                      onClick={() => {
-                        setQuery("");
-                        setLocationFilter(defaultLocation?.code || "all");
-                      }}
-                      disabled={!hasActiveFilters}
+                      onClick={resetLocationFilters}
+                      disabled={!hasLocationFilters}
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
                     </Button>
@@ -389,136 +594,98 @@ export default function InventoryPage() {
                   <TooltipContent>Limpiar filtros</TooltipContent>
                 </Tooltip>
               </OpsFiltersRow>
-              <OpsTableWrap minWidth="1080px">
+
+              <OpsTableWrap minWidth="960px">
                 <table className="w-full border-collapse">
                   <thead className="bg-[var(--ops-surface-muted)]">
                     <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                      <th className="px-4 py-3">Producto</th>
-                      <th className="px-4 py-3">Codigo</th>
-                      <th className="px-4 py-3">Tallas</th>
-                      <th className="px-4 py-3">Ubicacion</th>
-                      <th className="px-4 py-3 text-right">Stock</th>
-                      <th className="px-4 py-3 text-right">Acciones</th>
+                      <th className="px-4 py-3">Sede</th>
+                      <th className="px-4 py-3">Stock total</th>
+                      <th className="px-4 py-3">Productos</th>
+                      <th className="px-4 py-3">Bajo stock</th>
+                      <th className="px-4 py-3">Sin stock</th>
+                      <th className="px-4 py-3">Estado</th>
+                      <th className="px-4 py-3 text-right">Acción</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
                     {loading ? (
                       <tr>
-                        <td colSpan={6} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                        <td colSpan={7} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
                           <LoaderCircle className="mr-2 inline-block h-5 w-5 animate-spin" />
-                          Cargando inventario...
+                          Cargando sedes...
                         </td>
                       </tr>
                     ) : error ? (
                       <tr>
-                        <td colSpan={6} className="px-4 py-6">
-                          <InlineStatusCard
-                            title="No pudimos cargar inventario"
-                            description={error}
-                            tone="danger"
-                            variant="ops"
-                          />
+                        <td colSpan={7} className="px-4 py-8 text-center text-sm text-[var(--ops-text-muted)]">
+                          {error}
                         </td>
                       </tr>
-                    ) : paginatedRows.length ? (
-                      paginatedRows.map((row) => (
-                        <tr
-                          key={row.rowKey}
-                          className="transition hover:bg-[var(--ops-surface-muted)]"
-                        >
+                    ) : paginatedLocations.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-10">
+                          <div className="rounded-xl border border-dashed border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-4 py-6 text-center text-sm text-[var(--ops-text-muted)]">
+                            No encontramos sedes para los filtros actuales.
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedLocations.map((row) => (
+                        <tr key={row.location_id} className="transition hover:bg-[var(--ops-surface-muted)]">
                           <td className="px-4 py-[var(--ops-row-py)]">
-                            <p className="truncate text-sm font-semibold text-[var(--ops-text)]">{row.styleName}</p>
-                            <div className="mt-1 flex items-center gap-2">
-                              <p className="truncate text-[11px] text-[var(--ops-text-muted)]">
-                                {row.garmentTypeName || "Sin tipo"}
-                              </p>
-                              {stylesWithoutCommercialPrice.has(row.styleCode) ? (
-                                <span className="inline-flex rounded-full border border-[color:color-mix(in_srgb,#f59e0b_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] px-2 py-0.5 text-[11px] font-semibold text-[color:color-mix(in_srgb,#f59e0b_72%,var(--ops-text))]">
-                                  Sin precio
-                                </span>
-                              ) : null}
+                            <div className="space-y-1">
+                              <p className="text-sm font-semibold text-[var(--ops-text)]">{row.location_name}</p>
                             </div>
                           </td>
                           <td className="px-4 py-[var(--ops-row-py)] text-sm font-semibold text-[var(--ops-text)]">
-                            {row.styleCode}
+                            {row.stock_total}
                           </td>
                           <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
-                            <div className="flex max-w-[300px] flex-wrap gap-1.5">
-                              {row.sizeStock.map((size) => (
-                                <span
-                                  key={`${row.rowKey}-${size.sizeCode}`}
-                                  className="inline-flex items-center gap-1 rounded-full border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-2 py-0.5 text-[11px] font-semibold text-[var(--ops-text-muted)]"
-                                  title={`${size.variantCount} variante${size.variantCount === 1 ? "" : "s"} · ${size.colorCount} color${size.colorCount === 1 ? "" : "es"}`}
-                                >
-                                  <span>{size.sizeCode}</span>
-                                  <span className="tabular-nums text-[var(--ops-text)]">
-                                    {size.totalQty}
-                                  </span>
-                                </span>
-                              ))}
-                            </div>
+                            {row.products_count}
                           </td>
                           <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
-                            <div className="flex items-center gap-2">
-                              <MapPin className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />
-                              {row.locationName}
-                            </div>
+                            {row.low_stock_count}
                           </td>
-                          <td className="px-4 py-[var(--ops-row-py)] text-right text-sm font-semibold text-[var(--ops-text)]">
-                            {row.totalQty}
+                          <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                            {row.out_of_stock_count}
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <OpsStatusBadge tone={getLocationStatusTone(row.status)} size="xs">
+                              {row.status_label}
+                            </OpsStatusBadge>
                           </td>
                           <td className="px-4 py-[var(--ops-row-py)] text-right">
-                            <AdminRowActionsMenu
-                              ariaLabel={`Acciones para ${row.styleName}`}
-                              items={[
-                                {
-                                  label: "Ver movimientos",
-                                  icon: <ClipboardList className="h-4 w-4" />,
-                                  onSelect: () => goToMovements(row),
-                                },
-                                {
-                                  label: "Ajustar stock",
-                                  icon: <PackageCheck className="h-4 w-4" />,
-                                  onSelect: () => goToAdjustment(row),
-                                },
-                                {
-                                  label: "Transferir",
-                                  icon: <ArrowRightLeft className="h-4 w-4" />,
-                                  onSelect: () => goToTransfer(row),
-                                },
-                              ]}
-                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="rounded-lg px-3"
+                              onClick={() => goToLocationView(row.location_id)}
+                            >
+                              Ver stock
+                            </Button>
                           </td>
                         </tr>
                       ))
-                    ) : (
-                      <tr>
-                        <td colSpan={6} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                          {items.length === 0
-                            ? "No hay inventario disponible para la ubicación actual."
-                            : "No se encontraron registros con los filtros actuales."}
-                        </td>
-                      </tr>
                     )}
                   </tbody>
                 </table>
-            </OpsTableWrap>
+              </OpsTableWrap>
 
-            <OpsTableFooter>
-              <span className="text-sm text-[var(--ops-text-muted)]">
-                {filteredRows.length
-                  ? `${visibleFrom}-${visibleTo} de ${filteredRows.length}`
-                  : "0 resultados"}
-              </span>
-              <Pagination
-                page={safePage}
-                totalPages={totalPages}
-                onPageChange={setPage}
-                className="self-end md:self-auto"
-              />
-            </OpsTableFooter>
+              <OpsTableFooter>
+                <p className="text-[13px] text-[var(--ops-text-muted)]">
+                  Vista consolidada por ubicación visible.
+                </p>
+                <Pagination
+                  page={safeLocationPage}
+                  totalPages={locationTotalPages}
+                  onPageChange={setLocationPage}
+                />
+              </OpsTableFooter>
             </OpsTableBlock>
-          </OpsSectionDivider>
+          )}
+        </OpsSectionDivider>
       </OpsPageShell>
     </TooltipProvider>
   );

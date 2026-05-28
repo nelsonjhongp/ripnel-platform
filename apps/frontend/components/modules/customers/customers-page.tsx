@@ -39,7 +39,7 @@ import {
 import { Pagination } from "@/components/ui/pagination"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { apiFetch, buildApiUrl, unwrapApiData } from "@/lib/api"
+import { apiFetch, apiFetchData, unwrapApiData } from "@/lib/api"
 import { appRoutes } from "@/lib/routes"
 
 const PAGE_SIZE = 10
@@ -152,20 +152,15 @@ export default function CustomersPage() {
     setSaveError(null)
 
     try {
-      const response = await fetch(buildApiUrl(`/api/customers/${editingCustomer.customer_id}`), {
+      const data = await apiFetchData<CustomerRecord>(`/api/customers/${editingCustomer.customer_id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildCustomerPayload(editState)),
       })
 
-      const payload = await response.json()
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo guardar el cliente")
-      }
-
       setCustomers((current) =>
         current.map((customer) =>
-          customer.customer_id === editingCustomer.customer_id ? payload.data : customer
+          customer.customer_id === editingCustomer.customer_id ? data : customer
         )
       )
       closeEditModal()
@@ -185,25 +180,20 @@ export default function CustomersPage() {
     setSaveError(null)
 
     try {
-      const response = await fetch(buildApiUrl(`/api/customers/${activeChangeCustomer.customer_id}`), {
+      const data = await apiFetchData<CustomerRecord>(`/api/customers/${activeChangeCustomer.customer_id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ active: !activeChangeCustomer.active }),
       })
 
-      const payload = await response.json()
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo actualizar el cliente")
-      }
-
       setCustomers((current) =>
         current.map((customer) =>
-          customer.customer_id === activeChangeCustomer.customer_id ? payload.data : customer
+          customer.customer_id === activeChangeCustomer.customer_id ? data : customer
         )
       )
       if (editingCustomer?.customer_id === activeChangeCustomer.customer_id) {
-        setEditingCustomer(payload.data)
-        setEditState(toFormState(payload.data))
+        setEditingCustomer(data)
+        setEditState(toFormState(data))
       }
       setActiveChangeCustomer(null)
     } catch (submitError: unknown) {

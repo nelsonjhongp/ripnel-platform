@@ -1,15 +1,9 @@
-const { AppError } = require('../../shared/errors');
-const { pool } = require('../../shared/db');
-const { findActiveUserById } = require('../auth/auth.repo');
-const { findDefaultLocationByUserId, findUserLocationsByUserId } = require('../users/users.repo');
-const {
-  findCashClosingByLocationAndDate,
-  countSalesByLocationAndDate,
-} = require('../cash/cash.repo');
+const { pool } = require("../../shared/db");
+const { findCashClosingByLocationAndDate } = require("../cash/cash.repo");
+const { resolveCashCapabilities } = require("../cash/cash-access");
 const {
   findCommercialActivityByTimeSlot,
-  findCommercialActivityByWeekday,
-  findCommercialActivityAggregate,
+  findCommercialActivityByDay,
   findSalesHeadlineByLocationAndDate,
   findPaymentTotalsByLocationAndDate,
   findPostsalesWindowCounts,
@@ -24,70 +18,121 @@ const {
   findRecentAdjustmentEvents,
   findRecentCashEvents,
   findSalesByDepartment,
-} = require('./dashboard.repo');
+} = require("./dashboard.repo");
+const { buildTransferCapabilities } = require("../transfers/transfers-access");
+const { hasPermission, resolveDashboardScope } = require("./dashboard-scope");
 
 const LOW_STOCK_THRESHOLD = 3;
 const POSTSALE_LOOKBACK_DAYS = 14;
 const TODAY_SLOT_COLUMNS = Array.from({ length: 12 }, (_, index) => {
   const startHour = index * 2;
   const endHour = startHour + 1;
-  const key = `slot_${String(startHour).padStart(2, '0')}`;
+  const key = `slot_${String(startHour).padStart(2, "0")}`;
 
   return {
     key,
-    label: `${String(startHour).padStart(2, '0')}:00-${String(endHour).padStart(2, '0')}:59`,
-    short_label: `${String(startHour).padStart(2, '0')}-${String(endHour).padStart(2, '0')}`,
+    label: `${String(startHour).padStart(2, "0")}:00-${String(endHour).padStart(2, "0")}:59`,
+    short_label: `${String(startHour).padStart(2, "0")}-${String(endHour).padStart(2, "0")}`,
     slot_index: index,
   };
 });
-const WEEKDAY_COLUMNS = [
-  { key: 'weekday_1', label: 'Lunes', short_label: 'Lun', weekday_number: 1 },
-  { key: 'weekday_2', label: 'Martes', short_label: 'Mar', weekday_number: 2 },
-  { key: 'weekday_3', label: 'Miercoles', short_label: 'Mie', weekday_number: 3 },
-  { key: 'weekday_4', label: 'Jueves', short_label: 'Jue', weekday_number: 4 },
-  { key: 'weekday_5', label: 'Viernes', short_label: 'Vie', weekday_number: 5 },
-  { key: 'weekday_6', label: 'Sabado', short_label: 'Sab', weekday_number: 6 },
-  { key: 'weekday_7', label: 'Domingo', short_label: 'Dom', weekday_number: 7 },
-];
-const AGGREGATE_COLUMNS = [
-  { key: 'amount', label: 'Monto', short_label: 'Monto' },
-  { key: 'sales', label: 'Ventas', short_label: 'Ventas' },
-  { key: 'avg_ticket', label: 'Ticket prom.', short_label: 'Ticket' },
-];
-
 function todayPeruDate() {
-  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Lima" });
 }
 
 function round2(value) {
   return Math.round(Number(value || 0) * 100) / 100;
 }
 
-function normalizeUuid(value) {
-  const normalized = String(value || '').trim();
-  if (!normalized) return null;
-
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    normalized
-  )
-    ? normalized
-    : null;
+function shiftIsoDate(dateString, deltaDays) {
+  const date = new Date(`${dateString}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + deltaDays);
+  return date.toISOString().slice(0, 10);
 }
 
-function hasPermission(permissions, permissionKey) {
-  return (
-    Array.isArray(permissions) &&
-    (permissions.includes('admin.manage') || permissions.includes(permissionKey))
-  );
+function buildPreviousPeriodRange(dateFrom, dateTo) {
+  const start = new Date(`${dateFrom}T00:00:00.000Z`);
+  const end = new Date(`${dateTo}T00:00:00.000Z`);
+  const spanDays = Math.max(1, Math.round((end - start) / 86400000) + 1);
+
+  return {
+    date_from: shiftIsoDate(dateFrom, -spanDays),
+    date_to: shiftIsoDate(dateTo, -spanDays),
+    span_days: spanDays,
+  };
 }
 
-function canViewCash(roleName) {
-  return ['ADMIN', 'CAJA'].includes(String(roleName || ''));
+function normalizeTransferCapabilities(rawCapabilities = {}) {
+  return {
+    manage: Boolean(rawCapabilities.manage),
+    request_create: Boolean(rawCapabilities.request_create),
+    request_view_own: Boolean(rawCapabilities.request_view_own),
+    approve: Boolean(rawCapabilities.approve),
+    ship: Boolean(rawCapabilities.ship),
+    receive: Boolean(rawCapabilities.receive),
+    cancel: Boolean(rawCapabilities.cancel),
+    visible: Boolean(rawCapabilities.visible),
+  };
+}
+
+function formatTransferStatusLabel(status) {
+  if (status === "requested") return "Solicitada";
+  if (status === "approved") return "Aprobada";
+  if (status === "shipped") return "Despachada";
+  if (status === "received") return "Recepcionada";
+  if (status === "cancelled") return "Cancelada";
+  return "Transferencia";
 }
 
 function normalizeActivityGroup(group) {
-  if (group === 'today' || group === 'week' || group === 'aggregate') return group;
-  return 'aggregate';
+  if (group === "today" || group === "daily") return group;
+  return "daily";
+}
+
+function enumerateDateRange(dateFrom, dateTo) {
+  const dates = [];
+  const cursor = new Date(`${dateFrom}T00:00:00.000Z`);
+  const end = new Date(`${dateTo}T00:00:00.000Z`);
+
+  while (cursor <= end) {
+    dates.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  return dates;
+}
+
+function buildDailyColumns(dateFrom, dateTo) {
+  const shortFormatter = new Intl.DateTimeFormat("es-PE", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+  const longFormatter = new Intl.DateTimeFormat("es-PE", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+  });
+
+  return enumerateDateRange(dateFrom, dateTo).map((isoDate) => {
+    const date = new Date(`${isoDate}T00:00:00.000Z`);
+
+    return {
+      key: isoDate,
+      label: longFormatter.format(date),
+      short_label: shortFormatter.format(date).replace(".", ""),
+    };
+  });
+}
+
+function normalizeBusinessDateKey(value) {
+  if (!value) return "";
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  return String(value).slice(0, 10);
 }
 
 function buildPaymentTotals(rows) {
@@ -119,14 +164,19 @@ function buildConsistency(paymentTotals, salesRow) {
 }
 
 function buildSections({ permissions, roleName }) {
-  const salesOrCashVisible = hasPermission(permissions, 'sales.pos') || canViewCash(roleName);
+  const cashCapabilities = resolveCashCapabilities({ permissions });
+  const salesOrCashVisible =
+    hasPermission(permissions, "sales.pos") || cashCapabilities.visible;
+  const transferCapabilities = normalizeTransferCapabilities(
+    buildTransferCapabilities({ permissions, roleName }),
+  );
 
   return {
     sales: salesOrCashVisible,
-    cash: canViewCash(roleName),
-    postsales: hasPermission(permissions, 'sales.postsale.view'),
-    inventory: hasPermission(permissions, 'inventory.view'),
-    transfers: hasPermission(permissions, 'transfers.manage'),
+    cash: cashCapabilities.visible,
+    postsales: hasPermission(permissions, "sales.postsale.view"),
+    inventory: hasPermission(permissions, "inventory.view"),
+    transfers: transferCapabilities.visible,
   };
 }
 
@@ -135,62 +185,62 @@ function buildShortcuts(sections, cashClosing) {
 
   if (sections.sales) {
     shortcuts.push({
-      key: 'new-sale',
-      label: 'Nueva venta',
-      href: '/ventas',
-      description: 'Registrar una nueva venta en la sede activa.',
+      key: "new-sale",
+      label: "Nueva venta",
+      href: "/ventas",
+      description: "Registrar una nueva venta en la sede activa.",
     });
     shortcuts.push({
-      key: 'sales-history',
-      label: 'Historial',
-      href: '/ventas/historial',
-      description: 'Revisar ventas confirmadas y su detalle.',
+      key: "sales-history",
+      label: "Historial",
+      href: "/ventas/historial",
+      description: "Revisar ventas confirmadas y su detalle.",
     });
   }
 
   if (sections.cash) {
     shortcuts.push({
-      key: 'cash',
-      label: cashClosing ? 'Caja del dia' : 'Abrir caja',
-      href: '/caja',
+      key: "cash",
+      label: cashClosing ? "Caja del dia" : "Abrir caja",
+      href: "/caja",
       description: cashClosing
-        ? 'Ver el estado de caja y la consistencia del dia.'
-        : 'Abrir la caja de la sede activa.',
+        ? "Ver el estado de caja y la consistencia del dia."
+        : "Abrir la caja de la sede activa.",
     });
   }
 
   if (sections.postsales) {
     shortcuts.push({
-      key: 'postsales',
-      label: 'Postventa',
-      href: '/postventa',
-      description: 'Resolver cambios y anulaciones controladas.',
+      key: "postsales",
+      label: "Postventa",
+      href: "/postventa",
+      description: "Resolver cambios y anulaciones controladas.",
     });
   }
 
   if (sections.inventory) {
     shortcuts.push({
-      key: 'inventory',
-      label: 'Inventario',
-      href: '/inventario',
-      description: 'Revisar stock actual y variantes criticas.',
+      key: "inventory",
+      label: "Inventario",
+      href: "/inventario",
+      description: "Revisar stock actual y variantes criticas.",
     });
   }
 
   if (sections.transfers) {
     shortcuts.push({
-      key: 'transfers',
-      label: 'Transferencias',
-      href: '/transferencias/recepciones-pendientes',
-      description: 'Atender recepciones pendientes de la sede.',
+      key: "transfers",
+      label: "Transferencias",
+      href: "/transferencias/listado-de-transferencias",
+      description: "Aprobar, despachar y recepcionar solicitudes entre sedes.",
     });
   }
 
   shortcuts.push({
-    key: 'bi',
-    label: 'BI',
-    href: '/bi',
-    description: 'Abrir la capa analitica y dashboards Power BI.',
+    key: "bi",
+    label: "BI",
+    href: "/bi",
+    description: "Abrir la capa analitica y dashboards Power BI.",
   });
 
   return shortcuts;
@@ -199,30 +249,30 @@ function buildShortcuts(sections, cashClosing) {
 function mapSalesEvent(event) {
   return {
     id: `sale:${event.sale_id}`,
-    type: 'sale',
+    type: "sale",
     occurred_at: event.occurred_at,
-    title: `Venta confirmada ${event.sale_number || ''}`.trim(),
-    subtitle: `${event.customer_name_text || 'Cliente general'} · S/. ${Number(
-      event.total_amount || 0
+    title: `Venta confirmada ${event.sale_number || ""}`.trim(),
+    subtitle: `${event.customer_name_text || "Cliente general"} · S/. ${Number(
+      event.total_amount || 0,
     ).toFixed(2)} · ${event.document_type}`,
-    status: 'confirmed',
+    status: "confirmed",
     href: `/ventas/${event.sale_id}`,
   };
 }
 
 function mapPostsaleEvent(event) {
   const title =
-    event.event_type === 'exchange'
-      ? `Cambio confirmado ${event.sale_number || ''}`.trim()
-      : `Venta anulada ${event.sale_number || ''}`.trim();
+    event.event_type === "exchange"
+      ? `Cambio confirmado ${event.sale_number || ""}`.trim()
+      : `Venta anulada ${event.sale_number || ""}`.trim();
 
   return {
     id: `postsale:${event.event_type}:${event.event_id}`,
-    type: 'postsale',
+    type: "postsale",
     occurred_at: event.occurred_at,
     title,
-    subtitle: `${event.customer_name_text || 'Cliente general'}${
-      event.reason ? ` · ${event.reason}` : ''
+    subtitle: `${event.customer_name_text || "Cliente general"}${
+      event.reason ? ` · ${event.reason}` : ""
     }`,
     status: event.status,
     href: `/postventa/${event.sale_id}`,
@@ -231,15 +281,41 @@ function mapPostsaleEvent(event) {
 
 function mapTransferEvent(event, locationId) {
   const isInbound = event.to_location_id === locationId;
-  const directionLabel = isInbound ? 'Recepcion' : 'Salida';
-  const counterpart = isInbound ? event.from_location_name : event.to_location_name;
+  const counterpart = isInbound
+    ? event.from_location_name
+    : event.to_location_name;
+  const statusLabel = formatTransferStatusLabel(event.status);
+  let title = `Transferencia ${event.transfer_number || ""}`.trim();
+  let subtitle = `${counterpart} · ${statusLabel}`;
+
+  if (event.status === "requested") {
+    title = `Solicitud ${event.transfer_number || ""}`.trim();
+    subtitle = isInbound
+      ? `${counterpart} atiende tu pedido · ${statusLabel}`
+      : `${counterpart} pide reposicion · ${statusLabel}`;
+  } else if (event.status === "approved") {
+    title = `Aprobacion ${event.transfer_number || ""}`.trim();
+    subtitle = isInbound
+      ? `${counterpart} preparo el despacho · ${statusLabel}`
+      : `${counterpart} espera envio · ${statusLabel}`;
+  } else if (event.status === "shipped") {
+    title =
+      `${isInbound ? "Recepcion en camino" : "Despacho"} ${event.transfer_number || ""}`.trim();
+    subtitle = `${counterpart} · ${statusLabel}`;
+  } else if (event.status === "received") {
+    title = `Recepcion ${event.transfer_number || ""}`.trim();
+    subtitle = `${counterpart} · ${statusLabel}`;
+  } else if (event.status === "cancelled") {
+    title = `Transferencia cancelada ${event.transfer_number || ""}`.trim();
+    subtitle = `${counterpart} · ${statusLabel}`;
+  }
 
   return {
     id: `transfer:${event.transfer_id}`,
-    type: 'transfer',
+    type: "transfer",
     occurred_at: event.occurred_at,
-    title: `${directionLabel} ${event.transfer_number || ''}`.trim(),
-    subtitle: `${counterpart} · ${event.status}`,
+    title,
+    subtitle,
     status: event.status,
     href: `/transferencias/${event.transfer_id}`,
   };
@@ -248,75 +324,44 @@ function mapTransferEvent(event, locationId) {
 function mapAdjustmentEvent(event) {
   return {
     id: `adjustment:${event.adjustment_id}`,
-    type: 'adjustment',
+    type: "adjustment",
     occurred_at: event.occurred_at,
-    title: `Ajuste ${event.adjustment_number || ''}`.trim(),
-    subtitle: `${event.status}${event.reason ? ` · ${event.reason}` : ''}`,
+    title: `Ajuste ${event.adjustment_number || ""}`.trim(),
+    subtitle: `${event.status}${event.reason ? ` · ${event.reason}` : ""}`,
     status: event.status,
-    href: '/inventario/ajustes',
+    href: "/inventario/ajustes",
   };
 }
 
 function mapCashEvent(event) {
   return {
     id: `cash:${event.cash_closing_id}`,
-    type: 'cash',
+    type: "cash",
     occurred_at: event.occurred_at,
-    title: `Caja ${event.status === 'closed' ? 'cerrada' : 'abierta'}`,
+    title: `Caja ${event.status === "closed" ? "cerrada" : "abierta"}`,
     subtitle: `${event.business_date} · S/. ${Number(event.total_all || 0).toFixed(2)}`,
     status: event.status,
-    href: '/caja',
+    href: "/caja",
   };
 }
 
-async function resolveDashboardContext(userId) {
-  const normalizedUserId = normalizeUuid(userId);
-
-  if (!normalizedUserId) {
-    throw new AppError('Not authenticated', 401, { code: 'AUTH_REQUIRED' });
-  }
-
-  const user = await findActiveUserById(normalizedUserId);
-  if (!user) {
-    throw new AppError('Not authenticated', 401, { code: 'AUTH_REQUIRED' });
-  }
-
-  const location = await findDefaultLocationByUserId(normalizedUserId);
-  if (!location) {
-    throw new AppError('Authenticated user has no default location assigned', 409, {
-      code: 'DEFAULT_LOCATION_REQUIRED',
-    });
-  }
-
-  if (!location.active) {
-    throw new AppError('Default location is inactive', 409, {
-      code: 'DEFAULT_LOCATION_INACTIVE',
-    });
-  }
-
-  return { user, location };
-}
-
-async function resolveCommercialLocations(userId) {
-  const rows = await findUserLocationsByUserId(userId);
-  const activeRows = rows.filter((row) => row.active !== false);
-
-  return activeRows.map((row) => ({
-    location_id: row.location_id,
-    name: row.name,
-    code: row.code,
-    type: row.type,
-    is_default: row.is_default === true,
-  }));
-}
-
 async function getDashboardOverview(input = {}) {
-  const { user, location } = await resolveDashboardContext(input.user_id);
+  const dashboardScope = await resolveDashboardScope(input);
+  const {
+    user,
+    defaultLocation,
+    selectedLocation,
+    activeLocationIds,
+    availableLocations,
+    scope,
+    scopeLabel,
+  } = dashboardScope;
   const permissions = Array.isArray(input.permissions) ? input.permissions : [];
   const roleName = input.role_name || user.role_name || null;
   const businessDate = todayPeruDate();
   const dateFrom = input.date_from || businessDate;
   const dateTo = input.date_to || businessDate;
+  const previousRange = buildPreviousPeriodRange(dateFrom, dateTo);
   const sections = buildSections({ permissions, roleName });
 
   const needsSalesAggregates = sections.sales || sections.cash;
@@ -324,7 +369,8 @@ async function getDashboardOverview(input = {}) {
   let salesHeadline = null;
   let paymentRows = [];
   let currentCashClosing = null;
-  let salesRow = null;
+  let previousSalesHeadline = null;
+  let previousPaymentRows = [];
   let postsalesCounts = null;
   let postsalesItems = [];
   let transferCounts = null;
@@ -336,53 +382,139 @@ async function getDashboardOverview(input = {}) {
     const executor = client.query.bind(client);
 
     if (needsSalesAggregates) {
-      salesHeadline = await findSalesHeadlineByLocationAndDate(location.location_id, dateFrom, dateTo, executor);
-      paymentRows = await findPaymentTotalsByLocationAndDate(location.location_id, dateFrom, dateTo, executor);
-      salesRow = await countSalesByLocationAndDate(location.location_id, dateFrom, dateTo, executor);
+      salesHeadline = await findSalesHeadlineByLocationAndDate(
+        activeLocationIds,
+        dateFrom,
+        dateTo,
+        executor,
+      );
+      paymentRows = await findPaymentTotalsByLocationAndDate(
+        activeLocationIds,
+        dateFrom,
+        dateTo,
+        executor,
+      );
+      previousSalesHeadline = await findSalesHeadlineByLocationAndDate(
+        activeLocationIds,
+        previousRange.date_from,
+        previousRange.date_to,
+        executor,
+      );
+      previousPaymentRows = await findPaymentTotalsByLocationAndDate(
+        activeLocationIds,
+        previousRange.date_from,
+        previousRange.date_to,
+        executor,
+      );
     }
 
-    if (sections.cash) {
-      currentCashClosing = await findCashClosingByLocationAndDate(location.location_id, dateFrom, dateTo, executor);
+    if (sections.cash && activeLocationIds.length === 1) {
+      currentCashClosing = await findCashClosingByLocationAndDate(
+        activeLocationIds[0],
+        dateFrom,
+        dateTo,
+        executor,
+      );
     }
 
     if (sections.postsales) {
       postsalesCounts = await findPostsalesWindowCounts(
-        location.location_id,
+        activeLocationIds,
         businessDate,
         POSTSALE_LOOKBACK_DAYS,
-        executor
+        executor,
       );
       postsalesItems = await findPostsalesWindowItems(
-        location.location_id,
+        activeLocationIds,
         businessDate,
         POSTSALE_LOOKBACK_DAYS,
         5,
-        executor
+        executor,
       );
     }
 
     if (sections.transfers) {
-      transferCounts = await findPendingTransfersCounts(location.location_id, executor);
-      transferItems = await findPendingTransfersItems(location.location_id, 5, executor);
+      transferCounts = await findPendingTransfersCounts(
+        activeLocationIds,
+        executor,
+      );
+      transferItems = await findPendingTransfersItems(
+        activeLocationIds,
+        5,
+        executor,
+      );
     }
 
     if (sections.inventory) {
-      inventoryCounts = await findCriticalInventoryCounts(location.location_id, LOW_STOCK_THRESHOLD, executor);
-      inventoryItems = await findCriticalInventoryItems(location.location_id, LOW_STOCK_THRESHOLD, 6, executor);
+      inventoryCounts = await findCriticalInventoryCounts(
+        activeLocationIds,
+        LOW_STOCK_THRESHOLD,
+        executor,
+      );
+      inventoryItems = await findCriticalInventoryItems(
+        activeLocationIds,
+        LOW_STOCK_THRESHOLD,
+        6,
+        executor,
+      );
     }
   } finally {
     client.release();
   }
 
   const paymentTotals = buildPaymentTotals(paymentRows);
-  const salesConsistency = buildConsistency(paymentTotals, salesRow || {});
+  const currentSalesRow = {
+    sale_count: Number((salesHeadline && salesHeadline.sale_count) || 0),
+    grand_total: round2(salesHeadline && salesHeadline.total_amount),
+  };
+  const previousPaymentTotals = buildPaymentTotals(previousPaymentRows);
+  const previousSalesRow = {
+    sale_count: Number(
+      (previousSalesHeadline && previousSalesHeadline.sale_count) || 0,
+    ),
+    grand_total: round2(
+      previousSalesHeadline && previousSalesHeadline.total_amount,
+    ),
+  };
+  const salesConsistency = buildConsistency(paymentTotals, currentSalesRow);
+  const previousSalesConsistency = buildConsistency(
+    previousPaymentTotals,
+    previousSalesRow,
+  );
+  const saleCountCurrent = Number(
+    (salesHeadline && salesHeadline.sale_count) || 0,
+  );
+  const saleCountPrevious = Number(
+    (previousSalesHeadline && previousSalesHeadline.sale_count) || 0,
+  );
+  const totalAmountCurrent = round2(
+    salesHeadline && salesHeadline.total_amount,
+  );
+  const totalAmountPrevious = round2(
+    previousSalesHeadline && previousSalesHeadline.total_amount,
+  );
+  const avgTicketCurrent =
+    saleCountCurrent > 0 ? round2(totalAmountCurrent / saleCountCurrent) : 0;
+  const avgTicketPrevious =
+    saleCountPrevious > 0 ? round2(totalAmountPrevious / saleCountPrevious) : 0;
 
   return {
     context: {
       generated_at: new Date().toISOString(),
       business_date: dateTo,
       date_from: dateFrom,
-      location,
+      date_to: dateTo,
+      location: selectedLocation || defaultLocation,
+      scope: {
+        mode: scope,
+        label: scopeLabel,
+        selected_location_id:
+          scope === "single" && selectedLocation
+            ? selectedLocation.location_id
+            : null,
+        active_location_ids: activeLocationIds,
+        available_locations: availableLocations,
+      },
       user: {
         user_id: user.user_id,
         full_name: user.full_name,
@@ -393,10 +525,24 @@ async function getDashboardOverview(input = {}) {
     sales_today: sections.sales
       ? {
           visible: true,
-          sale_count: Number((salesHeadline && salesHeadline.sale_count) || 0),
-          total_amount: round2(salesHeadline && salesHeadline.total_amount),
+          sale_count: saleCountCurrent,
+          total_amount: totalAmountCurrent,
           last_confirmed_at: salesHeadline && salesHeadline.last_confirmed_at,
           by_method: paymentTotals,
+          comparisons: {
+            sale_count: buildMetricComparison(
+              saleCountCurrent,
+              saleCountPrevious,
+            ),
+            total_amount: buildMetricComparison(
+              totalAmountCurrent,
+              totalAmountPrevious,
+            ),
+            avg_ticket: buildMetricComparison(
+              avgTicketCurrent,
+              avgTicketPrevious,
+            ),
+          },
         }
       : { visible: false },
     cash: sections.cash
@@ -404,10 +550,16 @@ async function getDashboardOverview(input = {}) {
           visible: true,
           closing: currentCashClosing,
           sales_summary: {
-            sale_count: Number((salesRow && salesRow.sale_count) || 0),
-            grand_total: round2(salesRow && salesRow.grand_total),
+            sale_count: currentSalesRow.sale_count,
+            grand_total: currentSalesRow.grand_total,
             by_method: paymentTotals,
             consistency: salesConsistency,
+            comparisons: {
+              payment_total: buildMetricComparison(
+                salesConsistency.payment_total,
+                previousSalesConsistency.payment_total,
+              ),
+            },
           },
         }
       : { visible: false },
@@ -416,16 +568,16 @@ async function getDashboardOverview(input = {}) {
           visible: true,
           recent_window_days: POSTSALE_LOOKBACK_DAYS,
           total_recent_confirmed: Number(
-            (postsalesCounts && postsalesCounts.total_recent_confirmed) || 0
+            (postsalesCounts && postsalesCounts.total_recent_confirmed) || 0,
           ),
           eligible_exchange_count: Number(
-            (postsalesCounts && postsalesCounts.eligible_exchange_count) || 0
+            (postsalesCounts && postsalesCounts.eligible_exchange_count) || 0,
           ),
           eligible_cancel_count: Number(
-            (postsalesCounts && postsalesCounts.eligible_cancel_count) || 0
+            (postsalesCounts && postsalesCounts.eligible_cancel_count) || 0,
           ),
           blocked_cancel_count: Number(
-            (postsalesCounts && postsalesCounts.blocked_cancel_count) || 0
+            (postsalesCounts && postsalesCounts.blocked_cancel_count) || 0,
           ),
           latest: postsalesItems,
         }
@@ -434,10 +586,13 @@ async function getDashboardOverview(input = {}) {
       ? {
           visible: true,
           pending_receipts_count: Number(
-            (transferCounts && transferCounts.pending_receipts_count) || 0
+            (transferCounts && transferCounts.pending_receipts_count) || 0,
           ),
-          draft_outgoing_count: Number(
-            (transferCounts && transferCounts.draft_outgoing_count) || 0
+          pending_approval_count: Number(
+            (transferCounts && transferCounts.pending_approval_count) || 0,
+          ),
+          pending_dispatch_count: Number(
+            (transferCounts && transferCounts.pending_dispatch_count) || 0,
           ),
           latest: transferItems,
         }
@@ -446,8 +601,12 @@ async function getDashboardOverview(input = {}) {
       ? {
           visible: true,
           low_stock_threshold: LOW_STOCK_THRESHOLD,
-          zero_stock_count: Number((inventoryCounts && inventoryCounts.zero_stock_count) || 0),
-          low_stock_count: Number((inventoryCounts && inventoryCounts.low_stock_count) || 0),
+          zero_stock_count: Number(
+            (inventoryCounts && inventoryCounts.zero_stock_count) || 0,
+          ),
+          low_stock_count: Number(
+            (inventoryCounts && inventoryCounts.low_stock_count) || 0,
+          ),
           critical_variants: inventoryItems,
         }
       : { visible: false },
@@ -456,15 +615,24 @@ async function getDashboardOverview(input = {}) {
 }
 
 async function getSalesByDepartment(input = {}) {
-  const { user, location } = await resolveDashboardContext(input.user_id);
+  const dashboardScope = await resolveDashboardScope(input);
   const dateFrom = input.date_from || todayPeruDate();
   const dateTo = input.date_to || todayPeruDate();
 
-  const rows = await findSalesByDepartment(location.location_id, dateFrom, dateTo);
+  const rows = await findSalesByDepartment(
+    dashboardScope.activeLocationIds,
+    dateFrom,
+    dateTo,
+  );
 
   return {
     context: {
-      location_id: location.location_id,
+      location_id: dashboardScope.selectedLocation
+        ? dashboardScope.selectedLocation.location_id
+        : null,
+      active_location_ids: dashboardScope.activeLocationIds,
+      location_scope: dashboardScope.scope,
+      scope_label: dashboardScope.scopeLabel,
       date_from: dateFrom,
       date_to: dateTo,
     },
@@ -477,83 +645,108 @@ async function getSalesByDepartment(input = {}) {
 }
 
 async function getCommercialActivity(input = {}) {
-  const { user, location } = await resolveDashboardContext(input.user_id);
+  const dashboardScope = await resolveDashboardScope(input);
+  const { user, selectedLocation, activeLocationIds, scope, scopeLabel } =
+    dashboardScope;
   const permissions = Array.isArray(input.permissions) ? input.permissions : [];
   const roleName = input.role_name || user.role_name || null;
   const sections = buildSections({ permissions, roleName });
   const group = normalizeActivityGroup(input.group);
   const dateFrom = input.date_from || todayPeruDate();
   const dateTo = input.date_to || todayPeruDate();
-  const assignedLocations = await resolveCommercialLocations(user.user_id);
   const visible = sections.sales;
+  const dailyColumns = buildDailyColumns(dateFrom, dateTo);
 
-  if (!visible || assignedLocations.length === 0) {
+  if (!visible) {
     return {
       visible: false,
       context: {
         date_from: dateFrom,
         date_to: dateTo,
         group,
-        default_metric: 'amount',
-        active_location_id: location.location_id,
+        default_metric: "amount",
+        active_location_id: selectedLocation
+          ? selectedLocation.location_id
+          : null,
+        active_location_ids: activeLocationIds,
+        location_scope: scope,
+        scope_label: scopeLabel,
       },
       rows: [],
-      columns: group === 'today' ? TODAY_SLOT_COLUMNS : group === 'week' ? WEEKDAY_COLUMNS : AGGREGATE_COLUMNS,
+      columns: group === "today" ? TODAY_SLOT_COLUMNS : dailyColumns,
       cells: [],
     };
   }
 
-  const locationIds = assignedLocations.map((entry) => entry.location_id);
-  let rows = [];
-
-  if (group === 'today') {
-    rows = await findCommercialActivityByTimeSlot(locationIds, dateFrom, dateTo);
-  } else if (group === 'week') {
-    rows = await findCommercialActivityByWeekday(locationIds, dateFrom, dateTo);
-  } else {
-    rows = await findCommercialActivityAggregate(locationIds, dateFrom, dateTo);
+  if (activeLocationIds.length === 0) {
+    return {
+      visible: false,
+      context: {
+        date_from: dateFrom,
+        date_to: dateTo,
+        group,
+        default_metric: "amount",
+        active_location_id: selectedLocation
+          ? selectedLocation.location_id
+          : null,
+        active_location_ids: activeLocationIds,
+        location_scope: scope,
+        scope_label: scopeLabel,
+      },
+      rows: [],
+      columns: group === "today" ? TODAY_SLOT_COLUMNS : dailyColumns,
+      cells: [],
+    };
   }
 
-  const cells =
-    group === 'today'
-      ? rows.map((row) => ({
-          location_id: row.location_id,
-          column_key: TODAY_SLOT_COLUMNS[Number(row.slot_index || 0)]?.key || 'slot_00',
-          sale_count: Number(row.sale_count || 0),
-          total_amount: round2(row.total_amount),
-          avg_ticket: round2(row.avg_ticket),
-        }))
-      : group === 'week'
-        ? rows.map((row) => ({
-            location_id: row.location_id,
-            column_key: `weekday_${Number(row.weekday_number || 1)}`,
-            sale_count: Number(row.sale_count || 0),
-            total_amount: round2(row.total_amount),
-            avg_ticket: round2(row.avg_ticket),
-          }))
-        : rows.flatMap((row) => ([
-            {
-              location_id: row.location_id,
-              column_key: 'amount',
-              sale_count: Number(row.sale_count || 0),
-              total_amount: round2(row.total_amount),
-              avg_ticket: round2(row.avg_ticket),
-            },
-            {
-              location_id: row.location_id,
-              column_key: 'sales',
-              sale_count: Number(row.sale_count || 0),
-              total_amount: round2(row.total_amount),
-              avg_ticket: round2(row.avg_ticket),
-            },
-            {
-              location_id: row.location_id,
-              column_key: 'avg_ticket',
-              sale_count: Number(row.sale_count || 0),
-              total_amount: round2(row.total_amount),
-              avg_ticket: round2(row.avg_ticket),
-            },
-          ]));
+  const rawRows =
+    group === "today"
+      ? await findCommercialActivityByTimeSlot(
+          activeLocationIds,
+          dateFrom,
+          dateTo,
+        )
+      : await findCommercialActivityByDay(activeLocationIds, dateFrom, dateTo);
+  const aggregateMap = new Map();
+
+  for (const row of rawRows) {
+    const key =
+      group === "today"
+        ? TODAY_SLOT_COLUMNS[Number(row.slot_index || 0)]?.key || "slot_00"
+        : normalizeBusinessDateKey(row.business_date);
+    const existing = aggregateMap.get(key) || {
+      sale_count: 0,
+      total_amount: 0,
+    };
+
+    existing.sale_count += Number(row.sale_count || 0);
+    existing.total_amount = round2(
+      existing.total_amount + Number(row.total_amount || 0),
+    );
+    aggregateMap.set(key, existing);
+  }
+
+  const columns = group === "today" ? TODAY_SLOT_COLUMNS : dailyColumns;
+  const cells = columns
+    .map((column) => {
+      const aggregated = aggregateMap.get(column.key);
+      if (!aggregated) return null;
+
+      return {
+        location_id: "all_locations",
+        column_key: column.key,
+        sale_count: Number(aggregated.sale_count || 0),
+        total_amount: round2(aggregated.total_amount),
+        avg_ticket:
+          Number(aggregated.sale_count || 0) > 0
+            ? round2(
+                Number(aggregated.total_amount || 0) /
+                  Number(aggregated.sale_count || 0),
+              )
+            : 0,
+      };
+    })
+    .filter(Boolean);
 
   return {
     visible: true,
@@ -561,23 +754,63 @@ async function getCommercialActivity(input = {}) {
       date_from: dateFrom,
       date_to: dateTo,
       group,
-      default_metric: 'amount',
-      active_location_id: location.location_id,
+      default_metric: "amount",
+      active_location_id: selectedLocation
+        ? selectedLocation.location_id
+        : null,
+      active_location_ids: activeLocationIds,
+      location_scope: scope,
+      scope_label: scopeLabel,
     },
-    rows: assignedLocations.map((entry) => ({
-      location_id: entry.location_id,
-      name: entry.name,
-      code: entry.code,
-      type: entry.type,
-      is_default: entry.is_default,
-    })),
-    columns: group === 'today' ? TODAY_SLOT_COLUMNS : group === 'week' ? WEEKDAY_COLUMNS : AGGREGATE_COLUMNS,
+    rows: [
+      {
+        location_id: "all_locations",
+        name: "Ventas generales",
+        code: null,
+        type: "aggregate",
+        is_default: true,
+      },
+    ],
+    columns,
     cells,
   };
 }
 
+function buildMetricComparison(currentValue, previousValue) {
+  const current = round2(currentValue);
+  const previous =
+    previousValue == null || Number.isNaN(Number(previousValue))
+      ? null
+      : round2(previousValue);
+
+  if (previous == null) {
+    return {
+      current,
+      previous: null,
+      delta: null,
+      delta_pct: null,
+      direction: "neutral",
+      valid: false,
+    };
+  }
+
+  const delta = round2(current - previous);
+  const deltaPct =
+    Math.abs(previous) < 0.01 ? null : round2((delta / previous) * 100);
+
+  return {
+    current,
+    previous,
+    delta,
+    delta_pct: deltaPct,
+    direction: delta > 0 ? "up" : delta < 0 ? "down" : "neutral",
+    valid: true,
+  };
+}
+
 async function getDashboardActivity(input = {}) {
-  const { user, location } = await resolveDashboardContext(input.user_id);
+  const dashboardScope = await resolveDashboardScope(input);
+  const { user, selectedLocation, activeLocationIds } = dashboardScope;
   const permissions = Array.isArray(input.permissions) ? input.permissions : [];
   const roleName = input.role_name || user.role_name || null;
   const sections = buildSections({ permissions, roleName });
@@ -593,19 +826,19 @@ async function getDashboardActivity(input = {}) {
     const executor = client.query.bind(client);
 
     salesEvents = sections.sales
-      ? await findRecentSalesEvents(location.location_id, 5, executor)
+      ? await findRecentSalesEvents(activeLocationIds, 5, executor)
       : [];
     postsaleEvents = sections.postsales
-      ? await findRecentPostsaleEvents(location.location_id, 5, executor)
+      ? await findRecentPostsaleEvents(activeLocationIds, 5, executor)
       : [];
     transferEvents = sections.transfers
-      ? await findRecentTransferEvents(location.location_id, 5, executor)
+      ? await findRecentTransferEvents(activeLocationIds, 5, executor)
       : [];
     adjustmentEvents = sections.inventory
-      ? await findRecentAdjustmentEvents(location.location_id, 5, executor)
+      ? await findRecentAdjustmentEvents(activeLocationIds, 5, executor)
       : [];
     cashEvents = sections.cash
-      ? await findRecentCashEvents(location.location_id, 5, executor)
+      ? await findRecentCashEvents(activeLocationIds, 5, executor)
       : [];
   } finally {
     client.release();
@@ -614,17 +847,25 @@ async function getDashboardActivity(input = {}) {
   const items = [
     ...salesEvents.map(mapSalesEvent),
     ...postsaleEvents.map(mapPostsaleEvent),
-    ...transferEvents.map((event) => mapTransferEvent(event, location.location_id)),
+    ...transferEvents.map((event) =>
+      mapTransferEvent(
+        event,
+        selectedLocation ? selectedLocation.location_id : activeLocationIds[0],
+      ),
+    ),
     ...adjustmentEvents.map(mapAdjustmentEvent),
     ...cashEvents.map(mapCashEvent),
   ]
     .filter((item) => item.occurred_at)
-    .sort((left, right) => new Date(right.occurred_at) - new Date(left.occurred_at))
+    .sort(
+      (left, right) => new Date(right.occurred_at) - new Date(left.occurred_at),
+    )
     .slice(0, 12);
 
   return {
     context: {
-      location_id: location.location_id,
+      location_id: selectedLocation ? selectedLocation.location_id : null,
+      active_location_ids: activeLocationIds,
       business_date: todayPeruDate(),
     },
     items,

@@ -4,6 +4,7 @@ const {
   listTransferRequestCandidates,
   getTransferById,
   createTransfer,
+  approveTransferById,
   shipTransferById,
   receiveTransferById,
   cancelTransferById,
@@ -63,6 +64,15 @@ async function postShipTransfer(req, res, next) {
   }
 }
 
+async function postApproveTransfer(req, res, next) {
+  try {
+    const transfer = await approveTransferById(req.params.transferId, req.body, req.auth);
+    res.json({ ok: true, data: transfer });
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function postReceiveTransfer(req, res, next) {
   try {
     const transfer = await receiveTransferById(req.params.transferId, req.body, req.auth);
@@ -87,6 +97,7 @@ module.exports = {
   getTransferRequestCandidates,
   getTransfer,
   postTransfer,
+  postApproveTransfer,
   postShipTransfer,
   postReceiveTransfer,
   postCancelTransfer,

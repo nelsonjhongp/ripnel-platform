@@ -8,12 +8,14 @@ import type { HomeOverview } from "./home-types"
 
 function flowLabel(flow: string) {
   if (flow === "receive") return "Por recibir"
+  if (flow === "approve") return "Por aprobar"
   if (flow === "ship") return "Por despachar"
   return "Solicitud"
 }
 
 function flowTone(flow: string) {
   if (flow === "receive") return "sales-chip sales-chip-warning"
+  if (flow === "approve") return "sales-chip sales-chip-accent"
   if (flow === "ship") return "sales-chip"
   return "sales-chip sales-chip-accent"
 }
@@ -31,13 +33,21 @@ export function HomeTransferRequests({
       title="Solicitudes entre tiendas"
       action={section.primary_action}
     >
-      <div className="grid gap-2 md:grid-cols-3">
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
         <div className="sales-panel-muted rounded-xl p-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
             Abiertas por mi tienda
           </p>
           <p className="mt-2 text-2xl font-bold text-[var(--ops-text)]">
-            {section.counts.drafts_for_store_count}
+            {section.counts.open_for_store_count}
+          </p>
+        </div>
+        <div className="sales-panel-muted rounded-xl p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+            Por aprobar
+          </p>
+          <p className="mt-2 text-2xl font-bold text-[var(--ops-text)]">
+            {section.counts.pending_approval_count}
           </p>
         </div>
         <div className="sales-panel-muted rounded-xl p-4">
@@ -45,7 +55,7 @@ export function HomeTransferRequests({
             Por despachar
           </p>
           <p className="mt-2 text-2xl font-bold text-[var(--ops-text)]">
-            {section.counts.drafts_to_ship_count}
+            {section.counts.pending_ship_count}
           </p>
         </div>
         <div className="sales-panel-muted rounded-xl p-4">

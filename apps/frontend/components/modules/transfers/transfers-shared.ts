@@ -1,4 +1,4 @@
-export type TransferStatus = "draft" | "shipped" | "received" | "cancelled";
+export type TransferStatus = "requested" | "approved" | "shipped" | "received" | "cancelled";
 export type TransferStatusFilter = "all" | TransferStatus;
 
 export type TransferSummary = {
@@ -14,6 +14,8 @@ export type TransferSummary = {
   notes: string | null;
   created_by: string | null;
   created_by_name: string | null;
+  approved_by: string | null;
+  approved_by_name: string | null;
   shipped_by: string | null;
   shipped_by_name: string | null;
   received_by: string | null;
@@ -21,6 +23,7 @@ export type TransferSummary = {
   cancelled_by: string | null;
   cancelled_by_name: string | null;
   created_at: string;
+  approved_at: string | null;
   shipped_at: string | null;
   received_at: string | null;
   cancelled_at: string | null;
@@ -58,31 +61,40 @@ export const TRANSFER_STATUS_FILTER_OPTIONS: ReadonlyArray<{
   label: string;
 }> = [
   { value: "all", label: "Todas" },
-  { value: "draft", label: "Borradores" },
-  { value: "shipped", label: "Enviadas" },
-  { value: "received", label: "Recibidas" },
+  { value: "requested", label: "Solicitadas" },
+  { value: "approved", label: "Aprobadas" },
+  { value: "shipped", label: "Despachadas" },
+  { value: "received", label: "Recepcionadas" },
   { value: "cancelled", label: "Canceladas" },
 ];
 
 export function formatTransferStatus(status: TransferStatus) {
-  if (status === "draft") {
-    return "Borrador";
+  if (status === "requested") {
+    return "Solicitada";
+  }
+
+  if (status === "approved") {
+    return "Aprobada";
   }
 
   if (status === "shipped") {
-    return "Enviada";
+    return "Despachada";
   }
 
   if (status === "received") {
-    return "Recibida";
+    return "Recepcionada";
   }
 
   return "Cancelada";
 }
 
 export function getTransferStatusClasses(status: TransferStatus) {
-  if (status === "draft") {
+  if (status === "requested") {
     return "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text-muted)]";
+  }
+
+  if (status === "approved") {
+    return "border-[color:color-mix(in_srgb,var(--ripnel-accent)_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_86%,var(--ops-surface))] text-[var(--ripnel-accent-hover)]";
   }
 
   if (status === "shipped") {

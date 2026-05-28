@@ -27,7 +27,7 @@ import {
   AdminSelectMenu,
   AdminTextarea,
 } from "@/components/admin/admin-ui";
-import { buildApiUrl } from "@/lib/api";
+import { apiFetchData } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
@@ -123,17 +123,10 @@ function formatShortDate(value: string) {
   });
 }
 
-async function requestApiData(path: string) {
-  const response = await fetch(buildApiUrl(path), {
+async function requestApiData<T>(path: string) {
+  return apiFetchData<T>(path, {
     cache: "no-store",
   });
-  const payload = await response.json();
-
-  if (!response.ok) {
-    throw new Error(payload.message || "No se pudo cargar estilos");
-  }
-
-  return payload.data || [];
 }
 
 async function requestStylesModuleData() {
@@ -144,11 +137,11 @@ async function requestStylesModuleData() {
     fabricDetailsData,
     targetsData,
   ] = await Promise.all([
-    requestApiData("/api/styles"),
-    requestApiData("/api/garment-types"),
-    requestApiData("/api/fabrics"),
-    requestApiData("/api/fabric-details"),
-    requestApiData("/api/targets"),
+    requestApiData<StyleItem[]>("/api/styles"),
+    requestApiData<OptionItem[]>("/api/garment-types"),
+    requestApiData<OptionItem[]>("/api/fabrics"),
+    requestApiData<OptionItem[]>("/api/fabric-details"),
+    requestApiData<OptionItem[]>("/api/targets"),
   ]);
 
   return {
@@ -214,7 +207,7 @@ export function StylesPage({
   }
 
   useEffect(() => {
-    void loadData();
+    void Promise.resolve().then(loadData);
   }, []);
 
   useEffect(() => {
@@ -234,10 +227,6 @@ export function StylesPage({
       handleEdit(matchedStyle);
     }
   }, [editingStyleId, initialStyleId, styles]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, statusFilter]);
 
   const activeCount = styles.filter((style) => style.active).length;
   const inactiveCount = styles.length - activeCount;
@@ -274,12 +263,6 @@ export function StylesPage({
 
   const totalPages = Math.max(1, Math.ceil(filteredStyles.length / PAGE_SIZE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
-
-  useEffect(() => {
-    if (currentPage !== safeCurrentPage) {
-      setCurrentPage(safeCurrentPage);
-    }
-  }, [currentPage, safeCurrentPage]);
 
   const paginatedStyles = useMemo(() => {
     const start = (safeCurrentPage - 1) * PAGE_SIZE;
@@ -331,7 +314,7 @@ export function StylesPage({
     setSuccessMessage(null);
 
     try {
-      const response = await fetch(buildApiUrl(`/api/styles/${style.style_id}`), {
+      const data = await apiFetchData<StyleItem>(`/api/styles/${style.style_id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -340,23 +323,17 @@ export function StylesPage({
           active: !style.active,
         }),
       });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo actualizar el style");
-      }
-
-      updateStyleInList(payload.data);
+      updateStyleInList(data);
 
       if (editingStyleId === style.style_id) {
         setFormState((current) => ({
           ...current,
-          active: payload.data.active,
+          active: data.active,
         }));
       }
 
       setSuccessMessage(
-        payload.data.active
+        data.active
           ? "Style activado correctamente."
           : "Style inactivado correctamente."
       );
@@ -383,7 +360,7 @@ export function StylesPage({
     setSuccessMessage(null);
 
     try {
-      const response = await fetch(buildApiUrl(`/api/styles/${editingStyleId}`), {
+      const data = await apiFetchData<StyleItem>(`/api/styles/${editingStyleId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -395,13 +372,7 @@ export function StylesPage({
           active: formState.active,
         }),
       });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo actualizar el style");
-      }
-
-      updateStyleInList(payload.data);
+      updateStyleInList(data);
       setSuccessMessage("Style actualizado correctamente.");
       resetForm();
     } catch (requestError) {
@@ -461,7 +432,10 @@ export function StylesPage({
             <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_auto]">
               <OpsSearchField
                 value={search}
-                onChange={setSearch}
+                onChange={(value) => {
+                  setSearch(value);
+                  setCurrentPage(1);
+                }}
                 placeholder="Buscar por style, código o catálogos"
                 ariaLabel="Buscar styles"
               />
@@ -470,7 +444,10 @@ export function StylesPage({
                 label="Estado"
                 value={statusFilter}
                 options={STATUS_OPTIONS}
-                onChange={(value) => setStatusFilter(value as "all" | "active" | "inactive")}
+                onChange={(value) => {
+                  setStatusFilter(value as "all" | "active" | "inactive");
+                  setCurrentPage(1);
+                }}
               />
 
               <Tooltip>
