@@ -25,6 +25,8 @@ next-env.d.ts
 
 # Logs
 *.log
+*.out.log
+*.err.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -35,7 +37,9 @@ yarn-error.log*
 .vercel/
 *.pem
 .codex
+.codex-logs/
 .local/
+.playwright-mcp/
 
 # Supabase local state
 supabase/.branches/
@@ -50,3 +54,11 @@ apps/graphify-out/
 linear.app/
 cookies.txt
 .codex-login-review.png
+
+# Temporary screenshots and visual review artifacts
+tmp-*.png
+dashboard-*.png
+panel-*.png
+sidebar-*.png
+inventario-*.png
+sale-detail-*.png

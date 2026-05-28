@@ -18,11 +18,23 @@
 -- - uses inventory adjustments as the formal "product intake" document
 -- - seeds transfers, confirmed sales and kardex movements for 30 days
 -- - leaves the subset with a deterministic final stock state
+-- - is safe to re-run because it cleans only demo records marked
+--   with A30D- / T30D- / SEED-30D prefixes
 --
 -- Safety:
 -- - deletes only records created by this seed using SEED-30D prefixes
 -- - resets only inventory rows for the seed subset
 -- - safe to re-run on the shared demo Supabase base
+--
+-- Recommended execution order:
+-- 1) database/seed_access_control.sql
+-- 2) database/seed_operational_mvp.sql
+-- 3) supabase/seed.sql
+-- 4) supabase/seed_styles_legacy.sql
+-- 5) database/seed_variants_inventory.sql
+-- 6) database/seed_style_size_prices.sql
+-- 7) database/seed_sales_mvp.sql
+-- 8) this file
 -- ============================================================
 
 begin;
@@ -348,8 +360,50 @@ begin
     raise exception 'seed_operational_30_days.sql requires SALE-CLI-001/002/003 from database/seed_sales_mvp.sql';
   end if;
 
+  if exists (
+    select 1
+    from seed_30d_sale_events se
+    left join product_variants pv on pv.sku = se.sku
+    left join style_size_prices ssp
+      on ssp.style_id = pv.style_id
+     and ssp.size_id = pv.size_id
+     and ssp.price_type = 'retail'
+     and ssp.active = true
+     and ssp.start_date <= (v_today_lima - se.day_offset)
+     and (ssp.end_date is null or ssp.end_date >= (v_today_lima - se.day_offset))
+    where ssp.style_size_price_id is null
+  ) then
+    raise exception 'seed_operational_30_days.sql requires active retail prices for every demo sale event';
+  end if;
+
   delete from stock_movements
-  where reason like 'SEED-30D:%';
+  where reason like 'SEED-30D:%'
+     or (
+       reference_type = 'adjustment'
+       and reference_id in (
+         select adjustment_id
+         from inventory_adjustments
+         where adjustment_number like 'A30D-%'
+            or coalesce(notes, '') like 'SEED-30D:%'
+       )
+     )
+     or (
+       reference_type = 'transfer'
+       and reference_id in (
+         select transfer_id
+         from stock_transfers
+         where transfer_number like 'T30D-%'
+            or coalesce(notes, '') like 'SEED-30D:%'
+       )
+     )
+     or (
+       reference_type = 'sale'
+       and reference_id in (
+         select sale_id
+         from sales
+         where coalesce(notes, '') like 'SEED-30D:%'
+       )
+     );
 
   delete from inventory_adjustments
   where adjustment_number like 'A30D-%'
@@ -933,6 +987,48 @@ begin
     raise exception 'seed_operational_30_days.sql found non-confirmed seed adjustments';
   end if;
 
+  if (
+    select count(*)
+    from inventory_adjustments
+    where adjustment_number like 'A30D-%'
+  ) <> 8 then
+    raise exception 'seed_operational_30_days.sql expected 8 confirmed adjustments';
+  end if;
+
+  if exists (
+    select 1
+    from stock_transfers
+    where transfer_number like 'T30D-%'
+      and status <> 'received'
+  ) then
+    raise exception 'seed_operational_30_days.sql found seed transfers outside received status';
+  end if;
+
+  if (
+    select count(*)
+    from stock_transfers
+    where transfer_number like 'T30D-%'
+  ) <> 6 then
+    raise exception 'seed_operational_30_days.sql expected 6 received transfers';
+  end if;
+
+  if exists (
+    select 1
+    from sales
+    where coalesce(notes, '') like 'SEED-30D:%'
+      and status <> 'confirmed'
+  ) then
+    raise exception 'seed_operational_30_days.sql found non-confirmed seed sales';
+  end if;
+
+  if (
+    select count(*)
+    from sales
+    where coalesce(notes, '') like 'SEED-30D:%'
+  ) <> 30 then
+    raise exception 'seed_operational_30_days.sql expected 30 confirmed sales';
+  end if;
+
   for r_expected in
     select *
     from seed_30d_expected_final_stock
@@ -983,6 +1079,14 @@ select
   count(*)::int as document_count
 from sales
 where coalesce(notes, '') like 'SEED-30D:%';
+
+select
+  movement_type,
+  count(*)::int as movement_count
+from stock_movements
+where reason like 'SEED-30D:%'
+group by movement_type
+order by movement_type;
 
 select
   min(timezone('America/Lima', created_at)::date) as first_business_date_lima,
