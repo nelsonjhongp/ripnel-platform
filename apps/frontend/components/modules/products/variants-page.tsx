@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Boxes,
   CircleAlert,
@@ -287,7 +287,7 @@ export function VariantsPage({
   const [styles, setStyles] = useState<StyleItem[]>([]);
   const [sizes, setSizes] = useState<SizeItem[]>([]);
   const [colors, setColors] = useState<ColorItem[]>([]);
-  const [selectedStyleId, setSelectedStyleId] = useState<string>("");
+  const [selectedStyleId, setSelectedStyleId] = useState<string>(initialStyleId || "");
   const [selectedSnapshot, setSelectedSnapshot] = useState<VariantSnapshot | null>(null);
   const [selectedWorkspace, setSelectedWorkspace] = useState<ProductWorkspace | null>(null);
   const [formState, setFormState] = useState<VariantFormState>(initialFormState);
@@ -305,9 +305,39 @@ export function VariantsPage({
   const [pendingStatusVariant, setPendingStatusVariant] = useState<VariantItem | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const hasAppliedInitialSelection = useRef(false);
+  const selectedStyleExists = useMemo(
+    () => styles.some((style) => style.style_id === selectedStyleId),
+    [selectedStyleId, styles]
+  );
+  const resolvedSelectedStyleId = selectedStyleExists ? selectedStyleId : "";
 
-  async function loadBaseData() {
+  const resetVariantViewState = useCallback(() => {
+    setSelectedSnapshot(null);
+    setSelectedWorkspace(null);
+    setFormState(initialFormState);
+    setVariantSearch("");
+    setVariantStatusFilter("all");
+    setVariantPage(1);
+  }, []);
+
+  function handleSelectStyle(styleId: string) {
+    setSelectedStyleId(styleId);
+    setSuccessMessage(null);
+    setError(null);
+    setVariantSearch("");
+    setVariantStatusFilter("all");
+    setVariantPage(1);
+  }
+
+  function handleClearSelectedStyle() {
+    setSelectedStyleId("");
+    setSuccessMessage(null);
+    setError(null);
+    resetVariantViewState();
+    router.push("/productos/variantes");
+  }
+
+  const loadBaseData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -318,12 +348,9 @@ export function VariantsPage({
       setSizes(sizesData);
       setColors(colorsData);
 
-      if (!selectedStyleId && initialStyleId && stylesData.length) {
-        const preferredStyle =
-          initialStyleId &&
-          stylesData.find((style) => style.style_id === initialStyleId)?.style_id;
-
-        setSelectedStyleId(preferredStyle || "");
+      if (selectedStyleId && !stylesData.some((style) => style.style_id === selectedStyleId)) {
+        setSelectedStyleId("");
+        resetVariantViewState();
       }
     } catch (requestError) {
       setError(
@@ -334,7 +361,7 @@ export function VariantsPage({
     } finally {
       setLoading(false);
     }
-  }
+  }, [resetVariantViewState, selectedStyleId]);
 
   async function loadStyleSnapshot(styleId: string) {
     setLoadingSelected(true);
@@ -366,85 +393,16 @@ export function VariantsPage({
   }
 
   useEffect(() => {
-    let cancelled = false;
-
-    setLoading(true);
-    setError(null);
-
-    requestVariantsBaseData()
-      .then(({ stylesData, sizesData, colorsData }) => {
-        if (cancelled) {
-          return;
-        }
-
-        setStyles(stylesData);
-        setSizes(sizesData);
-        setColors(colorsData);
-
-        if (initialStyleId && stylesData.length) {
-          const preferredStyle =
-            initialStyleId &&
-            stylesData.find((style) => style.style_id === initialStyleId)?.style_id;
-
-          setSelectedStyleId((current) => current || preferredStyle || "");
-        }
-      })
-      .catch((requestError) => {
-        if (cancelled) {
-          return;
-        }
-
-        setError(
-          requestError instanceof Error
-            ? requestError.message
-            : "No se pudo cargar la base de Variantes"
-        );
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [initialStyleId]);
+    void Promise.resolve().then(loadBaseData);
+  }, [loadBaseData]);
 
   useEffect(() => {
-    if (
-      hasAppliedInitialSelection.current ||
-      !initialStyleId ||
-      !styles.some((style) => style.style_id === initialStyleId)
-    ) {
+    if (!resolvedSelectedStyleId) {
       return;
     }
 
-    hasAppliedInitialSelection.current = true;
-    setSelectedStyleId(initialStyleId);
-  }, [initialStyleId, styles]);
-
-  useEffect(() => {
-    if (!selectedStyleId) {
-      setSelectedSnapshot(null);
-      setSelectedWorkspace(null);
-      setFormState(initialFormState);
-      setVariantSearch("");
-      setVariantStatusFilter("all");
-      setVariantPage(1);
-      return;
-    }
-
-    loadStyleSnapshot(selectedStyleId);
-  }, [selectedStyleId]);
-
-  useEffect(() => {
-    setStylePage(1);
-  }, [styleSearch, styleStatusFilter]);
-
-  useEffect(() => {
-    setVariantPage(1);
-  }, [variantSearch, variantStatusFilter, selectedStyleId]);
+    void Promise.resolve().then(() => loadStyleSnapshot(resolvedSelectedStyleId));
+  }, [resolvedSelectedStyleId]);
 
   const filteredStyles = useMemo(() => {
     const term = normalizeText(styleSearch);
@@ -471,18 +429,6 @@ export function VariantsPage({
       return haystack.includes(term);
     });
   }, [styleSearch, styleStatusFilter, styles]);
-
-  useEffect(() => {
-    if (!selectedStyleId || !styles.length) {
-      return;
-    }
-
-    const stillExists = styles.some((style) => style.style_id === selectedStyleId);
-
-    if (!stillExists) {
-      setSelectedStyleId("");
-    }
-  }, [selectedStyleId, styles]);
 
   const visibleSizes = useMemo(() => {
     const selectedIds = new Set(formState.sizeIds);
@@ -547,12 +493,6 @@ export function VariantsPage({
   const styleTotalPages = Math.max(1, Math.ceil(filteredStyles.length / STYLE_PAGE_SIZE));
   const safeStylePage = Math.min(stylePage, styleTotalPages);
 
-  useEffect(() => {
-    if (stylePage !== safeStylePage) {
-      setStylePage(safeStylePage);
-    }
-  }, [safeStylePage, stylePage]);
-
   const paginatedStyles = useMemo(() => {
     const start = (safeStylePage - 1) * STYLE_PAGE_SIZE;
     return filteredStyles.slice(start, start + STYLE_PAGE_SIZE);
@@ -565,12 +505,6 @@ export function VariantsPage({
 
   const variantTotalPages = Math.max(1, Math.ceil(filteredVariants.length / VARIANT_PAGE_SIZE));
   const safeVariantPage = Math.min(variantPage, variantTotalPages);
-
-  useEffect(() => {
-    if (variantPage !== safeVariantPage) {
-      setVariantPage(safeVariantPage);
-    }
-  }, [safeVariantPage, variantPage]);
 
   const paginatedVariants = useMemo(() => {
     const start = (safeVariantPage - 1) * VARIANT_PAGE_SIZE;
@@ -586,7 +520,7 @@ export function VariantsPage({
 
   async function handleSaveConfig(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedStyleId) {
+    if (!resolvedSelectedStyleId) {
       return;
     }
 
@@ -595,7 +529,7 @@ export function VariantsPage({
     setSuccessMessage(null);
 
     try {
-      await requestApiData<VariantSnapshot>(`/api/variants/styles/${selectedStyleId}/config`, {
+      await requestApiData<VariantSnapshot>(`/api/variants/styles/${resolvedSelectedStyleId}/config`, {
         method: "PUT",
         body: JSON.stringify({
           size_ids: formState.sizeIds,
@@ -603,7 +537,7 @@ export function VariantsPage({
         }),
       });
 
-      await loadStyleSnapshot(selectedStyleId);
+      await loadStyleSnapshot(resolvedSelectedStyleId);
       setSuccessMessage("Configuracion guardada correctamente.");
       await loadBaseData();
     } catch (requestError) {
@@ -618,7 +552,7 @@ export function VariantsPage({
   }
 
   async function handleGenerateVariants() {
-    if (!selectedStyleId) {
+    if (!resolvedSelectedStyleId) {
       return;
     }
 
@@ -631,11 +565,11 @@ export function VariantsPage({
         created_count: number;
         existing_count: number;
         summary: VariantSnapshot["summary"];
-      }>(`/api/variants/styles/${selectedStyleId}/generate`, {
+      }>(`/api/variants/styles/${resolvedSelectedStyleId}/generate`, {
         method: "POST",
       });
 
-      await loadStyleSnapshot(selectedStyleId);
+      await loadStyleSnapshot(resolvedSelectedStyleId);
       await loadBaseData();
       setSuccessMessage(
         `Generacion completada. Se crearon ${result.created_count} variantes y ${result.existing_count} ya existian.`
@@ -664,8 +598,8 @@ export function VariantsPage({
         }),
       });
 
-      if (selectedStyleId) {
-        await loadStyleSnapshot(selectedStyleId);
+      if (resolvedSelectedStyleId) {
+        await loadStyleSnapshot(resolvedSelectedStyleId);
       }
 
       setSuccessMessage(
@@ -693,16 +627,13 @@ export function VariantsPage({
             title="Variantes de producto"
             actions={
               <>
-                {selectedStyleId ? (
+                {resolvedSelectedStyleId ? (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     className="rounded-lg"
-                    onClick={() => {
-                      setSelectedStyleId("");
-                      router.push("/productos/variantes");
-                    }}
+                    onClick={handleClearSelectedStyle}
                   >
                     Volver a variantes
                   </Button>
@@ -736,12 +667,15 @@ export function VariantsPage({
           </div>
 
           <div className="space-y-5">
-            {!selectedStyleId ? (
+            {!resolvedSelectedStyleId ? (
               <OpsSectionDivider className="space-y-4">
                 <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_auto]">
                   <OpsSearchField
                     value={styleSearch}
-                    onChange={setStyleSearch}
+                    onChange={(value) => {
+                      setStyleSearch(value);
+                      setStylePage(1);
+                    }}
                     placeholder="Buscar por código, nombre o tela"
                     ariaLabel="Buscar styles para variantes"
                   />
@@ -750,7 +684,10 @@ export function VariantsPage({
                     label="Estado"
                     value={styleStatusFilter}
                     options={STATUS_FILTER_OPTIONS}
-                    onChange={(v) => setStyleStatusFilter(v as StatusFilter)}
+                    onChange={(v) => {
+                      setStyleStatusFilter(v as StatusFilter);
+                      setStylePage(1);
+                    }}
                   />
 
                   <Tooltip>
@@ -860,9 +797,8 @@ export function VariantsPage({
                                   size="sm"
                                   className="rounded-lg px-3"
                                   onClick={() => {
-                                    setSelectedStyleId(style.style_id);
+                                    handleSelectStyle(style.style_id);
                                     router.push(`/productos/variantes?style_id=${encodeURIComponent(style.style_id)}`);
-                                    setSuccessMessage(null);
                                   }}
                                 >
                                   Configurar
@@ -893,7 +829,7 @@ export function VariantsPage({
               </OpsSectionDivider>
             ) : null}
 
-            {selectedStyleId ? (
+            {resolvedSelectedStyleId ? (
               <article className="ops-surface rounded-lg border p-4 md:p-5">
                 {loadingSelected ? (
                   <div className="ops-text-muted flex min-h-56 items-center justify-center">
@@ -1178,7 +1114,10 @@ export function VariantsPage({
                   <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_auto]">
                     <OpsSearchField
                       value={variantSearch}
-                      onChange={setVariantSearch}
+                      onChange={(value) => {
+                        setVariantSearch(value);
+                        setVariantPage(1);
+                      }}
                       placeholder="Buscar por SKU, talla o color"
                       ariaLabel="Buscar variantes"
                     />
@@ -1187,7 +1126,10 @@ export function VariantsPage({
                       label="Estado"
                       value={variantStatusFilter}
                       options={STATUS_FILTER_OPTIONS}
-                      onChange={(v) => setVariantStatusFilter(v as StatusFilter)}
+                      onChange={(v) => {
+                        setVariantStatusFilter(v as StatusFilter);
+                        setVariantPage(1);
+                      }}
                     />
 
                     <Tooltip>

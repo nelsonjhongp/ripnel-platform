@@ -34,7 +34,12 @@ with seeded_permissions(permission_key, description) as (
     ('sales.pos', 'Operar venta rapida y checkout.'),
     ('sales.postsale.view', 'Consultar postventa operativa y ventas elegibles.'),
     ('sales.postsale.exchange', 'Registrar cambios simples de postventa.'),
-    ('sales.postsale.cancel', 'Registrar anulaciones controladas de postventa.')
+    ('sales.postsale.cancel', 'Registrar anulaciones controladas de postventa.'),
+    ('cash.view', 'Consultar caja del dia e historial operativo de la sede activa.'),
+    ('cash.operate', 'Abrir y cerrar la caja operativa de la sede activa.'),
+    ('cash.admin.view', 'Consultar el control transversal de cajas multi-sede.'),
+    ('dashboard.view', 'Consultar el panel operativo y gerencial.'),
+    ('dashboard.global.view', 'Consultar el panel con alcance multi-sede.')
 )
 insert into permissions (
   key,
@@ -74,7 +79,11 @@ permission_keys(permission_key) as (
     ('sales.postsale.view'),
     ('sales.postsale.exchange'),
     ('sales.postsale.cancel'),
+    ('cash.view'),
+    ('cash.operate'),
+    ('cash.admin.view'),
     ('dashboard.view'),
+    ('dashboard.global.view'),
     ('users.manage'),
     ('roles.manage'),
     ('locations.manage'),
@@ -107,12 +116,18 @@ with seeded_role_permissions(role_name, permission_key) as (
     ('ADMIN', 'sales.postsale.view'),
     ('ADMIN', 'sales.postsale.exchange'),
     ('ADMIN', 'sales.postsale.cancel'),
+    ('ADMIN', 'cash.view'),
+    ('ADMIN', 'cash.operate'),
+    ('ADMIN', 'cash.admin.view'),
+    ('ADMIN', 'dashboard.view'),
+    ('ADMIN', 'dashboard.global.view'),
 
     ('ALMACEN', 'inventory.view'),
     ('ALMACEN', 'inventory.adjust'),
     ('ALMACEN', 'transfers.manage'),
     ('ALMACEN', 'transfers.ship'),
     ('ALMACEN', 'transfers.receive'),
+    ('ALMACEN', 'dashboard.view'),
 
     ('TIENDA', 'catalogs.manage'),
     ('TIENDA', 'products.manage'),
@@ -126,11 +141,15 @@ with seeded_role_permissions(role_name, permission_key) as (
     ('TIENDA', 'sales.pos'),
     ('TIENDA', 'sales.postsale.view'),
     ('TIENDA', 'sales.postsale.exchange'),
+    ('TIENDA', 'dashboard.view'),
 
     ('CAJA', 'customers.manage'),
     ('CAJA', 'sales.pos'),
     ('CAJA', 'sales.postsale.view'),
     ('CAJA', 'sales.postsale.cancel'),
+    ('CAJA', 'cash.view'),
+    ('CAJA', 'cash.operate'),
+    ('CAJA', 'dashboard.view'),
 
     ('VENTAS', 'products.manage'),
     ('VENTAS', 'customers.manage'),
@@ -139,7 +158,8 @@ with seeded_role_permissions(role_name, permission_key) as (
     ('VENTAS', 'transfers.request.view_own'),
     ('VENTAS', 'sales.pos'),
     ('VENTAS', 'sales.postsale.view'),
-    ('VENTAS', 'sales.postsale.exchange')
+    ('VENTAS', 'sales.postsale.exchange'),
+    ('VENTAS', 'dashboard.view')
 )
 insert into role_permissions (
   role_id,

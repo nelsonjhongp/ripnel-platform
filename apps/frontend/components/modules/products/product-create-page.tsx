@@ -490,7 +490,7 @@ function ConfirmationDialog({
 }
 
 export function ProductCreatePage() {
-  const nameId = useId()
+  const nameId = useId();
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [nameMode, setNameMode] = useState<NameMode>("auto");
   const [garmentTypes, setGarmentTypes] = useState<CatalogItem[]>([]);
@@ -529,13 +529,33 @@ export function ProductCreatePage() {
       requestData<ExistingStyle[]>("/api/styles"),
     ]);
 
-    setGarmentTypes(garmentTypesData.filter((item) => item.active !== false));
-    setFabrics(fabricsData.filter((item) => item.active !== false));
-    setFabricDetails(fabricDetailsData.filter((item) => item.active !== false));
-    setTargets(targetsData.filter((item) => item.active !== false));
-    setSizes(sortSizes(sizesData.filter((item) => item.active !== false)));
-    setColors(colorsData.filter((item) => item.active !== false));
+    const activeGarmentTypes = garmentTypesData.filter((item) => item.active !== false);
+    const activeFabrics = fabricsData.filter((item) => item.active !== false);
+    const activeFabricDetails = fabricDetailsData.filter((item) => item.active !== false);
+    const activeTargets = targetsData.filter((item) => item.active !== false);
+    const activeSizes = sortSizes(sizesData.filter((item) => item.active !== false));
+    const activeColors = colorsData.filter((item) => item.active !== false);
+    const mujerTarget = activeTargets.find(
+      (item) => String(item.name || "").trim().toLowerCase() === "mujer"
+    );
+
+    setGarmentTypes(activeGarmentTypes);
+    setFabrics(activeFabrics);
+    setFabricDetails(activeFabricDetails);
+    setTargets(activeTargets);
+    setSizes(activeSizes);
+    setColors(activeColors);
     setExistingStyles(stylesData);
+    setFormState((current) => {
+      if (current.target_id || !mujerTarget) {
+        return current;
+      }
+
+      return {
+        ...current,
+        target_id: getItemId(mujerTarget, ["target_id"]),
+      };
+    });
   }
 
   useEffect(() => {
@@ -562,7 +582,7 @@ export function ProductCreatePage() {
       }
     }
 
-    void run();
+    void Promise.resolve().then(run);
 
     return () => {
       cancelled = true;
@@ -587,39 +607,19 @@ export function ProductCreatePage() {
     [formState.target_id, targets]
   );
 
-  useEffect(() => {
-    if (!targets.length || formState.target_id) {
-      return;
-    }
-
-    const mujerTarget = targets.find((item) => String(item.name || "").trim().toLowerCase() === "mujer");
-    if (mujerTarget) {
-      setFormState((current) => ({
-        ...current,
-        target_id: getItemId(mujerTarget, ["target_id"]),
-      }));
-    }
-  }, [formState.target_id, targets]);
-
-  useEffect(() => {
-    if (nameMode !== "auto") {
-      return;
-    }
-
-    const nextName = buildAutoName([
-      getCatalogItemName(selectedGarmentType || {}),
-      getCatalogItemName(selectedFabric || {}),
-      getCatalogItemName(selectedFabricDetail || {}),
-    ]);
-
-    setFormState((current) => ({
-      ...current,
-      name: nextName,
-    }));
-  }, [nameMode, selectedFabric, selectedFabricDetail, selectedGarmentType]);
+  const autoName = useMemo(
+    () =>
+      buildAutoName([
+        getCatalogItemName(selectedGarmentType || {}),
+        getCatalogItemName(selectedFabric || {}),
+        getCatalogItemName(selectedFabricDetail || {}),
+      ]),
+    [selectedFabric, selectedFabricDetail, selectedGarmentType]
+  );
+  const resolvedName = nameMode === "auto" ? autoName : formState.name;
 
   const confirmationSummary = useMemo<ConfirmationSummary | null>(() => {
-    if (!formState.name.trim() || !formState.garment_type_id || !formState.size_ids.length) {
+    if (!resolvedName.trim() || !formState.garment_type_id || !formState.size_ids.length) {
       return null;
     }
 
@@ -629,7 +629,7 @@ export function ProductCreatePage() {
     const colorItems = colors.filter((item) => formState.color_ids.includes(getItemId(item, ["color_id"])));
 
     return {
-      name: formState.name.trim(),
+      name: resolvedName.trim(),
       garmentType: getCatalogItemName(selectedGarmentType || {}) || "-",
       fabric: getCatalogItemName(selectedFabric || {}) || "Sin tela",
       fabricDetail: getCatalogItemName(selectedFabricDetail || {}) || "Sin detalle",
@@ -646,7 +646,7 @@ export function ProductCreatePage() {
     formState.color_ids,
     formState.description,
     formState.garment_type_id,
-    formState.name,
+    resolvedName,
     formState.size_ids,
     selectedFabric,
     selectedFabricDetail,
@@ -655,7 +655,7 @@ export function ProductCreatePage() {
     sizes,
   ]);
 
-  const normalizedCurrentName = normalizeComparableText(formState.name);
+  const normalizedCurrentName = normalizeComparableText(resolvedName);
   const duplicatedStyle = useMemo(
     () =>
       existingStyles.find(
@@ -673,7 +673,7 @@ export function ProductCreatePage() {
       const style = await requestData<CreatedStyle>("/api/styles", {
         method: "POST",
         body: JSON.stringify({
-          name: formState.name.trim(),
+          name: resolvedName.trim(),
           garment_type_id: formState.garment_type_id,
           fabric_id: formState.fabric_id || null,
           fabric_detail_id: formState.fabric_detail_id || null,
@@ -696,7 +696,10 @@ export function ProductCreatePage() {
       });
 
       setCreatedStyle(style);
-      setFormState(initialFormState);
+      setFormState((current) => ({
+        ...initialFormState,
+        target_id: current.target_id,
+      }));
       setNameMode("auto");
       setPendingConfirmation(null);
       setConfirmationOpen(false);
@@ -719,18 +722,18 @@ export function ProductCreatePage() {
     setConfirmationOpen(true);
   }
 
-function handleSubmit(event: FormEvent<HTMLFormElement>) {
-  event.preventDefault();
-  setError(null);
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
 
-  if (duplicatedStyle) {
-    setError("Ya existe un style con ese nombre. Ajusta el nombre antes de crear.");
-    return;
-  }
+    if (duplicatedStyle) {
+      setError("Ya existe un style con ese nombre. Ajusta el nombre antes de crear.");
+      return;
+    }
 
-  if (!confirmationSummary) {
-    return;
-  }
+    if (!confirmationSummary) {
+      return;
+    }
 
     setPendingConfirmation(confirmationSummary);
     setConfirmationOpen(true);
@@ -841,13 +844,11 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
     }
   }
 
-  const activeCatalogDefinition = catalogPanel
-    ? catalogPanelDefinitions[catalogPanel.key]
-    : null;
+  const activeCatalogDefinition = catalogPanel ? catalogPanelDefinitions[catalogPanel.key] : null;
   const activeCatalogMetadata = activeCatalogDefinition
     ? catalogPageBySlug[activeCatalogDefinition.slug]
     : null;
-  const activeCatalogItems = useMemo(() => {
+  const activeCatalogItems = (() => {
     if (!catalogPanel) {
       return [];
     }
@@ -873,9 +874,9 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
     }
 
     return colors;
-  }, [catalogPanel, colors, fabricDetails, fabrics, garmentTypes, sizes, targets]);
+  })();
   const normalizedCatalogName = normalizeComparableText(catalogPanel?.values.name || "");
-  const hasCatalogNameDuplicate = useMemo(() => {
+  const hasCatalogNameDuplicate = (() => {
     if (!catalogPanel || !normalizedCatalogName || catalogPanel.key === "sizes") {
       return false;
     }
@@ -883,7 +884,7 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
     return activeCatalogItems.some(
       (item) => normalizeComparableText(String(item.name || "")) === normalizedCatalogName
     );
-  }, [activeCatalogItems, catalogPanel, normalizedCatalogName]);
+  })();
 
   return (
     <>
@@ -932,13 +933,20 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
                   <FieldLabel
                     htmlFor={nameId}
                     actionLabel={nameMode === "auto" ? "Editar" : undefined}
-                    onAction={nameMode === "auto" ? () => setNameMode("manual") : undefined}
+                    onAction={
+                      nameMode === "auto"
+                        ? () => {
+                            setNameMode("manual");
+                            setFormState((current) => ({ ...current, name: autoName }));
+                          }
+                        : undefined
+                    }
                   >
                     Nombre
                   </FieldLabel>
                   {nameMode === "auto" ? (
                     <OpsReadonlyFieldState
-                      value={formState.name}
+                      value={resolvedName}
                       placeholder="Se completará automáticamente"
                     />
                   ) : (
@@ -1091,7 +1099,7 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
                   loading ||
                   submitting ||
                   !formState.size_ids.length ||
-                  !formState.name.trim() ||
+                  !resolvedName.trim() ||
                   !formState.garment_type_id ||
                   Boolean(duplicatedStyle)
                 }

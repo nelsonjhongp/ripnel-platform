@@ -9,6 +9,7 @@ import {
   AdminTextarea,
 } from "@/components/admin/admin-ui";
 import { InlineStatusCard } from "@/components/feedback/status-page";
+import { ForbiddenPage } from "@/components/feedback/status-page";
 import { Button } from "@/components/ui/button";
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
 import {
@@ -19,16 +20,21 @@ import {
 } from "@/components/ui/ops-page-shell";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { appRoutes } from "@/lib/routes";
+import { useAuth } from "@/components/auth/AuthProvider";
 import {
   type AdjustmentDetail,
+  type AdjustmentIntent,
   type AdjustmentVariant,
+  buildAdjustmentReason,
   type DraftAdjustmentLine,
+  formatAdjustmentIntent,
   type Location,
   requestAdjustmentJson,
 } from "./inventory-adjustments-shared";
 
 export function InventoryAdjustmentsCreatePage() {
   const router = useRouter();
+  const { user } = useAuth();
   const initialSearchParams =
     typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -36,6 +42,7 @@ export function InventoryAdjustmentsCreatePage() {
   const [savingAdjustment, setSavingAdjustment] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createLocationId, setCreateLocationId] = useState(() => initialSearchParams.get("location_id") || "");
+  const [adjustmentIntent, setAdjustmentIntent] = useState<AdjustmentIntent>("adjustment");
   const [createReason, setCreateReason] = useState("");
   const [createNotes, setCreateNotes] = useState("");
   const [draftLines, setDraftLines] = useState<DraftAdjustmentLine[]>([]);
@@ -43,6 +50,9 @@ export function InventoryAdjustmentsCreatePage() {
   const [variantResults, setVariantResults] = useState<AdjustmentVariant[]>([]);
   const [loadingVariants, setLoadingVariants] = useState(false);
   const [variantSearchError, setVariantSearchError] = useState<string | null>(null);
+  const canManageAdjustments = ["ADMIN", "ALMACEN"].includes(
+    String(user?.role_name || "").toUpperCase()
+  );
 
   async function loadLocations() {
     setLoadingLocations(true);
@@ -201,7 +211,7 @@ export function InventoryAdjustmentsCreatePage() {
         method: "POST",
         body: JSON.stringify({
           location_id: createLocationId,
-          reason: createReason.trim() || null,
+          reason: buildAdjustmentReason(adjustmentIntent, createReason),
           notes: createNotes.trim() || null,
           lines: draftLines.map((line) => ({
             variant_id: line.variant_id,
@@ -223,17 +233,21 @@ export function InventoryAdjustmentsCreatePage() {
     }
   }
 
+  if (!canManageAdjustments) {
+    return <ForbiddenPage variant="ops" />;
+  }
+
   return (
     <OpsPageShell width="wide">
       <PosHeader
-        eyebrow="Apertura y regularizacion"
-        title="Nuevo ajuste"
+        eyebrow="Corrección y carga inicial"
+        title="Registrar apertura o ajuste"
         actions={
           <div className="flex flex-wrap gap-2">
             <Button asChild type="button" variant="outline" size="sm" className="rounded-lg">
               <Link href={appRoutes.inventoryAdjustments}>
                 <ArrowLeft className="h-4 w-4" />
-                Volver a ajustes
+                Volver a aperturas y ajustes
               </Link>
             </Button>
             <Button
@@ -283,6 +297,29 @@ export function InventoryAdjustmentsCreatePage() {
 
               <div className="space-y-1.5">
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                  Tipo operativo
+                </label>
+                <AdminSelectMenu
+                  value={adjustmentIntent}
+                  onValueChange={(value) => setAdjustmentIntent(value as AdjustmentIntent)}
+                  placeholder="Selecciona una intención"
+                  options={[
+                    {
+                      value: "adjustment",
+                      label: formatAdjustmentIntent("adjustment"),
+                      helper: "Conteo físico o regularización",
+                    },
+                    {
+                      value: "opening",
+                      label: formatAdjustmentIntent("opening"),
+                      helper: "Carga inicial antes de operar en sistema",
+                    },
+                  ]}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                   Motivo
                 </label>
                 <input
@@ -290,7 +327,11 @@ export function InventoryAdjustmentsCreatePage() {
                   value={createReason}
                   onChange={(event) => setCreateReason(event.target.value)}
                   className="sales-field h-10 w-full rounded-lg px-3 text-sm"
-                  placeholder="Motivo operativo del ajuste"
+                  placeholder={
+                    adjustmentIntent === "opening"
+                      ? "Ej. Stock previo a salida en vivo"
+                      : "Ej. Conteo físico, merma, regularización"
+                  }
                 />
               </div>
 
@@ -306,7 +347,7 @@ export function InventoryAdjustmentsCreatePage() {
                   value={createNotes}
                   onChange={(event) => setCreateNotes(event.target.value)}
                   rows={3}
-                  placeholder="Notas del conteo o contexto del ajuste"
+                  placeholder="Notas del ajuste"
                   className="min-h-[92px]"
                 />
               </div>
@@ -430,7 +471,7 @@ export function InventoryAdjustmentsCreatePage() {
                   </p>
                 </div>
                 <span className="inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]">
-                  Draft
+                  {formatAdjustmentIntent(adjustmentIntent)}
                 </span>
               </div>
 

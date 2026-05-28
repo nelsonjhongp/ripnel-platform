@@ -74,81 +74,13 @@ Variables minimas:
 Crear `apps/frontend/.env.local` a partir de `apps/frontend/.env.example`.
 
 Variable minima:
+- `NEXT_PUBLIC_API_BASE_URL`
+
 ## Flujo funcional actual
 
-El flujo base de producto sigue este orden:
-Editor de precios ahora selecciona por style_size_price_id y muestra style+talla en el selector.
-Cambio en list-prices.tsx.
-Antes buscaba por style_code (ambiguo si había varias tallas del mismo style).
-
-## Changelog — 2026-04-23 (resumen de trabajo reciente)
-
-Resumen profesional y ordenado de las acciones realizadas hoy (work in progress):
-
-- Objetivo general: restaurar módulos faltantes, mejorar la estabilidad del pipeline de desarrollo y eliminar avisos críticos de ESLint que bloqueaban el build.
-
-- Restauraciones principales:
-	- `apps/frontend/app/(protected)/account-mockup/page.tsx` — archivo restaurado desde un commit previo y recuperado al working tree.
-
-- Cambios operativos y de infraestructura:
-	- Añadido pipeline básico de CI: `/.github/workflows/ci.yml` (instalación, lint, build y comprobaciones básicas).
-	- Añadido `apps/backend/.env.example` con variables de entorno de ejemplo y placeholders operativos.
-
-- Correcciones de código (frontend):
-	- Resolución de múltiples avisos de ESLint sobre `react-hooks/set-state-in-effect`.
-	- Estrategia aplicada: diferir llamadas que provocaban `setState` dentro de `useEffect` usando microtasks (`void Promise.resolve().then(...)`) para evitar actualizaciones de estado síncronas en el cuerpo del efecto.
-	- Páginas corregidas (ejemplos representativos):
-		- `apps/frontend/app/(protected)/bi/page.tsx`
-		- `apps/frontend/app/(protected)/kardex/page.tsx`
-		- `apps/frontend/app/(protected)/postventa/page.tsx`
-		- `apps/frontend/app/(protected)/postventa/[saleId]/page.tsx`
-		- `apps/frontend/app/(protected)/purchase-system/page.jsx`
-		- otras páginas relacionadas con `inventory`, `dashboard`, `caja`, `administracion`.
-
-- Estado actual y observaciones:
-	- Los cambios están aplicados en el working tree; algunos archivos requieren commit.
-	- Backend arrancable localmente (escucha en `3001` durante pruebas). Frontend en conflicto si hay una instancia previa en `3000`.
-	- `npm ci` en CI fallará si no existe `package-lock.json` en el repo; se recomienda ejecutar `npm install` localmente y commitear `package-lock.json` para que `npm ci` funcione en GitHub Actions.
-
-- Siguientes pasos recomendados (priorizados):
-	1. Ejecutar localmente:
-
-		 ```bash
-		 npm.cmd install
-		 npm.cmd --workspace @ripnel/frontend run lint
-		 npm.cmd --workspace @ripnel/frontend run build
-		 ```
-
-	2. Verificar el estado del frontend dev server y detener instancias previas si es necesario (ej. `taskkill /PID <pid> /F` en Windows).
-	3. Commit + push de los cambios (incluyendo `package-lock.json` si se genera):
-
-		 ```bash
-		 git add .
-		 git commit -m "chore: restore account mockup; add CI; defer setState in effects to satisfy lint"
-		 git push
-		 ```
-
-	4. Revisar CI en GitHub Actions y confirmar que `npm ci` + `next build` pasan en el pipeline.
-
----
-Generado y añadido el 2026-04-23 como resumen del trabajo del día.
-COMMIT
-Si algo falla: ROLLBACK.
-API real para pricing_rules implementada y conectada al frontend.
-Nuevos archivos backend:
-pricing-rules.repo.js
-pricing-rules.service.js
-pricing-rules.controller.js
-pricing-rules.routes.js
-Registro de rutas en app.js:
-GET /api/pricing-rules
-POST /api/pricing-rules
-PATCH /api/pricing-rules/:ruleId
-Vista rules conectada en list-prices.tsx:
-Carga reglas reales
-Crea regla si no existe
-Edita regla existente
-Muestra listado real de reglas
+- Producto: catalogos -> estilos -> variantes -> precios.
+- Operacion ERP: el frontend consume backend; el backend resuelve stock, precios y validaciones.
+- Ventas MVP: una venta confirmada impacta `sales`, `sales_details`, `sales_payments` y `stock_movements`.
 
 ## Notas de ventas
 
@@ -160,8 +92,12 @@ Muestra listado real de reglas
 
 - [Workflow Backend + Supabase](./docs/backend-supabase-workflow.md)
 - [Acceso del equipo a Supabase](./docs/supabase-team-access.md)
+- [Sistema de diseno](./DESIGN.md)
+- [Estandar de paginas frontend](./docs/frontend-page-standard.md)
+- [Criterios UI/UX operativos](./docs/frontend-ui-ux-operativo.md)
 - [Flujo de producto](./docs/product-flow.md)
 - [Scope de Ventas MVP Semana 9](./docs/sales-mvp-scope.md)
 - [Flujo funcional de ventas](./docs/sales-flow.md)
 - [Testing manual de ventas](./docs/testing-sales.md)
 - [Readiness check de ventas](./docs/sales-readiness-check.md)
+- [Seed operativo de 30 dias](./docs/seed-operational-30-days.md)

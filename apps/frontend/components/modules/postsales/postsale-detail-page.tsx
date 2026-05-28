@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { type ReactNode, useEffect, useMemo, useState } from "react"
 import {
   AlertTriangle,
   ArrowLeft,
@@ -24,8 +24,11 @@ import {
   ProtectedLoadingPage,
   ProtectedNotFoundPage,
 } from "@/components/feedback/status-page"
+import { Button } from "@/components/ui/button"
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { ApiError, apiFetch } from "@/lib/api"
 import { buildSaleDetailRoute } from "@/lib/routes"
+import { cn } from "@/lib/utils"
 
 type PostsaleAvailability = {
   exchange: {
@@ -156,6 +159,15 @@ type SellableVariant = {
   retail_price: number
 }
 
+const sectionClass =
+  "rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-[var(--ops-panel-padding)] shadow-sm"
+const mutedBlockClass =
+  "rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-3 py-3"
+const inputClass =
+  "sales-field h-10 w-full rounded-lg px-3 text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
+const textareaClass =
+  "sales-field min-h-[108px] w-full rounded-lg px-3 py-2.5 text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN" }).format(value)
 }
@@ -219,21 +231,69 @@ function resolveDocumentPath(context: PostsaleContext) {
 }
 
 function cashStatusLabel(status: PostsaleContext["sale"]["cash_status"]) {
-  if (status === "open") return "Caja operativa abierta"
-  if (status === "closed") return "Caja operativa cerrada"
-  return "Sin caja operativa abierta"
-}
-
-function cashStatusClasses(status: PostsaleContext["sale"]["cash_status"]) {
-  if (status === "open") return "border-emerald-200 bg-emerald-50 text-emerald-700"
-  if (status === "closed") return "border-rose-200 bg-rose-50 text-rose-700"
-  return "border-amber-200 bg-amber-50 text-amber-700"
+  if (status === "open") return "Caja abierta"
+  if (status === "closed") return "Caja cerrada"
+  return "Sin caja"
 }
 
 function computeCandidateTotal(candidate: SellableVariant, line: SaleLine, taxRate: number) {
   const subtotal = round2(Number(candidate.retail_price || 0) * Number(line.quantity || 0))
   const tax = round2(subtotal * Number(taxRate || 0))
   return round2(subtotal + tax)
+}
+
+function MetaPill({
+  label,
+  tone = "neutral",
+}: {
+  label: string
+  tone?: "neutral" | "accent" | "success" | "warning" | "danger"
+}) {
+  const toneClass =
+    tone === "accent"
+      ? "sales-chip sales-chip-accent"
+      : tone === "success"
+        ? "sales-chip sales-chip-success"
+        : tone === "warning"
+          ? "sales-chip sales-chip-warning"
+          : tone === "danger"
+            ? "sales-chip sales-chip-danger"
+            : "sales-chip sales-chip-neutral"
+
+  return <span className={cn("rounded-full px-2.5 py-1 text-[11px] font-semibold", toneClass)}>{label}</span>
+}
+
+function SectionCard({
+  title,
+  icon,
+  aside,
+  children,
+  tone = "default",
+}: {
+  title: string
+  icon?: ReactNode
+  aside?: ReactNode
+  children: ReactNode
+  tone?: "default" | "danger"
+}) {
+  return (
+    <article
+      className={cn(
+        sectionClass,
+        tone === "danger" &&
+          "border-rose-200 bg-[color:color-mix(in_srgb,#fb7185_7%,var(--ops-surface))] dark:border-rose-500/30 dark:bg-rose-500/10"
+      )}
+    >
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-[var(--ops-text)]">
+          {icon}
+          {title}
+        </h2>
+        {aside}
+      </div>
+      {children}
+    </article>
+  )
 }
 
 export default function PostsaleDetailPage({ params }: { params: Promise<{ saleId: string }> }) {
@@ -291,13 +351,11 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
 
   useEffect(() => {
     if (!saleId) return
-    // defer loadContext to avoid synchronous setState inside effect
     void Promise.resolve().then(() => loadContext(saleId))
   }, [saleId])
 
   useEffect(() => {
     const firstLine = context?.sale.details?.[0]?.sale_detail_id || ""
-    // defer setting selection to avoid synchronous setState inside effect
     void Promise.resolve().then(() => {
       if (!selectedSaleDetailId || !context?.sale.details.some((line) => line.sale_detail_id === selectedSaleDetailId)) {
         setSelectedSaleDetailId(firstLine)
@@ -313,7 +371,6 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
       replacementSearch.trim().length >= 2
 
     if (!canSearchReplacement) {
-      // defer clearing replacement state to avoid synchronous setState inside effect
       void Promise.resolve().then(() => {
         setReplacementResults([])
         setReplacementLoading(false)
@@ -434,7 +491,6 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
 
     if (!saleId) return
 
-    // TODO: Replace window.confirm() with a proper confirmation modal
     if (!window.confirm("¿Confirmas que deseas anular esta venta? Esta acción es irreversible.")) {
       return
     }
@@ -494,62 +550,41 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
   return (
     <PermissionGuard permission="sales.postsale.view">
       <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
-        <div className="mx-auto max-w-7xl space-y-[var(--ops-stack-gap)]">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Link
-              href="/postventa"
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Volver a postventa
-            </Link>
-
-            <div className="flex flex-wrap gap-2">
-              {has("sales.pos") ? (
-                <Link
-                  href={buildSaleDetailRoute(context.sale.sale_id)}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
-                >
-                  Ver venta completa
-                </Link>
-              ) : null}
-              {documentPath && has("sales.pos") ? (
-                <a
-                  href={documentPath}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-700"
-                >
-                  <ReceiptText className="h-4 w-4" />
-                  Abrir documento
-                </a>
-              ) : null}
-            </div>
-          </div>
-
-          <header className="rounded-3xl border border-slate-200 bg-white/90 p-[var(--ops-panel-padding)] shadow-sm backdrop-blur">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-[var(--ripnel-accent-hover)]">Postventa operativa</p>
-                <h1 className="mt-1 text-2xl font-semibold text-[var(--ops-text)] md:text-3xl">
-                  {context.sale.sale_number || "Sin correlativo"}
-                </h1>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <span
-                  className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${cashStatusClasses(
-                    context.sale.cash_status
-                  )}`}
-                >
-                  {cashStatusLabel(context.sale.cash_status)}
-                </span>
-                <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                  Fecha operativa {context.sale.business_date}
-                </span>
-              </div>
-            </div>
-          </header>
+        <div className="mx-auto max-w-[1180px] space-y-4">
+          <PosHeader
+            eyebrow="Postventa operativa"
+            title={context.sale.sale_number || "Sin correlativo"}
+            meta={
+              <>
+                <MetaPill label={context.sale.document_type.toUpperCase()} tone="accent" />
+                <MetaPill label={cashStatusLabel(context.sale.cash_status)} tone={context.sale.cash_status === "open" ? "success" : context.sale.cash_status === "closed" ? "danger" : "warning"} />
+                <MetaPill label={`Fecha operativa ${context.sale.business_date}`} />
+              </>
+            }
+            actions={
+              <>
+                <Button asChild variant="outline" size="sm" className="rounded-lg">
+                  <Link href="/postventa">
+                    <ArrowLeft className="h-4 w-4" />
+                    Volver
+                  </Link>
+                </Button>
+                {has("sales.pos") ? (
+                  <Button asChild variant="outline" size="sm" className="rounded-lg">
+                    <Link href={buildSaleDetailRoute(context.sale.sale_id)}>Ver venta completa</Link>
+                  </Button>
+                ) : null}
+                {documentPath && has("sales.pos") ? (
+                  <Button asChild variant="accent" size="sm" className="rounded-lg">
+                    <a href={documentPath} target="_blank" rel="noreferrer">
+                      <ReceiptText className="h-4 w-4" />
+                      Abrir documento
+                    </a>
+                  </Button>
+                ) : null}
+              </>
+            }
+          />
 
           {actionSuccess ? (
             <InlineStatusCard
@@ -587,226 +622,229 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
             />
           ) : null}
 
-          <div className="grid gap-[var(--ops-stack-gap)] xl:grid-cols-[1.2fr_0.8fr]">
-            <div className="space-y-[var(--ops-stack-gap)]">
-              <article className="rounded-3xl border border-slate-200 bg-white/90 p-[var(--ops-panel-padding)] shadow-sm backdrop-blur">
-                <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
-                  <PackageSearch className="h-4 w-4 text-amber-700" />
-                  Venta base
-                </h2>
-                <div className="space-y-3">
+          <div className="grid gap-4 xl:grid-cols-[1.18fr_0.82fr]">
+            <div className="space-y-4">
+              <SectionCard
+                title="Venta base"
+                icon={<PackageSearch className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />}
+              >
+                <div className="space-y-2.5">
                   {context.sale.details.map((line) => (
                     <label
                       key={line.sale_detail_id}
-                      className={`block rounded-2xl border px-4 py-3 transition ${
+                      className={cn(
+                        "block cursor-pointer rounded-lg border px-3 py-3 transition",
                         selectedSaleDetailId === line.sale_detail_id
-                          ? "border-amber-300 bg-amber-50"
-                          : "border-slate-200 bg-slate-50"
-                      }`}
+                          ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_82%,var(--ops-surface))]"
+                          : "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] hover:bg-[var(--ops-surface)]"
+                      )}
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div className="flex gap-3">
+                        <div className="flex min-w-0 gap-3">
                           <input
                             type="radio"
                             name="sale-line"
                             value={line.sale_detail_id}
                             checked={selectedSaleDetailId === line.sale_detail_id}
                             onChange={() => setSelectedSaleDetailId(line.sale_detail_id)}
-                            className="mt-1 h-4 w-4 accent-amber-600"
+                            className="mt-0.5 h-4 w-4 accent-[var(--ripnel-accent)]"
                             disabled={!context.availability.exchange.allowed || !has("sales.postsale.exchange")}
                           />
-                          <div>
-                            <p className="font-semibold text-slate-900">{line.style_name}</p>
-                            <p className="text-xs text-slate-500">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-[var(--ops-text)]">{line.style_name}</p>
+                            <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
                               {line.sku} • {line.size_code} / {line.color_code}
                             </p>
                           </div>
                         </div>
-                        <p className="text-sm font-semibold text-slate-900">
+                        <p className="text-sm font-semibold text-[var(--ops-text)]">
                           {formatCurrency(Number(line.line_total))}
                         </p>
                       </div>
-                      <div className="mt-2 grid gap-2 text-sm text-slate-600 md:grid-cols-4">
-                        <span>Cantidad: {line.quantity}</span>
-                        <span>Lista: {formatCurrency(Number(line.unit_price_list))}</span>
-                        <span>Final: {formatCurrency(Number(line.unit_price_final))}</span>
-                        <span>Subtotal: {formatCurrency(Number(line.line_subtotal))}</span>
+                      <div className="mt-3 grid gap-2 text-xs text-[var(--ops-text-muted)] md:grid-cols-4">
+                        <span>Cantidad {line.quantity}</span>
+                        <span>Lista {formatCurrency(Number(line.unit_price_list))}</span>
+                        <span>Final {formatCurrency(Number(line.unit_price_final))}</span>
+                        <span>Subtotal {formatCurrency(Number(line.line_subtotal))}</span>
                       </div>
                     </label>
                   ))}
                 </div>
-              </article>
+              </SectionCard>
 
               {context.exchanges.length > 0 ? (
-                <article className="rounded-3xl border border-slate-200 bg-white/90 p-[var(--ops-panel-padding)] shadow-sm backdrop-blur">
-                  <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
-                    <RefreshCcw className="h-4 w-4 text-amber-700" />
-                    Trazabilidad de cambios
-                  </h2>
+                <SectionCard
+                  title="Trazabilidad de cambios"
+                  icon={<RefreshCcw className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />}
+                >
                   <div className="space-y-3">
                     {context.exchanges.map((exchange) => (
-                      <div
-                        key={exchange.exchange_id}
-                        className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div key={exchange.exchange_id} className={mutedBlockClass}>
+                        <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
-                            <p className="font-semibold text-slate-900">
+                            <p className="text-sm font-semibold text-[var(--ops-text)]">
                               {exchange.exchange_number || exchange.exchange_id}
                             </p>
-                            <p className="text-sm text-slate-600">
-                              {exchange.reason || "Sin motivo"} •{" "}
-                              {formatDateTime(exchange.confirmed_at, exchange.created_at)}
+                            <p className="mt-1 text-xs text-[var(--ops-text-muted)]">
+                              {exchange.reason || "Sin motivo"} • {formatDateTime(exchange.confirmed_at, exchange.created_at)}
                             </p>
                           </div>
-                          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                            {exchange.status}
-                          </span>
+                          <MetaPill label={exchange.status} tone="success" />
                         </div>
 
                         <div className="mt-3 grid gap-2 md:grid-cols-2">
                           {exchange.lines.map((line) => (
                             <div
                               key={line.exchange_line_id}
-                              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                              className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2.5"
                             >
-                              <p className="font-semibold text-slate-900">
+                              <p className="text-sm font-semibold text-[var(--ops-text)]">
                                 {line.direction === "IN" ? "Ingreso" : "Salida"} • {line.style_name}
                               </p>
-                              <p className="text-xs text-slate-500">
+                              <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
                                 {line.sku} • {line.size_code} / {line.color_code}
                               </p>
-                              <p className="mt-1">
-                                Cantidad {line.quantity} • Ref.{" "}
-                                {formatCurrency(Number(line.unit_reference_price || 0))}
+                              <p className="mt-2 text-xs text-[var(--ops-text-muted)]">
+                                Cantidad {line.quantity} • Ref. {formatCurrency(Number(line.unit_reference_price || 0))}
                               </p>
                             </div>
                           ))}
                         </div>
 
                         {exchange.notes ? (
-                          <p className="mt-3 text-sm text-slate-600">{exchange.notes}</p>
+                          <p className="mt-3 text-sm text-[var(--ops-text-muted)]">{exchange.notes}</p>
                         ) : null}
                       </div>
                     ))}
                   </div>
-                </article>
+                </SectionCard>
               ) : null}
 
               {context.cancellation ? (
-                <article className="rounded-3xl border border-rose-200 bg-rose-50/80 p-5 shadow-sm">
-                  <h2 className="mb-2 text-lg font-semibold text-rose-900">Anulación registrada</h2>
-                  <p className="text-sm text-rose-900/80">
-                    {context.cancellation.reason} •{" "}
-                    {formatDateTime(context.cancellation.cancelled_at)}
+                <SectionCard title="Anulación registrada" tone="danger">
+                  <p className="text-sm text-[color:color-mix(in_srgb,#be123c_78%,var(--ops-text))]">
+                    {context.cancellation.reason} • {formatDateTime(context.cancellation.cancelled_at)}
                   </p>
                   {context.cancellation.notes ? (
-                    <p className="mt-2 text-sm text-rose-900/80">{context.cancellation.notes}</p>
+                    <p className="mt-2 text-sm text-[color:color-mix(in_srgb,#be123c_68%,var(--ops-text))]">
+                      {context.cancellation.notes}
+                    </p>
                   ) : null}
-                  <p className="mt-2 text-xs uppercase tracking-wide text-rose-700">
+                  <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:color-mix(in_srgb,#be123c_72%,var(--ops-text))]">
                     Ejecutado por {context.cancellation.cancelled_by_name || "Usuario no identificado"}
                   </p>
-                </article>
+                </SectionCard>
               ) : null}
             </div>
 
-            <div className="space-y-[var(--ops-stack-gap)]">
-              <article className="rounded-3xl border border-slate-200 bg-white/90 p-[var(--ops-panel-padding)] shadow-sm backdrop-blur">
-                <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
-                  <User className="h-4 w-4 text-amber-700" />
-                  Cliente y operación
-                </h2>
-                <div className="space-y-2 text-sm text-slate-700">
-                  <p>
-                    <span className="font-medium">Cliente:</span>{" "}
-                    {context.sale.customer_name_text || "Cliente general"}
-                  </p>
-                  <p>
-                    <span className="font-medium">Documento:</span>{" "}
-                    {context.sale.customer_doc_type || "-"} {context.sale.customer_doc_number || ""}
-                  </p>
-                  <p>
-                    <span className="font-medium">Dirección:</span>{" "}
-                    {context.sale.customer_address_text || "-"}
-                  </p>
-                  <p>
-                    <span className="font-medium">Sede:</span> {context.sale.location_name}
-                  </p>
-                  <p>
-                    <span className="font-medium">Vendedor:</span> {context.sale.seller_name}
-                  </p>
+            <div className="space-y-4">
+              <SectionCard
+                title="Cliente y operación"
+                icon={<User className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />}
+              >
+                <div className="grid gap-2 text-sm md:grid-cols-2">
+                  <div className={mutedBlockClass}>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">Cliente</p>
+                    <p className="mt-1 text-sm font-medium text-[var(--ops-text)]">
+                      {context.sale.customer_name_text || "Cliente general"}
+                    </p>
+                  </div>
+                  <div className={mutedBlockClass}>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">Documento</p>
+                    <p className="mt-1 text-sm text-[var(--ops-text)]">
+                      {context.sale.customer_doc_type || "-"} {context.sale.customer_doc_number || ""}
+                    </p>
+                  </div>
+                  <div className={mutedBlockClass}>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">Sede</p>
+                    <p className="mt-1 text-sm text-[var(--ops-text)]">{context.sale.location_name}</p>
+                  </div>
+                  <div className={mutedBlockClass}>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">Vendedor</p>
+                    <p className="mt-1 text-sm text-[var(--ops-text)]">{context.sale.seller_name}</p>
+                  </div>
+                  <div className={cn(mutedBlockClass, "md:col-span-2")}>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">Dirección</p>
+                    <p className="mt-1 text-sm text-[var(--ops-text)]">{context.sale.customer_address_text || "-"}</p>
+                  </div>
                 </div>
-              </article>
+              </SectionCard>
 
-              <article className="rounded-3xl border border-slate-200 bg-white/90 p-[var(--ops-panel-padding)] shadow-sm backdrop-blur">
-                <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
-                  <CreditCard className="h-4 w-4 text-amber-700" />
-                  Pagos y neutralización
-                </h2>
-                <div className="space-y-2 text-sm text-slate-700">
+              <SectionCard
+                title="Pagos y neutralización"
+                icon={<CreditCard className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />}
+              >
+                <div className="space-y-2">
                   {(context.sale.payments || []).map((payment) => (
-                    <div
-                      key={payment.payment_id}
-                      className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2"
-                    >
-                      <p className="font-medium capitalize text-slate-800">{payment.method}</p>
-                      <p>Monto: {formatCurrency(Number(payment.amount))}</p>
-                      <p className="text-xs text-slate-500">{formatDateTime(payment.paid_at)}</p>
+                    <div key={payment.payment_id} className={mutedBlockClass}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold capitalize text-[var(--ops-text)]">{payment.method}</p>
+                          <p className="mt-1 text-xs text-[var(--ops-text-muted)]">{formatDateTime(payment.paid_at)}</p>
+                        </div>
+                        <p className="text-sm font-semibold text-[var(--ops-text)]">
+                          {formatCurrency(Number(payment.amount))}
+                        </p>
+                      </div>
+                      {payment.reference ? (
+                        <p className="mt-2 text-xs text-[var(--ops-text-muted)]">Ref. {payment.reference}</p>
+                      ) : null}
                     </div>
                   ))}
 
                   {context.payment_reversals.length > 0 ? (
-                    <div className="space-y-2 pt-2">
+                    <div className="space-y-2 pt-1">
                       {context.payment_reversals.map((reversal) => (
                         <div
                           key={reversal.payment_reversal_id}
-                          className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2"
+                          className="rounded-lg border border-rose-200 bg-[color:color-mix(in_srgb,#fb7185_8%,var(--ops-surface))] px-3 py-3 dark:border-rose-500/30 dark:bg-rose-500/10"
                         >
-                          <p className="font-medium capitalize text-rose-900">
-                            Reverso {reversal.method}
-                          </p>
-                          <p className="text-rose-900/80">
-                            - {formatCurrency(Number(reversal.amount))}
-                          </p>
-                          <p className="text-xs text-rose-700">
-                            {reversal.reason} • {formatDateTime(reversal.reversed_at)}
-                          </p>
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold capitalize text-[color:color-mix(in_srgb,#be123c_78%,var(--ops-text))]">
+                                Reverso {reversal.method}
+                              </p>
+                              <p className="mt-1 text-xs text-[color:color-mix(in_srgb,#be123c_68%,var(--ops-text))]">
+                                {reversal.reason} • {formatDateTime(reversal.reversed_at)}
+                              </p>
+                            </div>
+                            <p className="text-sm font-semibold text-[color:color-mix(in_srgb,#be123c_82%,var(--ops-text))]">
+                              - {formatCurrency(Number(reversal.amount))}
+                            </p>
+                          </div>
                         </div>
                       ))}
                     </div>
                   ) : null}
                 </div>
 
-                <div className="mt-4 space-y-2 border-t border-slate-200 pt-4 text-sm">
-                  <div className="flex justify-between text-slate-600">
+                <div className="mt-4 space-y-2 border-t border-[var(--ops-border-strong)] pt-4 text-sm">
+                  <div className="flex justify-between text-[var(--ops-text-muted)]">
                     <span>Pagos registrados</span>
                     <span>{formatCurrency(paymentSummary.paymentTotal)}</span>
                   </div>
-                  <div className="flex justify-between text-slate-600">
+                  <div className="flex justify-between text-[var(--ops-text-muted)]">
                     <span>Reversos internos</span>
                     <span>{formatCurrency(paymentSummary.reversalTotal)}</span>
                   </div>
-                  <div className="flex justify-between text-base font-bold text-slate-900">
+                  <div className="flex justify-between text-base font-semibold text-[var(--ops-text)]">
                     <span>Neto operativo</span>
                     <span>{formatCurrency(paymentSummary.netTotal)}</span>
                   </div>
                 </div>
-              </article>
+              </SectionCard>
 
               {has("sales.postsale.exchange") ? (
-                <form
-                  onSubmit={handleExchangeSubmit}
-                  className="rounded-3xl border border-slate-200 bg-white/90 p-[var(--ops-panel-padding)] shadow-sm backdrop-blur"
-                >
-                  <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
-                    <RefreshCcw className="h-4 w-4 text-amber-700" />
-                    Cambio simple
-                  </h2>
+                <form onSubmit={handleExchangeSubmit} className={sectionClass}>
+                  <div className="mb-4 flex items-center gap-2">
+                    <RefreshCcw className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />
+                    <h2 className="text-lg font-semibold text-[var(--ops-text)]">Cambio simple</h2>
+                  </div>
 
                   {context.availability.exchange.allowed ? (
                     <div className="space-y-4">
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                        <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">
                           Buscar reemplazo
                         </label>
                         <input
@@ -814,25 +852,31 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                           value={replacementSearch}
                           onChange={(event) => setReplacementSearch(event.target.value)}
                           placeholder="Busca por SKU, estilo o código"
-                          className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[var(--ripnel-accent-soft)]"
+                          className={inputClass}
                         />
                         {replacementError ? (
-                          <p className="mt-2 text-sm text-rose-600">{replacementError}</p>
+                          <p className="mt-2 text-sm text-[color:color-mix(in_srgb,#be123c_78%,var(--ops-text))]">
+                            {replacementError}
+                          </p>
                         ) : null}
                       </div>
 
                       {selectedLine ? (
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                          <p className="font-semibold text-slate-900">Línea base seleccionada</p>
-                          <p className="mt-1">
-                            {selectedLine.style_name} • {selectedLine.quantity} und • Total original{" "}
-                            {formatCurrency(Number(selectedLine.line_total))}
+                        <div className={mutedBlockClass}>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">
+                            Línea base
+                          </p>
+                          <p className="mt-1 text-sm font-medium text-[var(--ops-text)]">
+                            {selectedLine.style_name} • {selectedLine.quantity} und
+                          </p>
+                          <p className="mt-1 text-xs text-[var(--ops-text-muted)]">
+                            Total original {formatCurrency(Number(selectedLine.line_total))}
                           </p>
                         </div>
                       ) : null}
 
                       {replacementLoading ? (
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">
+                        <div className={cn(mutedBlockClass, "py-6 text-center text-sm text-[var(--ops-text-muted)]")}>
                           Buscando variantes disponibles...
                         </div>
                       ) : replacementResults.length > 0 ? (
@@ -850,39 +894,39 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                                 key={variant.variant_id}
                                 type="button"
                                 onClick={() => setSelectedReplacementVariantId(variant.variant_id)}
-                                className={`block w-full rounded-2xl border px-3 py-3 text-left transition ${
+                                className={cn(
+                                  "block w-full rounded-lg border px-3 py-3 text-left transition",
                                   selectedReplacementVariantId === variant.variant_id
-                                    ? "border-amber-300 bg-amber-50"
-                                    : "border-slate-200 bg-slate-50 hover:bg-white"
-                                }`}
+                                    ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_82%,var(--ops-surface))]"
+                                    : "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] hover:bg-[var(--ops-surface)]"
+                                )}
                               >
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                   <div>
-                                    <p className="font-semibold text-slate-900">{variant.style_name}</p>
-                                    <p className="text-xs text-slate-500">
+                                    <p className="text-sm font-semibold text-[var(--ops-text)]">{variant.style_name}</p>
+                                    <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
                                       {variant.sku} • {variant.size_code} / {variant.color_code}
                                     </p>
                                   </div>
                                   <div className="text-right text-sm">
-                                    <p className="font-semibold text-slate-900">
+                                    <p className="font-semibold text-[var(--ops-text)]">
                                       {formatCurrency(Number(variant.retail_price || 0))}
                                     </p>
-                                    <p className="text-slate-500">Stock {Number(variant.stock || 0)}</p>
+                                    <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
+                                      Stock {Number(variant.stock || 0)}
+                                    </p>
                                   </div>
                                 </div>
                                 {selectedLine ? (
-                                  <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                                    <span
-                                      className={`rounded-full border px-2.5 py-1 font-semibold ${
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    <MetaPill
+                                      label={
                                         valueMatches
-                                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                          : "border-rose-200 bg-rose-50 text-rose-700"
-                                      }`}
-                                    >
-                                      {valueMatches
-                                        ? "Mismo valor total"
-                                        : `Total resultante ${formatCurrency(replacementTotal)}`}
-                                    </span>
+                                          ? "Mismo valor total"
+                                          : `Total ${formatCurrency(replacementTotal)}`
+                                      }
+                                      tone={valueMatches ? "success" : "warning"}
+                                    />
                                   </div>
                                 ) : null}
                               </button>
@@ -890,23 +934,27 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                           })}
                         </div>
                       ) : replacementSearch.trim().length >= 2 ? (
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-6 text-center text-sm text-slate-500">
+                        <div className={cn(mutedBlockClass, "py-6 text-center text-sm text-[var(--ops-text-muted)]")}>
                           No encontramos variantes disponibles para ese criterio.
                         </div>
                       ) : null}
 
                       {selectedReplacement ? (
-                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-                          <p className="font-semibold">Reemplazo seleccionado</p>
-                          <p className="mt-1">
-                            {selectedReplacement.style_name} • {selectedReplacement.sku} • Precio{" "}
-                            {formatCurrency(Number(selectedReplacement.retail_price || 0))}
+                        <div className="rounded-lg border border-emerald-200 bg-[color:color-mix(in_srgb,#10b981_10%,var(--ops-surface))] px-3 py-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:color-mix(in_srgb,#047857_76%,var(--ops-text))]">
+                            Reemplazo seleccionado
+                          </p>
+                          <p className="mt-1 text-sm font-medium text-[var(--ops-text)]">
+                            {selectedReplacement.style_name} • {selectedReplacement.sku}
+                          </p>
+                          <p className="mt-1 text-xs text-[var(--ops-text-muted)]">
+                            Precio {formatCurrency(Number(selectedReplacement.retail_price || 0))}
                           </p>
                         </div>
                       ) : null}
 
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                        <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">
                           Motivo obligatorio
                         </label>
                         <input
@@ -914,39 +962,41 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                           value={exchangeReason}
                           onChange={(event) => setExchangeReason(event.target.value)}
                           placeholder="Ej. talla no adecuada, color reemplazado"
-                          className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[var(--ripnel-accent-soft)]"
+                          className={inputClass}
                         />
                       </div>
 
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                        <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">
                           Notas
                         </label>
                         <textarea
                           value={exchangeNotes}
                           onChange={(event) => setExchangeNotes(event.target.value)}
                           rows={3}
-                          className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[var(--ripnel-accent-soft)]"
+                          className={textareaClass}
                           placeholder="Detalle adicional del cambio"
                         />
                       </div>
 
-                      <button
+                      <Button
                         type="submit"
+                        variant="accent"
+                        size="lg"
+                        className="rounded-lg px-4"
                         disabled={
                           exchangeSubmitting ||
                           !selectedSaleDetailId ||
                           !selectedReplacementVariantId ||
                           !exchangeReason.trim()
                         }
-                        className="inline-flex items-center gap-2 rounded-2xl bg-[var(--ripnel-accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <RefreshCcw className="h-4 w-4" />
                         {exchangeSubmitting ? "Registrando cambio..." : "Registrar cambio simple"}
-                      </button>
+                      </Button>
                     </div>
                   ) : (
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm text-[var(--ops-text-muted)]">
                       {context.availability.exchange.reasons.join(" ")}
                     </p>
                   )}
@@ -954,19 +1004,16 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
               ) : null}
 
               {has("sales.postsale.cancel") ? (
-                <form
-                  onSubmit={handleCancelSubmit}
-                  className="rounded-3xl border border-slate-200 bg-white/90 p-[var(--ops-panel-padding)] shadow-sm backdrop-blur"
-                >
-                  <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-slate-800">
+                <form onSubmit={handleCancelSubmit} className={sectionClass}>
+                  <div className="mb-4 flex items-center gap-2">
                     <Undo2 className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                    Anulación total
-                  </h2>
+                    <h2 className="text-lg font-semibold text-[var(--ops-text)]">Anulación total</h2>
+                  </div>
 
                   {context.availability.cancel.allowed ? (
                     <div className="space-y-4">
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                        <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">
                           Motivo obligatorio
                         </label>
                         <input
@@ -974,34 +1021,36 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                           value={cancelReason}
                           onChange={(event) => setCancelReason(event.target.value)}
                           placeholder="Ej. venta digitada por error"
-                          className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[var(--ripnel-accent-soft)]"
+                          className={inputClass}
                         />
                       </div>
 
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-slate-700">
+                        <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">
                           Notas
                         </label>
                         <textarea
                           value={cancelNotes}
                           onChange={(event) => setCancelNotes(event.target.value)}
                           rows={3}
-                          className="w-full rounded-2xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[var(--ripnel-accent-soft)]"
+                          className={textareaClass}
                           placeholder="Detalle adicional de la anulación"
                         />
                       </div>
 
-                      <button
+                      <Button
                         type="submit"
+                        variant="accent"
+                        size="lg"
+                        className="rounded-lg px-4"
                         disabled={cancelSubmitting || !cancelReason.trim()}
-                        className="inline-flex items-center gap-2 rounded-2xl bg-[var(--ripnel-accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <Undo2 className="h-4 w-4" />
                         {cancelSubmitting ? "Anulando venta..." : "Anular venta"}
-                      </button>
+                      </Button>
                     </div>
                   ) : (
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm text-[var(--ops-text-muted)]">
                       {context.availability.cancel.reasons.join(" ")}
                     </p>
                   )}
@@ -1009,10 +1058,9 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
               ) : null}
 
               {context.sale.notes ? (
-                <article className="rounded-3xl border border-slate-200 bg-white/90 p-[var(--ops-panel-padding)] shadow-sm backdrop-blur">
-                  <h2 className="mb-2 text-lg font-semibold text-slate-800">Notas originales</h2>
-                  <p className="text-sm text-slate-600">{context.sale.notes}</p>
-                </article>
+                <SectionCard title="Notas originales">
+                  <p className="text-sm text-[var(--ops-text-muted)]">{context.sale.notes}</p>
+                </SectionCard>
               ) : null}
             </div>
           </div>

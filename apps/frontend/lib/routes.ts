@@ -50,6 +50,18 @@ export function buildTransferModuleRoute(slug: TransferRouteSlug) {
   return `${appRoutes.transfers}/${slug}`
 }
 
+export function buildInventoryDetailRoute(styleId: string, locationId?: string | null) {
+  const params = new URLSearchParams()
+
+  if (locationId) {
+    params.set("location_id", locationId)
+  }
+
+  return params.toString()
+    ? `${appRoutes.inventory}/${styleId}?${params.toString()}`
+    : `${appRoutes.inventory}/${styleId}`
+}
+
 export function buildSaleDetailRoute(saleId: string) {
   return `${appRoutes.purchaseSystem}/${saleId}`
 }

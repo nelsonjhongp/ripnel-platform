@@ -6,6 +6,7 @@ const {
   getTransferRequestCandidates,
   getTransfer,
   postTransfer,
+  postApproveTransfer,
   postShipTransfer,
   postReceiveTransfer,
   postCancelTransfer,
@@ -21,8 +22,9 @@ router.get('/pending-receipts', requireTransferCapability('receive'), getPending
 router.get('/request-candidates', requireTransferCapability('request_create'), getTransferRequestCandidates);
 router.get('/:transferId', requireTransferCapability('visible'), getTransfer);
 router.post('/', requireTransferCapability('request_create'), postTransfer);
+router.post('/:transferId/approve', requireTransferCapability('approve'), postApproveTransfer);
 router.post('/:transferId/ship', requireTransferCapability('ship'), postShipTransfer);
 router.post('/:transferId/receive', requireTransferCapability('receive'), postReceiveTransfer);
-router.post('/:transferId/cancel', requireTransferCapability('visible'), postCancelTransfer);
+router.post('/:transferId/cancel', requireTransferCapability('cancel'), postCancelTransfer);
 
 module.exports = router;

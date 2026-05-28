@@ -26,17 +26,31 @@ function formatDate(value: string | null) {
   }).format(new Date(value))
 }
 
+function createRuleDraft(rule: PricingRuleRow | null) {
+  if (!rule) {
+    return {
+      minQty: "3",
+      active: true,
+      validFrom: "",
+      validTo: "",
+    }
+  }
+
+  return {
+    minQty: String(rule.min_qty),
+    active: rule.active,
+    validFrom: rule.valid_from?.slice(0, 10) || "",
+    validTo: rule.valid_to?.slice(0, 10) || "",
+  }
+}
+
 export function PricingRulesPage() {
   const [rules, setRules] = useState<PricingRuleRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
-
-  const [minQty, setMinQty] = useState("3")
-  const [active, setActive] = useState(true)
-  const [validFrom, setValidFrom] = useState("")
-  const [validTo, setValidTo] = useState("")
+  const [draft, setDraft] = useState<ReturnType<typeof createRuleDraft> | null>(null)
 
   const loadRules = useCallback(async () => {
     setLoading(true)
@@ -54,7 +68,7 @@ export function PricingRulesPage() {
   }, [])
 
   useEffect(() => {
-    void loadRules()
+    void Promise.resolve().then(() => loadRules())
   }, [loadRules])
 
   const wholesaleRule = useMemo(
@@ -63,16 +77,25 @@ export function PricingRulesPage() {
     [rules]
   )
 
-  useEffect(() => {
-    if (!wholesaleRule) {
-      return
-    }
+  const formState = useMemo(
+    () => draft ?? createRuleDraft(wholesaleRule),
+    [draft, wholesaleRule]
+  )
 
-    setMinQty(String(wholesaleRule.min_qty))
-    setActive(wholesaleRule.active)
-    setValidFrom(wholesaleRule.valid_from?.slice(0, 10) || "")
-    setValidTo(wholesaleRule.valid_to?.slice(0, 10) || "")
-  }, [wholesaleRule])
+  const updateDraft = useCallback(
+    (updater: (current: ReturnType<typeof createRuleDraft>) => ReturnType<typeof createRuleDraft>) => {
+      setDraft((current) => updater(current ?? createRuleDraft(wholesaleRule)))
+      setError(null)
+      setMessage(null)
+    },
+    [wholesaleRule]
+  )
+
+  const handleRefresh = useCallback(() => {
+    setDraft(null)
+    setMessage(null)
+    void loadRules()
+  }, [loadRules])
 
   async function handleSubmit() {
     setSubmitting(true)
@@ -81,10 +104,10 @@ export function PricingRulesPage() {
 
     try {
       const payload = {
-        min_qty: Number(minQty),
-        active,
-        valid_from: validFrom || null,
-        valid_to: validTo || null,
+        min_qty: Number(formState.minQty),
+        active: formState.active,
+        valid_from: formState.validFrom || null,
+        valid_to: formState.validTo || null,
       }
 
       if (wholesaleRule) {
@@ -97,6 +120,7 @@ export function PricingRulesPage() {
       }
 
       await loadRules()
+      setDraft(null)
       setMessage("Regla mayorista guardada correctamente")
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo guardar la regla")
@@ -117,7 +141,7 @@ export function PricingRulesPage() {
                 type="button"
                 variant="outline"
                 size="icon-sm"
-                onClick={() => void loadRules()}
+                onClick={handleRefresh}
                 disabled={loading}
                 aria-label="Actualizar"
                 className="rounded-lg"
@@ -157,8 +181,8 @@ export function PricingRulesPage() {
                 <input
                   type="number"
                   min="1"
-                  value={minQty}
-                  onChange={(event) => setMinQty(event.target.value)}
+                  value={formState.minQty}
+                  onChange={(event) => updateDraft((current) => ({ ...current, minQty: event.target.value }))}
                   className="sales-field h-10 w-full rounded-lg px-3 text-sm text-[var(--ops-text)] outline-none"
                 />
               </div>
@@ -170,8 +194,8 @@ export function PricingRulesPage() {
                 <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-[var(--ops-text)]">
                   <input
                     type="checkbox"
-                    checked={active}
-                    onChange={(event) => setActive(event.target.checked)}
+                    checked={formState.active}
+                    onChange={(event) => updateDraft((current) => ({ ...current, active: event.target.checked }))}
                     className="h-4 w-4 rounded border-[var(--ops-border-strong)] accent-[var(--ripnel-accent)]"
                   />
                   Regla activa
@@ -180,17 +204,17 @@ export function PricingRulesPage() {
 
               <DateFilterPicker
                 label="Vigente desde"
-                value={validFrom}
-                onChange={setValidFrom}
+                value={formState.validFrom}
+                onChange={(value) => updateDraft((current) => ({ ...current, validFrom: value }))}
                 ariaLabel="Vigente desde"
               />
 
               <DateFilterPicker
                 label="Vigente hasta"
-                value={validTo}
-                onChange={setValidTo}
+                value={formState.validTo}
+                onChange={(value) => updateDraft((current) => ({ ...current, validTo: value }))}
                 ariaLabel="Vigente hasta"
-                min={validFrom || undefined}
+                min={formState.validFrom || undefined}
               />
             </div>
 
@@ -213,7 +237,7 @@ export function PricingRulesPage() {
                 size="sm"
                 className="rounded-lg px-3"
                 onClick={() => void handleSubmit()}
-                disabled={submitting || Number.isNaN(Number(minQty)) || Number(minQty) <= 0}
+                disabled={submitting || Number.isNaN(Number(formState.minQty)) || Number(formState.minQty) <= 0}
               >
                 {submitting ? (
                   <>

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 
-import { buildApiUrl } from "@/lib/api"
+import { apiFetchData } from "@/lib/api"
 import { AdminFormPageShell } from "@/components/admin/admin-form-page-shell"
 import {
   AdminActionButton,
@@ -43,12 +43,6 @@ type UserFormState = {
   default_location_id: string
 }
 
-type ApiResponse<T> = {
-  ok: boolean
-  data: T
-  message?: string
-}
-
 const emptyUserForm: UserFormState = {
   full_name: "",
   username: "",
@@ -60,23 +54,14 @@ const emptyUserForm: UserFormState = {
 }
 
 async function requestJson<T>(path: string, init?: RequestInit) {
-  const response = await fetch(buildApiUrl(path), {
+  return apiFetchData<T>(path, {
     headers: {
       "Content-Type": "application/json",
       ...(init?.headers || {}),
     },
     cache: "no-store",
-    credentials: "include",
     ...init,
   })
-
-  const payload = (await response.json().catch(() => null)) as ApiResponse<T> | null
-
-  if (!response.ok || !payload?.ok) {
-    throw new Error(payload?.message || "Request failed")
-  }
-
-  return payload.data
 }
 
 export default function UsersCreatePage() {

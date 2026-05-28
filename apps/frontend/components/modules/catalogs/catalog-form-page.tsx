@@ -93,7 +93,7 @@ export function CatalogFormPage({
 
   return (
     <AdminFormPageShell
-      eyebrow="Catalogos"
+      eyebrow="Catálogos"
       title={`Nuevo ${catalogLabel.toLowerCase()}`}
       backHref={catalogRoute}
     >
