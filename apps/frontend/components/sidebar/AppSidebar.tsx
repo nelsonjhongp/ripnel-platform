@@ -378,17 +378,17 @@ export function AppSidebar({
             }
 
             if (item.url.startsWith("/transferencias/")) {
-              if (item.url.endsWith("/solicitar-productos")) {
+              if (item.url.endsWith("/solicitar")) {
                 return transferCapabilities.requestCreate;
               }
 
-              if (item.url.endsWith("/listado-de-transferencias")) {
-                return transferCapabilities.visible;
-              }
-
-              if (item.url.endsWith("/recepciones-pendientes")) {
+              if (item.url.endsWith("/recepciones")) {
                 return transferCapabilities.receive;
               }
+            }
+
+            if (item.url === "/transferencias") {
+              return transferCapabilities.visible;
             }
 
             if (item.url.startsWith("/caja")) {

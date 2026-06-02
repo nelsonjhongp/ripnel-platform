@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import { ShoppingCart } from "lucide-react"
 import { resolveProductMasterRouteTitle } from "@/lib/product-master-metadata"
-import { appRoutes, buildTransferModuleRoute, transferRouteSlugs } from "@/lib/routes"
+import { appRoutes } from "@/lib/routes"
 
 export type TopbarAction = {
   key: string
@@ -20,13 +20,14 @@ const routeTitles: Record<string, string> = {
   [appRoutes.administrationRoles]: "Roles",
   [appRoutes.administrationLocations]: "Ubicaciones",
   [appRoutes.inventory]: "Stock actual",
-  [appRoutes.kardex]: "Kardex",
+  [appRoutes.inventoryMovements]: "Movimientos de stock",
   [appRoutes.purchaseSystem]: "Nueva venta",
   [appRoutes.transactionHistory]: "Historial de ventas",
   [appRoutes.postsales]: "Postventa",
-  [buildTransferModuleRoute(transferRouteSlugs.list)]: "Transferencias",
-  [buildTransferModuleRoute(transferRouteSlugs.requestProducts)]: "Solicitar reposición",
-  [buildTransferModuleRoute(transferRouteSlugs.pendingReceipts)]: "Recepciones pendientes",
+  [appRoutes.transfers]: "Transferencias",
+  [appRoutes.transferRequest]: "Solicitar transferencia",
+  [appRoutes.transferPendingReceipts]: "Recepciones pendientes",
+  [appRoutes.transferHistory]: "Historial de transferencias",
   [appRoutes.prices]: "Listado de precios",
   [`${appRoutes.prices}/crear`]: "Gestion de precios",
   [`${appRoutes.prices}/reglas`]: "Reglas de precio",
