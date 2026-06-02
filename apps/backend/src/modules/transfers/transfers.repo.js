@@ -1,5 +1,7 @@
 const { query } = require('../../shared/db');
 
+const TRANSFER_EVENT_AT_SQL = `coalesce(received_at, cancelled_at, shipped_at, approved_at, updated_at, created_at)`;
+
 function buildTransfersWhereClause(filters = {}) {
   const conditions = [];
   const values = [];
@@ -7,6 +9,11 @@ function buildTransfersWhereClause(filters = {}) {
   if (filters.status) {
     values.push(filters.status);
     conditions.push(`status = $${values.length}`);
+  }
+
+  if (Array.isArray(filters.statusList) && filters.statusList.length > 0) {
+    values.push(filters.statusList);
+    conditions.push(`status = any($${values.length}::text[])`);
   }
 
   if (filters.fromLocationId) {
@@ -31,6 +38,24 @@ function buildTransfersWhereClause(filters = {}) {
         or to_location_name ilike $${index}
       )`
     );
+  }
+
+  if (Array.isArray(filters.locationIds) && filters.locationIds.length > 0) {
+    values.push(filters.locationIds);
+    const index = values.length;
+    conditions.push(
+      `(from_location_id = any($${index}::uuid[]) or to_location_id = any($${index}::uuid[]))`
+    );
+  }
+
+  if (filters.dateFrom) {
+    values.push(filters.dateFrom);
+    conditions.push(`(${TRANSFER_EVENT_AT_SQL})::date >= $${values.length}::date`);
+  }
+
+  if (filters.dateTo) {
+    values.push(filters.dateTo);
+    conditions.push(`(${TRANSFER_EVENT_AT_SQL})::date <= $${values.length}::date`);
   }
 
   return {
@@ -145,7 +170,7 @@ async function findAllTransfers(filters = {}) {
        qty_received_total
      from transfer_summary
      ${whereClause}
-     order by created_at desc, transfer_id desc`,
+     order by ${TRANSFER_EVENT_AT_SQL} desc, transfer_id desc`,
     values
   );
 

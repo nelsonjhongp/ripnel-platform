@@ -15,6 +15,11 @@ const {
   markTransferCancelled,
 } = require('./transfers.repo');
 const {
+  normalizeLocationIds,
+  buildTransferPendingCounts,
+  buildTransferPendingItems,
+} = require('./transfers-inbox');
+const {
   findLocationById,
   findVariantsByIds,
   findInventoryQtyByLocationAndVariant,
@@ -29,6 +34,14 @@ const {
 const { buildTransferCapabilities } = require('./transfers-access');
 
 const ALLOWED_TRANSFER_STATUSES = ['requested', 'approved', 'shipped', 'received', 'cancelled'];
+const ALLOWED_TRANSFER_HISTORY_STATUSES = [...ALLOWED_TRANSFER_STATUSES, 'closed'];
+const ALLOWED_TRANSFER_SCOPES = ['current', 'network'];
+const TRANSFER_INBOX_QUEUES = [
+  'open_for_store',
+  'pending_approval',
+  'pending_dispatch',
+  'pending_receipts',
+];
 
 function normalizeUuid(value) {
   const normalized = String(value || '').trim();
@@ -52,6 +65,40 @@ function normalizePositiveInteger(value) {
   }
 
   return parsed;
+}
+
+function normalizeDate(value) {
+  const normalized = normalizeText(value);
+
+  if (!normalized) {
+    return null;
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    throw new AppError('Transfer date filter is invalid', 400);
+  }
+
+  const parsed = new Date(`${normalized}T00:00:00.000Z`);
+
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== normalized) {
+    throw new AppError('Transfer date filter is invalid', 400);
+  }
+
+  return normalized;
+}
+
+function normalizeTransferScope(value) {
+  const normalized = normalizeText(value);
+
+  if (!normalized) {
+    return 'current';
+  }
+
+  if (!ALLOWED_TRANSFER_SCOPES.includes(normalized)) {
+    throw new AppError('Transfer scope is invalid', 400);
+  }
+
+  return normalized;
 }
 
 function buildTransferNumber() {
@@ -120,14 +167,15 @@ async function resolveTransferActorContext(auth = {}) {
     throw new AppError('Not authenticated', 401, { code: 'AUTH_REQUIRED' });
   }
 
-  const locationIds = assignments
-    .filter((assignment) => assignment.active)
-    .map((assignment) => assignment.location_id);
+  const locationIds = normalizeLocationIds(
+    assignments.filter((assignment) => assignment.active).map((assignment) => assignment.location_id)
+  );
 
   return {
     user_id: userId,
     role_name: auth.role_name || user.role_name || null,
     permissions: Array.isArray(auth.permissions) ? auth.permissions : [],
+    default_location: defaultLocation || null,
     default_location_id: defaultLocation ? defaultLocation.location_id : null,
     location_ids: locationIds,
     capabilities: buildTransferCapabilities({
@@ -135,6 +183,41 @@ async function resolveTransferActorContext(auth = {}) {
       roleName: auth.role_name || user.role_name,
     }),
   };
+}
+
+function getActiveLocationId(actor) {
+  return actor.default_location_id || actor.location_ids[0] || null;
+}
+
+function getActorCurrentLocationIds(actor) {
+  const activeLocationId = getActiveLocationId(actor);
+  return activeLocationId ? [activeLocationId] : normalizeLocationIds(actor.location_ids);
+}
+
+function getActorScope(actor, inputScope) {
+  const requestedScope = normalizeTransferScope(inputScope);
+
+  if (requestedScope === 'network' && actor.capabilities.manage) {
+    return 'network';
+  }
+
+  return 'current';
+}
+
+function getActorScopeLocationIds(actor, scope) {
+  if (scope === 'network') {
+    const networkLocationIds = normalizeLocationIds(actor.location_ids);
+    return networkLocationIds.length > 0 ? networkLocationIds : getActorCurrentLocationIds(actor);
+  }
+
+  return getActorCurrentLocationIds(actor);
+}
+
+function transferIntersectsLocationIds(transfer, locationIds) {
+  const locationIdsSet = new Set(normalizeLocationIds(locationIds));
+  return (
+    locationIdsSet.has(transfer.from_location_id) || locationIdsSet.has(transfer.to_location_id)
+  );
 }
 
 function canAccessTransferHeader(transfer, actor) {
@@ -146,14 +229,217 @@ function canAccessTransferHeader(transfer, actor) {
     return true;
   }
 
-  const locationIds = new Set(actor.location_ids || []);
-  const destinationVisible =
-    locationIds.has(transfer.to_location_id) &&
-    (actor.capabilities.request_view_own || actor.capabilities.receive);
-  const originVisible =
-    locationIds.has(transfer.from_location_id) && actor.capabilities.ship;
+  const locationIds = new Set(getActorCurrentLocationIds(actor));
+  const isDestination = locationIds.has(transfer.to_location_id);
+  const isSource = locationIds.has(transfer.from_location_id);
 
-  return destinationVisible || originVisible;
+  const destinationVisible =
+    isDestination &&
+    (actor.capabilities.request_view_own ||
+      actor.capabilities.request_create ||
+      actor.capabilities.receive ||
+      actor.user_id === transfer.created_by);
+  const sourceVisible =
+    isSource &&
+    (actor.capabilities.approve || actor.capabilities.ship || actor.capabilities.cancel);
+
+  return destinationVisible || sourceVisible;
+}
+
+function getTransferScopeRole(transfer, actor) {
+  const activeLocationId = getActiveLocationId(actor);
+
+  if (activeLocationId && transfer.from_location_id === activeLocationId) {
+    return 'source';
+  }
+
+  if (activeLocationId && transfer.to_location_id === activeLocationId) {
+    return 'destination';
+  }
+
+  if (actor.capabilities.manage) {
+    return 'network';
+  }
+
+  return 'observer';
+}
+
+function getTransferNextStep(status) {
+  if (status === 'requested') return 'approval';
+  if (status === 'approved') return 'dispatch';
+  if (status === 'shipped') return 'receipt';
+  if (status === 'received') return 'completed';
+  return 'cancelled';
+}
+
+function buildTransferNextOwner(transfer, nextStep) {
+  if (nextStep === 'approval' || nextStep === 'dispatch') {
+    return {
+      location_id: transfer.from_location_id,
+      location_code: transfer.from_location_code,
+      location_name: transfer.from_location_name,
+      scope_role: 'source',
+    };
+  }
+
+  if (nextStep === 'receipt') {
+    return {
+      location_id: transfer.to_location_id,
+      location_code: transfer.to_location_code,
+      location_name: transfer.to_location_name,
+      scope_role: 'destination',
+    };
+  }
+
+  return null;
+}
+
+function canActorApproveTransfer(transfer, actor) {
+  if (transfer.status !== 'requested') {
+    return false;
+  }
+
+  return (
+    actor.capabilities.approve && transfer.from_location_id === getActiveLocationId(actor)
+  );
+}
+
+function canActorShipTransfer(transfer, actor) {
+  if (transfer.status !== 'approved') {
+    return false;
+  }
+
+  return actor.capabilities.ship && transfer.from_location_id === getActiveLocationId(actor);
+}
+
+function canActorReceiveTransfer(transfer, actor) {
+  if (transfer.status !== 'shipped') {
+    return false;
+  }
+
+  return actor.capabilities.receive && transfer.to_location_id === getActiveLocationId(actor);
+}
+
+function canActorCancelTransfer(transfer, actor) {
+  if (!['requested', 'approved'].includes(transfer.status)) {
+    return false;
+  }
+
+  if (actor.capabilities.manage) {
+    return true;
+  }
+
+  const activeLocationId = getActiveLocationId(actor);
+  const isDestination = transfer.to_location_id === activeLocationId;
+  const isSource = transfer.from_location_id === activeLocationId;
+
+  if (transfer.status === 'requested') {
+    return actor.user_id === transfer.created_by;
+  }
+
+  return isSource && actor.capabilities.cancel;
+}
+
+function buildTransferAvailableActions(transfer, actor) {
+  return {
+    approve: canActorApproveTransfer(transfer, actor),
+    ship: canActorShipTransfer(transfer, actor),
+    receive: canActorReceiveTransfer(transfer, actor),
+    cancel: canActorCancelTransfer(transfer, actor),
+  };
+}
+
+function buildTransferPrimaryAction(availableActions = {}) {
+  if (availableActions.approve) return 'approve';
+  if (availableActions.ship) return 'ship';
+  if (availableActions.receive) return 'receive';
+  if (availableActions.cancel) return 'cancel';
+  return null;
+}
+
+function buildTransferActiveMessage(transfer, actor, availableActions, scopeRole, nextOwner) {
+  if (transfer.status === 'requested') {
+    if (availableActions.approve) {
+      return 'Tu sede debe aprobar esta solicitud antes de despacharla.';
+    }
+
+    if (availableActions.cancel) {
+      return 'Todavía puedes cancelar esta solicitud antes de que el origen la procese.';
+    }
+
+    if (scopeRole === 'destination') {
+      return `Pendiente de validación en ${transfer.from_location_name}.`;
+    }
+
+    return nextOwner
+      ? `Pendiente de validación en ${nextOwner.location_name}.`
+      : 'Pendiente de validación del origen.';
+  }
+
+  if (transfer.status === 'approved') {
+    if (availableActions.ship) {
+      return 'La solicitud ya fue aprobada. Tu sede debe despachar el stock.';
+    }
+
+    if (availableActions.cancel) {
+      return 'Todavía puedes cancelar esta transferencia antes de que salga del origen.';
+    }
+
+    if (scopeRole === 'destination') {
+      return `Pendiente de despacho en ${transfer.from_location_name}.`;
+    }
+
+    return nextOwner
+      ? `Pendiente de despacho en ${nextOwner.location_name}.`
+      : 'Pendiente de despacho del origen.';
+  }
+
+  if (transfer.status === 'shipped') {
+    if (availableActions.receive) {
+      return 'La transferencia ya salió del origen. Tu sede debe confirmar la recepción.';
+    }
+
+    if (scopeRole === 'source') {
+      return `Despachada desde ${transfer.from_location_name}. Esperando recepción en ${transfer.to_location_name}.`;
+    }
+
+    return `En tránsito hacia ${transfer.to_location_name}.`;
+  }
+
+  if (transfer.status === 'received') {
+    return 'Flujo completado. El stock ya quedó registrado en destino.';
+  }
+
+  return 'Solicitud cancelada. El flujo ya no debe continuar.';
+}
+
+function buildTransferStateSummary(transfer, actor) {
+  const nextStep = getTransferNextStep(transfer.status);
+  const nextOwner = buildTransferNextOwner(transfer, nextStep);
+  const scopeRole = getTransferScopeRole(transfer, actor);
+  const availableActions = buildTransferAvailableActions(transfer, actor);
+
+  return {
+    scope_role: scopeRole,
+    next_step: nextStep,
+    next_owner: nextOwner,
+    available_actions: availableActions,
+    primary_action: buildTransferPrimaryAction(availableActions),
+    active_message: buildTransferActiveMessage(
+      transfer,
+      actor,
+      availableActions,
+      scopeRole,
+      nextOwner
+    ),
+  };
+}
+
+function enrichTransferRecord(transfer, actor) {
+  return {
+    ...transfer,
+    ...buildTransferStateSummary(transfer, actor),
+  };
 }
 
 async function getTransferById(transferId, auth = {}) {
@@ -177,7 +463,15 @@ async function getTransferById(transferId, auth = {}) {
   const lines = await findTransferLinesByTransferId(normalizedTransferId);
 
   return {
-    ...header,
+    ...enrichTransferRecord(header, actor),
+    active_location: actor.default_location
+      ? {
+          location_id: actor.default_location.location_id,
+          location_code: actor.default_location.code || null,
+          location_name: actor.default_location.name,
+          location_type: actor.default_location.type,
+        }
+      : null,
     lines,
   };
 }
@@ -185,41 +479,103 @@ async function getTransferById(transferId, auth = {}) {
 async function listTransfers(input = {}, auth = {}) {
   const actor = await resolveTransferActorContext(auth);
   const status = normalizeText(input.status);
+  const dateFrom = normalizeDate(input.date_from);
+  const dateTo = normalizeDate(input.date_to);
 
-  if (status && !ALLOWED_TRANSFER_STATUSES.includes(status)) {
+  if (status && !ALLOWED_TRANSFER_HISTORY_STATUSES.includes(status)) {
     throw new AppError('Transfer status is invalid', 400);
   }
 
+  if (dateFrom && dateTo && dateFrom > dateTo) {
+    throw new AppError('Transfer date range is invalid', 400);
+  }
+
+  const scope = getActorScope(actor, input.scope);
+  const locationIds = getActorScopeLocationIds(actor, scope);
   const filters = {
-    status,
+    status: status && status !== 'closed' ? status : null,
+    statusList: status === 'closed' ? ['received', 'cancelled'] : null,
     fromLocationId: normalizeUuid(input.from_location_id),
     toLocationId: normalizeUuid(input.to_location_id),
     query: normalizeText(input.query),
+    dateFrom,
+    dateTo,
+    locationIds,
   };
 
   const transfers = await findAllTransfers(filters);
 
-  if (actor.capabilities.manage) {
-    return transfers;
+  return transfers
+    .filter((transfer) => canAccessTransferHeader(transfer, actor))
+    .map((transfer) => enrichTransferRecord(transfer, actor));
+}
+
+async function listTransferInbox(input = {}, auth = {}) {
+  const actor = await resolveTransferActorContext(auth);
+  const scope = getActorScope(actor, input.scope);
+  const requestedQueue = normalizeText(input.queue);
+  const locationIds = getActorScopeLocationIds(actor, scope);
+
+  if (requestedQueue && !TRANSFER_INBOX_QUEUES.includes(requestedQueue)) {
+    throw new AppError('Transfer inbox queue is invalid', 400);
   }
 
-  return transfers.filter((transfer) => canAccessTransferHeader(transfer, actor));
+  const transfers = (await findAllTransfers({ locationIds }))
+    .filter((transfer) => canAccessTransferHeader(transfer, actor))
+    .map((transfer) => enrichTransferRecord(transfer, actor));
+
+  const pendingItems = buildTransferPendingItems(transfers, locationIds, transfers.length || 0);
+  const counts = buildTransferPendingCounts(transfers, locationIds);
+  const allQueues = {
+    open_for_store: pendingItems.filter((transfer) => transfer.pending_stage === 'open_for_store'),
+    pending_approval: pendingItems.filter(
+      (transfer) => transfer.pending_stage === 'pending_approval'
+    ),
+    pending_dispatch: pendingItems.filter(
+      (transfer) => transfer.pending_stage === 'pending_dispatch'
+    ),
+    pending_receipts: pendingItems.filter(
+      (transfer) => transfer.pending_stage === 'pending_receipts'
+    ),
+  };
+  const queues = requestedQueue
+    ? {
+        open_for_store: requestedQueue === 'open_for_store' ? allQueues.open_for_store : [],
+        pending_approval: requestedQueue === 'pending_approval' ? allQueues.pending_approval : [],
+        pending_dispatch: requestedQueue === 'pending_dispatch' ? allQueues.pending_dispatch : [],
+        pending_receipts: requestedQueue === 'pending_receipts' ? allQueues.pending_receipts : [],
+      }
+    : allQueues;
+
+  return {
+    context: {
+      scope,
+      can_view_network: actor.capabilities.manage,
+      active_location: actor.default_location
+        ? {
+            location_id: actor.default_location.location_id,
+            location_code: actor.default_location.code || null,
+            location_name: actor.default_location.name,
+            location_type: actor.default_location.type,
+          }
+        : null,
+      location_ids: locationIds,
+    },
+    counts,
+    totals: {
+      active_total:
+        counts.open_for_store_count +
+        counts.pending_approval_count +
+        counts.pending_dispatch_count +
+        counts.pending_receipts_count,
+    },
+    queues,
+  };
 }
 
 async function listPendingReceipts(auth = {}) {
-  const actor = await resolveTransferActorContext(auth);
-  const transfers = await findAllTransfers({ status: 'shipped' });
-
-  if (actor.capabilities.manage) {
-    return transfers;
-  }
-
-  if (!actor.capabilities.receive) {
-    return [];
-  }
-
-  const locationIds = new Set(actor.location_ids || []);
-  return transfers.filter((transfer) => locationIds.has(transfer.to_location_id));
+  const inbox = await listTransferInbox({ scope: 'current' }, auth);
+  return inbox.queues.pending_receipts;
 }
 
 async function listTransferRequestCandidates(input = {}, auth = {}) {
@@ -399,18 +755,15 @@ async function shipTransferById(transferId, input = {}, auth = {}) {
     throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
   }
 
-  if (
-    !actor.capabilities.manage &&
-    !actor.location_ids.includes(transfer.from_location_id)
-  ) {
-    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
-  }
-
   if (transfer.status !== 'approved') {
     throw new AppError('Only approved transfers can be shipped', 400);
   }
-  const shippedBy = actor.user_id;
 
+  if (!canActorShipTransfer(transfer, actor)) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
+  const shippedBy = actor.user_id;
   const lines = await findTransferLinesByTransferId(normalizedTransferId);
 
   if (!lines.length) {
@@ -444,11 +797,7 @@ async function shipTransferById(transferId, input = {}, auth = {}) {
         client.query.bind(client)
       );
 
-      await updateTransferLineShipment(
-        line.transfer_line_id,
-        shippedQty,
-        client.query.bind(client)
-      );
+      await updateTransferLineShipment(line.transfer_line_id, shippedQty, client.query.bind(client));
 
       await upsertInventoryQty(
         transfer.from_location_id,
@@ -473,11 +822,7 @@ async function shipTransferById(transferId, input = {}, auth = {}) {
       );
     }
 
-    await markTransferShipped(
-      normalizedTransferId,
-      shippedBy,
-      client.query.bind(client)
-    );
+    await markTransferShipped(normalizedTransferId, shippedBy, client.query.bind(client));
 
     await client.query('commit');
   } catch (error) {
@@ -508,18 +853,15 @@ async function receiveTransferById(transferId, input = {}, auth = {}) {
     throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
   }
 
-  if (
-    !actor.capabilities.manage &&
-    !actor.location_ids.includes(transfer.to_location_id)
-  ) {
-    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
-  }
-
   if (transfer.status !== 'shipped') {
     throw new AppError('Only shipped transfers can be received', 400);
   }
-  const receivedBy = actor.user_id;
 
+  if (!canActorReceiveTransfer(transfer, actor)) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
+  const receivedBy = actor.user_id;
   const lines = await findTransferLinesByTransferId(normalizedTransferId);
 
   if (!lines.length) {
@@ -543,11 +885,7 @@ async function receiveTransferById(transferId, input = {}, auth = {}) {
         client.query.bind(client)
       );
 
-      await updateTransferLineReceipt(
-        line.transfer_line_id,
-        receivedQty,
-        client.query.bind(client)
-      );
+      await updateTransferLineReceipt(line.transfer_line_id, receivedQty, client.query.bind(client));
 
       await upsertInventoryQty(
         transfer.to_location_id,
@@ -572,11 +910,7 @@ async function receiveTransferById(transferId, input = {}, auth = {}) {
       );
     }
 
-    await markTransferReceived(
-      normalizedTransferId,
-      receivedBy,
-      client.query.bind(client)
-    );
+    await markTransferReceived(normalizedTransferId, receivedBy, client.query.bind(client));
 
     await client.query('commit');
   } catch (error) {
@@ -607,16 +941,14 @@ async function cancelTransferById(transferId, input = {}, auth = {}) {
     throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
   }
 
-  if (
-    !actor.capabilities.manage &&
-    !actor.location_ids.includes(transfer.from_location_id)
-  ) {
-    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
-  }
-
   if (!['requested', 'approved'].includes(transfer.status)) {
     throw new AppError('Only requested or approved transfers can be cancelled', 400);
   }
+
+  if (!canActorCancelTransfer(transfer, actor)) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+  }
+
   await markTransferCancelled(normalizedTransferId, actor.user_id);
 
   return getTransferById(normalizedTransferId, auth);
@@ -640,15 +972,12 @@ async function approveTransferById(transferId, input = {}, auth = {}) {
     throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
   }
 
-  if (
-    !actor.capabilities.manage &&
-    !actor.location_ids.includes(transfer.from_location_id)
-  ) {
-    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
-  }
-
   if (transfer.status !== 'requested') {
     throw new AppError('Only requested transfers can be approved', 400);
+  }
+
+  if (!canActorApproveTransfer(transfer, actor)) {
+    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
   }
 
   await markTransferApproved(normalizedTransferId, actor.user_id);
@@ -658,6 +987,7 @@ async function approveTransferById(transferId, input = {}, auth = {}) {
 
 module.exports = {
   listTransfers,
+  listTransferInbox,
   listPendingReceipts,
   listTransferRequestCandidates,
   getTransferById,
