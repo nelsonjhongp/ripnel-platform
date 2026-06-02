@@ -21,8 +21,6 @@ import {
 } from "@/lib/product-master-metadata";
 import {
   appRoutes,
-  buildTransferModuleRoute,
-  transferRouteSlugs,
 } from "@/lib/routes";
 
 export type SidebarItem = {
@@ -98,9 +96,13 @@ const stockGroup: SidebarGroup = {
       url: appRoutes.inventory,
       permission: "inventory.view",
     },
-    { title: "Kardex", url: appRoutes.kardex, permission: "inventory.view" },
     {
-      title: "Aperturas y ajustes",
+      title: "Movimientos de stock",
+      url: appRoutes.inventoryMovements,
+      permission: "inventory.view",
+    },
+    {
+      title: "Ajustes de inventario",
       url: appRoutes.inventoryAdjustments,
       permission: "inventory.view",
       onlyForRoles: ["ADMIN", "ALMACEN"],
@@ -113,18 +115,23 @@ const transferenciasGroup: SidebarGroup = {
   icon: ArrowRightLeft,
   items: [
     {
-      title: "Solicitar reposición",
-      url: buildTransferModuleRoute(transferRouteSlugs.requestProducts),
+      title: "Solicitar transferencia",
+      url: appRoutes.transferRequest,
       icon: ArrowRightLeft,
     },
     {
-      title: "Listado de transferencias",
-      url: buildTransferModuleRoute(transferRouteSlugs.list),
+      title: "Transferencias",
+      url: appRoutes.transfers,
       icon: ArrowRightLeft,
     },
     {
       title: "Recepciones pendientes",
-      url: buildTransferModuleRoute(transferRouteSlugs.pendingReceipts),
+      url: appRoutes.transferPendingReceipts,
+      icon: ArrowRightLeft,
+    },
+    {
+      title: "Historial de transferencias",
+      url: appRoutes.transferHistory,
       icon: ArrowRightLeft,
     },
   ],

@@ -10,9 +10,10 @@ export type Location = {
   location_id: string;
   code: string;
   name: string;
-  type: string;
-  address: string | null;
-  active: boolean;
+  type?: string | null;
+  address?: string | null;
+  active?: boolean;
+  is_default?: boolean;
 };
 
 export type AdjustmentStatus = "draft" | "confirmed" | "cancelled";
@@ -25,6 +26,7 @@ export type AdjustmentSummary = {
   location_code: string;
   location_name: string;
   status: AdjustmentStatus;
+  intent_type?: AdjustmentIntent | null;
   reason: string | null;
   notes: string | null;
   created_by: string | null;
@@ -57,6 +59,27 @@ export type AdjustmentDetail = AdjustmentSummary & {
   lines: AdjustmentLine[];
 };
 
+export type AdjustmentCollectionMeta = {
+  available_locations: Location[];
+  selected_location_id: string | null;
+  can_view_all_locations: boolean;
+};
+
+export type AdjustmentListData = {
+  rows: AdjustmentSummary[];
+  meta: AdjustmentCollectionMeta;
+};
+
+export type AdjustmentDetailData = {
+  adjustment: AdjustmentDetail;
+  meta: AdjustmentCollectionMeta;
+};
+
+export type AdjustmentVariantsData = {
+  rows: AdjustmentVariant[];
+  meta: AdjustmentCollectionMeta;
+};
+
 export type AdjustmentVariant = {
   variant_id: string;
   sku: string;
@@ -75,8 +98,23 @@ export function inferAdjustmentIntent(reason: string | null | undefined): Adjust
   return /apertura|inicial/i.test(String(reason || "")) ? "opening" : "adjustment";
 }
 
+export function resolveAdjustmentIntent(value: {
+  intent_type?: AdjustmentIntent | null;
+  reason?: string | null;
+} | string | null | undefined): AdjustmentIntent {
+  if (value && typeof value === "object") {
+    if (value.intent_type === "opening" || value.intent_type === "adjustment") {
+      return value.intent_type;
+    }
+
+    return inferAdjustmentIntent(value.reason);
+  }
+
+  return inferAdjustmentIntent(value);
+}
+
 export function formatAdjustmentIntent(intent: AdjustmentIntent) {
-  return intent === "opening" ? "Apertura inicial" : "Ajuste";
+  return intent === "opening" ? "Apertura inicial" : "Ajuste de inventario";
 }
 
 export function buildAdjustmentReason(intent: AdjustmentIntent, rawReason: string) {

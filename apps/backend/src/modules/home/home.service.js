@@ -187,7 +187,7 @@ function buildHero({
       tone: "default",
       cta: {
         label: "Ver solicitudes",
-        href: "/transferencias/listado-de-transferencias",
+        href: "/transferencias",
       },
     };
   }
@@ -204,7 +204,7 @@ function buildHero({
       tone: "warning",
       cta: {
         label: "Solicitar reposición",
-        href: "/transferencias/solicitar-productos",
+        href: "/transferencias/solicitar",
       },
     };
   }
@@ -277,7 +277,7 @@ function buildQuickActions({
     actions.push({
       key: "request-products",
       label: "Solicitar reposición",
-      href: "/transferencias/solicitar-productos",
+      href: "/transferencias/solicitar",
       description: "Pedir reposición a otra tienda cercana.",
       tone: "primary",
     });
@@ -287,7 +287,7 @@ function buildQuickActions({
     actions.push({
       key: "transfer-tracking",
       label: "Seguimiento",
-      href: "/transferencias/listado-de-transferencias",
+      href: "/transferencias",
       description: "Ver solicitudes, despachos y recepciones.",
       tone: "default",
     });
@@ -297,7 +297,7 @@ function buildQuickActions({
     actions.push({
       key: "receipts",
       label: "Recepciones",
-      href: "/transferencias/recepciones-pendientes",
+      href: "/transferencias/recepciones",
       description: "Confirmar ingresos pendientes en tu sede.",
       tone: "default",
     });
@@ -359,13 +359,13 @@ function buildPriorities({
 
   if (
     transferCapabilities.receive &&
-    Number(transferCounts?.pending_receive_count || 0) > 0
+    Number(transferCounts?.pending_receipts_count || 0) > 0
   ) {
     priorities.push({
       key: "transfer-receive",
       title: "Recepcionar transferencias",
-      description: `${transferCounts.pending_receive_count} transferencia(s) siguen enviadas hacia tu tienda.`,
-      href: "/transferencias/recepciones-pendientes",
+      description: `${transferCounts.pending_receipts_count} transferencia(s) siguen enviadas hacia tu tienda.`,
+      href: "/transferencias/recepciones",
       tone: "warning",
     });
   }
@@ -378,20 +378,20 @@ function buildPriorities({
       key: "transfer-approve",
       title: "Aprobar solicitudes",
       description: `${transferCounts.pending_approval_count} solicitud(es) esperan validación del origen.`,
-      href: "/transferencias/listado-de-transferencias",
+      href: "/transferencias",
       tone: "default",
     });
   }
 
   if (
     transferCapabilities.ship &&
-    Number(transferCounts?.pending_ship_count || 0) > 0
+    Number(transferCounts?.pending_dispatch_count || 0) > 0
   ) {
     priorities.push({
       key: "transfer-ship",
       title: "Despachar reposiciones",
-      description: `${transferCounts.pending_ship_count} solicitud(es) ya aprobadas siguen pendientes por despachar.`,
-      href: "/transferencias/listado-de-transferencias",
+      description: `${transferCounts.pending_dispatch_count} solicitud(es) ya aprobadas siguen pendientes por despachar.`,
+      href: "/transferencias",
       tone: "warning",
     });
   }
@@ -404,7 +404,7 @@ function buildPriorities({
       key: "request-replenishment",
       title: "Solicitar reposición",
       description: `${inventoryCounts.zero_stock_count} variante(s) quedaron en cero en la sede activa.`,
-      href: "/transferencias/solicitar-productos",
+      href: "/transferencias/solicitar",
       tone: "warning",
     });
   }
@@ -432,27 +432,21 @@ function buildPriorities({
   return priorities.slice(0, 4);
 }
 
-function buildTransferItems(rows, locationId) {
+function buildTransferItems(rows) {
   return (rows || []).map((row) => {
     let flow = "request";
     let title = "Solicitud abierta";
-    let href = "/transferencias/listado-de-transferencias";
+    let href = "/transferencias";
 
-    if (row.status === "shipped" && row.to_location_id === locationId) {
-      flow = "receive";
+    if (row.pending_stage === "pending_receipts") {
+      flow = "receipt";
       title = "Recepción pendiente";
-      href = "/transferencias/recepciones-pendientes";
-    } else if (
-      row.status === "requested" &&
-      row.from_location_id === locationId
-    ) {
+      href = "/transferencias/recepciones";
+    } else if (row.pending_stage === "pending_approval") {
       flow = "approve";
       title = "Pendiente por aprobar";
-    } else if (
-      row.status === "approved" &&
-      row.from_location_id === locationId
-    ) {
-      flow = "ship";
+    } else if (row.pending_stage === "pending_dispatch") {
+      flow = "dispatch";
       title = "Pendiente por despachar";
     }
 
@@ -468,7 +462,7 @@ function buildTransferItems(rows, locationId) {
       to_location_code: row.to_location_code,
       qty_requested_total: Number(row.qty_requested_total || 0),
       qty_shipped_total: Number(row.qty_shipped_total || 0),
-      happened_at: row.shipped_at || row.updated_at || row.created_at,
+      happened_at: row.happened_at || row.shipped_at || row.updated_at || row.created_at,
       href,
     };
   });
@@ -598,18 +592,18 @@ async function getHomeOverview(input = {}) {
           meta: "Por mi tienda",
           scope: "location",
           tone: "default",
-          href: "/transferencias/listado-de-transferencias",
+          href: "/transferencias",
         }
       : null,
     transferCapabilities.receive
       ? {
           key: "pending-receive",
           label: "Por recibir",
-          value: Number(transferCounts?.pending_receive_count || 0),
+          value: Number(transferCounts?.pending_receipts_count || 0),
           meta: "En tránsito hacia mi sede",
           scope: "location",
           tone: "warning",
-          href: "/transferencias/recepciones-pendientes",
+          href: "/transferencias/recepciones",
         }
       : null,
     cashVisible
@@ -715,21 +709,20 @@ async function getHomeOverview(input = {}) {
               pending_approval_count: Number(
                 transferCounts?.pending_approval_count || 0,
               ),
-              pending_ship_count: Number(
-                transferCounts?.pending_ship_count || 0,
+              pending_dispatch_count: Number(
+                transferCounts?.pending_dispatch_count || 0,
               ),
-              pending_receive_count: Number(
-                transferCounts?.pending_receive_count || 0,
+              pending_receipts_count: Number(
+                transferCounts?.pending_receipts_count || 0,
               ),
             },
             latest: buildTransferItems(
               transferItems,
-              defaultLocation.location_id,
             ),
             primary_action: transferCapabilities.request_create
               ? {
                   label: "Solicitar reposición",
-                  href: "/transferencias/solicitar-productos",
+                  href: "/transferencias/solicitar",
                 }
               : null,
           }

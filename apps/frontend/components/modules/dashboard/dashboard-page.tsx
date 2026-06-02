@@ -64,8 +64,6 @@ import type {
 } from "@/lib/dashboard-types"
 import {
   appRoutes,
-  buildTransferModuleRoute,
-  transferRouteSlugs,
 } from "@/lib/routes"
 import { cn } from "@/lib/utils"
 
@@ -464,7 +462,7 @@ export default function DashboardPage() {
         highlightValue: formatNumber(pendingTransfers),
         badge: buildAttentionBadge(pendingTransfers, pendingTransfers > 0 ? "warning" : "success"),
         cta: "Ver transferencias",
-        href: buildTransferModuleRoute(transferRouteSlugs.list),
+        href: appRoutes.transfers,
         icon: Truck,
         tone: pendingTransfers > 0 ? "warning" : "success",
       })
@@ -1128,7 +1126,7 @@ function OperationsCard({
           </div>
           <div>
             <CardActionLink
-              href={buildTransferModuleRoute(transferRouteSlugs.list)}
+              href={appRoutes.transfers}
               label="Ver transferencias"
             />
           </div>

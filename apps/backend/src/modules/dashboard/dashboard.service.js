@@ -231,7 +231,7 @@ function buildShortcuts(sections, cashClosing) {
     shortcuts.push({
       key: "transfers",
       label: "Transferencias",
-      href: "/transferencias/listado-de-transferencias",
+      href: "/transferencias",
       description: "Aprobar, despachar y recepcionar solicitudes entre sedes.",
     });
   }

@@ -88,6 +88,66 @@ function normalizeStockStatus(value) {
   return null;
 }
 
+function inferAdjustmentIntentType(reason) {
+  return /apertura|inicial/i.test(String(reason || '')) ? 'opening' : 'adjustment';
+}
+
+function resolveMovementDirection(movementType) {
+  if (movementType === 'IN') return 'entry';
+  if (movementType === 'OUT') return 'exit';
+  return 'adjustment';
+}
+
+function resolveDocumentFamily(referenceType) {
+  if (
+    referenceType === 'sale' ||
+    referenceType === 'transfer' ||
+    referenceType === 'exchange' ||
+    referenceType === 'adjustment'
+  ) {
+    return referenceType;
+  }
+
+  return 'none';
+}
+
+function resolveSemanticOrigin(movement = {}) {
+  const documentFamily = resolveDocumentFamily(movement.reference_type);
+  const movementType = movement.movement_type;
+  const intentType = inferAdjustmentIntentType(movement.reason);
+
+  if (documentFamily === 'adjustment') {
+    return intentType === 'opening' ? 'opening_confirmed' : 'adjustment_confirmed';
+  }
+
+  if (documentFamily === 'transfer') {
+    if (movementType === 'OUT') return 'transfer_shipped';
+    if (movementType === 'IN') return 'transfer_received';
+  }
+
+  if (documentFamily === 'exchange') {
+    if (movementType === 'IN') return 'exchange_received';
+    if (movementType === 'OUT') return 'exchange_delivered';
+  }
+
+  if (documentFamily === 'sale') {
+    if (movementType === 'OUT') return 'sale_confirmed';
+    if (movementType === 'IN') return 'sale_cancelled';
+  }
+
+  return 'unclassified';
+}
+
+function buildInventoryScopeMeta(scope, selectedLocationId = null) {
+  return {
+    available_locations: scope.availableLocations,
+    selected_location_id:
+      selectedLocationId ||
+      (scope.availableLocations.length === 1 ? scope.availableLocations[0].location_id : null),
+    can_view_all_locations: scope.canViewGlobal,
+  };
+}
+
 function hasAdminInventoryScope(auth = {}) {
   return hasPermission(auth.permissions, 'admin.manage');
 }
@@ -567,6 +627,13 @@ async function listKardex(input = {}, auth = {}) {
   const movementType = normalizeText(input.movement_type);
   const referenceType = normalizeText(input.reference_type);
   const referenceId = normalizeUuid(input.reference_id);
+  const requestedLocationId = normalizeUuid(input.location_id);
+
+  if (input.location_id && !requestedLocationId) {
+    throw new AppError('Location id is invalid', 400);
+  }
+
+  const scope = await resolveInventoryScope(auth, input);
 
   if (movementType && !ALLOWED_MOVEMENT_TYPES.includes(movementType)) {
     throw new AppError('Movement type is invalid', 400);
@@ -577,7 +644,8 @@ async function listKardex(input = {}, auth = {}) {
   }
 
   const filters = {
-    locationId: normalizeUuid(input.location_id),
+    locationIds: scope.activeLocationIds,
+    locationId: requestedLocationId,
     variantId: normalizeUuid(input.variant_id),
     movementType,
     referenceType,
@@ -595,15 +663,46 @@ async function listKardex(input = {}, auth = {}) {
     throw new AppError('Date to is invalid', 400);
   }
 
-  return findAllKardex(filters);
+  const rows = await findAllKardex(filters);
+
+  return {
+    rows: rows.map((row) => ({
+      ...row,
+      movement_direction: resolveMovementDirection(row.movement_type),
+      document_family: resolveDocumentFamily(row.reference_type),
+      semantic_origin: resolveSemanticOrigin(row),
+    })),
+    meta: buildInventoryScopeMeta(scope, requestedLocationId),
+  };
 }
 
-async function listAdjustments(auth = {}) {
+async function listAdjustments(input = {}, auth = {}) {
   if (!canManageInventoryAdjustments(auth)) {
     throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
   }
 
-  return findAllAdjustments();
+  const requestedLocationId = normalizeUuid(input.location_id);
+
+  if (input.location_id && !requestedLocationId) {
+    throw new AppError('Location id is invalid', 400);
+  }
+
+  const scope = await resolveInventoryScope(auth, input);
+  const rows = await findAllAdjustments({
+    locationIds: scope.activeLocationIds,
+    locationId: requestedLocationId,
+    status: normalizeText(input.status),
+    query: normalizeText(input.query),
+  });
+
+  return {
+    rows: rows.map((row) => ({
+      ...row,
+      line_count: Number(row.line_count || 0),
+      intent_type: inferAdjustmentIntentType(row.reason),
+    })),
+    meta: buildInventoryScopeMeta(scope, requestedLocationId),
+  };
 }
 
 async function searchVariantsForAdjustment(input = {}, auth = {}) {
@@ -618,17 +717,27 @@ async function searchVariantsForAdjustment(input = {}, auth = {}) {
     throw new AppError('Location id is required', 400);
   }
 
+  const scope = await resolveInventoryScope(auth, { location_id: locationId });
+
+  if (!query || query.length < 2) {
+    return {
+      rows: [],
+      meta: buildInventoryScopeMeta(scope, locationId),
+    };
+  }
+
   const location = await findLocationById(locationId);
 
   if (!location) {
     throw new AppError('Location is invalid', 400);
   }
 
-  if (!query || query.length < 2) {
-    return [];
-  }
+  const rows = await findAdjustmentVariants(locationId, query);
 
-  return findAdjustmentVariants(locationId, query);
+  return {
+    rows,
+    meta: buildInventoryScopeMeta(scope, locationId),
+  };
 }
 
 async function getAdjustmentById(adjustmentId, auth = {}) {
@@ -648,11 +757,16 @@ async function getAdjustmentById(adjustmentId, auth = {}) {
     throw new AppError('Adjustment not found', 404);
   }
 
+  const scope = await resolveInventoryScope(auth, { location_id: header.location_id });
   const lines = await findAdjustmentLinesByAdjustmentId(normalizedAdjustmentId);
 
   return {
-    ...header,
-    lines,
+    adjustment: {
+      ...header,
+      intent_type: inferAdjustmentIntentType(header.reason),
+      lines,
+    },
+    meta: buildInventoryScopeMeta(scope, header.location_id),
   };
 }
 
@@ -673,6 +787,8 @@ async function createAdjustment(input, auth = {}) {
   if (!locationId) {
     throw new AppError('Location id is required', 400);
   }
+
+  await resolveInventoryScope(auth, { location_id: locationId });
 
   if (!lines.length) {
     throw new AppError('At least one adjustment line is required', 400);
@@ -790,6 +906,8 @@ async function confirmAdjustmentById(adjustmentId, input = {}, auth = {}) {
     throw new AppError('Adjustment not found', 404);
   }
 
+  await resolveInventoryScope(auth, { location_id: existingAdjustment.location_id });
+
   if (existingAdjustment.status !== 'draft') {
     throw new AppError('Only draft adjustments can be confirmed', 400);
   }
@@ -877,6 +995,8 @@ async function cancelAdjustmentById(adjustmentId, input = {}, auth = {}) {
   if (!existingAdjustment) {
     throw new AppError('Adjustment not found', 404);
   }
+
+  await resolveInventoryScope(auth, { location_id: existingAdjustment.location_id });
 
   if (existingAdjustment.status !== 'draft') {
     throw new AppError('Only draft adjustments can be cancelled', 400);

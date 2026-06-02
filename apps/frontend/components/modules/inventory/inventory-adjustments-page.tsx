@@ -44,8 +44,8 @@ import {
 import { cn } from "@/lib/utils";
 import { appRoutes } from "@/lib/routes";
 import {
-  type AdjustmentDetail,
-  inferAdjustmentIntent,
+  type AdjustmentDetailData,
+  type AdjustmentListData,
   type AdjustmentStatus,
   type AdjustmentSummary,
   formatAdjustmentIntent,
@@ -55,6 +55,7 @@ import {
   getAdjustmentStatusClasses,
   requestAdjustmentJson,
   type Location,
+  resolveAdjustmentIntent,
 } from "./inventory-adjustments-shared";
 
 function AdjustmentStatusChip({ status }: { status: AdjustmentStatus }) {
@@ -70,8 +71,12 @@ function AdjustmentStatusChip({ status }: { status: AdjustmentStatus }) {
   );
 }
 
-function AdjustmentIntentChip({ reason }: { reason: string | null }) {
-  const intent = inferAdjustmentIntent(reason);
+function AdjustmentIntentChip({
+  adjustment,
+}: {
+  adjustment: { intent_type?: "opening" | "adjustment" | null; reason: string | null };
+}) {
+  const intent = resolveAdjustmentIntent(adjustment);
   const classes =
     intent === "opening"
       ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_26%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))] text-[var(--ripnel-accent-hover)]"
@@ -89,7 +94,6 @@ export function InventoryAdjustmentsPage() {
   const [adjustments, setAdjustments] = useState<AdjustmentSummary[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [loadingAdjustments, setLoadingAdjustments] = useState(true);
-  const [loadingLocations, setLoadingLocations] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -113,8 +117,9 @@ export function InventoryAdjustmentsPage() {
     setError(null);
 
     try {
-      const data = await requestAdjustmentJson<AdjustmentSummary[]>("/api/inventory/adjustments");
-      setAdjustments(data || []);
+      const data = await requestAdjustmentJson<AdjustmentListData>("/api/inventory/adjustments");
+      setAdjustments(data?.rows || []);
+      setLocations(data?.meta.available_locations || []);
     } catch (requestError) {
       setError(
         requestError instanceof Error ? requestError.message : "No se pudo cargar ajustes"
@@ -124,27 +129,15 @@ export function InventoryAdjustmentsPage() {
     }
   }
 
-  async function loadLocations() {
-    setLoadingLocations(true);
-
-    try {
-      const data = await requestAdjustmentJson<Location[]>("/api/locations");
-      setLocations((data || []).filter((location) => location.active));
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error ? requestError.message : "No se pudieron cargar sedes"
-      );
-    } finally {
-      setLoadingLocations(false);
-    }
-  }
-
   useEffect(() => {
     void Promise.resolve().then(() => {
       void loadAdjustments();
-      void loadLocations();
     });
   }, []);
+  const effectiveLocationFilter =
+    locationFilter === "all" || locations.some((location) => location.location_id === locationFilter)
+      ? locationFilter
+      : "all";
 
   const filteredAdjustments = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -152,7 +145,7 @@ export function InventoryAdjustmentsPage() {
     return adjustments.filter((adjustment) => {
       const matchesStatus = statusFilter === "all" || adjustment.status === statusFilter;
       const matchesLocation =
-        locationFilter === "all" || adjustment.location_id === locationFilter;
+        effectiveLocationFilter === "all" || adjustment.location_id === effectiveLocationFilter;
       const matchesQuery =
         !normalizedQuery ||
         adjustment.adjustment_number.toLowerCase().includes(normalizedQuery) ||
@@ -163,7 +156,7 @@ export function InventoryAdjustmentsPage() {
 
       return matchesStatus && matchesLocation && matchesQuery;
     });
-  }, [adjustments, locationFilter, query, statusFilter]);
+  }, [adjustments, effectiveLocationFilter, query, statusFilter]);
 
   const totals = useMemo(
     () => ({
@@ -183,7 +176,7 @@ export function InventoryAdjustmentsPage() {
     ? Math.min(pageStart + 10, filteredAdjustments.length)
     : 0;
   const hasActiveFilters =
-    Boolean(query.trim()) || statusFilter !== "all" || locationFilter !== "all";
+    Boolean(query.trim()) || statusFilter !== "all" || effectiveLocationFilter !== "all";
 
   async function openDetail(adjustmentId: string) {
     setDetailOpen(true);
@@ -194,10 +187,11 @@ export function InventoryAdjustmentsPage() {
     setCancelModalOpen(false);
 
     try {
-      const data = await requestAdjustmentJson<AdjustmentDetail>(
+      const data = await requestAdjustmentJson<AdjustmentDetailData>(
         `/api/inventory/adjustments/${adjustmentId}`
       );
-      setDetail(data);
+      setDetail(data.adjustment);
+      setLocations(data.meta.available_locations || []);
     } catch (requestError) {
       setDetailError(
         requestError instanceof Error ? requestError.message : "No se pudo cargar el detalle"
@@ -226,7 +220,7 @@ export function InventoryAdjustmentsPage() {
     setNotice(null);
 
     try {
-      await requestAdjustmentJson<AdjustmentDetail>(
+      await requestAdjustmentJson<AdjustmentDetailData>(
         `/api/inventory/adjustments/${detail.adjustment_id}/confirm`,
         { method: "POST", body: JSON.stringify({}) }
       );
@@ -255,7 +249,7 @@ export function InventoryAdjustmentsPage() {
     setNotice(null);
 
     try {
-      await requestAdjustmentJson<AdjustmentDetail>(
+      await requestAdjustmentJson<AdjustmentDetailData>(
         `/api/inventory/adjustments/${detail.adjustment_id}/cancel`,
         { method: "POST", body: JSON.stringify({}) }
       );
@@ -280,27 +274,26 @@ export function InventoryAdjustmentsPage() {
       ) : (
       <OpsPageShell width="wide">
         <PosHeader
-          eyebrow="Corrección y carga inicial"
-          title="Aperturas y ajustes"
+          eyebrow="Inventario"
+          title="Ajustes de inventario"
           actions={
             <div className="flex flex-wrap gap-2">
               <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="rounded-lg"
-                onClick={() => {
-                  void loadAdjustments();
-                  void loadLocations();
-                }}
-              >
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-lg"
+              onClick={() => {
+                void loadAdjustments();
+              }}
+            >
                 <RefreshCw className="h-4 w-4" />
                 Actualizar
               </Button>
               <Button asChild variant="accent" size="sm" className="rounded-lg">
                 <Link href={`${appRoutes.inventoryAdjustments}/nuevo`}>
                   <PackagePlus className="h-4 w-4" />
-                  Registrar apertura o ajuste
+                  Registrar ajuste de inventario
                 </Link>
               </Button>
             </div>
@@ -333,7 +326,7 @@ export function InventoryAdjustmentsPage() {
 
             <FilterDropdown
               label="Sede"
-              value={locationFilter}
+              value={effectiveLocationFilter}
               options={[
                 { value: "all", label: "Todas" },
                 ...locations.map((location) => ({
@@ -399,7 +392,7 @@ export function InventoryAdjustmentsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                {loadingAdjustments || loadingLocations ? (
+                {loadingAdjustments ? (
                   <tr>
                     <td
                       colSpan={8}
@@ -446,7 +439,7 @@ export function InventoryAdjustmentsPage() {
                         <AdjustmentStatusChip status={adjustment.status} />
                       </td>
                       <td className="px-4 py-[var(--ops-row-py)] align-top">
-                        <AdjustmentIntentChip reason={adjustment.reason} />
+                        <AdjustmentIntentChip adjustment={adjustment} />
                       </td>
                       <td className="px-4 py-[var(--ops-row-py)] align-top">
                         <span className="block max-w-[180px] truncate text-sm text-[var(--ops-text)]">
@@ -510,7 +503,7 @@ export function InventoryAdjustmentsPage() {
 
         {detailOpen ? (
           <AdminModalShell
-            title="Detalle de ajuste"
+            title="Detalle del ajuste"
             onClose={closeDetail}
             widthClass="max-w-5xl"
             footer={
@@ -552,9 +545,11 @@ export function InventoryAdjustmentsPage() {
                 ) : null}
                 {detail?.status === "confirmed" ? (
                   <Button asChild type="button" variant="outline" size="sm" className="rounded-lg">
-                    <Link href={`/kardex?query=${encodeURIComponent(detail.adjustment_id)}`}>
+                    <Link
+                      href={`${appRoutes.inventoryMovements}?query=${encodeURIComponent(detail.adjustment_id)}`}
+                    >
                       <Eye className="h-4 w-4" />
-                      Ver trazabilidad
+                      Ver movimientos de stock
                     </Link>
                   </Button>
                 ) : null}
@@ -592,7 +587,7 @@ export function InventoryAdjustmentsPage() {
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                         Intención
                       </p>
-                      <AdjustmentIntentChip reason={detail.reason} />
+                      <AdjustmentIntentChip adjustment={detail} />
                     </div>
                     <div className="space-y-1">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
@@ -651,9 +646,9 @@ export function InventoryAdjustmentsPage() {
                   </dl>
 
                   <AdminInlineMessage tone="warning">
-                    Al confirmar, cada linea ajusta la cantidad final de la sede y registra un
-                    movimiento <code>ADJUST</code>. No uses este flujo para mover stock entre
-                    sedes.
+                    Al confirmar, cada linea actualiza la cantidad final de la sede y registra un
+                    movimiento <code>ADJUST</code> en movimientos de stock. No uses este flujo para
+                    mover mercaderia entre sedes.
                   </AdminInlineMessage>
                 </div>
 

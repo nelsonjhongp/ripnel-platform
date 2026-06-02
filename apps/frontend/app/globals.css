@@ -558,7 +558,24 @@ html[data-theme-preset="graphite"] {
   }
 
   .ops-picker-list {
-    padding-block: 0.25rem;
+    padding-block: 0;
+  }
+
+  @keyframes transfer-draft-row-flash {
+    0% {
+      background: color-mix(in srgb, var(--ripnel-accent-soft) 88%, var(--ops-surface));
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ripnel-accent) 30%, transparent);
+    }
+
+    70% {
+      background: color-mix(in srgb, var(--ripnel-accent-soft) 42%, var(--ops-surface));
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ripnel-accent) 14%, transparent);
+    }
+
+    100% {
+      background: var(--ops-surface);
+      box-shadow: inset 0 0 0 1px transparent;
+    }
   }
 
   .ops-picker-option {
