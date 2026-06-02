@@ -40,8 +40,8 @@ function buildInventoryWhereClause(filters = {}) {
 }
 
 function buildKardexWhereClause(filters = {}) {
-  const conditions = [];
-  const values = [];
+  const conditions = [`location_id = any($1::uuid[])`];
+  const values = [filters.locationIds || []];
 
   if (filters.locationId) {
     values.push(filters.locationId);
@@ -439,7 +439,43 @@ async function findAllKardex(filters = {}) {
   return result.rows;
 }
 
-async function findAllAdjustments() {
+function buildAdjustmentsWhereClause(filters = {}) {
+  const conditions = [`ia.location_id = any($1::uuid[])`];
+  const values = [filters.locationIds || []];
+
+  if (filters.locationId) {
+    values.push(filters.locationId);
+    conditions.push(`ia.location_id = $${values.length}`);
+  }
+
+  if (filters.status) {
+    values.push(filters.status);
+    conditions.push(`ia.status = $${values.length}`);
+  }
+
+  if (filters.query) {
+    values.push(`%${filters.query}%`);
+    const index = values.length;
+    conditions.push(
+      `(
+        ia.adjustment_number ilike $${index}
+        or l.code ilike $${index}
+        or l.name ilike $${index}
+        or coalesce(ia.reason, '') ilike $${index}
+        or coalesce(created_user.full_name, '') ilike $${index}
+      )`
+    );
+  }
+
+  return {
+    whereClause: `where ${conditions.join(' and ')}`,
+    values,
+  };
+}
+
+async function findAllAdjustments(filters = {}) {
+  const { whereClause, values } = buildAdjustmentsWhereClause(filters);
+
   const result = await query(
     `select
        ia.adjustment_id,
@@ -467,6 +503,7 @@ async function findAllAdjustments() {
      left join users confirmed_user on confirmed_user.user_id = ia.confirmed_by
      left join users cancelled_user on cancelled_user.user_id = ia.cancelled_by
      left join inventory_adjustment_lines ial on ial.adjustment_id = ia.adjustment_id
+     ${whereClause}
      group by
        ia.adjustment_id,
        ia.adjustment_number,
@@ -487,7 +524,7 @@ async function findAllAdjustments() {
        ia.cancelled_at,
        ia.updated_at
      order by ia.created_at desc`,
-    []
+    values
   );
 
   return result.rows;
