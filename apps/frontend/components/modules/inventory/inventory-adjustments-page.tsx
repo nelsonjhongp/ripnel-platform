@@ -44,6 +44,7 @@ import {
 import { cn } from "@/lib/utils";
 import { appRoutes } from "@/lib/routes";
 import {
+  type AdjustmentDetail,
   type AdjustmentDetailData,
   type AdjustmentListData,
   type AdjustmentStatus,

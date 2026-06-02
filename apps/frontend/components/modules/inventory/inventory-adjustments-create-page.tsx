@@ -153,7 +153,7 @@ export function InventoryAdjustmentsCreatePage() {
       locations.map((location) => ({
         value: location.location_id,
         label: `${location.code} - ${location.name}`,
-        helper: location.type,
+        helper: location.type ?? undefined,
       })),
     [locations]
   );
