@@ -134,11 +134,11 @@ export default function InventoryDetailPage() {
       ? `${appRoutes.inventory}?location_id=${encodeURIComponent(selectedLocationId)}`
       : appRoutes.inventory;
   const kardexHref = detail
-    ? `${appRoutes.kardex}?${new URLSearchParams({
+    ? `${appRoutes.inventoryMovements}?${new URLSearchParams({
         query: detail.style.style_code,
         ...(selectedLocation?.location_code ? { location: selectedLocation.location_code } : {}),
       }).toString()}`
-    : appRoutes.kardex;
+    : appRoutes.inventoryMovements;
 
   useSidebarTopbarBreadcrumbs(
     detail
@@ -398,14 +398,14 @@ export default function InventoryDetailPage() {
         {tab === "movements" ? (
           <section className="rounded-2xl border border-dashed border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-5 py-6">
             <div className="space-y-2">
-              <h2 className="text-sm font-semibold text-[var(--ops-text)]">Movimientos</h2>
+              <h2 className="text-sm font-semibold text-[var(--ops-text)]">Movimientos de stock</h2>
               <p className="text-sm text-[var(--ops-text-muted)]">{detail.movements.message}</p>
               <p className="text-sm text-[var(--ops-text-muted)]">
-                Aquí se mostrarán entradas, salidas, transferencias, ventas y ajustes de inventario.
+                Aquí verás entradas, salidas, transferencias, ventas y ajustes que impactan el stock.
               </p>
               <div className="pt-2">
                 <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
-                  <Link href={kardexHref}>Ver Kardex</Link>
+                  <Link href={kardexHref}>Ver movimientos de stock</Link>
                 </Button>
               </div>
             </div>

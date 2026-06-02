@@ -1,4 +1,9 @@
 const { query } = require('../../shared/db');
+const { findAllTransfers } = require('../transfers/transfers.repo');
+const {
+  buildTransferPendingCounts,
+  buildTransferPendingItems,
+} = require('../transfers/transfers-inbox');
 
 function normalizeLocationIds(locationIdOrIds) {
   if (Array.isArray(locationIdOrIds)) {
@@ -303,84 +308,14 @@ async function findPostsalesWindowItems(
 
 async function findPendingTransfersCounts(locationId, executor = query) {
   const locationIds = normalizeLocationIds(locationId);
-  const result = await executor(
-    `SELECT
-       COUNT(*) FILTER (
-         WHERE to_location_id = ANY($1::uuid[])
-           AND status = 'shipped'
-       )::int AS pending_receipts_count,
-       COUNT(*) FILTER (
-         WHERE from_location_id = ANY($1::uuid[])
-           AND status = 'requested'
-       )::int AS pending_approval_count,
-       COUNT(*) FILTER (
-         WHERE from_location_id = ANY($1::uuid[])
-           AND status = 'approved'
-       )::int AS pending_dispatch_count
-     FROM stock_transfers`,
-    [locationIds]
-  );
-
-  return result.rows[0] || null;
+  const rows = await findAllTransfers({ locationIds });
+  return buildTransferPendingCounts(rows, locationIds);
 }
 
 async function findPendingTransfersItems(locationId, limit = 5, executor = query) {
   const locationIds = normalizeLocationIds(locationId);
-  const result = await executor(
-    `SELECT
-       st.transfer_id,
-       st.transfer_number,
-       st.status,
-       st.from_location_id,
-       lf.name AS from_location_name,
-       lf.code AS from_location_code,
-       st.to_location_id,
-       lt.name AS to_location_name,
-        lt.code AS to_location_code,
-       st.created_at,
-       st.approved_at,
-       st.shipped_at,
-       st.updated_at,
-       CASE
-         WHEN st.from_location_id = ANY($1::uuid[]) AND st.status = 'requested' THEN 'approval'
-         WHEN st.from_location_id = ANY($1::uuid[]) AND st.status = 'approved' THEN 'dispatch'
-         WHEN st.to_location_id = ANY($1::uuid[]) AND st.status = 'shipped' THEN 'receipt'
-         ELSE 'tracking'
-       END AS pending_stage,
-       COALESCE(SUM(stl.qty_requested), 0)::int AS qty_requested_total,
-       COALESCE(SUM(stl.qty_shipped), 0)::int AS qty_shipped_total
-     FROM stock_transfers st
-     INNER JOIN locations lf ON lf.location_id = st.from_location_id
-     INNER JOIN locations lt ON lt.location_id = st.to_location_id
-     LEFT JOIN stock_transfer_lines stl ON stl.transfer_id = st.transfer_id
-     WHERE (
-         st.from_location_id = ANY($1::uuid[])
-         AND st.status IN ('requested', 'approved')
-       )
-        OR (
-         st.to_location_id = ANY($1::uuid[])
-         AND st.status = 'shipped'
-       )
-     GROUP BY
-       st.transfer_id,
-       st.transfer_number,
-       st.status,
-       st.from_location_id,
-       lf.name,
-       lf.code,
-       st.to_location_id,
-       lt.name,
-       lt.code,
-       st.created_at,
-       st.approved_at,
-       st.shipped_at,
-       st.updated_at
-     ORDER BY COALESCE(st.shipped_at, st.approved_at, st.updated_at, st.created_at) DESC
-     LIMIT $2`,
-    [locationIds, limit]
-  );
-
-  return result.rows;
+  const rows = await findAllTransfers({ locationIds });
+  return buildTransferPendingItems(rows, locationIds, limit);
 }
 
 async function findCriticalInventoryCounts(locationId, lowStockThreshold = 3, executor = query) {

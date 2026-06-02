@@ -1,5 +1,6 @@
-import KardexPage from "@/components/modules/kardex/kardex-page"
+import { redirect } from "next/navigation"
+import { appRoutes } from "@/lib/routes"
 
 export default function Page() {
-  return <KardexPage />
+  redirect(appRoutes.inventoryMovements)
 }

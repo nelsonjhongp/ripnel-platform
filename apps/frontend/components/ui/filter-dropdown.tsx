@@ -27,6 +27,7 @@ export function FilterDropdown({
   inlineLabel = false,
   triggerClassName,
   disabled = false,
+  showSelectedHelper = true,
 }: {
   label: string
   value: string
@@ -36,6 +37,7 @@ export function FilterDropdown({
   inlineLabel?: boolean
   triggerClassName?: string
   disabled?: boolean
+  showSelectedHelper?: boolean
 }) {
   const selectedOption = options.find((o) => o.value === value) || options[0]
   const contentClass =
@@ -66,7 +68,7 @@ export function FilterDropdown({
             ) : null}
             <span className="min-w-0 flex-1">
               <span className="block truncate">{selectedOption?.label || ""}</span>
-              {selectedOption?.helper ? (
+              {showSelectedHelper && selectedOption?.helper ? (
                 <span className="block truncate text-[11px] text-[var(--ops-text-muted)]">
                   {selectedOption.helper}
                 </span>

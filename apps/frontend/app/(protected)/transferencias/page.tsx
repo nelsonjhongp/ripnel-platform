@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation"
-import { buildTransferModuleRoute, transferRouteSlugs } from "@/lib/routes"
+import { TransfersListPage } from "@/components/modules/transfers/transfers-list-page"
 
 export default function TransfersPage() {
-  redirect(buildTransferModuleRoute(transferRouteSlugs.list))
+  return <TransfersListPage />
 }

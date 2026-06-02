@@ -1,0 +1,486 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { LoaderCircle, Plus, RefreshCw, RotateCcw } from "lucide-react";
+
+import { useAuth } from "@/components/auth/AuthProvider";
+import { ForbiddenPage, InlineStatusCard, LoadingPage } from "@/components/feedback/status-page";
+import { apiFetch, type ApiEnvelope, unwrapApiData } from "@/lib/api";
+import { resolveTransferCapabilities } from "@/lib/capabilities";
+import { appRoutes } from "@/lib/routes";
+import { Button } from "@/components/ui/button";
+import { DateFilterPicker } from "@/components/ui/date-filter-picker";
+import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import { Pagination } from "@/components/ui/pagination";
+import {
+  OpsFiltersRow,
+  OpsPageShell,
+  OpsSearchField,
+  OpsSectionDivider,
+  OpsTableBlock,
+  OpsTableFooter,
+  OpsTableWrap,
+} from "@/components/ui/ops-page-shell";
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import {
+  formatDateTime,
+  formatTransferScopeRole,
+  formatTransferStatus,
+  getTransferStatusClasses,
+  TRANSFER_SCOPE_OPTIONS,
+  type TransferScope,
+  type TransferSummary,
+} from "./transfers-shared";
+
+type TransferHistoryStatus = "closed" | "received" | "cancelled";
+
+const HISTORY_STATUS_OPTIONS: ReadonlyArray<{
+  value: TransferHistoryStatus;
+  label: string;
+  helper: string;
+}> = [
+  {
+    value: "closed",
+    label: "Cerradas",
+    helper: "Muestra transferencias recibidas o canceladas.",
+  },
+  {
+    value: "received",
+    label: "Recibidas",
+    helper: "Solo documentos cuyo flujo terminó en recepción.",
+  },
+  {
+    value: "cancelled",
+    label: "Canceladas",
+    helper: "Solo documentos anulados antes de cerrar el movimiento.",
+  },
+];
+
+function explainHistoryError(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "No se pudo cargar el historial de transferencias";
+}
+
+export function TransfersHistoryPage() {
+  const { loading: authLoading, permissions, user } = useAuth();
+  const [items, setItems] = useState<TransferSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<TransferHistoryStatus>("closed");
+  const [scope, setScope] = useState<TransferScope>("current");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const transferCapabilities = useMemo(
+    () => resolveTransferCapabilities({ permissions, roleName: user?.role_name }),
+    [permissions, user?.role_name]
+  );
+
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+
+    const timeoutId = window.setTimeout(async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const params = new URLSearchParams({ scope, status });
+
+        if (query.trim()) {
+          params.set("query", query.trim());
+        }
+
+        if (dateFrom) {
+          params.set("date_from", dateFrom);
+        }
+
+        if (dateTo) {
+          params.set("date_to", dateTo);
+        }
+
+        const payload = await apiFetch<ApiEnvelope<TransferSummary[]> | TransferSummary[]>(
+          `/api/transfers?${params.toString()}`,
+          {
+            cache: "no-store",
+            signal: controller.signal,
+          }
+        );
+
+        if (!active) {
+          return;
+        }
+
+        setItems(unwrapApiData(payload) || []);
+      } catch (requestError) {
+        if (!active || controller.signal.aborted) {
+          return;
+        }
+
+        setItems([]);
+        setError(explainHistoryError(requestError));
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      active = false;
+      controller.abort();
+      window.clearTimeout(timeoutId);
+    };
+  }, [dateFrom, dateTo, query, scope, status]);
+
+  const receivedCount = useMemo(
+    () => items.filter((transfer) => transfer.status === "received").length,
+    [items]
+  );
+  const cancelledCount = useMemo(
+    () => items.filter((transfer) => transfer.status === "cancelled").length,
+    [items]
+  );
+
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedItems = items.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const firstVisible = items.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const lastVisible = Math.min(safePage * pageSize, items.length);
+  const hasActiveFilters =
+    Boolean(query.trim()) || status !== "closed" || scope !== "current" || Boolean(dateFrom) || Boolean(dateTo);
+
+  function clearFilters() {
+    setQuery("");
+    setStatus("closed");
+    setScope("current");
+    setDateFrom("");
+    setDateTo("");
+    setCurrentPage(1);
+  }
+
+  async function refreshHistory() {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const params = new URLSearchParams({ scope, status });
+
+      if (query.trim()) {
+        params.set("query", query.trim());
+      }
+
+      if (dateFrom) {
+        params.set("date_from", dateFrom);
+      }
+
+      if (dateTo) {
+        params.set("date_to", dateTo);
+      }
+
+      const payload = await apiFetch<ApiEnvelope<TransferSummary[]> | TransferSummary[]>(
+        `/api/transfers?${params.toString()}`,
+        { cache: "no-store" }
+      );
+
+      setItems(unwrapApiData(payload) || []);
+    } catch (requestError) {
+      setItems([]);
+      setError(explainHistoryError(requestError));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (authLoading) {
+    return (
+      <LoadingPage
+        variant="ops"
+        title="Preparando historial"
+        description="Consultando transferencias cerradas para la sede activa y la red asignada."
+      />
+    );
+  }
+
+  if (!transferCapabilities.visible) {
+    return <ForbiddenPage variant="ops" />;
+  }
+
+  return (
+    <OpsPageShell width="wide" className="max-w-[1320px]">
+      <PosHeader
+        eyebrow="Transferencias"
+        title="Historial de transferencias"
+        actions={
+          <>
+            <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
+              <Link href={appRoutes.transfers}>Volver a bandeja</Link>
+            </Button>
+            {transferCapabilities.requestCreate ? (
+              <Button asChild variant="accent" size="sm" className="rounded-lg px-3">
+                <Link href={appRoutes.transferRequest}>
+                  <Plus className="h-4 w-4" />
+                  Solicitar transferencia
+                </Link>
+              </Button>
+            ) : null}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={() => void refreshHistory()}
+                    disabled={loading}
+                    className="rounded-lg"
+                    aria-label="Actualizar historial"
+                  >
+                    {loading ? (
+                      <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Actualizar historial</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </>
+        }
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <OpsMetricPill label="Recibidas" value={receivedCount} tone="accent" />
+        <OpsMetricPill label="Canceladas" value={cancelledCount} />
+        <OpsMetricPill label="Consulta actual" value={items.length} tone="warning" />
+      </div>
+
+      <OpsSectionDivider>
+        <OpsTableBlock>
+          <OpsFiltersRow className="lg:grid-cols-[minmax(0,1.35fr)_0.9fr_0.9fr_0.86fr_0.86fr_auto]">
+            <OpsSearchField
+              value={query}
+              onChange={(value) => {
+                setQuery(value);
+                setCurrentPage(1);
+              }}
+              placeholder="Buscar por número, origen o destino"
+              ariaLabel="Buscar transferencias cerradas"
+            />
+
+            <FilterDropdown
+              label="Estado"
+              value={status}
+              options={HISTORY_STATUS_OPTIONS}
+              onChange={(value) => {
+                setStatus(value as TransferHistoryStatus);
+                setCurrentPage(1);
+              }}
+            />
+
+            {transferCapabilities.manage ? (
+              <FilterDropdown
+                label="Alcance"
+                value={scope}
+                options={TRANSFER_SCOPE_OPTIONS}
+                onChange={(value) => {
+                  setScope(value as TransferScope);
+                  setCurrentPage(1);
+                }}
+              />
+            ) : (
+              <div className="flex items-end">
+                <div className="sales-field flex h-10 w-full items-center rounded-lg px-3 text-sm text-[var(--ops-text-muted)]">
+                  Sede activa
+                </div>
+              </div>
+            )}
+
+            <DateFilterPicker
+              label="Fecha desde"
+              value={dateFrom}
+              onChange={(value) => {
+                setDateFrom(value);
+                setCurrentPage(1);
+              }}
+              ariaLabel="Filtrar desde fecha"
+              max={dateTo || undefined}
+            />
+
+            <DateFilterPicker
+              label="Fecha hasta"
+              value={dateTo}
+              onChange={(value) => {
+                setDateTo(value);
+                setCurrentPage(1);
+              }}
+              ariaLabel="Filtrar hasta fecha"
+              min={dateFrom || undefined}
+            />
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={clearFilters}
+                    disabled={!hasActiveFilters}
+                    className="rounded-lg"
+                    aria-label="Limpiar filtros"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Limpiar filtros</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </OpsFiltersRow>
+
+          <OpsTableWrap minWidth="1120px">
+            <table className="w-full border-collapse">
+              <thead className="bg-[var(--ops-surface-muted)]">
+                <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                  <th className="px-4 py-3">Documento</th>
+                  <th className="px-4 py-3">Ruta</th>
+                  <th className="px-4 py-3">Estado</th>
+                  <th className="px-4 py-3">Cierre</th>
+                  <th className="px-4 py-3 text-right">Unidades</th>
+                  <th className="px-4 py-3">Última actividad</th>
+                  <th className="px-4 py-3 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                      Cargando historial...
+                    </td>
+                  </tr>
+                ) : error ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-6">
+                      <InlineStatusCard
+                        title="No pudimos cargar el historial"
+                        description={error}
+                        tone="danger"
+                        variant="ops"
+                      />
+                    </td>
+                  </tr>
+                ) : paginatedItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                      No encontramos transferencias cerradas con ese criterio.
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedItems.map((transfer) => {
+                    const happenedAt =
+                      transfer.received_at ||
+                      transfer.cancelled_at ||
+                      transfer.shipped_at ||
+                      transfer.approved_at ||
+                      transfer.updated_at ||
+                      transfer.created_at;
+
+                    return (
+                      <tr
+                        key={transfer.transfer_id}
+                        className="transition hover:bg-[var(--ops-surface-muted)]"
+                      >
+                        <td className="px-4 py-[var(--ops-row-py)] align-top">
+                          <div className="space-y-1.5">
+                            <Link
+                              href={`/transferencias/${transfer.transfer_id}`}
+                              className="inline-flex rounded-md text-sm font-semibold text-[var(--ops-text)] transition hover:text-[var(--ripnel-accent-hover)]"
+                            >
+                              {transfer.transfer_number || "Sin número"}
+                            </Link>
+                            <p className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                              {formatTransferScopeRole(transfer.scope_role)}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] align-top">
+                          <p className="text-sm text-[var(--ops-text)]">
+                            {transfer.from_location_name}{" "}
+                            <span className="text-[var(--ops-text-muted)]">&rarr;</span>{" "}
+                            {transfer.to_location_name}
+                          </p>
+                          <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                            {transfer.from_location_code} / {transfer.to_location_code}
+                          </p>
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] align-top">
+                          <span
+                            className={cn(
+                              "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                              getTransferStatusClasses(transfer.status)
+                            )}
+                          >
+                            {formatTransferStatus(transfer.status)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] align-top">
+                          <p className="text-sm text-[var(--ops-text)]">{transfer.active_message}</p>
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
+                          <p className="text-sm font-semibold tabular-nums text-[var(--ops-text)]">
+                            {transfer.status === "received"
+                              ? transfer.qty_received_total
+                              : transfer.qty_requested_total}
+                          </p>
+                          <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                            {transfer.status === "received" ? "Recibidas" : "Solicitadas"}
+                          </p>
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] align-top">
+                          <p className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                            {formatDateTime(happenedAt)}
+                          </p>
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
+                          <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
+                            <Link href={`/transferencias/${transfer.transfer_id}`}>Ver detalle</Link>
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </OpsTableWrap>
+
+          <OpsTableFooter>
+            <span className="text-sm text-[var(--ops-text-muted)]">
+              {items.length === 0 ? "0 resultados" : `${firstVisible}-${lastVisible} de ${items.length}`}
+            </span>
+            <Pagination
+              page={safePage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              className="self-end md:self-auto"
+            />
+          </OpsTableFooter>
+        </OpsTableBlock>
+      </OpsSectionDivider>
+    </OpsPageShell>
+  );
+}

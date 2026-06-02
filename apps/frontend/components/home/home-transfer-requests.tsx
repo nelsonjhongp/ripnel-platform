@@ -7,16 +7,16 @@ import { HomeSectionCard } from "./home-section-card"
 import type { HomeOverview } from "./home-types"
 
 function flowLabel(flow: string) {
-  if (flow === "receive") return "Por recibir"
+  if (flow === "receipt") return "Por recibir"
   if (flow === "approve") return "Por aprobar"
-  if (flow === "ship") return "Por despachar"
+  if (flow === "dispatch") return "Por despachar"
   return "Solicitud"
 }
 
 function flowTone(flow: string) {
-  if (flow === "receive") return "sales-chip sales-chip-warning"
+  if (flow === "receipt") return "sales-chip sales-chip-warning"
   if (flow === "approve") return "sales-chip sales-chip-accent"
-  if (flow === "ship") return "sales-chip"
+  if (flow === "dispatch") return "sales-chip"
   return "sales-chip sales-chip-accent"
 }
 
@@ -55,7 +55,7 @@ export function HomeTransferRequests({
             Por despachar
           </p>
           <p className="mt-2 text-2xl font-bold text-[var(--ops-text)]">
-            {section.counts.pending_ship_count}
+            {section.counts.pending_dispatch_count}
           </p>
         </div>
         <div className="sales-panel-muted rounded-xl p-4">
@@ -63,7 +63,7 @@ export function HomeTransferRequests({
             Por recibir
           </p>
           <p className="mt-2 text-2xl font-bold text-[var(--ops-text)]">
-            {section.counts.pending_receive_count}
+            {section.counts.pending_receipts_count}
           </p>
         </div>
       </div>
@@ -91,7 +91,7 @@ export function HomeTransferRequests({
                     {item.to_location_name} ({item.to_location_code})
                   </p>
                   <p className="mt-2 text-sm text-[var(--ops-text-muted)]">
-                    {item.flow === "receive"
+                    {item.flow === "receipt"
                       ? `${item.qty_shipped_total} und enviadas`
                       : `${item.qty_requested_total} und solicitadas`}
                     {" · "}

@@ -395,10 +395,10 @@ export default function InicioPage() {
             <HomeKpiCard
               icon={<ArrowLeftRight className="h-4 w-4" />}
               label="Transferencias"
-              value={`${transferSection.counts.open_for_store_count + transferSection.counts.pending_receive_count} pendientes`}
+              value={`${transferSection.counts.open_for_store_count + transferSection.counts.pending_receipts_count} pendientes`}
               detail={
                 transferSection.counts.open_for_store_count === 0 &&
-                transferSection.counts.pending_receive_count === 0
+                transferSection.counts.pending_receipts_count === 0
                   ? "Sin movimientos"
                   : `${transferSection.counts.open_for_store_count} abiertas`
               }
@@ -626,25 +626,25 @@ export default function InicioPage() {
                     />
                     <OpsMetricStripItem
                       label="Por despachar"
-                      value={transferSection.counts.pending_ship_count}
+                      value={transferSection.counts.pending_dispatch_count}
                       tone="warning"
                       isNeutral={
-                        transferSection.counts.pending_ship_count === 0
+                        transferSection.counts.pending_dispatch_count === 0
                       }
                     />
                     <OpsMetricStripItem
                       label="Por recibir"
-                      value={transferSection.counts.pending_receive_count}
+                      value={transferSection.counts.pending_receipts_count}
                       tone="info"
                       isNeutral={
-                        transferSection.counts.pending_receive_count === 0
+                        transferSection.counts.pending_receipts_count === 0
                       }
                     />
                   </div>
 
                   {transferSection.counts.open_for_store_count === 0 &&
-                    transferSection.counts.pending_ship_count === 0 &&
-                    transferSection.counts.pending_receive_count === 0 && (
+                    transferSection.counts.pending_dispatch_count === 0 &&
+                    transferSection.counts.pending_receipts_count === 0 && (
                       <div className="mt-3 rounded-xl border border-dashed border-[var(--ops-border-soft)] px-4 py-4">
                         <div className="flex items-center gap-2">
                           <Inbox className="h-5 w-5 text-[var(--ops-text-muted)]" />
@@ -751,5 +751,5 @@ export default function InicioPage() {
 }
 
 function buildTransferListRoute() {
-  return `${appRoutes.transfers}/listado-de-transferencias`;
+  return appRoutes.transfers;
 }

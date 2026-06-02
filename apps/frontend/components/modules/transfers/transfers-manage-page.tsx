@@ -196,8 +196,8 @@ export function TransfersManagePage() {
   return (
     <OpsPageShell width="wide">
       <PosHeader
-        eyebrow="Traslado interno"
-        title="Crear transferencia"
+        eyebrow="Transferencias"
+        title="Registrar transferencia"
       />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -287,7 +287,7 @@ export function TransfersManagePage() {
                       <th className="px-4 py-3">Variante</th>
                       <th className="px-4 py-3">Detalle</th>
                       <th className="px-4 py-3 text-right">Disponible</th>
-                      <th className="px-4 py-3">Solicitar</th>
+                      <th className="px-4 py-3">Cantidad</th>
                       <th className="px-4 py-3 text-right">Agregar</th>
                     </tr>
                   </thead>
@@ -391,7 +391,7 @@ export function TransfersManagePage() {
                   <ArrowRightLeft className="h-4 w-4 text-[var(--ops-text-muted)]" />
                   <div>
                     <h2 className="text-sm font-semibold text-[var(--ops-text)]">
-                      Lineas del traslado
+                      Líneas de la transferencia
                     </h2>
                     <p className="text-xs text-[var(--ops-text-muted)]">
                       Borrador listo para registrar.
@@ -420,7 +420,7 @@ export function TransfersManagePage() {
                           colSpan={4}
                           className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
                         >
-                          Aun no agregas variantes al traslado.
+                          Aún no agregas variantes a la transferencia.
                         </td>
                       </tr>
                     ) : (
@@ -479,7 +479,7 @@ export function TransfersManagePage() {
 
               <div className="flex flex-col gap-3 border-t border-[var(--ops-border-strong)] pt-4 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-sm text-[var(--ops-text-muted)]">
-                  {totals.lines} lineas y {totals.units} unidades en borrador
+                  {totals.lines} líneas y {totals.units} unidades en borrador
                 </span>
                 <Button
                   type="submit"

@@ -34,8 +34,35 @@ import {
 } from "@/components/ui/tooltip";
 
 type MovementType = "IN" | "OUT" | "ADJUST";
+type MovementDirection = "entry" | "exit" | "adjustment";
+type DocumentFamily = "sale" | "transfer" | "exchange" | "adjustment" | "none";
+type SemanticOrigin =
+  | "sale_confirmed"
+  | "sale_cancelled"
+  | "transfer_shipped"
+  | "transfer_received"
+  | "exchange_received"
+  | "exchange_delivered"
+  | "opening_confirmed"
+  | "adjustment_confirmed"
+  | "unclassified";
 type MovementOperationFilter = "ALL" | "IN" | "OUT" | "ADJUST" | "TRANSFER";
-type MovementOriginFilter = "ALL" | "sale" | "transfer" | "adjustment" | "opening";
+type MovementOriginFilter =
+  | "ALL"
+  | "sale"
+  | "transfer"
+  | "exchange"
+  | "adjustment"
+  | "opening";
+
+type KardexLocation = {
+  location_id: string;
+  code: string;
+  name: string;
+  type?: string | null;
+  active?: boolean;
+  is_default?: boolean;
+};
 
 type KardexMovement = {
   movement_id: string;
@@ -57,6 +84,18 @@ type KardexMovement = {
   created_by: string | null;
   created_by_name: string | null;
   created_at: string;
+  movement_direction?: MovementDirection | null;
+  document_family?: DocumentFamily | null;
+  semantic_origin?: SemanticOrigin | null;
+};
+
+type KardexResponse = {
+  rows: KardexMovement[];
+  meta: {
+    available_locations: KardexLocation[];
+    selected_location_id: string | null;
+    can_view_all_locations: boolean;
+  };
 };
 
 function isOpeningMovement(movement: KardexMovement) {
@@ -66,73 +105,137 @@ function isOpeningMovement(movement: KardexMovement) {
   );
 }
 
-function formatMovementOperationLabel(movement: KardexMovement) {
-  if (movement.reference_type === "transfer") {
-    return movement.movement_type === "OUT"
-      ? "Salida por transferencia"
-      : "Entrada por transferencia";
+function resolveDocumentFamily(movement: KardexMovement): DocumentFamily {
+  if (
+    movement.document_family === "sale" ||
+    movement.document_family === "transfer" ||
+    movement.document_family === "exchange" ||
+    movement.document_family === "adjustment" ||
+    movement.document_family === "none"
+  ) {
+    return movement.document_family;
   }
 
-  if (isOpeningMovement(movement)) {
-    return "Apertura inicial";
-  }
-
-  if (movement.reference_type === "sale") {
-    return "Salida por venta";
-  }
-
-  if (movement.reference_type === "exchange") {
-    return movement.movement_type === "OUT"
-      ? "Salida por cambio"
-      : "Entrada por cambio";
-  }
-
+  if (movement.reference_type === "sale") return "sale";
+  if (movement.reference_type === "transfer") return "transfer";
+  if (movement.reference_type === "exchange") return "exchange";
   if (movement.reference_type === "adjustment" || movement.movement_type === "ADJUST") {
-    return "Ajuste";
+    return "adjustment";
   }
 
-  if (movement.movement_type === "IN") return "Entrada";
-  if (movement.movement_type === "OUT") return "Salida";
-  return "Ajuste";
+  return "none";
+}
+
+function resolveMovementDirection(movement: KardexMovement): MovementDirection {
+  if (
+    movement.movement_direction === "entry" ||
+    movement.movement_direction === "exit" ||
+    movement.movement_direction === "adjustment"
+  ) {
+    return movement.movement_direction;
+  }
+
+  if (movement.movement_type === "IN") return "entry";
+  if (movement.movement_type === "OUT") return "exit";
+  return "adjustment";
+}
+
+function resolveSemanticOrigin(movement: KardexMovement): SemanticOrigin {
+  if (
+    movement.semantic_origin === "sale_confirmed" ||
+    movement.semantic_origin === "sale_cancelled" ||
+    movement.semantic_origin === "transfer_shipped" ||
+    movement.semantic_origin === "transfer_received" ||
+    movement.semantic_origin === "exchange_received" ||
+    movement.semantic_origin === "exchange_delivered" ||
+    movement.semantic_origin === "opening_confirmed" ||
+    movement.semantic_origin === "adjustment_confirmed" ||
+    movement.semantic_origin === "unclassified"
+  ) {
+    return movement.semantic_origin;
+  }
+
+  const documentFamily = resolveDocumentFamily(movement);
+  const movementDirection = resolveMovementDirection(movement);
+
+  if (documentFamily === "transfer") {
+    return movementDirection === "exit" ? "transfer_shipped" : "transfer_received";
+  }
+
+  if (documentFamily === "sale") {
+    return movementDirection === "entry" ? "sale_cancelled" : "sale_confirmed";
+  }
+
+  if (documentFamily === "exchange") {
+    return movementDirection === "entry" ? "exchange_received" : "exchange_delivered";
+  }
+
+  if (documentFamily === "adjustment") {
+    return isOpeningMovement(movement) ? "opening_confirmed" : "adjustment_confirmed";
+  }
+
+  return "unclassified";
+}
+
+function formatMovementOperationLabel(movement: KardexMovement) {
+  switch (resolveSemanticOrigin(movement)) {
+    case "transfer_shipped":
+      return "Salida por transferencia";
+    case "transfer_received":
+      return "Entrada por transferencia";
+    case "sale_confirmed":
+      return "Salida por venta";
+    case "sale_cancelled":
+      return "Entrada por anulacion";
+    case "exchange_received":
+      return "Entrada por cambio";
+    case "exchange_delivered":
+      return "Salida por cambio";
+    case "opening_confirmed":
+      return "Apertura inicial";
+    case "adjustment_confirmed":
+      return "Ajuste";
+    default:
+      if (resolveMovementDirection(movement) === "entry") return "Entrada";
+      if (resolveMovementDirection(movement) === "exit") return "Salida";
+      return "Ajuste";
+  }
 }
 
 function formatMovementOriginLabel(movement: KardexMovement) {
-  if (movement.reference_type === "transfer") {
-    return movement.movement_type === "OUT"
-      ? "Transferencia despachada"
-      : "Transferencia recepcionada";
+  switch (resolveSemanticOrigin(movement)) {
+    case "transfer_shipped":
+      return "Transferencia despachada";
+    case "transfer_received":
+      return "Transferencia recibida";
+    case "sale_confirmed":
+      return "Venta confirmada";
+    case "sale_cancelled":
+      return "Venta anulada";
+    case "exchange_received":
+      return "Cambio recibido";
+    case "exchange_delivered":
+      return "Cambio entregado";
+    case "opening_confirmed":
+      return "Apertura inicial";
+    case "adjustment_confirmed":
+      return "Ajuste de inventario";
+    default:
+      return "Movimiento sin documento";
   }
-
-  if (movement.reference_type === "sale") {
-    return "Venta confirmada";
-  }
-
-  if (movement.reference_type === "exchange") {
-    return "Postventa o cambio";
-  }
-
-  if (isOpeningMovement(movement)) {
-    return "Apertura inicial";
-  }
-
-  if (movement.reference_type === "adjustment" || movement.movement_type === "ADJUST") {
-    return "Ajuste de stock";
-  }
-
-  return "Movimiento sin documento";
 }
 
 function formatReference(movement: KardexMovement) {
   if (movement.reference_type && movement.reference_id) {
     const referenceLabel =
-      movement.reference_type === "transfer"
+      resolveDocumentFamily(movement) === "transfer"
         ? "Transferencia"
-        : movement.reference_type === "sale"
+        : resolveDocumentFamily(movement) === "sale"
           ? "Venta"
-          : movement.reference_type === "exchange"
+          : resolveDocumentFamily(movement) === "exchange"
             ? "Postventa"
-        : movement.reference_type === "adjustment"
-          ? isOpeningMovement(movement)
+        : resolveDocumentFamily(movement) === "adjustment"
+          ? resolveSemanticOrigin(movement) === "opening_confirmed"
             ? "Apertura"
             : "Ajuste"
           : movement.reference_type;
@@ -170,6 +273,7 @@ function resolveOriginFilterFromParams(referenceTypeParam: string | null): Movem
   if (
     referenceTypeParam === "sale" ||
     referenceTypeParam === "transfer" ||
+    referenceTypeParam === "exchange" ||
     referenceTypeParam === "adjustment"
   ) {
     return referenceTypeParam;
@@ -183,11 +287,21 @@ function resolveBackendReferenceType(
   originFilter: MovementOriginFilter,
   referenceTypeParam: string | null
 ) {
-  if (referenceTypeParam === "sale" || referenceTypeParam === "transfer" || referenceTypeParam === "adjustment") {
+  if (
+    referenceTypeParam === "sale" ||
+    referenceTypeParam === "transfer" ||
+    referenceTypeParam === "exchange" ||
+    referenceTypeParam === "adjustment"
+  ) {
     return referenceTypeParam;
   }
 
-  if (originFilter === "sale" || originFilter === "transfer" || originFilter === "adjustment") {
+  if (
+    originFilter === "sale" ||
+    originFilter === "transfer" ||
+    originFilter === "exchange" ||
+    originFilter === "adjustment"
+  ) {
     return originFilter;
   }
 
@@ -202,7 +316,7 @@ export default function KardexPage() {
   const searchParams = useSearchParams();
   const searchParamsKey = searchParams.toString();
   const initialQuery = searchParams.get("query") ?? searchParams.get("reference_id") ?? "";
-  const initialLocation = searchParams.get("location") ?? "ALL";
+  const initialLocation = searchParams.get("location_id") ?? searchParams.get("location") ?? "ALL";
   const initialMovementType = resolveMovementTypeFromParams(
     searchParams.get("movement_type"),
     searchParams.get("reference_type")
@@ -251,6 +365,7 @@ function KardexPageContent({
   const router = useRouter();
   const pathname = usePathname();
   const [movements, setMovements] = useState<KardexMovement[]>([]);
+  const [availableLocations, setAvailableLocations] = useState<KardexLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState(initialQuery);
@@ -260,6 +375,11 @@ function KardexPageContent({
   const [dateFrom, setDateFrom] = useState(initialDateFrom);
   const [dateTo, setDateTo] = useState(initialDateTo);
   const [currentPage, setCurrentPage] = useState(1);
+  const effectiveLocationFilter =
+    locationFilter === "ALL" ||
+    availableLocations.some((location) => location.location_id === locationFilter)
+      ? locationFilter
+      : "ALL";
 
   const loadKardex = useCallback(async () => {
     setLoading(true);
@@ -293,6 +413,10 @@ function KardexPageContent({
         params.set("query", combinedQuery);
       }
 
+      if (effectiveLocationFilter !== "ALL") {
+        params.set("location_id", effectiveLocationFilter);
+      }
+
       if (dateFrom) {
         params.set("date_from", `${dateFrom}T00:00:00`);
       }
@@ -301,10 +425,11 @@ function KardexPageContent({
         params.set("date_to", `${dateTo}T23:59:59`);
       }
 
-      const data = await apiFetchData<KardexMovement[]>(`/api/inventory/kardex?${params.toString()}`, {
+      const data = await apiFetchData<KardexResponse>(`/api/inventory/kardex?${params.toString()}`, {
         cache: "no-store",
       });
-      setMovements(data || []);
+      setMovements(data?.rows || []);
+      setAvailableLocations(data?.meta.available_locations || []);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -314,38 +439,45 @@ function KardexPageContent({
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, movementType, originFilter, query, referenceIdParam, referenceTypeParam]);
+  }, [dateFrom, dateTo, effectiveLocationFilter, movementType, originFilter, query, referenceIdParam, referenceTypeParam]);
 
   useEffect(() => {
     void Promise.resolve().then(() => loadKardex());
   }, [loadKardex]);
 
   const locationOptions = useMemo(() => {
-    const map = new Map<string, string>();
-
-    for (const movement of movements) {
-      map.set(movement.location_code, movement.location_name);
-    }
-
-    return Array.from(map.entries()).map(([code, name]) => ({ code, name }));
-  }, [movements]);
+    return availableLocations.map((location) => ({
+      location_id: location.location_id,
+      code: location.code,
+      name: location.name,
+    }));
+  }, [availableLocations]);
 
   const filteredMovements = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return movements.filter((movement) => {
       const movementDate = new Date(movement.created_at);
+      const movementDirection = resolveMovementDirection(movement);
+      const documentFamily = resolveDocumentFamily(movement);
+      const semanticOrigin = resolveSemanticOrigin(movement);
       const matchesType =
         movementType === "ALL" ||
         (movementType === "TRANSFER"
-          ? movement.reference_type === "transfer"
-          : movement.movement_type === movementType && movement.reference_type !== "transfer");
+          ? documentFamily === "transfer"
+          : movementType === "IN"
+            ? movementDirection === "entry" && documentFamily !== "transfer"
+            : movementType === "OUT"
+              ? movementDirection === "exit" && documentFamily !== "transfer"
+              : movementDirection === "adjustment");
       const matchesOrigin =
         originFilter === "ALL" ||
         (originFilter === "opening"
-          ? isOpeningMovement(movement)
-          : movement.reference_type === originFilter);
+          ? semanticOrigin === "opening_confirmed"
+          : originFilter === "adjustment"
+            ? semanticOrigin === "adjustment_confirmed"
+            : documentFamily === originFilter);
       const matchesLocation =
-        locationFilter === "ALL" || movement.location_code === locationFilter;
+        effectiveLocationFilter === "ALL" || movement.location_id === effectiveLocationFilter;
       const matchesDateFrom =
         !dateFrom ||
         (!Number.isNaN(movementDate.getTime()) &&
@@ -372,7 +504,7 @@ function KardexPageContent({
         matchesQuery
       );
     });
-  }, [dateFrom, dateTo, locationFilter, movements, originFilter, query, movementType]);
+  }, [dateFrom, dateTo, effectiveLocationFilter, movements, originFilter, query, movementType]);
 
   const totals = useMemo(() => {
     return filteredMovements.reduce(
@@ -383,10 +515,10 @@ function KardexPageContent({
         if (movement.quantity_effect < 0) {
           acc.exits += Math.abs(movement.quantity_effect);
         }
-        if (movement.movement_type === "ADJUST") {
+        if (resolveMovementDirection(movement) === "adjustment") {
           acc.adjustments += 1;
         }
-        if (movement.reference_type === "transfer") {
+        if (resolveDocumentFamily(movement) === "transfer") {
           acc.transfers += 1;
         }
         return acc;
@@ -412,7 +544,7 @@ function KardexPageContent({
 
   const hasActiveFilters =
     query !== "" ||
-    locationFilter !== "ALL" ||
+    effectiveLocationFilter !== "ALL" ||
     movementType !== "ALL" ||
     originFilter !== "ALL" ||
     dateFrom !== "" ||
@@ -422,7 +554,7 @@ function KardexPageContent({
   return (
     <OpsPageShell width="wide">
         <PosHeader
-          eyebrow="Trazabilidad"
+          eyebrow="Kardex"
           title="Movimientos de stock"
           actions={
             <Button
@@ -458,11 +590,11 @@ function KardexPageContent({
 
             <FilterDropdown
               label="Sede"
-              value={locationFilter}
+              value={effectiveLocationFilter}
               options={[
                 { value: "ALL", label: "Todas" },
                 ...locationOptions.map((location) => ({
-                  value: location.code,
+                  value: location.location_id,
                   label: `${location.code} - ${location.name}`,
                 })),
               ]}
@@ -489,6 +621,7 @@ function KardexPageContent({
                 { value: "ALL", label: "Todos" },
                 { value: "sale", label: "Venta" },
                 { value: "transfer", label: "Transferencia" },
+                { value: "exchange", label: "Cambio" },
                 { value: "adjustment", label: "Ajuste" },
                 { value: "opening", label: "Apertura" },
               ]}
@@ -615,18 +748,18 @@ function KardexPageContent({
                           <span
                             className={cn(
                               "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
-                              movement.movement_type === "IN" &&
+                              resolveMovementDirection(movement) === "entry" &&
                                 "border-[color:color-mix(in_srgb,#10b981_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_82%,var(--ops-text))]",
-                              movement.movement_type === "OUT" &&
+                              resolveMovementDirection(movement) === "exit" &&
                                 "border-[color:color-mix(in_srgb,#f59e0b_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] text-[color:color-mix(in_srgb,#d97706_72%,var(--ops-text))]",
-                              movement.movement_type === "ADJUST" &&
+                              resolveMovementDirection(movement) === "adjustment" &&
                                 "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text-muted)]"
                             )}
                           >
-                            {movement.movement_type === "IN" && (
+                            {resolveMovementDirection(movement) === "entry" && (
                               <ArrowUpCircle className="h-3 w-3" />
                             )}
-                            {movement.movement_type === "OUT" && (
+                            {resolveMovementDirection(movement) === "exit" && (
                               <ArrowDownCircle className="h-3 w-3" />
                             )}
                             {formatMovementOperationLabel(movement)}

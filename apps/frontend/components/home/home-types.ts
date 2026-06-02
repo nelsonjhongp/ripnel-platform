@@ -73,8 +73,8 @@ export type HomeOverview = {
       counts: {
         open_for_store_count: number
         pending_approval_count: number
-        pending_ship_count: number
-        pending_receive_count: number
+        pending_dispatch_count: number
+        pending_receipts_count: number
       }
       latest: Array<{
         transfer_id: string
