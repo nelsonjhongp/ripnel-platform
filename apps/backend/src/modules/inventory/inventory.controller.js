@@ -59,7 +59,7 @@ async function getKardex(req, res, next) {
 
 async function getAdjustments(req, res, next) {
   try {
-    const adjustments = await listAdjustments(req.auth);
+    const adjustments = await listAdjustments(req.query, req.auth);
     res.json({ ok: true, data: adjustments });
   } catch (error) {
     next(error);
