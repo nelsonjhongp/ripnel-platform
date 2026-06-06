@@ -21,11 +21,11 @@ const iconToneClasses: Record<NonNullable<OpsAttentionRowProps["tone"]>, string>
   neutral:
     "bg-[color:color-mix(in_srgb,#4f46e5_8%,var(--ops-surface))] text-[#4f46e5]",
   success:
-    "bg-[color:color-mix(in_srgb,#10b981_8%,var(--ops-surface))] text-emerald-600",
+    "bg-[var(--ops-tone-success-bg)] text-emerald-600",
   warning:
-    "bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] text-amber-600",
+    "bg-[var(--ops-tone-warning-bg)] text-amber-600",
   danger:
-    "bg-[color:color-mix(in_srgb,#f43f5e_10%,var(--ops-surface))] text-rose-600",
+    "bg-[var(--ops-tone-danger-bg)] text-rose-600",
   accent:
     "bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_84%,var(--ops-surface))] text-[var(--ripnel-accent-hover)]",
 }

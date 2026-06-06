@@ -9,13 +9,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
-import {
-  OpsMultiSelectMenu,
-  type OpsOption,
-  OpsReadonlyFieldState,
-  OpsSelectionChip,
-  OpsSelectMenu,
-} from "@/components/ui/ops-selection"
 import { cn } from "@/lib/utils"
 
 const adminControlClass =
@@ -30,10 +23,10 @@ export function AdminInlineMessage({
 }) {
   const toneClass =
     tone === "danger"
-      ? "border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#be123c_74%,var(--ops-text))]"
+      ? "border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] text-[var(--ops-tone-danger-text)]"
       : tone === "warning"
-        ? "border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]"
-        : "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#047857_74%,var(--ops-text))]"
+        ? "border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)] text-[var(--ops-tone-warning-text)]"
+        : "border-[var(--ops-tone-success-border)] bg-[var(--ops-tone-success-bg)] text-[var(--ops-tone-success-text)]"
 
   return <div className={cn("rounded-xl border px-4 py-3 text-sm", toneClass)}>{children}</div>
 }
@@ -114,72 +107,6 @@ export function AdminSelect(props: ComponentProps<"select">) {
       className={cn(adminControlClass, "h-10 cursor-pointer px-3.5 py-2.5", props.className)}
     />
   )
-}
-
-export function AdminSelectMenu({
-  value,
-  onValueChange,
-  placeholder,
-  options,
-  disabled = false,
-}: {
-  value: string
-  onValueChange: (value: string) => void
-  placeholder: string
-  options: OpsOption[]
-  disabled?: boolean
-}) {
-  return (
-    <OpsSelectMenu
-      value={value}
-      onValueChange={onValueChange}
-      placeholder={placeholder}
-      options={options}
-      disabled={disabled}
-    />
-  )
-}
-
-export function AdminMultiSelectMenu({
-  selectedValues,
-  onToggle,
-  placeholder,
-  options,
-  disabled = false,
-}: {
-  selectedValues: string[]
-  onToggle: (value: string) => void
-  placeholder: string
-  options: OpsOption[]
-  disabled?: boolean
-}) {
-  return (
-    <OpsMultiSelectMenu
-      selectedValues={selectedValues}
-      onToggle={onToggle}
-      placeholder={placeholder}
-      options={options}
-      disabled={disabled}
-    />
-  )
-}
-
-export function AdminSelectionChip({
-  label,
-  onRemove,
-  selected = false,
-}: {
-  label: string
-  onRemove?: () => void
-  selected?: boolean
-}) {
-  return (
-    <OpsSelectionChip label={label} onRemove={onRemove} selected={selected} />
-  )
-}
-
-export function AdminReadonlyFieldState(props: ComponentProps<typeof OpsReadonlyFieldState>) {
-  return <OpsReadonlyFieldState {...props} />
 }
 
 export function AdminCheckboxRow({
@@ -411,7 +338,7 @@ export function AdminConfirmModal({
       }
     >
       <div className="flex gap-3">
-        <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[color:color-mix(in_srgb,#f43f5e_32%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_12%,var(--ops-surface))] text-[color:color-mix(in_srgb,#be123c_78%,var(--ops-text))]">
+        <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] text-[var(--ops-tone-danger-text)]">
           <AlertTriangle className="h-4 w-4" />
         </span>
         <div className="text-sm leading-6 text-[var(--ops-text-muted)]">{description}</div>

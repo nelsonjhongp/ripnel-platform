@@ -36,17 +36,17 @@ const toneClasses: Record<
     badgeText: "text-teal-700 dark:text-teal-400",
   },
   warning: {
-    bg: "bg-[color:color-mix(in_srgb,#f59e0b_12%,var(--ops-surface))]",
+    bg: "bg-[var(--ops-tone-warning-bg)]",
     text: "text-amber-700 dark:text-amber-400",
     badge:
-      "border-[color:color-mix(in_srgb,#f59e0b_24%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_12%,var(--ops-surface))]",
+      "border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)]",
     badgeText: "text-amber-700 dark:text-amber-400",
   },
   danger: {
-    bg: "bg-[color:color-mix(in_srgb,#f43f5e_10%,var(--ops-surface))]",
+    bg: "bg-[var(--ops-tone-danger-bg)]",
     text: "text-rose-700 dark:text-rose-400",
     badge:
-      "border-[color:color-mix(in_srgb,#f43f5e_22%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_10%,var(--ops-surface))]",
+      "border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)]",
     badgeText: "text-rose-700 dark:text-rose-400",
   },
   neutral: {

@@ -15,15 +15,15 @@ const toneClasses: Record<
   string
 > = {
   success:
-    "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]",
+    "bg-[var(--ops-tone-success-bg)] text-[var(--ops-tone-success-text)]",
   warning:
-    "border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]",
+    "bg-[var(--ops-tone-warning-bg)] text-[var(--ops-tone-warning-text)]",
   danger:
-    "border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#be123c_74%,var(--ops-text))]",
+    "bg-[var(--ops-tone-danger-bg)] text-[var(--ops-tone-danger-text)]",
   accent:
-    "border-[color:color-mix(in_srgb,var(--ripnel-accent)_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_82%,var(--ops-surface))] text-[color:color-mix(in_srgb,var(--ripnel-accent)_72%,var(--ops-text))]",
+    "bg-[var(--ripnel-accent-soft)] text-[var(--ripnel-accent-hover)]",
   neutral:
-    "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] text-[var(--ops-text-muted)]",
+    "bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]",
 }
 
 const sizeClasses: Record<NonNullable<OpsStatusBadgeProps["size"]>, string> = {
@@ -41,7 +41,7 @@ export function OpsStatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full border font-semibold",
+        "inline-flex items-center rounded-full font-semibold",
         toneClasses[tone],
         sizeClasses[size],
         className
