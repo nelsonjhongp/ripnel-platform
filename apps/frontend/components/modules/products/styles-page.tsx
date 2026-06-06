@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { usePagination } from "@/hooks/use-pagination";
 import {
   Power,
   LoaderCircle,
@@ -22,15 +23,16 @@ import {
   AdminInlineMessage,
   AdminInput,
   AdminModalShell,
-  AdminReadonlyFieldState,
   AdminRowActionsMenu,
-  AdminSelectMenu,
   AdminTextarea,
 } from "@/components/admin/admin-ui";
+import { OpsReadonlyFieldState, OpsSelectMenu } from "@/components/ui/ops-selection";
 import { apiFetchData } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { formatDate } from "@/lib/date-utils";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsEmptyState } from "@/components/ui/ops-empty-state";
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
 import {
   OpsFiltersRow,
@@ -48,13 +50,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-type OptionItem = {
-  [key: string]: unknown;
-  active?: boolean;
-  name?: string;
-  code?: string | null;
-};
+import type { CatalogItem, StatusFilter } from "@/types/products";
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
 
 type StyleItem = {
   style_id: string;
@@ -85,8 +82,6 @@ type FormState = {
   active: boolean;
 };
 
-const PAGE_SIZE = 10;
-
 const STATUS_OPTIONS = [
   { value: "all", label: "Todos" },
   { value: "active", label: "Activos" },
@@ -103,7 +98,7 @@ const initialFormState: FormState = {
   active: true,
 };
 
-function getOptionId(item: OptionItem) {
+function getOptionId(item: CatalogItem) {
   return String(
     item.garment_type_id ||
       item.fabric_id ||
@@ -113,14 +108,8 @@ function getOptionId(item: OptionItem) {
   );
 }
 
-function getOptionLabel(item: OptionItem) {
+function getOptionLabel(item: CatalogItem) {
   return String(item.name || "");
-}
-
-function formatShortDate(value: string) {
-  return new Date(value).toLocaleDateString("es-PE", {
-    dateStyle: "short",
-  });
 }
 
 async function requestApiData<T>(path: string) {
@@ -138,10 +127,10 @@ async function requestStylesModuleData() {
     targetsData,
   ] = await Promise.all([
     requestApiData<StyleItem[]>("/api/styles"),
-    requestApiData<OptionItem[]>("/api/garment-types"),
-    requestApiData<OptionItem[]>("/api/fabrics"),
-    requestApiData<OptionItem[]>("/api/fabric-details"),
-    requestApiData<OptionItem[]>("/api/targets"),
+    requestApiData<CatalogItem[]>("/api/garment-types"),
+    requestApiData<CatalogItem[]>("/api/fabrics"),
+    requestApiData<CatalogItem[]>("/api/fabric-details"),
+    requestApiData<CatalogItem[]>("/api/targets"),
   ]);
 
   return {
@@ -160,17 +149,16 @@ export function StylesPage({
 }) {
   const router = useRouter();
   const [styles, setStyles] = useState<StyleItem[]>([]);
-  const [garmentTypes, setGarmentTypes] = useState<OptionItem[]>([]);
-  const [fabrics, setFabrics] = useState<OptionItem[]>([]);
-  const [fabricDetails, setFabricDetails] = useState<OptionItem[]>([]);
-  const [targets, setTargets] = useState<OptionItem[]>([]);
+  const [garmentTypes, setGarmentTypes] = useState<CatalogItem[]>([]);
+  const [fabrics, setFabrics] = useState<CatalogItem[]>([]);
+  const [fabricDetails, setFabricDetails] = useState<CatalogItem[]>([]);
+  const [targets, setTargets] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [editingStyleId, setEditingStyleId] = useState<string | null>(null);
   const [pendingStatusStyle, setPendingStatusStyle] = useState<StyleItem | null>(null);
   const [togglingStyleId, setTogglingStyleId] = useState<string | null>(null);
@@ -261,23 +249,21 @@ export function StylesPage({
     });
   }, [search, statusFilter, styles]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredStyles.length / PAGE_SIZE));
-  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const {
+    paginatedItems: paginatedStyles,
+    firstVisible,
+    lastVisible,
+    totalPages,
+    safePage: safeCurrentPage,
+    setPage,
+  } = usePagination(filteredStyles);
 
-  const paginatedStyles = useMemo(() => {
-    const start = (safeCurrentPage - 1) * PAGE_SIZE;
-    return filteredStyles.slice(start, start + PAGE_SIZE);
-  }, [filteredStyles, safeCurrentPage]);
-
-  const firstVisible =
-    paginatedStyles.length === 0 ? 0 : (safeCurrentPage - 1) * PAGE_SIZE + 1;
-  const lastVisible = paginatedStyles.length === 0 ? 0 : firstVisible + paginatedStyles.length - 1;
   const hasActiveFilters = Boolean(search.trim()) || statusFilter !== "all";
 
   function clearFilters() {
     setSearch("");
     setStatusFilter("all");
-    setCurrentPage(1);
+    setPage(1);
   }
 
   function resetForm() {
@@ -434,7 +420,7 @@ export function StylesPage({
                 value={search}
                 onChange={(value) => {
                   setSearch(value);
-                  setCurrentPage(1);
+                  setPage(1);
                 }}
                 placeholder="Buscar por style, código o catálogos"
                 ariaLabel="Buscar styles"
@@ -446,7 +432,7 @@ export function StylesPage({
                 options={STATUS_OPTIONS}
                 onChange={(value) => {
                   setStatusFilter(value as "all" | "active" | "inactive");
-                  setCurrentPage(1);
+                  setPage(1);
                 }}
               />
 
@@ -489,11 +475,11 @@ export function StylesPage({
                       Cargando styles…
                     </div>
                   ) : paginatedStyles.length === 0 ? (
-                    <div className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                      {styles.length
+                    <OpsEmptyState variant="compact" description={
+                      styles.length
                         ? "No se encontraron styles con los filtros aplicados."
-                        : "Aun no hay styles registrados."}
-                    </div>
+                        : "Aun no hay styles registrados."
+                    } />
                   ) : (
                     paginatedStyles.map((style) => (
                       <div
@@ -512,7 +498,7 @@ export function StylesPage({
                               {style.style_code || "Sin codigo"}
                             </span>
                             <span className="text-[11px] text-[var(--ops-text-muted)]">
-                              {formatShortDate(style.created_at)}
+                              {formatDate(style.created_at)}
                             </span>
                           </div>
                           {style.description ? (
@@ -543,16 +529,9 @@ export function StylesPage({
                         </div>
 
                         <div>
-                           <span
-                            className={cn(
-                              "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-                              style.active
-                                ? "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
-                                : "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]"
-                            )}
-                          >
-                            {style.active ? "Activo" : "Inactivo"}
-                          </span>
+                           <OpsStatusBadge tone={style.active ? "success" : "neutral"}>
+                              {style.active ? "Activo" : "Inactivo"}
+                            </OpsStatusBadge>
                         </div>
 
                         <AdminRowActionsMenu
@@ -604,7 +583,7 @@ export function StylesPage({
                 <Pagination
                   page={safeCurrentPage}
                   totalPages={totalPages}
-                  onPageChange={setCurrentPage}
+                  onPageChange={setPage}
                   className="self-end md:self-auto"
                 />
               </OpsTableFooter>
@@ -633,7 +612,7 @@ export function StylesPage({
                 </AdminField>
 
                 <AdminField label="Código">
-                  <AdminReadonlyFieldState
+                  <OpsReadonlyFieldState
                     value={styles.find((style) => style.style_id === editingStyleId)?.style_code || ""}
                     placeholder="Sin código"
                   />
@@ -641,7 +620,7 @@ export function StylesPage({
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <AdminField label="Tipo de prenda">
-                    <AdminReadonlyFieldState
+                    <OpsReadonlyFieldState
                       value={
                         garmentTypes.find((item) => getOptionId(item) === formState.garment_type_id)?.name ||
                         ""
@@ -651,7 +630,7 @@ export function StylesPage({
                   </AdminField>
 
                   <AdminField label="Tela">
-                    <AdminReadonlyFieldState
+                    <OpsReadonlyFieldState
                       value={
                         fabrics.find((item) => getOptionId(item) === formState.fabric_id)?.name || ""
                       }
@@ -662,7 +641,7 @@ export function StylesPage({
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <AdminField label="Detalle de tela">
-                    <AdminReadonlyFieldState
+                    <OpsReadonlyFieldState
                       value={
                         fabricDetails.find((item) => getOptionId(item) === formState.fabric_detail_id)?.name ||
                         ""
@@ -672,7 +651,7 @@ export function StylesPage({
                   </AdminField>
 
                   <AdminField label="Target">
-                    <AdminSelectMenu
+                    <OpsSelectMenu
                       value={formState.target_id}
                       onValueChange={(value) =>
                         setFormState((current) => ({

@@ -1,11 +1,3 @@
-import { apiFetchData } from "@/lib/api";
-
-export type ApiResponse<T> = {
-  ok: boolean;
-  data: T;
-  message?: string;
-};
-
 export type Location = {
   location_id: string;
   code: string;
@@ -135,33 +127,7 @@ export function buildAdjustmentReason(intent: AdjustmentIntent, rawReason: strin
   return normalized;
 }
 
-export async function requestAdjustmentJson<T>(path: string, init?: RequestInit) {
-  return apiFetchData<T>(path, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
-    cache: "no-store",
-    ...init,
-  });
-}
-
-export function formatAdjustmentDateTime(value: string | null) {
-  if (!value) {
-    return "-";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("es-PE", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(date);
-}
+export { formatDateTime as formatAdjustmentDateTime } from "@/lib/date-utils"
 
 export function formatAdjustmentStatus(status: AdjustmentStatus) {
   if (status === "confirmed") {

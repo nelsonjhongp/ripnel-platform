@@ -1,13 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ArrowRightLeft,
   Banknote,
   CheckCircle2,
   ChevronDown,
   Clock3,
-  Info,
   RefreshCw,
   Smartphone,
   X,
@@ -23,12 +22,10 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
-  Tooltip,
-  TooltipContent,
   TooltipProvider,
-  TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ApiError, apiFetch } from "@/lib/api";
+import { useApiGet } from "@/hooks/use-api-get";
 import { resolveCashCapabilities } from "@/lib/capabilities";
 import {
   CurrentCashResponse,
@@ -79,31 +76,12 @@ function explainCashError(error: unknown, fallback: string) {
   return error.message || fallback;
 }
 
-function HelpTooltip({ content }: { content: string }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)]"
-          aria-label="Más información"
-        >
-          <Info className="h-3.5 w-3.5" />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="top" sideOffset={8} className="max-w-72">
-        {content}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
+import { HelpTooltip } from "@/components/ui/help-tooltip"
 
 export default function CajaPage() {
   const { defaultLocation, permissions } = useAuth();
-  const [current, setCurrent] = useState<CurrentCashResponse | null>(null);
-  const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [closeNotes, setCloseNotes] = useState("");
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
@@ -111,43 +89,27 @@ export default function CajaPage() {
   const cashCapabilities = resolveCashCapabilities({ permissions });
   const canOperateCash = cashCapabilities.operate;
 
-  const fetchCurrent = useCallback(async () => {
-    if (!locationId) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const data = await apiFetch<CurrentCashResponse>("/api/cash/current", {
-        cache: "no-store",
-      });
-      setCurrent(data);
-    } catch (err) {
-      setError(explainCashError(err, "Error al cargar caja"));
-    } finally {
-      setLoading(false);
-    }
-  }, [locationId]);
-
-  useEffect(() => {
-    // defer fetchCurrent to avoid synchronous setState inside effect
-    void Promise.resolve().then(() => fetchCurrent());
-  }, [fetchCurrent]);
+  const { data: current, loading, error, refetch } = useApiGet(
+    locationId
+      ? () => apiFetch<CurrentCashResponse>(`/api/cash/current?location_id=${locationId}`, { cache: "no-store" })
+      : null,
+    [locationId]
+  );
 
   async function handleOpen() {
     if (!locationId || actionLoading || !canOperateCash) return;
 
     setActionLoading(true);
-    setError(null);
+    setActionError(null);
 
     try {
       await apiFetch("/api/cash/open", {
         method: "POST",
         body: JSON.stringify({ location_id: locationId }),
       });
-      await fetchCurrent();
+      refetch();
     } catch (err) {
-      setError(explainCashError(err, "Error al abrir caja"));
+      setActionError(explainCashError(err, "Error al abrir caja"));
     } finally {
       setActionLoading(false);
     }
@@ -157,7 +119,7 @@ export default function CajaPage() {
     if (!current?.closing || actionLoading || !canOperateCash) return;
 
     setActionLoading(true);
-    setError(null);
+    setActionError(null);
 
     try {
       await apiFetch(`/api/cash/${current.closing.cash_closing_id}/close`, {
@@ -166,9 +128,9 @@ export default function CajaPage() {
       });
       setShowCloseConfirm(false);
       setCloseNotes("");
-      await fetchCurrent();
+      refetch();
     } catch (err) {
-      setError(explainCashError(err, "Error al cerrar caja"));
+      setActionError(explainCashError(err, "Error al cerrar caja"));
     } finally {
       setActionLoading(false);
     }
@@ -227,16 +189,16 @@ export default function CajaPage() {
                 </div>
               </header>
 
-              {error ? (
+              {(error || actionError) ? (
                 <div
                   role="alert"
                   aria-live="polite"
                   className="sales-chip sales-chip-danger flex items-center gap-3 rounded-xl px-4 py-3 text-sm"
                 >
                   <X className="h-4 w-4 shrink-0" />
-                  {error}
+                  {actionError || error}
                   <button
-                    onClick={() => setError(null)}
+                    onClick={() => setActionError(null)}
                     className="ml-auto text-current transition hover:opacity-80"
                   >
                     <X className="h-3 w-3" />
@@ -344,7 +306,7 @@ export default function CajaPage() {
                         ) : null}
 
                         <button
-                          onClick={fetchCurrent}
+                          onClick={refetch}
                           disabled={loading || actionLoading}
                           className="sales-field sales-field-interactive rounded-xl px-3 py-2 text-[var(--ops-text-muted)] disabled:opacity-60"
                           title="Actualizar"

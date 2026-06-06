@@ -1,16 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { Dialog as DialogPrimitive } from "radix-ui";
 import { FormEvent, useEffect, useId, useMemo, useState } from "react";
 import {
-  Check,
   Eye,
   LoaderCircle,
   Save,
   ShoppingBag,
   Sparkles,
-  X,
 } from "lucide-react";
 import { AdminInlineMessage } from "@/components/admin/admin-ui";
 import { ApiEnvelope, apiFetch, unwrapApiData } from "@/lib/api";
@@ -18,11 +15,12 @@ import { catalogPageBySlug, type CatalogFieldConfig } from "@/lib/product-master
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  OpsMultiSelectMenu,
   OpsReadonlyFieldState,
-  OpsSelectionChip,
   OpsSelectMenu,
 } from "@/components/ui/ops-selection";
+import { FieldLabel } from "@/components/ui/ops-field-label";
+import { MultiSelectCatalog } from "@/components/ui/ops-multi-select-catalog";
+import { AdminConfirmModal } from "@/components/admin/admin-ui";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
   Sheet,
@@ -32,15 +30,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-
-type CatalogItem = {
-  [key: string]: unknown;
-  active?: boolean;
-  code?: string | null;
-  name?: string | null;
-  hex?: string | null;
-  sort_order?: number | null;
-};
+import type { CatalogItem } from "@/types/products";
 
 type CreatedStyle = {
   style_id: string;
@@ -80,7 +70,7 @@ type CatalogPanelState = {
   values: Record<string, string>;
 } | null;
 
-type ConfirmationSummary = {
+export type ConfirmationSummary = {
   name: string;
   garmentType: string;
   fabric: string;
@@ -249,245 +239,11 @@ async function requestData<T>(path: string, init?: RequestInit): Promise<T> {
   return unwrapApiData(payload);
 }
 
-function FieldLabel({
-  children,
-  actionLabel,
-  onAction,
-  htmlFor,
-}: {
-  children: React.ReactNode;
-  actionLabel?: string;
-  onAction?: () => void;
-  htmlFor?: string;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <label htmlFor={htmlFor} className="text-sm font-semibold text-[var(--ops-text)]">{children}</label>
-      {actionLabel && onAction ? (
-        <button
-          type="button"
-          onClick={onAction}
-          className="cursor-pointer text-xs font-semibold text-[var(--ripnel-accent-hover)] transition hover:text-[var(--ripnel-accent)]"
-        >
-          {actionLabel}
-        </button>
-      ) : null}
-    </div>
-  );
-}
 
-function MultiSelectCatalog({
-  label,
-  items,
-  selectedIds,
-  idKeys,
-  placeholder,
-  onToggle,
-  onCreate,
-  colorMode = false,
-}: {
-  label: string;
-  items: CatalogItem[];
-  selectedIds: string[];
-  idKeys: string[];
-  placeholder: string;
-  onToggle: (id: string) => void;
-  onCreate: () => void;
-  colorMode?: boolean;
-}) {
-  const selectedItems = items.filter((item) => selectedIds.includes(getItemId(item, idKeys)));
-  const options = items.map((item) => {
-    const itemId = getItemId(item, idKeys);
-    const visibleLabel = colorMode ? getCatalogVisibleLabel(item) : getSizeLabel(item);
 
-    return {
-      value: itemId,
-      label: visibleLabel,
-      leading: colorMode ? (
-        <span
-          className="h-3.5 w-3.5 rounded-full border border-[color:var(--ops-border-soft)]"
-          style={{ backgroundColor: item.hex || "#ffffff" }}
-        />
-      ) : undefined,
-    };
-  });
 
-  return (
-    <section className="space-y-2">
-      <FieldLabel actionLabel="Crear nuevo" onAction={onCreate}>{label}</FieldLabel>
-      <OpsMultiSelectMenu
-        selectedValues={selectedIds}
-        onToggle={onToggle}
-        placeholder={placeholder}
-        options={options}
-        formatCountLabel={(count) => `${count} ${label.toLowerCase()} seleccionadas`}
-      />
-      <div className="flex min-h-8 flex-wrap gap-1.5">
-        {selectedItems.length ? (
-          selectedItems.map((item) => {
-            const id = getItemId(item, idKeys);
-            return (
-              <OpsSelectionChip
-                key={id}
-                label={colorMode ? getCatalogVisibleLabel(item) : getSizeLabel(item)}
-                leading={
-                  colorMode ? (
-                    <span
-                      className="h-3 w-3 rounded-full border border-[color:var(--ops-border-soft)]"
-                      style={{ backgroundColor: item.hex || "#ffffff" }}
-                    />
-                  ) : undefined
-                }
-                onRemove={() => onToggle(id)}
-              />
-            );
-          })
-        ) : (
-          <span className="text-xs text-[var(--ops-text-muted)]">
-            {colorMode ? "Sin colores: se usara UNICO si aplica." : "Selecciona al menos una talla."}
-          </span>
-        )}
-      </div>
-    </section>
-  );
-}
 
-function ConfirmationDialog({
-  open,
-  onOpenChange,
-  summary,
-  submitting,
-  onConfirm,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  summary: ConfirmationSummary | null;
-  submitting: boolean;
-  onConfirm: () => Promise<void>;
-}) {
-  if (!summary) {
-    return null;
-  }
 
-  return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
-      <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/15 backdrop-blur-[2px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
-        <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,720px)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-5 shadow-xl outline-none data-open:animate-in data-open:zoom-in-95 data-closed:animate-out data-closed:zoom-out-95">
-          <div className="flex items-start justify-between gap-4 border-b border-[var(--ops-border-soft)] pb-4">
-            <div className="space-y-1">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--ripnel-accent-hover)]">
-                Confirmacion
-              </p>
-              <DialogPrimitive.Title className="text-xl font-semibold text-[var(--ops-text)]">
-                Revisar nuevo producto
-              </DialogPrimitive.Title>
-            </div>
-            <DialogPrimitive.Close asChild>
-              <Button type="button" variant="ghost" size="icon-sm" className="rounded-lg">
-                <X className="h-4 w-4" />
-              </Button>
-            </DialogPrimitive.Close>
-          </div>
-
-          <div className="mt-4 space-y-4">
-            <div className="rounded-lg border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-4 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
-                Nombre final
-              </p>
-              <p className="mt-2 text-lg font-semibold text-[var(--ops-text)]">{summary.name}</p>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-lg border border-[var(--ops-border-soft)] px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
-                  Configuracion base
-                </p>
-                <div className="mt-3 space-y-2 text-sm text-[var(--ops-text)]">
-                  <p>Tipo: {summary.garmentType}</p>
-                  <p>Tela: {summary.fabric}</p>
-                  <p>Detalle: {summary.fabricDetail}</p>
-                  <p>Target: {summary.target}</p>
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-[var(--ops-border-soft)] px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
-                  Configuracion comercial
-                </p>
-                <div className="mt-3 space-y-3 text-sm text-[var(--ops-text)]">
-                  <div>
-                    <p className="font-medium">Tallas</p>
-                    <div className="mt-1 flex flex-wrap gap-1.5">
-                      {summary.sizes.map((size) => (
-                        <span key={size} className="ops-metric-pill rounded-full px-2 py-0.5 text-[11px] font-semibold">
-                          {size}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="font-medium">Colores</p>
-                    <div className="mt-1 flex flex-wrap gap-1.5">
-                      {summary.colors.length ? (
-                        summary.colors.map((color) => (
-                          <span
-                            key={color.label}
-                            className="ops-metric-pill inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                          >
-                            {color.hex ? (
-                              <span
-                                className="h-3 w-3 rounded-full border border-[color:var(--ops-border-soft)]"
-                                style={{ backgroundColor: color.hex }}
-                              />
-                            ) : null}
-                            {color.label}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-[var(--ops-text-muted)]">UNICO si aplica</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {summary.description ? (
-              <div className="rounded-lg border border-[var(--ops-border-soft)] px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
-                  Descripcion
-                </p>
-                <p className="mt-2 text-sm text-[var(--ops-text)]">{summary.description}</p>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <DialogPrimitive.Close asChild>
-              <Button type="button" variant="outline" className="rounded-lg">
-                Cancelar
-              </Button>
-            </DialogPrimitive.Close>
-            <Button type="button" variant="accent" className="rounded-lg" disabled={submitting} onClick={() => void onConfirm()}>
-              {submitting ? (
-                <>
-                  <LoaderCircle className="h-4 w-4 animate-spin" />
-                  Creando…
-                </>
-              ) : (
-                <>
-                  <Check className="h-4 w-4" />
-                  Confirmar creacion
-                </>
-              )}
-            </Button>
-          </div>
-        </DialogPrimitive.Content>
-      </DialogPrimitive.Portal>
-    </DialogPrimitive.Root>
-  );
-}
 
 export function ProductCreatePage() {
   const nameId = useId();
@@ -1253,12 +1009,81 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
         </SheetContent>
       </Sheet>
 
-      <ConfirmationDialog
+      <AdminConfirmModal
         open={confirmationOpen}
-        onOpenChange={setConfirmationOpen}
-        summary={pendingConfirmation}
-        submitting={submitting}
-        onConfirm={handleCreateProduct}
+        title="Revisar nuevo producto"
+        description={
+          pendingConfirmation ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
+                  Nombre final
+                </p>
+                <p className="mt-2 text-lg font-semibold text-[var(--ops-text)]">{pendingConfirmation.name}</p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-lg border border-[var(--ops-border-soft)] px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
+                    Configuracion base
+                  </p>
+                  <div className="mt-3 space-y-2 text-sm text-[var(--ops-text)]">
+                    <p>Tipo: {pendingConfirmation.garmentType}</p>
+                    <p>Tela: {pendingConfirmation.fabric}</p>
+                    <p>Detalle: {pendingConfirmation.fabricDetail}</p>
+                    <p>Target: {pendingConfirmation.target}</p>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-[var(--ops-border-soft)] px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
+                    Configuracion comercial
+                  </p>
+                  <div className="mt-3 space-y-3 text-sm text-[var(--ops-text)]">
+                    <div>
+                      <p className="font-medium">Tallas</p>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {pendingConfirmation.sizes.map((size) => (
+                          <span key={size} className="ops-metric-pill rounded-full px-2 py-0.5 text-[11px] font-semibold">
+                            {size}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="font-medium">Colores</p>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {pendingConfirmation.colors.length ? (
+                          pendingConfirmation.colors.map((color) => (
+                            <span key={color.label} className="ops-metric-pill inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold">
+                              {color.hex ? (
+                                <span className="h-3 w-3 rounded-full border border-[color:var(--ops-border-soft)]" style={{ backgroundColor: color.hex }} />
+                              ) : null}
+                              {color.label}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[var(--ops-text-muted)]">UNICO si aplica</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {pendingConfirmation.description ? (
+                <div className="rounded-lg border border-[var(--ops-border-soft)] px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ops-text-muted)]">
+                    Descripcion
+                  </p>
+                  <p className="mt-2 text-sm text-[var(--ops-text)]">{pendingConfirmation.description}</p>
+                </div>
+              ) : null}
+            </div>
+          ) : null
+        }
+        confirmLabel="Confirmar creacion"
+        confirmTone="accent"
+        busy={submitting}
+        onCancel={() => setConfirmationOpen(false)}
+        onConfirm={() => { handleCreateProduct(); }}
       />
     </>
   );

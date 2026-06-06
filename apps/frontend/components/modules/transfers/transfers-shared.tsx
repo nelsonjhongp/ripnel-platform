@@ -1,3 +1,11 @@
+import type { ReactNode } from "react"
+import {
+  CheckCheck,
+  SendHorizonal,
+  ShieldCheck,
+  X,
+} from "lucide-react"
+
 export type TransferStatus = "requested" | "approved" | "shipped" | "received" | "cancelled";
 export type TransferScope = "current" | "network";
 export type TransferScopeRole = "source" | "destination" | "observer" | "network";
@@ -262,19 +270,142 @@ export function getTransferQueueCount(inbox: TransferInboxResponse["counts"], qu
   return Number(inbox.pending_receipts_count || 0);
 }
 
-export function formatDateTime(value: string | null) {
-  if (!value) {
-    return "-";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("es-PE", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(date);
+export type RequestCandidateSource = {
+  location_id: string
+  location_code: string
+  location_name: string
+  qty_available: number
 }
+
+export type RequestCandidate = {
+  variant_id: string
+  sku: string
+  style_code: string
+  style_name: string
+  garment_type_name: string | null
+  size_code: string
+  color_name: string
+  total_available: number
+  candidate_sources: RequestCandidateSource[]
+}
+
+export type RequestProductVariant = {
+  variant_id: string
+  sku: string
+  size_code: string
+  color_name: string
+  total_available: number
+  candidate_sources: RequestCandidateSource[]
+}
+
+export type RequestProductGroup = {
+  product_key: string
+  style_code: string
+  style_name: string
+  garment_type_name: string | null
+  secondary_code: string
+  total_available: number
+  variants: RequestProductVariant[]
+}
+
+export type DraftLine = {
+  location_id: string
+  location_code: string
+  location_name: string
+  variant_id: string
+  sku: string
+  style_code: string
+  style_name: string
+  garment_type_name: string | null
+  size_code: string
+  color_name: string
+  qty: number
+  qty_requested: number
+}
+
+export type RequestLocationOption = {
+  value: string
+  label: string
+  type?: string | null
+}
+
+export type TransferActionKey = "approve" | "ship" | "receive" | "cancel"
+
+export type TransferActionConfig<T = TransferSummary> = {
+  label: string
+  confirmLabel: string
+  successMessage: string
+  busyMessage?: string
+  path: (transferId: string) => string
+  icon: ReactNode
+  tone: "danger" | "accent" | "neutral"
+  description: (transfer: T) => ReactNode
+}
+
+export const TRANSFER_ACTION_CONFIG: Record<
+  TransferActionKey,
+  TransferActionConfig
+> = {
+  approve: {
+    label: "Aprobar",
+    confirmLabel: "Aprobar solicitud",
+    successMessage: "Solicitud aprobada para despacho.",
+    busyMessage: "Aprobando...",
+    path: (transferId) => `/api/transfers/${transferId}/approve`,
+    icon: <ShieldCheck className="h-3.5 w-3.5" />,
+    tone: "accent",
+    description: (transfer) => (
+      <>
+        La transferencia <strong>{transfer.transfer_number || "sin número"}</strong> quedará lista
+        para despacho desde <strong>{transfer.from_location_name}</strong>.
+      </>
+    ),
+  },
+  ship: {
+    label: "Despachar",
+    confirmLabel: "Despachar transferencia",
+    successMessage: "Transferencia despachada.",
+    busyMessage: "Despachando...",
+    path: (transferId) => `/api/transfers/${transferId}/ship`,
+    icon: <SendHorizonal className="h-3.5 w-3.5" />,
+    tone: "accent",
+    description: (transfer) => (
+      <>
+        La transferencia <strong>{transfer.transfer_number || "sin número"}</strong> descontará
+        stock del origen y quedará lista para recepción en{" "}
+        <strong>{transfer.to_location_name}</strong>.
+      </>
+    ),
+  },
+  receive: {
+    label: "Recibir",
+    confirmLabel: "Confirmar recepción",
+    successMessage: "Transferencia recepcionada.",
+    busyMessage: "Recepcionando...",
+    path: (transferId) => `/api/transfers/${transferId}/receive`,
+    icon: <CheckCheck className="h-3.5 w-3.5" />,
+    tone: "accent",
+    description: (transfer) => (
+      <>
+        La transferencia <strong>{transfer.transfer_number || "sin número"}</strong> ingresará
+        stock en <strong>{transfer.to_location_name}</strong>.
+      </>
+    ),
+  },
+  cancel: {
+    label: "Cancelar",
+    confirmLabel: "Cancelar transferencia",
+    successMessage: "Transferencia cancelada.",
+    busyMessage: "Cancelando...",
+    path: (transferId) => `/api/transfers/${transferId}/cancel`,
+    icon: <X className="h-3.5 w-3.5" />,
+    tone: "danger",
+    description: (transfer) => (
+      <>
+        La transferencia <strong>{transfer.transfer_number || "sin número"}</strong> quedará
+        anulada y no continuará el flujo entre sedes.
+      </>
+    ),
+  },
+}
+

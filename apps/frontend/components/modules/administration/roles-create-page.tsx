@@ -1,9 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 
 import { apiFetchData } from "@/lib/api"
+import { useApiGet } from "@/hooks/use-api-get"
+import { EMPTY_ROLE_FORM, type RoleFormState } from "@/types/admin"
 import { AdminFormPageShell } from "@/components/admin/admin-form-page-shell"
 import {
   AdminActionButton,
@@ -20,57 +22,16 @@ import {
   type RolePermission,
 } from "@/components/admin/role-permission-picker"
 
-type RoleFormState = {
-  name: string
-  description: string
-  active: boolean
-  permission_keys: string[]
-}
-
-const emptyRoleForm: RoleFormState = {
-  name: "",
-  description: "",
-  active: true,
-  permission_keys: [],
-}
-
-async function requestJson<T>(path: string, init?: RequestInit) {
-  return apiFetchData<T>(path, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
-    cache: "no-store",
-    ...init,
-  })
-}
-
 export default function RolesCreatePage() {
   const router = useRouter()
-  const [availablePermissions, setAvailablePermissions] = useState<RolePermission[]>([])
-  const [loadingPermissions, setLoadingPermissions] = useState(true)
-  const [permissionsError, setPermissionsError] = useState<string | null>(null)
-  const [roleForm, setRoleForm] = useState<RoleFormState>(emptyRoleForm)
+  const { data: permissionsData, loading: loadingPermissions, error: permissionsError } = useApiGet(
+    () => apiFetchData<RolePermission[]>("/api/roles/permissions"),
+    []
+  )
+  const availablePermissions = permissionsData || []
+  const [roleForm, setRoleForm] = useState<RoleFormState>(EMPTY_ROLE_FORM)
   const [savingRole, setSavingRole] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    async function loadPermissions() {
-      setLoadingPermissions(true)
-      setPermissionsError(null)
-
-      try {
-        const data = await requestJson<RolePermission[]>("/api/roles/permissions")
-        setAvailablePermissions(data)
-      } catch (loadError) {
-        setPermissionsError(loadError instanceof Error ? loadError.message : "No se pudo cargar permisos")
-      } finally {
-        setLoadingPermissions(false)
-      }
-    }
-
-    void loadPermissions()
-  }, [])
 
   function toggleRolePermission(permissionKey: string) {
     setRoleForm((current) => {
@@ -95,7 +56,7 @@ export default function RolesCreatePage() {
     setError(null)
 
     try {
-      await requestJson("/api/roles", {
+      await apiFetchData("/api/roles", {
         method: "POST",
         body: JSON.stringify({
           name: roleForm.name,

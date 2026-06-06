@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import {
@@ -22,7 +22,8 @@ import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { useSidebarTopbarBreadcrumbs } from "@/components/sidebar/SidebarShell";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { apiFetch, unwrapApiData } from "@/lib/api";
+import { apiFetchData } from "@/lib/api";
+import { useApiGet } from "@/hooks/use-api-get";
 import { appRoutes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import {
@@ -43,48 +44,24 @@ export default function InventoryDetailPage() {
     normalizeInventoryDetailTab(searchParams.get("tab"))
   );
   const [selectedLocationId, setSelectedLocationId] = useState(searchParams.get("location_id") || "");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [detail, setDetail] = useState<InventoryDetailResponse | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
 
-  const loadDetail = useCallback(async () => {
-    if (!styleId) return;
+  const { data: detail, loading, error } = useApiGet(
+    () => {
+      if (!styleId) return Promise.resolve(null as InventoryDetailResponse | null);
 
-    setLoading(true);
-    setError(null);
-
-    try {
       const params = new URLSearchParams();
       if (selectedLocationId) {
         params.set("location_id", selectedLocationId);
       }
 
-      const payload = await apiFetch<{ ok: boolean; data: InventoryDetailResponse }>(
+      return apiFetchData<InventoryDetailResponse>(
         `/api/inventory/styles/${styleId}${params.toString() ? `?${params.toString()}` : ""}`,
-        {
-          cache: "no-store",
-          suppressAuthEvent: true,
-        }
+        { cache: "no-store", suppressAuthEvent: true }
       );
-
-      setDetail(unwrapApiData(payload) ?? null);
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error ? requestError.message : "No se pudo cargar el detalle del producto."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedLocationId, styleId]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadDetail();
-    }, 0);
-
-    return () => window.clearTimeout(timer);
-  }, [loadDetail, refreshNonce]);
+    },
+    [styleId, selectedLocationId, refreshNonce]
+  );
 
   useEffect(() => {
     const params = new URLSearchParams();

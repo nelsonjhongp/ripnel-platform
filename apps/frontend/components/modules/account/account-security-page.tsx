@@ -8,8 +8,8 @@ import {
   AccountPageFrame,
   PanelSection,
   SettingsFormRow,
-  SettingsStatusMessage,
 } from "@/components/account/account-preferences-ui";
+import { AdminInlineMessage } from "@/components/admin/admin-ui";
 import { Button } from "@/components/ui/button";
 import { appRoutes } from "@/lib/routes";
 import {
@@ -187,8 +187,8 @@ export default function AccountSecurityPage() {
             </InputGroup>
           </SettingsFormRow>
 
-          {error ? <SettingsStatusMessage tone="danger">{error}</SettingsStatusMessage> : null}
-          {message ? <SettingsStatusMessage tone="success">{message}</SettingsStatusMessage> : null}
+          {error ? <AdminInlineMessage tone="danger">{error}</AdminInlineMessage> : null}
+          {message ? <AdminInlineMessage tone="success">{message}</AdminInlineMessage> : null}
 
           <div className="flex justify-end border-t border-[var(--ops-border-strong)] px-4 py-3">
             <Button

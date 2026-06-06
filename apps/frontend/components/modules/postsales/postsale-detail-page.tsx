@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   CreditCard,
+  Download,
   PackageSearch,
   ReceiptText,
   RefreshCcw,
@@ -19,53 +20,20 @@ import { useAuth } from "@/components/auth/AuthProvider"
 import { PermissionGuard } from "@/components/auth/PermissionGuard"
 import {
   ProtectedErrorPage,
-  ProtectedForbiddenPage,
   InlineStatusCard,
   ProtectedLoadingPage,
-  ProtectedNotFoundPage,
 } from "@/components/feedback/status-page"
 import { Button } from "@/components/ui/button"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
-import { ApiError, apiFetch } from "@/lib/api"
+import { ReceiptOptionsModal } from "@/components/ui/purchase-system/ReceiptOptionsModal"
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
+import { formatApiFetchError, apiFetch, apiFetchData } from "@/lib/api"
 import { buildSaleDetailRoute } from "@/lib/routes"
 import { cn } from "@/lib/utils"
-
-type PostsaleAvailability = {
-  exchange: {
-    allowed: boolean
-    reasons: string[]
-  }
-  cancel: {
-    allowed: boolean
-    reasons: string[]
-  }
-}
-
-type SaleLine = {
-  sale_detail_id: string
-  variant_id: string
-  sku: string
-  style_name: string
-  style_code: string
-  size_code: string
-  size_name: string
-  color_code: string
-  color_name: string
-  quantity: number
-  unit_price_list: number
-  unit_price_final: number
-  line_subtotal: number
-  line_tax: number
-  line_total: number
-}
-
-type SalePayment = {
-  payment_id: string
-  method: string
-  amount: number
-  reference: string | null
-  paid_at: string
-}
+import { useApiGet } from "@/hooks/use-api-get"
+import { formatCurrency, round2 } from "@/lib/format-utils"
+import { formatDateTime } from "@/lib/date-utils"
+import { type PostsaleAvailability, type SaleLine, type SalePayment } from "@/types/postsales"
 
 type PaymentReversal = {
   payment_reversal_id: string
@@ -168,56 +136,6 @@ const inputClass =
 const textareaClass =
   "sales-field min-h-[108px] w-full rounded-lg px-3 py-2.5 text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("es-PE", { style: "currency", currency: "PEN" }).format(value)
-}
-
-function round2(value: number) {
-  return Math.round(Number(value || 0) * 100) / 100
-}
-
-function formatDateTime(value: string | null, fallback?: string | null) {
-  const source = value || fallback
-  if (!source) return "-"
-
-  return new Date(source).toLocaleString("es-PE", {
-    dateStyle: "short",
-    timeStyle: "short",
-  })
-}
-
-function explainLoadError(error: unknown) {
-  if (!(error instanceof ApiError)) {
-    return "No pudimos cargar el contexto de postventa."
-  }
-
-  if (error.status === 403) {
-    return "Tu rol no tiene acceso a este flujo de postventa."
-  }
-
-  if (error.status === 409) {
-    return "Necesitas una sede default activa para operar postventa."
-  }
-
-  return error.message || "No pudimos cargar el contexto de postventa."
-}
-
-function explainActionError(error: unknown) {
-  if (!(error instanceof ApiError)) {
-    return "La operación no se pudo completar."
-  }
-
-  if (error.status === 403) {
-    return "Tu rol no tiene permisos para ejecutar esta operación."
-  }
-
-  if (error.status === 409 || error.status === 400) {
-    return error.message
-  }
-
-  return error.message || "La operación no se pudo completar."
-}
-
 function resolveDocumentPath(context: PostsaleContext) {
   if (context.sale.document_type === "proforma") {
     return `/api/sales/${context.sale.sale_id}/proforma-pdf`
@@ -240,27 +158,6 @@ function computeCandidateTotal(candidate: SellableVariant, line: SaleLine, taxRa
   const subtotal = round2(Number(candidate.retail_price || 0) * Number(line.quantity || 0))
   const tax = round2(subtotal * Number(taxRate || 0))
   return round2(subtotal + tax)
-}
-
-function MetaPill({
-  label,
-  tone = "neutral",
-}: {
-  label: string
-  tone?: "neutral" | "accent" | "success" | "warning" | "danger"
-}) {
-  const toneClass =
-    tone === "accent"
-      ? "sales-chip sales-chip-accent"
-      : tone === "success"
-        ? "sales-chip sales-chip-success"
-        : tone === "warning"
-          ? "sales-chip sales-chip-warning"
-          : tone === "danger"
-            ? "sales-chip sales-chip-danger"
-            : "sales-chip sales-chip-neutral"
-
-  return <span className={cn("rounded-full px-2.5 py-1 text-[11px] font-semibold", toneClass)}>{label}</span>
 }
 
 function SectionCard({
@@ -299,9 +196,10 @@ function SectionCard({
 export default function PostsaleDetailPage({ params }: { params: Promise<{ saleId: string }> }) {
   const { has } = useAuth()
   const [saleId, setSaleId] = useState<string | null>(null)
-  const [context, setContext] = useState<PostsaleContext | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
+  const { data: context, loading, error, refetch } = useApiGet(
+    saleId ? () => apiFetchData<PostsaleContext>(`/api/postsales/${saleId}`) : null,
+    [saleId]
+  )
   const [selectedSaleDetailId, setSelectedSaleDetailId] = useState<string>("")
   const [replacementSearch, setReplacementSearch] = useState("")
   const [replacementResults, setReplacementResults] = useState<SellableVariant[]>([])
@@ -316,6 +214,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
   const [actionSuccess, setActionSuccess] = useState<string | null>(null)
   const [exchangeSubmitting, setExchangeSubmitting] = useState(false)
   const [cancelSubmitting, setCancelSubmitting] = useState(false)
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -330,29 +229,6 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
       active = false
     }
   }, [params])
-
-  async function loadContext(targetSaleId: string) {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const data = await apiFetch<PostsaleContext>(`/api/postsales/${targetSaleId}`, {
-        cache: "no-store",
-      })
-
-      setContext(data)
-    } catch (loadError) {
-      setContext(null)
-      setError(loadError instanceof Error ? loadError : new Error(explainLoadError(loadError)))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    if (!saleId) return
-    void Promise.resolve().then(() => loadContext(saleId))
-  }, [saleId])
 
   useEffect(() => {
     const firstLine = context?.sale.details?.[0]?.sale_detail_id || ""
@@ -405,7 +281,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
         }
 
         setReplacementResults([])
-        setReplacementError(explainActionError(loadError))
+        setReplacementError(formatApiFetchError(loadError, "No se pudo buscar el reemplazo."))
       } finally {
         if (active) {
           setReplacementLoading(false)
@@ -462,7 +338,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
     setExchangeSubmitting(true)
 
     try {
-      const updated = await apiFetch<PostsaleContext>(`/api/postsales/${saleId}/exchanges`, {
+      await apiFetch<PostsaleContext>(`/api/postsales/${saleId}/exchanges`, {
         method: "POST",
         body: JSON.stringify({
           sale_detail_id: selectedSaleDetailId,
@@ -472,7 +348,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
         }),
       })
 
-      setContext(updated)
+      refetch()
       setActionSuccess("El cambio simple quedó registrado correctamente.")
       setReplacementSearch("")
       setReplacementResults([])
@@ -480,7 +356,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
       setExchangeReason("")
       setExchangeNotes("")
     } catch (submitError) {
-      setActionError(explainActionError(submitError))
+      setActionError(formatApiFetchError(submitError, "La operación no se pudo completar."))
     } finally {
       setExchangeSubmitting(false)
     }
@@ -500,7 +376,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
     setCancelSubmitting(true)
 
     try {
-      const updated = await apiFetch<PostsaleContext>(`/api/postsales/${saleId}/cancel`, {
+      await apiFetch<PostsaleContext>(`/api/postsales/${saleId}/cancel`, {
         method: "POST",
         body: JSON.stringify({
           reason: cancelReason,
@@ -508,12 +384,12 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
         }),
       })
 
-      setContext(updated)
+      refetch()
       setActionSuccess("La venta quedó anulada y la trazabilidad interna fue registrada.")
       setCancelReason("")
       setCancelNotes("")
     } catch (submitError) {
-      setActionError(explainActionError(submitError))
+      setActionError(formatApiFetchError(submitError, "La operación no se pudo completar."))
     } finally {
       setCancelSubmitting(false)
     }
@@ -528,24 +404,17 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
     )
   }
 
-  if (error instanceof ApiError && error.status === 404) {
-    return <ProtectedNotFoundPage />
-  }
-
-  if (error instanceof ApiError && error.status === 403) {
-    return <ProtectedForbiddenPage />
-  }
-
   if (error || !context) {
     return (
       <ProtectedErrorPage
         title="No pudimos abrir la postventa"
-        description={error?.message || "La venta solicitada no está disponible para esta sede."}
+        description={error || "La venta solicitada no está disponible para esta sede."}
       />
     )
   }
 
   const documentPath = resolveDocumentPath(context)
+  const isProforma = context.sale.document_type === "proforma"
 
   return (
     <PermissionGuard permission="sales.postsale.view">
@@ -556,9 +425,9 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
             title={context.sale.sale_number || "Sin correlativo"}
             meta={
               <>
-                <MetaPill label={context.sale.document_type.toUpperCase()} tone="accent" />
-                <MetaPill label={cashStatusLabel(context.sale.cash_status)} tone={context.sale.cash_status === "open" ? "success" : context.sale.cash_status === "closed" ? "danger" : "warning"} />
-                <MetaPill label={`Fecha operativa ${context.sale.business_date}`} />
+                <OpsStatusBadge tone="accent">{context.sale.document_type.toUpperCase()}</OpsStatusBadge>
+                <OpsStatusBadge tone={context.sale.cash_status === "open" ? "success" : context.sale.cash_status === "closed" ? "danger" : "warning"}>{cashStatusLabel(context.sale.cash_status)}</OpsStatusBadge>
+                <OpsStatusBadge>{`Fecha operativa ${context.sale.business_date}`}</OpsStatusBadge>
               </>
             }
             actions={
@@ -575,12 +444,25 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                   </Button>
                 ) : null}
                 {documentPath && has("sales.pos") ? (
-                  <Button asChild variant="accent" size="sm" className="rounded-lg">
-                    <a href={documentPath} target="_blank" rel="noreferrer">
-                      <ReceiptText className="h-4 w-4" />
-                      Abrir documento
-                    </a>
-                  </Button>
+                  isProforma ? (
+                    <Button asChild variant="accent" size="sm" className="rounded-lg">
+                      <a href={documentPath} target="_blank" rel="noreferrer">
+                        <ReceiptText className="h-4 w-4" />
+                        Abrir proforma
+                      </a>
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="accent"
+                      size="sm"
+                      className="rounded-lg"
+                      onClick={() => setReceiptModalOpen(true)}
+                    >
+                      <Download className="h-4 w-4" />
+                      Descargar comprobante
+                    </Button>
+                  )
                 ) : null}
               </>
             }
@@ -689,7 +571,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                               {exchange.reason || "Sin motivo"} • {formatDateTime(exchange.confirmed_at, exchange.created_at)}
                             </p>
                           </div>
-                          <MetaPill label={exchange.status} tone="success" />
+                          <OpsStatusBadge tone="success">{exchange.status}</OpsStatusBadge>
                         </div>
 
                         <div className="mt-3 grid gap-2 md:grid-cols-2">
@@ -919,14 +801,13 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                                 </div>
                                 {selectedLine ? (
                                   <div className="mt-2 flex flex-wrap gap-2">
-                                    <MetaPill
-                                      label={
-                                        valueMatches
-                                          ? "Mismo valor total"
-                                          : `Total ${formatCurrency(replacementTotal)}`
-                                      }
+                                    <OpsStatusBadge
                                       tone={valueMatches ? "success" : "warning"}
-                                    />
+                                    >
+                                      {valueMatches
+                                        ? "Mismo valor total"
+                                        : `Total ${formatCurrency(replacementTotal)}`}
+                                    </OpsStatusBadge>
                                   </div>
                                 ) : null}
                               </button>
@@ -1065,6 +946,15 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
             </div>
           </div>
         </div>
+
+        <ReceiptOptionsModal
+          open={receiptModalOpen}
+          onClose={() => setReceiptModalOpen(false)}
+          saleId={context.sale.sale_id}
+          onOpenPreview={() => {
+            setReceiptModalOpen(false)
+          }}
+        />
       </section>
     </PermissionGuard>
   )

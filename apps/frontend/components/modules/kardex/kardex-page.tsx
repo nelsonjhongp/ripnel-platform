@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { usePagination } from "@/hooks/use-pagination";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowDownCircle,
@@ -11,10 +12,14 @@ import {
 } from "lucide-react";
 import { InlineStatusCard } from "@/components/feedback/status-page";
 import { apiFetchData } from "@/lib/api";
+import { useApiGet } from "@/hooks/use-api-get";
 import { cn } from "@/lib/utils";
+import type { Location } from "@/types/shared";
+import { formatDateTime } from "@/lib/date-utils";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsEmptyState } from "@/components/ui/ops-empty-state";
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
 import { Pagination } from "@/components/ui/pagination";
 import {
@@ -33,284 +38,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-type MovementType = "IN" | "OUT" | "ADJUST";
-type MovementDirection = "entry" | "exit" | "adjustment";
-type DocumentFamily = "sale" | "transfer" | "exchange" | "adjustment" | "none";
-type SemanticOrigin =
-  | "sale_confirmed"
-  | "sale_cancelled"
-  | "transfer_shipped"
-  | "transfer_received"
-  | "exchange_received"
-  | "exchange_delivered"
-  | "opening_confirmed"
-  | "adjustment_confirmed"
-  | "unclassified";
-type MovementOperationFilter = "ALL" | "IN" | "OUT" | "ADJUST" | "TRANSFER";
-type MovementOriginFilter =
-  | "ALL"
-  | "sale"
-  | "transfer"
-  | "exchange"
-  | "adjustment"
-  | "opening";
-
-type KardexLocation = {
-  location_id: string;
-  code: string;
-  name: string;
-  type?: string | null;
-  active?: boolean;
-  is_default?: boolean;
-};
-
-type KardexMovement = {
-  movement_id: string;
-  location_id: string;
-  location_code: string;
-  location_name: string;
-  variant_id: string;
-  sku: string;
-  style_code: string;
-  style_name: string;
-  movement_type: MovementType;
-  quantity: number;
-  quantity_effect: number;
-  balance_qty: number;
-  reason: string | null;
-  reference_type: string | null;
-  reference_id: string | null;
-  reference_line_id: string | null;
-  created_by: string | null;
-  created_by_name: string | null;
-  created_at: string;
-  movement_direction?: MovementDirection | null;
-  document_family?: DocumentFamily | null;
-  semantic_origin?: SemanticOrigin | null;
-};
-
-type KardexResponse = {
-  rows: KardexMovement[];
-  meta: {
-    available_locations: KardexLocation[];
-    selected_location_id: string | null;
-    can_view_all_locations: boolean;
-  };
-};
-
-function isOpeningMovement(movement: KardexMovement) {
-  return (
-    movement.reference_type === "adjustment" &&
-    /apertura|inicial/i.test(movement.reason || "")
-  );
-}
-
-function resolveDocumentFamily(movement: KardexMovement): DocumentFamily {
-  if (
-    movement.document_family === "sale" ||
-    movement.document_family === "transfer" ||
-    movement.document_family === "exchange" ||
-    movement.document_family === "adjustment" ||
-    movement.document_family === "none"
-  ) {
-    return movement.document_family;
-  }
-
-  if (movement.reference_type === "sale") return "sale";
-  if (movement.reference_type === "transfer") return "transfer";
-  if (movement.reference_type === "exchange") return "exchange";
-  if (movement.reference_type === "adjustment" || movement.movement_type === "ADJUST") {
-    return "adjustment";
-  }
-
-  return "none";
-}
-
-function resolveMovementDirection(movement: KardexMovement): MovementDirection {
-  if (
-    movement.movement_direction === "entry" ||
-    movement.movement_direction === "exit" ||
-    movement.movement_direction === "adjustment"
-  ) {
-    return movement.movement_direction;
-  }
-
-  if (movement.movement_type === "IN") return "entry";
-  if (movement.movement_type === "OUT") return "exit";
-  return "adjustment";
-}
-
-function resolveSemanticOrigin(movement: KardexMovement): SemanticOrigin {
-  if (
-    movement.semantic_origin === "sale_confirmed" ||
-    movement.semantic_origin === "sale_cancelled" ||
-    movement.semantic_origin === "transfer_shipped" ||
-    movement.semantic_origin === "transfer_received" ||
-    movement.semantic_origin === "exchange_received" ||
-    movement.semantic_origin === "exchange_delivered" ||
-    movement.semantic_origin === "opening_confirmed" ||
-    movement.semantic_origin === "adjustment_confirmed" ||
-    movement.semantic_origin === "unclassified"
-  ) {
-    return movement.semantic_origin;
-  }
-
-  const documentFamily = resolveDocumentFamily(movement);
-  const movementDirection = resolveMovementDirection(movement);
-
-  if (documentFamily === "transfer") {
-    return movementDirection === "exit" ? "transfer_shipped" : "transfer_received";
-  }
-
-  if (documentFamily === "sale") {
-    return movementDirection === "entry" ? "sale_cancelled" : "sale_confirmed";
-  }
-
-  if (documentFamily === "exchange") {
-    return movementDirection === "entry" ? "exchange_received" : "exchange_delivered";
-  }
-
-  if (documentFamily === "adjustment") {
-    return isOpeningMovement(movement) ? "opening_confirmed" : "adjustment_confirmed";
-  }
-
-  return "unclassified";
-}
-
-function formatMovementOperationLabel(movement: KardexMovement) {
-  switch (resolveSemanticOrigin(movement)) {
-    case "transfer_shipped":
-      return "Salida por transferencia";
-    case "transfer_received":
-      return "Entrada por transferencia";
-    case "sale_confirmed":
-      return "Salida por venta";
-    case "sale_cancelled":
-      return "Entrada por anulacion";
-    case "exchange_received":
-      return "Entrada por cambio";
-    case "exchange_delivered":
-      return "Salida por cambio";
-    case "opening_confirmed":
-      return "Apertura inicial";
-    case "adjustment_confirmed":
-      return "Ajuste";
-    default:
-      if (resolveMovementDirection(movement) === "entry") return "Entrada";
-      if (resolveMovementDirection(movement) === "exit") return "Salida";
-      return "Ajuste";
-  }
-}
-
-function formatMovementOriginLabel(movement: KardexMovement) {
-  switch (resolveSemanticOrigin(movement)) {
-    case "transfer_shipped":
-      return "Transferencia despachada";
-    case "transfer_received":
-      return "Transferencia recibida";
-    case "sale_confirmed":
-      return "Venta confirmada";
-    case "sale_cancelled":
-      return "Venta anulada";
-    case "exchange_received":
-      return "Cambio recibido";
-    case "exchange_delivered":
-      return "Cambio entregado";
-    case "opening_confirmed":
-      return "Apertura inicial";
-    case "adjustment_confirmed":
-      return "Ajuste de inventario";
-    default:
-      return "Movimiento sin documento";
-  }
-}
-
-function formatReference(movement: KardexMovement) {
-  if (movement.reference_type && movement.reference_id) {
-    const referenceLabel =
-      resolveDocumentFamily(movement) === "transfer"
-        ? "Transferencia"
-        : resolveDocumentFamily(movement) === "sale"
-          ? "Venta"
-          : resolveDocumentFamily(movement) === "exchange"
-            ? "Postventa"
-        : resolveDocumentFamily(movement) === "adjustment"
-          ? resolveSemanticOrigin(movement) === "opening_confirmed"
-            ? "Apertura"
-            : "Ajuste"
-          : movement.reference_type;
-    return `${referenceLabel} ${movement.reference_id.slice(0, 8)}`;
-  }
-  if (movement.reference_type) return movement.reference_type;
-  return movement.reason || "Sin referencia";
-}
-
-function formatDateTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("es-PE", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(date);
-}
-
-function resolveMovementTypeFromParams(
-  movementTypeParam: string | null,
-  referenceTypeParam: string | null
-): MovementOperationFilter {
-  if (movementTypeParam === "IN" || movementTypeParam === "OUT" || movementTypeParam === "ADJUST") {
-    return movementTypeParam;
-  }
-
-  if (referenceTypeParam === "transfer") {
-    return "TRANSFER";
-  }
-
-  return "ALL";
-}
-
-function resolveOriginFilterFromParams(referenceTypeParam: string | null): MovementOriginFilter {
-  if (
-    referenceTypeParam === "sale" ||
-    referenceTypeParam === "transfer" ||
-    referenceTypeParam === "exchange" ||
-    referenceTypeParam === "adjustment"
-  ) {
-    return referenceTypeParam;
-  }
-
-  return "ALL";
-}
-
-function resolveBackendReferenceType(
-  movementType: MovementOperationFilter,
-  originFilter: MovementOriginFilter,
-  referenceTypeParam: string | null
-) {
-  if (
-    referenceTypeParam === "sale" ||
-    referenceTypeParam === "transfer" ||
-    referenceTypeParam === "exchange" ||
-    referenceTypeParam === "adjustment"
-  ) {
-    return referenceTypeParam;
-  }
-
-  if (
-    originFilter === "sale" ||
-    originFilter === "transfer" ||
-    originFilter === "exchange" ||
-    originFilter === "adjustment"
-  ) {
-    return originFilter;
-  }
-
-  if (movementType === "TRANSFER") {
-    return "transfer";
-  }
-
-  return null;
-}
+import type { KardexMovement, KardexResponse, MovementOperationFilter, MovementOriginFilter } from "@/lib/kardex-domain";
+import { resolveDocumentFamily, resolveMovementDirection, resolveSemanticOrigin, formatMovementOperationLabel, formatMovementOriginLabel, formatReference, resolveMovementTypeFromParams, resolveOriginFilterFromParams, resolveBackendReferenceType } from "@/lib/kardex-domain";
 
 export default function KardexPage() {
   const searchParams = useSearchParams();
@@ -364,27 +93,15 @@ function KardexPageContent({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [movements, setMovements] = useState<KardexMovement[]>([]);
-  const [availableLocations, setAvailableLocations] = useState<KardexLocation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState(initialQuery);
   const [locationFilter, setLocationFilter] = useState(initialLocation);
   const [movementType, setMovementType] = useState<MovementOperationFilter>(initialMovementType);
   const [originFilter, setOriginFilter] = useState<MovementOriginFilter>(initialOriginFilter);
   const [dateFrom, setDateFrom] = useState(initialDateFrom);
   const [dateTo, setDateTo] = useState(initialDateTo);
-  const [currentPage, setCurrentPage] = useState(1);
-  const effectiveLocationFilter =
-    locationFilter === "ALL" ||
-    availableLocations.some((location) => location.location_id === locationFilter)
-      ? locationFilter
-      : "ALL";
 
-  const loadKardex = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
+  const { data: kardexResponse, loading, error, refetch } = useApiGet<KardexResponse>(
+    () => {
       const params = new URLSearchParams();
       const normalizedQuery = query.trim();
       const backendReferenceType = resolveBackendReferenceType(
@@ -413,8 +130,8 @@ function KardexPageContent({
         params.set("query", combinedQuery);
       }
 
-      if (effectiveLocationFilter !== "ALL") {
-        params.set("location_id", effectiveLocationFilter);
+      if (locationFilter !== "ALL") {
+        params.set("location_id", locationFilter);
       }
 
       if (dateFrom) {
@@ -425,25 +142,21 @@ function KardexPageContent({
         params.set("date_to", `${dateTo}T23:59:59`);
       }
 
-      const data = await apiFetchData<KardexResponse>(`/api/inventory/kardex?${params.toString()}`, {
+      return apiFetchData<KardexResponse>(`/api/inventory/kardex?${params.toString()}`, {
         cache: "no-store",
       });
-      setMovements(data?.rows || []);
-      setAvailableLocations(data?.meta.available_locations || []);
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "No se pudo cargar movimientos de stock"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [dateFrom, dateTo, effectiveLocationFilter, movementType, originFilter, query, referenceIdParam, referenceTypeParam]);
+    },
+    [query, locationFilter, movementType, originFilter, referenceTypeParam, referenceIdParam, dateFrom, dateTo]
+  );
 
-  useEffect(() => {
-    void Promise.resolve().then(() => loadKardex());
-  }, [loadKardex]);
+  const movements = useMemo(() => kardexResponse?.rows || [], [kardexResponse]);
+  const availableLocations = useMemo(() => kardexResponse?.meta?.available_locations || [], [kardexResponse]);
+
+  const effectiveLocationFilter =
+    locationFilter === "ALL" ||
+    availableLocations.some((location) => location.location_id === locationFilter)
+      ? locationFilter
+      : "ALL";
 
   const locationOptions = useMemo(() => {
     return availableLocations.map((location) => ({
@@ -527,19 +240,18 @@ function KardexPageContent({
     );
   }, [filteredMovements]);
 
-  const pageSize = 10;
-  const totalPages = Math.max(1, Math.ceil(filteredMovements.length / pageSize));
-  const safePage = Math.min(currentPage, totalPages);
-  const paginatedMovements = filteredMovements.slice(
-    (safePage - 1) * pageSize,
-    safePage * pageSize
-  );
-  const firstVisible = filteredMovements.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
-  const lastVisible = Math.min(safePage * pageSize, filteredMovements.length);
+  const {
+    paginatedItems: paginatedMovements,
+    firstVisible,
+    lastVisible,
+    totalPages,
+    safePage,
+    setPage,
+  } = usePagination(filteredMovements);
 
   function handleFilterChange(fn: () => void) {
     fn();
-    setCurrentPage(1);
+    setPage(1);
   }
 
   const hasActiveFilters =
@@ -562,7 +274,7 @@ function KardexPageContent({
               variant="outline"
               size="sm"
               className="rounded-lg"
-              onClick={() => loadKardex()}
+              onClick={() => refetch()}
               disabled={loading}
             >
               <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
@@ -717,10 +429,12 @@ function KardexPageContent({
                      </tr>
                    ) : filteredMovements.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                        {movements.length === 0
-                          ? "No hay movimientos de stock registrados."
-                          : "No se encontraron movimientos con los filtros actuales."}
+                      <td colSpan={9} className="px-4 py-10">
+                        <OpsEmptyState variant="compact" description={
+                          movements.length === 0
+                            ? "No hay movimientos de stock registrados."
+                            : "No se encontraron movimientos con los filtros actuales."
+                        } />
                       </td>
                     </tr>
                   ) : (
@@ -798,7 +512,7 @@ function KardexPageContent({
             <Pagination
               page={safePage}
               totalPages={totalPages}
-              onPageChange={setCurrentPage}
+              onPageChange={setPage}
               className="self-end md:self-auto"
             />
           </OpsTableFooter>

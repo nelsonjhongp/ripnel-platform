@@ -139,22 +139,6 @@ export function formatBusinessDate(value: string | null | undefined) {
   return parsed.toLocaleDateString("es-PE", { timeZone: "America/Lima" })
 }
 
-export function formatDateTime(value: string | null | undefined, fallback?: string | null) {
-  const source = value || fallback
-  if (!source) return "-"
-
-  const parsed = new Date(source)
-  if (Number.isNaN(parsed.getTime())) {
-    return String(source)
-  }
-
-  return parsed.toLocaleString("es-PE", {
-    dateStyle: "short",
-    timeStyle: "short",
-    timeZone: "America/Lima",
-  })
-}
-
 export function getCashStatusLabel(status: CashClosing["status"]) {
   return status === "open" ? "Pendiente de cierre" : "Cerrada"
 }

@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react"
 import { ClipboardList } from "lucide-react"
 
-import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state"
+import { OpsEmptyState } from "@/components/ui/ops-empty-state"
 import { OpsAttentionRow } from "@/components/ui/ops-attention-row"
 import { OpsSectionHeader } from "@/components/ui/ops-section-header"
 
@@ -32,7 +32,7 @@ export function AttentionPanel({
         title="Requiere atención"
       />
       {items.length === 0 ? (
-        <DashboardEmptyState compact dashed={false} description="No hay alertas visibles para tu perfil en este momento." />
+        <OpsEmptyState variant="compact" description="No hay alertas visibles para tu perfil en este momento." />
       ) : (
         <div className="overflow-hidden rounded-xl border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_30%,var(--ops-surface))]">
           {items.map((item) => {

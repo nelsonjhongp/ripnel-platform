@@ -1,9 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { MapPin, PencilLine, Plus, Power, RefreshCw, RotateCcw } from "lucide-react";
 import { apiFetchData } from "@/lib/api";
+import { useApiGet } from "@/hooks/use-api-get";
+import { activeBadgeLabel } from "@/lib/badge-utils";
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
+import { usePagination } from "@/hooks/use-pagination";
+import { EMPTY_USER_FORM, type UserFormState } from "@/types/admin";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,9 +21,10 @@ import {
   AdminModalShell,
   AdminRowActionsMenu,
   AdminSection,
-  AdminSelectMenu,
 } from "@/components/admin/admin-ui";
+import { OpsSelectMenu } from "@/components/ui/ops-selection";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsEmptyState } from "@/components/ui/ops-empty-state";
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
 import {
   OpsFiltersRow,
@@ -26,9 +32,8 @@ import {
   OpsSearchField,
   OpsSectionDivider,
   OpsTableBlock,
-  OpsTableFooter,
-  OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
+import { OpsDataTable } from "@/components/ui/ops-data-table";
 import { Pagination } from "@/components/ui/pagination";
 import {
   Tooltip,
@@ -81,64 +86,34 @@ type UserLocationsPayload = {
   assignments: UserLocationAssignment[];
 };
 
-type UserFormState = {
-  full_name: string;
-  username: string;
-  email: string;
-  role_id: string;
-  active: boolean;
-  location_ids: string[];
-  default_location_id: string;
-};
 
-async function requestJson<T>(path: string, init?: RequestInit) {
-  return apiFetchData<T>(path, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
-    cache: "no-store",
-    ...init,
-  });
-}
 
-const emptyUserForm: UserFormState = {
-  full_name: "",
-  username: "",
-  email: "",
-  role_id: "",
-  active: true,
-  location_ids: [],
-  default_location_id: "",
-};
-
-const PAGE_SIZE = 10;
-
-function statusBadgeClass(active: boolean) {
-  return active
-    ? "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
-    : "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]";
-}
 
 export default function UsuariosPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [availableLocations, setAvailableLocations] = useState<Location[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(true);
-  const [loadingRoles, setLoadingRoles] = useState(true);
-  const [loadingLocations, setLoadingLocations] = useState(true);
-  const [usersError, setUsersError] = useState<string | null>(null);
-  const [rolesError, setRolesError] = useState<string | null>(null);
-  const [locationsError, setLocationsError] = useState<string | null>(null);
+  const { data: usersData, loading: loadingUsers, error: usersError, refetch: refetchUsers } = useApiGet(
+    () => apiFetchData<User[]>("/api/users"),
+    []
+  );
+  const users = usersData || [];
+
+  const { data: rolesData, loading: loadingRoles, error: rolesError, refetch: refetchRoles } = useApiGet(
+    () => apiFetchData<Role[]>("/api/roles"),
+    []
+  );
+  const roles = (rolesData || []).filter((role) => role.active);
+
+  const { data: locationsData, loading: loadingLocations, error: locationsError, refetch: refetchLocations } = useApiGet(
+    () => apiFetchData<Location[]>("/api/locations"),
+    []
+  );
+  const availableLocations = (locationsData || []).filter((location) => location.active);
 
   const [userQuery, setUserQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
-  const [userPage, setUserPage] = useState(1);
-
   const [showUserForm, setShowUserForm] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
-  const [userForm, setUserForm] = useState<UserFormState>(emptyUserForm);
+  const [userForm, setUserForm] = useState<UserFormState>(EMPTY_USER_FORM);
   const [savingUser, setSavingUser] = useState(false);
   const [activeChangeUser, setActiveChangeUser] = useState<User | null>(null);
   const [savingActiveChange, setSavingActiveChange] = useState(false);
@@ -150,56 +125,7 @@ export default function UsuariosPage() {
   const [loadingUserLocations, setLoadingUserLocations] = useState(false);
   const [savingUserLocations, setSavingUserLocations] = useState(false);
   const [userLocationsError, setUserLocationsError] = useState<string | null>(null);
-
-  const loadUsers = useCallback(async () => {
-    setLoadingUsers(true);
-    setUsersError(null);
-
-    try {
-      const data = await requestJson<User[]>("/api/users");
-      setUsers(data);
-    } catch (error) {
-      setUsersError(error instanceof Error ? error.message : "No se pudo cargar usuarios");
-    } finally {
-      setLoadingUsers(false);
-    }
-  }, []);
-
-  const loadRoles = useCallback(async () => {
-    setLoadingRoles(true);
-    setRolesError(null);
-
-    try {
-      const data = await requestJson<Role[]>("/api/roles");
-      setRoles(data.filter((role) => role.active));
-    } catch (error) {
-      setRolesError(error instanceof Error ? error.message : "No se pudo cargar roles");
-    } finally {
-      setLoadingRoles(false);
-    }
-  }, []);
-
-  const loadLocations = useCallback(async () => {
-    setLoadingLocations(true);
-    setLocationsError(null);
-
-    try {
-      const data = await requestJson<Location[]>("/api/locations");
-      setAvailableLocations(data.filter((location) => location.active));
-    } catch (error) {
-      setLocationsError(error instanceof Error ? error.message : "No se pudo cargar sedes");
-    } finally {
-      setLoadingLocations(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void Promise.resolve().then(() => {
-      void loadUsers();
-      void loadRoles();
-      void loadLocations();
-    });
-  }, [loadUsers, loadRoles, loadLocations]);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const filteredUsers = useMemo(() => {
     const query = userQuery.trim().toLowerCase();
@@ -230,20 +156,13 @@ export default function UsuariosPage() {
     return result;
   }, [userQuery, users, roles, roleFilter, sortOrder]);
 
-  const totalUserPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
-  const safeUserPage = Math.min(userPage, totalUserPages);
-  const paginatedUsers = filteredUsers.slice(
-    (safeUserPage - 1) * PAGE_SIZE,
-    safeUserPage * PAGE_SIZE
-  );
-  const userRangeStart = filteredUsers.length === 0 ? 0 : (safeUserPage - 1) * PAGE_SIZE + 1;
-  const userRangeEnd = Math.min(filteredUsers.length, safeUserPage * PAGE_SIZE);
+  const { paginatedItems: paginatedUsers, totalPages, safePage, firstVisible, lastVisible, setPage } = usePagination(filteredUsers)
 
   const clearFilters = () => {
     setUserQuery("");
     setRoleFilter("all");
     setSortOrder("desc");
-    setUserPage(1);
+    setPage(1);
   };
 
   const hasActiveFilters = userQuery.trim() !== "" || roleFilter !== "all" || sortOrder !== "desc";
@@ -267,16 +186,17 @@ export default function UsuariosPage() {
       });
     } else {
       setEditingUserId(null);
-      setUserForm(emptyUserForm);
+      setUserForm(EMPTY_USER_FORM);
     }
 
+    setSaveError(null);
     setShowUserForm(true);
   }
 
   function closeUserForm() {
     setShowUserForm(false);
     setEditingUserId(null);
-    setUserForm(emptyUserForm);
+    setUserForm(EMPTY_USER_FORM);
   }
 
   async function submitUserForm(event: FormEvent<HTMLFormElement>) {
@@ -293,7 +213,7 @@ export default function UsuariosPage() {
       };
 
       if (editingUserId) {
-        await requestJson<User>(`/api/users/${editingUserId}`, {
+        await apiFetchData<User>(`/api/users/${editingUserId}`, {
           method: "PATCH",
           body: JSON.stringify(payload),
         });
@@ -310,7 +230,7 @@ export default function UsuariosPage() {
           throw new Error("Elige una sede default para el usuario.");
         }
 
-        const createdUser = await requestJson<User>("/api/users", {
+        const createdUser = await apiFetchData<User>("/api/users", {
           method: "POST",
           body: JSON.stringify({
             ...payload,
@@ -323,6 +243,7 @@ export default function UsuariosPage() {
         });
 
         if (createdUser.temporary_password) {
+          // TODO: Replace with toast notification in Phase 3
           window.alert(
             `Usuario creado.\nUsuario: ${createdUser.username}\nClave temporal: ${createdUser.temporary_password}\n\nEntrega esta clave al usuario para su primer ingreso.`
           );
@@ -330,9 +251,9 @@ export default function UsuariosPage() {
       }
 
       closeUserForm();
-      await loadUsers();
+      refetchUsers();
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "No se pudo guardar el usuario");
+      setSaveError(error instanceof Error ? error.message : "No se pudo guardar el usuario");
     } finally {
       setSavingUser(false);
     }
@@ -377,14 +298,14 @@ export default function UsuariosPage() {
     setSavingActiveChange(true);
 
     try {
-      await requestJson<User>(`/api/users/${activeChangeUser.user_id}`, {
+      await apiFetchData<User>(`/api/users/${activeChangeUser.user_id}`, {
         method: "PATCH",
         body: JSON.stringify({ active: targetState }),
       });
       setActiveChangeUser(null);
-      await loadUsers();
+      refetchUsers();
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "No se pudo actualizar el usuario");
+      setSaveError(error instanceof Error ? error.message : "No se pudo actualizar el usuario");
     } finally {
       setSavingActiveChange(false);
     }
@@ -399,7 +320,7 @@ export default function UsuariosPage() {
     setLoadingUserLocations(true);
 
     try {
-      const payload = await requestJson<UserLocationsPayload>(
+      const payload = await apiFetchData<UserLocationsPayload>(
         `/api/users/${user.user_id}/locations`
       );
       setSelectedLocationIds(payload.assignments.map((assignment) => assignment.location_id));
@@ -451,7 +372,7 @@ export default function UsuariosPage() {
     setUserLocationsError(null);
 
     try {
-      await requestJson<UserLocationsPayload>(
+      await apiFetchData<UserLocationsPayload>(
         `/api/users/${locationsUser.user_id}/locations`,
         {
           method: "PUT",
@@ -495,7 +416,7 @@ export default function UsuariosPage() {
                       variant="outline"
                       size="icon-sm"
                       className="rounded-lg"
-                      onClick={loadUsers}
+                      onClick={refetchUsers}
                       aria-label="Actualizar usuarios"
                     >
                       <RefreshCw className="h-4 w-4" />
@@ -522,13 +443,13 @@ export default function UsuariosPage() {
                 value={userQuery}
                 onChange={(value) => {
                   setUserQuery(value);
-                  setUserPage(1);
+                  setPage(1);
                 }}
                 placeholder="Buscar por nombre, usuario, email o rol"
                 ariaLabel="Buscar usuarios"
               />
-              <FilterDropdown label="Rol" value={roleFilter} options={roleFilterOptions} onChange={(v) => { setRoleFilter(v); setUserPage(1); }} />
-              <FilterDropdown label="Orden" value={sortOrder} options={[{ value: "desc", label: "Más reciente" }, { value: "asc", label: "Más antiguo" }]} onChange={(v) => { setSortOrder(v as "desc" | "asc"); setUserPage(1); }} />
+              <FilterDropdown label="Rol" value={roleFilter} options={roleFilterOptions} onChange={(v) => { setRoleFilter(v); setPage(1); }} />
+              <FilterDropdown label="Orden" value={sortOrder} options={[{ value: "desc", label: "Más reciente" }, { value: "asc", label: "Más antiguo" }]} onChange={(v) => { setSortOrder(v as "desc" | "asc"); setPage(1); }} />
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button onClick={clearFilters} disabled={!hasActiveFilters} variant="outline" size="icon-sm" className="mt-auto h-10 w-10 rounded-lg" aria-label="Limpiar filtros">
@@ -539,124 +460,103 @@ export default function UsuariosPage() {
               </Tooltip>
             </OpsFiltersRow>
 
-            {usersError && (
-              <div className="rounded-xl border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-4 py-2.5 text-sm text-[color:color-mix(in_srgb,#be123c_74%,var(--ops-text))]">
-                {usersError}
-              </div>
-            )}
+            <OpsDataTable
+              columns={[
+                { key: "usuario", header: "Usuario" },
+                { key: "rol", header: "Rol" },
+                { key: "estado", header: "Estado" },
+                { key: "actualizado", header: "Actualizado" },
+                { key: "acciones", header: "", className: "w-[4.5rem] text-right" },
+              ]}
+              minWidth="980px"
+              loading={loadingUsers}
+              loadingMessage="Cargando usuarios..."
+              error={!loadingUsers ? usersError : null}
+              errorTitle="Error al cargar usuarios"
+              isEmpty={!loadingUsers && !usersError && filteredUsers.length === 0}
+              emptyMessage="No hay usuarios para este filtro."
+              footer={
+                !loadingUsers && !usersError && filteredUsers.length > 0 ? (
+                  <>
+                    <span className="text-sm tabular-nums text-[var(--ops-text-muted)]">
+                      {firstVisible}-{lastVisible} de {filteredUsers.length}
+                    </span>
+                    <Pagination page={safePage} totalPages={totalPages} onPageChange={setPage} className="self-end md:self-auto" />
+                  </>
+                ) : undefined
+              }
+            >
+              {paginatedUsers.map((user) => {
+                const roleName =
+                  user.role_name ||
+                  roles.find((role) => role.role_id === user.role_id)?.name ||
+                  "Sin rol";
 
-            <OpsTableWrap minWidth="980px">
-              {loadingUsers ? (
-                <div className="px-4 py-6 text-sm text-[var(--ops-text-muted)]">Cargando usuarios…</div>
-              ) : filteredUsers.length === 0 ? (
-                <div className="px-4 py-6 text-sm text-[var(--ops-text-muted)]">
-                  No hay usuarios para este filtro.
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-[var(--ops-border-strong)] text-sm">
-                    <thead className="bg-[var(--ops-surface-muted)]">
-                      <tr>
-                        <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                          Usuario
-                        </th>
-                        <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                          Rol
-                        </th>
-                        <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                          Estado
-                        </th>
-                        <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                          Actualizado
-                        </th>
-                        <th className="w-[4.5rem] px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                          Acciones
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                      {paginatedUsers.map((user) => {
-                        const roleName =
-                          user.role_name ||
-                          roles.find((role) => role.role_id === user.role_id)?.name ||
-                          "Sin rol";
-
-                        return (
-                          <tr key={user.user_id} className="transition hover:bg-[var(--ops-surface-muted)]">
-                            <td className="px-4 py-[var(--ops-row-py)] align-top">
-                              <div className="font-semibold text-[var(--ops-text)]">
-                                {user.full_name}
-                              </div>
-                              <div className="text-xs text-[var(--ops-text-muted)]">
-                                @{user.username}
-                              </div>
-                              {user.email && (
-                                <div className="text-xs text-[var(--ops-text-muted)]">
-                                  {user.email}
-                                </div>
-                              )}
-                            </td>
-                            <td className="px-4 py-[var(--ops-row-py)] align-top">
-                              <span className="inline-flex rounded-full border border-[var(--ops-border-soft)] bg-[var(--ripnel-accent-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--ripnel-accent-hover)]">
-                                {roleName}
-                              </span>
-                            </td>
-                            <td className="px-4 py-[var(--ops-row-py)] align-top">
-                              <span
-                                className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium ${statusBadgeClass(user.active)}`}
-                              >
-                                {user.active ? "Activo" : "Inactivo"}
-                              </span>
-                              {user.must_change_password ? (
-                                <span className="mt-1.5 block">
-                                  <span className="inline-flex rounded-full border border-[color:color-mix(in_srgb,var(--warning)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--warning)_10%,transparent)] px-2 py-0.5 text-[11px] font-medium text-[color:color-mix(in_srgb,var(--warning)_70%,currentColor)]">
-                                    Clave pendiente
-                                  </span>
-                                </span>
-                              ) : null}
-                            </td>
-                            <td className="px-4 py-[var(--ops-row-py)] align-top text-xs text-[var(--ops-text-muted)]">
-                              {new Date(user.updated_at).toLocaleString("es-PE")}
-                            </td>
-                            <td className="w-[4.5rem] px-4 py-[var(--ops-row-py)] align-top">
-                              <AdminRowActionsMenu
-                                ariaLabel={`Acciones para ${user.full_name}`}
-                                items={[
-                                  {
-                                    label: "Sedes",
-                                    icon: <MapPin className="h-3.5 w-3.5" />,
-                                    onSelect: () => openLocationsModal(user),
-                                  },
-                                  {
-                                    label: "Editar",
-                                    icon: <PencilLine className="h-3.5 w-3.5" />,
-                                    onSelect: () => openUserForm(user),
-                                  },
-                                  {
-                                    label: user.active ? "Inactivar" : "Activar",
-                                    icon: <Power className="h-3.5 w-3.5" />,
-                                    tone: user.active ? "danger" : "neutral",
-                                    onSelect: () => setActiveChangeUser(user),
-                                  },
-                                ]}
-                              />
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </OpsTableWrap>
-            {!loadingUsers && filteredUsers.length > 0 ? (
-              <OpsTableFooter className="border-t border-[var(--ops-border-strong)] pt-3">
-                <div className="text-xs font-medium text-[var(--ops-text-muted)]">
-                  {userRangeStart}-{userRangeEnd} de {filteredUsers.length}
-                </div>
-                <Pagination page={safeUserPage} totalPages={totalUserPages} onPageChange={setUserPage} />
-              </OpsTableFooter>
-            ) : null}
+                return (
+                  <tr key={user.user_id} className="transition hover:bg-[var(--ops-surface-muted)]">
+                    <td className="px-4 py-[var(--ops-row-py)] align-top">
+                      <div className="font-semibold text-[var(--ops-text)]">
+                        {user.full_name}
+                      </div>
+                      <div className="text-xs text-[var(--ops-text-muted)]">
+                        @{user.username}
+                      </div>
+                      {user.email && (
+                        <div className="text-xs text-[var(--ops-text-muted)]">
+                          {user.email}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-[var(--ops-row-py)] align-top">
+                      <span className="inline-flex rounded-full border border-[var(--ops-border-soft)] bg-[var(--ripnel-accent-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--ripnel-accent-hover)]">
+                        {roleName}
+                      </span>
+                    </td>
+                    <td className="px-4 py-[var(--ops-row-py)] align-top">
+                      <OpsStatusBadge tone={user.active ? "success" : "neutral"}>
+                        {activeBadgeLabel(user.active)}
+                      </OpsStatusBadge>
+                      {user.must_change_password ? (
+                        <span className="mt-1.5 block">
+                          <span className="inline-flex rounded-full border border-[color:color-mix(in_srgb,var(--warning)_18%,transparent)] bg-[color:color-mix(in_srgb,var(--warning)_10%,transparent)] px-2 py-0.5 text-[11px] font-medium text-[color:color-mix(in_srgb,var(--warning)_70%,currentColor)]">
+                            Clave pendiente
+                          </span>
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-[var(--ops-row-py)] align-top text-xs text-[var(--ops-text-muted)]">
+                      {new Date(user.updated_at).toLocaleString("es-PE")}
+                    </td>
+                    <td className="w-[4.5rem] px-4 py-[var(--ops-row-py)] align-top">
+                      <AdminRowActionsMenu
+                        ariaLabel={`Acciones para ${user.full_name}`}
+                        items={[
+                          {
+                            label: "Sedes",
+                            icon: <MapPin className="h-3.5 w-3.5" />,
+                            onSelect: () => openLocationsModal(user),
+                          },
+                          {
+                            label: "Editar",
+                            icon: <PencilLine className="h-3.5 w-3.5" />,
+                            onSelect: () => openUserForm(user),
+                          },
+                          {
+                            label: user.active ? "Inactivar" : "Activar",
+                            icon: <Power className="h-3.5 w-3.5" />,
+                            tone: user.active ? "danger" : "neutral",
+                            onSelect: () => {
+                              setSaveError(null);
+                              setActiveChangeUser(user);
+                            },
+                          },
+                        ]}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </OpsDataTable>
             </OpsTableBlock>
           </OpsSectionDivider>
 
@@ -693,6 +593,9 @@ export default function UsuariosPage() {
               }
             >
                 <form id="user-edit-form" className="space-y-4" onSubmit={submitUserForm}>
+                  {saveError && (
+                    <AdminInlineMessage tone="danger">{saveError}</AdminInlineMessage>
+                  )}
                   <AdminSection title="Identidad y acceso">
                     <div className="space-y-4">
                       <AdminField label="Nombre completo">
@@ -733,7 +636,7 @@ export default function UsuariosPage() {
                       </AdminField>
 
                       <AdminField label="Rol" hint={rolesError || undefined}>
-                        <AdminSelectMenu
+                        <OpsSelectMenu
                           value={userForm.role_id}
                           onValueChange={(value) =>
                             setUserForm((current) => ({ ...current, role_id: value }))
@@ -934,6 +837,9 @@ export default function UsuariosPage() {
             description={
               activeChangeUser ? (
                 <>
+                  {saveError && (
+                    <AdminInlineMessage tone="danger">{saveError}</AdminInlineMessage>
+                  )}
                   Vas a {activeChangeUser.active ? "inactivar" : "activar"} a{" "}
                   <span className="font-semibold text-[var(--ops-text)]">
                     {activeChangeUser.full_name}

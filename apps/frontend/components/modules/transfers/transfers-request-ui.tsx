@@ -32,65 +32,16 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-
-export type RequestCandidateSource = {
-  location_id: string;
-  location_code: string;
-  location_name: string;
-  qty_available: number;
-};
-
-export type RequestCandidate = {
-  variant_id: string;
-  sku: string;
-  style_code: string;
-  style_name: string;
-  garment_type_name: string | null;
-  size_code: string;
-  color_name: string;
-  total_available: number;
-  candidate_sources: RequestCandidateSource[];
-};
-
-export type RequestProductVariant = {
-  variant_id: string;
-  sku: string;
-  size_code: string;
-  color_name: string;
-  total_available: number;
-  candidate_sources: RequestCandidateSource[];
-};
-
-export type RequestProductGroup = {
-  product_key: string;
-  style_code: string;
-  style_name: string;
-  garment_type_name: string | null;
-  secondary_code: string;
-  total_available: number;
-  variants: RequestProductVariant[];
-};
-
-export type DraftLine = {
-  location_id: string;
-  location_code: string;
-  location_name: string;
-  variant_id: string;
-  sku: string;
-  style_code: string;
-  style_name: string;
-  garment_type_name: string | null;
-  size_code: string;
-  color_name: string;
-  qty: number;
-  qty_requested: number;
-};
-
-export type RequestLocationOption = {
-  value: string;
-  label: string;
-  type?: string | null;
-};
+import type {
+  DraftLine,
+  RequestCandidate,
+  RequestCandidateSource,
+  RequestLocationOption,
+  RequestProductGroup,
+  RequestProductVariant,
+} from "./transfers-shared"
+import { OpsLocationIcon } from "@/components/ui/ops-location-icon"
+import { OpsQuantityStepper } from "@/components/ui/ops-quantity-stepper"
 
 const panelClass = "ops-surface rounded-xl border";
 const softPanelClass =
@@ -119,108 +70,8 @@ function getVariantOriginStock(variant: RequestProductVariant, lockedOriginId: s
   );
 }
 
-function LocationIcon({
-  type,
-  className,
-}: {
-  type?: string | null;
-  className?: string;
-}) {
-  if (type === "store") {
-    return <Store className={className} />;
-  }
-
-  if (type === "warehouse") {
-    return <Warehouse className={className} />;
-  }
-
-  return <Building2 className={className} />;
-}
-
 function FieldLabel({ children }: { children: string }) {
   return <p className={fieldLabelClass}>{children}</p>;
-}
-
-export function QuantityStepper({
-  value,
-  onChange,
-  onIncrement,
-  onDecrement,
-  disabled = false,
-  min = 1,
-  max,
-  className,
-  inputClassName,
-}: {
-  value: string | number;
-  onChange: (value: string) => void;
-  onIncrement?: () => void;
-  onDecrement?: () => void;
-  disabled?: boolean;
-  min?: number;
-  max?: number;
-  className?: string;
-  inputClassName?: string;
-}) {
-  const numericValue = typeof value === "number" ? value : Number(value);
-  const hasNumericValue = Number.isFinite(numericValue);
-  const canDecrement = !disabled && hasNumericValue && numericValue > min;
-  const canIncrement = !disabled && hasNumericValue && (typeof max !== "number" || numericValue < max);
-
-  return (
-    <div
-      className={cn(
-        "flex h-10 items-stretch gap-0 rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] pl-3 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--ops-surface)_74%,transparent)] overflow-hidden",
-        disabled && "cursor-not-allowed bg-[var(--ops-surface-muted)] opacity-70",
-        className
-      )}
-    >
-      <input
-        type="number"
-        min={min}
-        max={max}
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-        className={cn(
-          "h-full w-full min-w-0 bg-transparent pr-2 text-center text-sm font-semibold tabular-nums text-[var(--ops-text)] outline-none disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
-          inputClassName
-        )}
-      />
-
-      <div className="flex h-full w-7 shrink-0 flex-col border-l border-[var(--ops-border-strong)]">
-        <button
-          type="button"
-          onClick={onIncrement}
-          disabled={!canIncrement}
-          className={cn(
-            "inline-flex h-1/2 w-full items-center justify-center border-b border-[var(--ops-border-strong)] transition",
-            canIncrement
-              ? "cursor-pointer text-[var(--ripnel-accent-hover)] hover:bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_78%,var(--ops-surface))]"
-              : "cursor-not-allowed text-[var(--ops-text-muted)]"
-          )}
-          aria-label="Aumentar cantidad"
-        >
-          <ChevronUp className="h-3 w-3" />
-        </button>
-
-        <button
-          type="button"
-          onClick={onDecrement}
-          disabled={!canDecrement}
-          className={cn(
-            "inline-flex h-1/2 w-full items-center justify-center transition",
-            canDecrement
-              ? "cursor-pointer text-[color:color-mix(in_srgb,#c96c1d_88%,var(--ops-text))] hover:bg-[color:color-mix(in_srgb,#f59e0b_18%,var(--ops-surface))]"
-              : "cursor-not-allowed text-[var(--ops-text-muted)]"
-          )}
-          aria-label="Disminuir cantidad"
-        >
-          <ChevronDown className="h-3 w-3" />
-        </button>
-      </div>
-    </div>
-  );
 }
 
 function ValidationItem({
@@ -283,7 +134,7 @@ export function RequestRouteField({
                 className="sales-field sales-field-interactive flex min-h-12 w-full min-w-0 items-center justify-between gap-3 rounded-2xl border-[color:color-mix(in_srgb,var(--ops-border-strong)_88%,var(--ripnel-accent)_12%)] bg-[color:color-mix(in_srgb,var(--ops-surface)_98%,var(--ops-surface-muted))] px-4 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] focus-visible:outline-none"
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  <LocationIcon
+                  <OpsLocationIcon
                     type={selectedOrigin?.type}
                     className="h-4 w-4 shrink-0 text-[var(--ops-text)]"
                   />
@@ -323,7 +174,7 @@ export function RequestRouteField({
           <FieldLabel>Destino</FieldLabel>
           <div className="sales-field flex min-h-12 w-full min-w-0 items-center justify-between gap-3 rounded-2xl border-[color:color-mix(in_srgb,var(--ops-border-strong)_88%,#86d6a8_18%)] bg-[color:color-mix(in_srgb,var(--ops-surface)_98%,var(--ops-surface-muted))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
             <div className="flex min-w-0 items-center gap-3">
-              <LocationIcon
+              <OpsLocationIcon
                 type={destinationType}
                 className="h-4 w-4 shrink-0 text-[var(--ops-text)]"
               />
@@ -585,7 +436,7 @@ export function RequestProductComposer({
             <div className="grid gap-3 md:grid-cols-[220px_minmax(0,1fr)] md:items-end">
               <div className="space-y-1.5">
                 <FieldLabel>Cantidad solicitada</FieldLabel>
-                <QuantityStepper
+                <OpsQuantityStepper
                   value={normalizedQuantity}
                   onChange={(nextValue) =>
                     setQuantity(
@@ -756,7 +607,7 @@ export function RequestDraftTable({
 
                     <td className="px-3 py-2.5">
                       <div className="flex justify-center">
-                        <QuantityStepper
+                        <OpsQuantityStepper
                           value={line.qty_requested}
                           onChange={(value) => onUpdateLineQty(line.variant_id, value)}
                           onIncrement={() => onUpdateLineQty(line.variant_id, String(Math.min(line.qty_requested + 1, line.qty)))}
@@ -904,12 +755,12 @@ export function DraftSummaryPanel({
       <section className="space-y-2 border-t border-[var(--ops-border-strong)] pt-4">
         <FieldLabel>Ruta</FieldLabel>
         <div className="flex items-center gap-2 text-sm">
-          <LocationIcon type={activeOriginType} className="h-4 w-4 shrink-0 text-[var(--ops-text)]" />
+          <OpsLocationIcon type={activeOriginType} className="h-4 w-4 shrink-0 text-[var(--ops-text)]" />
           <span className="min-w-0 truncate font-semibold text-[var(--ripnel-accent-hover)]">
             {activeOriginName || "Seleccionar origen"}
           </span>
           <ArrowRight className="h-4 w-4 shrink-0 text-[var(--ops-text)]" />
-          <LocationIcon type={activeDestinationType} className="h-4 w-4 shrink-0 text-[var(--ops-text)]" />
+          <OpsLocationIcon type={activeDestinationType} className="h-4 w-4 shrink-0 text-[var(--ops-text)]" />
           <span className="min-w-0 truncate font-semibold text-[var(--ops-text)]">
             {activeDestinationName}
           </span>
