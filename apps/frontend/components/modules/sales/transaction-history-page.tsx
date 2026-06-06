@@ -17,117 +17,25 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { cn } from "@/lib/utils"
-import { ApiError, apiFetch } from "@/lib/api"
+import { OpsEmptyState } from "@/components/ui/ops-empty-state"
+import { OpsMetricPill } from "@/components/ui/ops-metric-pill"
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
+import { formatDateTime } from "@/lib/date-utils"
+import { formatCurrency } from "@/lib/format-utils"
+import { formatApiFetchError, apiFetch } from "@/lib/api"
 import { buildSaleDetailRoute } from "@/lib/routes"
+import { SALE_STATUS_META, SALE_STATUS_TONES, type SaleItem, type SalesPageResponse } from "@/types/sales"
 
-type SaleStatus = "confirmed" | "draft" | "cancelled"
-
-type SaleItem = {
-  sale_id: string
-  sale_number: string | null
-  status: SaleStatus
-  document_type: string
-  customer_name_text: string | null
-  subtotal_amount: number
-  tax_amount: number
-  sale_discount_amount: number
-  total_amount: number
-  currency: string
-  confirmed_at: string | null
-  created_at: string
-  location_name: string
-  seller_name: string
-}
-
-type SalesPageResponse = {
-  items: SaleItem[]
-  total: number
-  limit: number
-  offset: number
-  has_more: boolean
-}
 
 const PAGE_SIZE = 10
 
 const STATUS_LABELS: Record<string, string> = {
-  confirmed: "Confirmada",
-  draft: "Borrador",
-  cancelled: "Anulada",
+  confirmed: SALE_STATUS_META.confirmed.label,
+  draft: SALE_STATUS_META.draft.label,
+  cancelled: SALE_STATUS_META.cancelled.label,
 }
 
-const STATUS_CLASSES: Record<string, string> = {
-  confirmed: "sales-chip sales-chip-success",
-  draft: "sales-chip sales-chip-warning",
-  cancelled: "sales-chip sales-chip-danger",
-}
-
-function explainSalesError(error: unknown) {
-  if (!(error instanceof ApiError)) {
-    return "No se pudieron cargar las ventas"
-  }
-
-  if (error.status === 403) {
-    return "Tu rol no tiene acceso al historial de ventas."
-  }
-
-  if (error.status === 409) {
-    return "Necesitas una sede default activa para consultar el historial operativo."
-  }
-
-  return error.message || "No se pudieron cargar las ventas"
-}
-
-function formatDateTime(value: string | null, fallback: string) {
-  const source = value || fallback
-  return new Date(source).toLocaleString("es-PE", {
-    dateStyle: "short",
-    timeStyle: "short",
-  })
-}
-
-function MetricPill({
-  label,
-  value,
-  tone = "default",
-}: {
-  label: string
-  value: string | number
-  tone?: "default" | "accent" | "warning"
-}) {
-  const toneClass =
-    tone === "accent"
-      ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))] text-[var(--ops-text)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--ripnel-accent)_14%,transparent)]"
-      : tone === "warning"
-        ? "border-[color:color-mix(in_srgb,#f59e0b_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
-        : "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text)]"
-  const labelClass =
-    tone === "accent"
-      ? "text-[color:color-mix(in_srgb,var(--ripnel-accent)_72%,var(--ops-text))]"
-      : tone === "warning"
-        ? "text-[color:color-mix(in_srgb,#f59e0b_82%,var(--ops-text))]"
-        : "text-[var(--ops-text-muted)]"
-  const valueClass =
-    tone === "accent"
-      ? "text-[var(--ops-text)]"
-      : tone === "warning"
-        ? "text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
-        : "text-[var(--ops-text)]"
-
-  return (
-    <div
-      className={cn(
-        "inline-flex items-center gap-2.5 rounded-full border px-3 py-2",
-        toneClass
-      )}
-    >
-      <span className={cn("text-[11px] font-semibold uppercase tracking-[0.16em]", labelClass)}>
-        {label}
-      </span>
-      <span className={cn("text-base font-semibold leading-none", valueClass)}>{value}</span>
-    </div>
-  )
-}
+const STATUS_TONES: Record<string, string> = SALE_STATUS_TONES
 
 export default function TransactionHistoryPage() {
   const [sales, setSales] = useState<SaleItem[]>([])
@@ -179,7 +87,7 @@ export default function TransactionHistoryPage() {
 
         setSales([])
         setTotalResults(0)
-        setError(explainSalesError(loadError))
+        setError(formatApiFetchError(loadError, "No se pudieron cargar las ventas"))
       } finally {
         if (active) {
           setLoading(false)
@@ -237,9 +145,9 @@ export default function TransactionHistoryPage() {
             />
 
             <div className="flex flex-wrap items-center gap-2">
-              <MetricPill label="Ventas visibles" value={totals.count} />
-              <MetricPill label="Ingreso visible" value={`S/. ${totals.revenue.toFixed(2)}`} tone="accent" />
-              <MetricPill label="Borradores" value={totals.pending} tone="warning" />
+              <OpsMetricPill label="Ventas visibles" value={totals.count} />
+              <OpsMetricPill label="Ingreso visible" value={`S/. ${totals.revenue.toFixed(2)}`} tone="accent" />
+              <OpsMetricPill label="Borradores" value={totals.pending} tone="warning" />
             </div>
 
             <div className="space-y-4 border-t border-[var(--ops-border-strong)] pt-4">
@@ -268,6 +176,7 @@ export default function TransactionHistoryPage() {
                   value={status}
                   options={[
                     { value: "all", label: "Todas" },
+                    { value: "draft", label: SALE_STATUS_META.draft.label },
                     { value: "confirmed", label: "Confirmadas" },
                     { value: "cancelled", label: "Canceladas" },
                   ]}
@@ -352,8 +261,8 @@ export default function TransactionHistoryPage() {
                         </tr>
                       ) : sales.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                            No se encontraron ventas con los filtros aplicados.
+                          <td colSpan={8} className="px-4 py-10">
+                            <OpsEmptyState variant="compact" description="No se encontraron ventas con los filtros aplicados." />
                           </td>
                         </tr>
                       ) : (
@@ -386,16 +295,14 @@ export default function TransactionHistoryPage() {
                             <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{sale.location_name}</td>
 
                             <td className="px-4 py-[var(--ops-row-py)]">
-                              <span
-                                className={`${STATUS_CLASSES[sale.status] || "sales-chip"} rounded-full px-2.5 py-1 text-[11px] font-semibold`}
-                              >
+                              <OpsStatusBadge tone={(STATUS_TONES[sale.status] || "neutral") as "success" | "warning" | "danger" | "neutral" | "accent"}>
                                 {STATUS_LABELS[sale.status] || sale.status}
-                              </span>
+                              </OpsStatusBadge>
                             </td>
 
                             <td className="px-4 py-[var(--ops-row-py)]">
                               <p className="text-sm font-semibold text-[var(--ops-text)]">
-                                S/. {Number(sale.total_amount).toFixed(2)}
+                                {formatCurrency(Number(sale.total_amount))}
                               </p>
                               <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
                                 {sale.currency}
