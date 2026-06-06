@@ -5,43 +5,31 @@ import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import Link from "next/link";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import {
-  Banknote,
   BadgeCheck,
   CircleAlert,
-  ChevronDown,
   CreditCard,
   History,
   Info,
-  Landmark,
   LoaderCircle,
   MapPin,
-  Minus,
-  PencilLine,
-  Plus,
   Receipt,
-  ScanLine,
-  Search,
   ShieldAlert,
   ShoppingBasket,
-  Smartphone,
-  Trash2,
   Users,
-  UserPlus,
   X,
 } from "lucide-react";
+
+import { ProductStage } from "./stage-products"
+import { CustomerStage } from "./stage-customer"
+import { PaymentStage } from "./stage-payment"
+import { SummaryStage } from "./stage-summary"
 
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { InlineStatusCard } from "@/components/feedback/status-page";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { SalesWizardRail } from "@/components/ui/purchase-system/SalesWizardRail";
 import { Button } from "@/components/ui/button";
-import {
-  CompactPickerEmpty,
-  CompactPickerList,
-  CompactPickerOption,
-  CompactPickerPopover,
-} from "@/components/ui/compact-picker";
 import { OpsSelectMenu } from "@/components/ui/ops-selection";
 import {
   Sheet,
@@ -88,7 +76,6 @@ import {
   formatMoney,
   parseAmountInput,
   buildSemanticChipClass,
-  buildVariantTone,
   createPaymentDraft,
   createDefaultMixedPayments,
   buildCustomerDisplayName,
@@ -98,7 +85,6 @@ import {
   buildCashLabel,
   buildCashTone,
   getPaymentMethodLabel,
-  getPaymentReferenceMeta,
   isCustomerValidForDocumentType,
   getCustomerSearchFilter,
   filterCustomersByDocumentType,
@@ -114,46 +100,7 @@ import {
   replaceCustomerInResults,
 } from "./pos-utils";
 
-const INPUT_CLASS = "sales-field w-full rounded-lg px-3 py-2 text-sm";
-const COMPACT_LABEL_CLASS =
-  "mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]";
-
-// buildSemanticChipClass is now imported from ./pos-utils
-
-function SemanticChip({
-  tone = "neutral",
-  children,
-  className = "",
-}: {
-  tone?: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${buildSemanticChipClass(tone)} ${className}`}
-    >
-      {children}
-    </span>
-  );
-}
-
-// All utility functions above are now imported from ./pos-utils
-
-function renderDocumentIcon(documentType: string, className: string) {
-  if (documentType === "factura") return <Receipt className={className} />;
-  if (documentType === "boleta") return <CreditCard className={className} />;
-  if (documentType === "proforma") return <BadgeCheck className={className} />;
-  return <CircleAlert className={className} />;
-}
-
-function renderPaymentMethodIcon(method: string, className: string) {
-  if (method === "cash") return <Banknote className={className} />;
-  if (method === "transfer") return <Landmark className={className} />;
-  return <Smartphone className={className} />;
-}
-
-// All other utility functions are now imported from ./pos-utils
+import { INPUT_CLASS, COMPACT_LABEL_CLASS } from "./pos-constants";
 
 export default function NuevaVentaPage() {
   const { defaultLocation, locationsLoading, has } = useAuth();
@@ -162,9 +109,7 @@ export default function NuevaVentaPage() {
   const productSectionRef = useRef<HTMLElement | null>(null);
   const paymentSectionRef = useRef<HTMLElement | null>(null);
   const summarySectionRef = useRef<HTMLElement | null>(null);
-  const productPickerRef = useRef<HTMLDivElement | null>(null);
   const productSearchInputRef = useRef<HTMLInputElement | null>(null);
-  const customerPickerRef = useRef<HTMLDivElement | null>(null);
   const customerSearchInputRef = useRef<HTMLInputElement | null>(null);
   const documentPickerRef = useRef<HTMLDivElement | null>(null);
   const stageOrder: Stage[] = ["products", "customer", "payment", "summary"];
@@ -487,25 +432,6 @@ export default function NuevaVentaPage() {
       ? selectedVariant.wholesale_price
       : selectedVariant?.retail_price;
 
-  useEffect(() => {
-    if (!productPickerOpen) {
-      return;
-    }
-
-    function handlePointerDown(event: MouseEvent) {
-      if (
-        productPickerRef.current &&
-        !productPickerRef.current.contains(event.target as Node)
-      ) {
-        setProductPickerOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-    };
-  }, [productPickerOpen]);
 
   useEffect(() => {
     void Promise.resolve().then(() => {
@@ -519,26 +445,6 @@ export default function NuevaVentaPage() {
       );
     });
   }, [searchableStyles]);
-
-  useEffect(() => {
-    if (!customerPickerOpen) {
-      return;
-    }
-
-    function handlePointerDown(event: MouseEvent) {
-      if (
-        customerPickerRef.current &&
-        !customerPickerRef.current.contains(event.target as Node)
-      ) {
-        setCustomerPickerOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-    };
-  }, [customerPickerOpen]);
 
   useEffect(() => {
     if (!documentPickerOpen) {
@@ -829,22 +735,6 @@ export default function NuevaVentaPage() {
     selectedCustomer?.customer_id !== genericCustomer?.customer_id;
   const activeDocumentOption =
     DOC_TYPES.find((docType) => docType.value === documentType) || DOC_TYPES[0];
-  const productInputValue =
-    productPickerOpen || query ? query : selectedProductStyle?.style_name || "";
-  const productInputPlaceholder =
-    selectedProductStyle && !productPickerOpen && !query
-      ? selectedProductStyle.style_name
-      : "Buscar por estilo, SKU, talla o color";
-  const customerInputValue =
-    customerPickerOpen || customerQuery
-      ? customerQuery
-      : selectedCustomer
-        ? buildCustomerDisplayName(selectedCustomer)
-        : "";
-  const customerInputPlaceholder =
-    selectedCustomer && !customerPickerOpen && !customerQuery
-      ? buildCustomerDisplayName(selectedCustomer)
-      : "Nombre, documento o codigo";
   const paymentSummaryLabel =
     paymentMode === "mixed"
       ? `${mixedPaymentsPreview.payments.length || mixedPayments.length} lineas de pago`
@@ -1211,27 +1101,16 @@ export default function NuevaVentaPage() {
     }
   }
 
-  function focusProductSearch() {
-    window.requestAnimationFrame(() => {
-      productSearchInputRef.current?.focus();
-    });
-  }
-
-  function focusCustomerSearch() {
-    window.requestAnimationFrame(() => {
-      customerSearchInputRef.current?.focus();
-    });
-  }
-
-  function clearProductSelection() {
-    setSelectedProductStyle(null);
-    setSelectedSizeCode("");
-    setSelectedColorCode("");
-    setQuery("");
-    setHighlightedProductIndex(0);
-  }
-
-  function selectProductStyle(style: SearchableStyle) {
+  function selectProductStyle(style: SearchableStyle | null) {
+    if (!style) {
+      setSelectedProductStyle(null);
+      setSelectedSizeCode("");
+      setSelectedColorCode("");
+      setQuery("");
+      setHighlightedProductIndex(0);
+      setProductPickerOpen(false);
+      return;
+    }
     setSelectedProductStyle(style);
     setSelectedSizeCode("");
     setSelectedColorCode("");
@@ -1240,7 +1119,7 @@ export default function NuevaVentaPage() {
     setProductPickerOpen(false);
   }
 
-  function selectCustomer(customer: PosCustomer) {
+  function selectCustomer(customer: PosCustomer | null) {
     setSelectedCustomer(customer);
     setCustomerQuery("");
     setCustomerResults([]);
@@ -1600,1560 +1479,120 @@ export default function NuevaVentaPage() {
                   ) : null}
 
                   <section className="grid gap-4 xl:grid-cols-[minmax(0,1.18fr)_360px]">
-                    <div className="contents">
-                      <section
-                        ref={productSectionRef}
-                        onMouseEnter={() => setActiveStage("products")}
-                        className={`relative space-y-3 xl:order-2 xl:col-span-2 ${
-                          activeStage === "products"
-                            ? productPickerOpen
-                              ? "z-30"
-                              : "z-0"
-                            : "hidden"
-                        }`}
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <ShoppingBasket className="h-5 w-5 text-[var(--ripnel-accent)]" />
-                            <h2 className="text-lg font-semibold text-[var(--ops-text)]">
-                              Productos
-                            </h2>
-                          </div>
+                    <ProductStage
+                      active={activeStage === "products"}
+                      query={query}
+                      setQuery={setQuery}
+                      searchableStyles={searchableStyles}
+                      loadingVariants={loadingVariants}
+                      productPickerOpen={productPickerOpen}
+                      setProductPickerOpen={setProductPickerOpen}
+                      highlightedProductIndex={highlightedProductIndex}
+                      setHighlightedProductIndex={setHighlightedProductIndex}
+                      selectedProductStyle={selectedProductStyle}
+                      selectProductStyle={selectProductStyle}
+                      selectedSizeCode={selectedSizeCode}
+                      setSelectedSizeCode={setSelectedSizeCode}
+                      selectedColorCode={selectedColorCode}
+                      setSelectedColorCode={setSelectedColorCode}
+                      sizeSelectOptions={sizeSelectOptions}
+                      colorSelectOptions={colorSelectOptions}
+                      selectedVariant={selectedVariant}
+                      previewWholesaleApplies={previewWholesaleApplies}
+                      selectedVariantAutoPrice={selectedVariantAutoPrice}
+                      cart={cart}
+                      totals={totals}
+                      addToCart={addToCart}
+                      updateQty={updateQty}
+                      removeFromCart={removeFromCart}
+                      openPriceSheet={openPriceSheet}
+                      clearPriceAdjustment={clearPriceAdjustment}
+                      posContext={posContext}
+                      defaultLocation={defaultLocation}
+                      productSearchInputRef={productSearchInputRef}
+                      productSectionRef={productSectionRef}
+                      onActivate={() => setActiveStage("products")}
+                    />
 
-                          <button
-                            type="button"
-                            disabled
-                            className="inline-flex items-center gap-2 rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2 text-sm font-medium text-[var(--ops-text-muted)] opacity-80"
-                          >
-                            <ScanLine className="h-4 w-4" />
-                            Escanear producto
-                          </button>
-                        </div>
+                    <CustomerStage
+                      active={activeStage === "customer"}
+                      documentType={documentType}
+                      setDocumentType={setDocumentType}
+                      documentPickerOpen={documentPickerOpen}
+                      setDocumentPickerOpen={setDocumentPickerOpen}
+                      customerQuery={customerQuery}
+                      setCustomerQuery={setCustomerQuery}
+                      customerResults={customerResults}
+                      loadingCustomers={loadingCustomers}
+                      customerPickerOpen={customerPickerOpen}
+                      setCustomerPickerOpen={setCustomerPickerOpen}
+                      highlightedCustomerIndex={highlightedCustomerIndex}
+                      setHighlightedCustomerIndex={setHighlightedCustomerIndex}
+                      selectedCustomer={selectedCustomer}
+                      selectCustomer={selectCustomer}
+                      genericCustomer={genericCustomer}
+                      isGenericCustomerSelected={isGenericCustomerSelected}
+                      customerStepReady={customerStepReady}
+                      customerIsValid={customerIsValid}
+                      canEditSelectedCustomer={canEditSelectedCustomer}
+                      activeDocumentOption={activeDocumentOption}
+                      selectedCustomerName={selectedCustomerName}
+                      selectedCustomerDocument={selectedCustomerDocument}
+                      openCustomerSheet={openCustomerSheet}
+                      goToPayment={() => goToStage("payment")}
+                      customerSearchInputRef={customerSearchInputRef}
+                      customerSectionRef={customerSectionRef}
+                      documentPickerRef={documentPickerRef}
+                      onActivate={() => setActiveStage("customer")}
+                    />
 
-                        <div ref={productPickerRef} className="relative">
-                          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
-                          <input
-                            ref={productSearchInputRef}
-                            type="text"
-                            value={productInputValue}
-                            onFocus={() => {
-                              setProductPickerOpen(true);
-                              if (!query) {
-                                setHighlightedProductIndex(0);
-                              }
-                            }}
-                            onChange={(event) => {
-                              setQuery(event.target.value);
-                              setProductPickerOpen(true);
-                              setHighlightedProductIndex(0);
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key === "Escape") {
-                                setProductPickerOpen(false);
-                                return;
-                              }
+                    <PaymentStage
+                      active={activeStage === "payment"}
+                      activeDocumentOption={activeDocumentOption}
+                      cartCount={cartCount}
+                      totals={totals}
+                      saleDiscount={saleDiscount}
+                      saleDiscountError={saleDiscountError}
+                      saleDiscountTargetTotal={saleDiscountTargetTotal}
+                      setDiscountModalOpen={setDiscountModalOpen}
+                      paymentMode={paymentMode}
+                      setPaymentModeWithDefaults={setPaymentModeWithDefaults}
+                      paymentMethod={paymentMethod}
+                      setPaymentMethod={setPaymentMethod}
+                      mixedPayments={mixedPayments}
+                      mixedPaymentsPreview={mixedPaymentsPreview}
+                      updateMixedPaymentDraft={updateMixedPaymentDraft}
+                      addMixedPaymentDraft={addMixedPaymentDraft}
+                      removeMixedPaymentDraft={removeMixedPaymentDraft}
+                      onActivate={() => setActiveStage("payment")}
+                    />
 
-                              if (!searchableStyles.length) {
-                                return;
-                              }
-
-                              if (event.key === "ArrowDown") {
-                                event.preventDefault();
-                                setProductPickerOpen(true);
-                                setHighlightedProductIndex((current) =>
-                                  Math.min(
-                                    current + 1,
-                                    searchableStyles.length - 1,
-                                  ),
-                                );
-                              }
-
-                              if (event.key === "ArrowUp") {
-                                event.preventDefault();
-                                setProductPickerOpen(true);
-                                setHighlightedProductIndex((current) =>
-                                  Math.max(current - 1, 0),
-                                );
-                              }
-
-                              if (event.key === "Enter" && productPickerOpen) {
-                                event.preventDefault();
-                                selectProductStyle(
-                                  searchableStyles[highlightedProductIndex],
-                                );
-                              }
-                            }}
-                            placeholder={productInputPlaceholder}
-                            className="sales-field w-full rounded-xl py-2.5 pl-9 pr-48 text-sm"
-                          />
-                          {selectedProductStyle || query ? (
-                            <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1.5">
-                              {selectedProductStyle &&
-                              !query &&
-                              !productPickerOpen ? (
-                                <>
-                                  <span className="sales-chip sales-chip-accent rounded-full px-2 py-0.5 text-[11px] font-semibold">
-                                    Stock {selectedProductStyle.totalStock}
-                                  </span>
-                                  {selectedProductStyle.style_code ? (
-                                    <span className="sales-chip rounded-full px-2 py-0.5 text-[11px] font-semibold">
-                                      {selectedProductStyle.style_code}
-                                    </span>
-                                  ) : null}
-                                  <span className="sales-chip rounded-full px-2 py-0.5 text-[11px] font-semibold">
-                                    {selectedProductStyle.variants.length}{" "}
-                                    variantes
-                                  </span>
-                                </>
-                              ) : null}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  clearProductSelection();
-                                  focusProductSearch();
-                                }}
-                                className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] text-[var(--ops-text-muted)] transition hover:border-[var(--ripnel-accent)] hover:text-[var(--ripnel-accent-hover)]"
-                                aria-label="Limpiar producto"
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          ) : null}
-
-                          {productPickerOpen ? (
-                            <CompactPickerPopover className="absolute left-0 right-0 top-[calc(100%+0.55rem)] z-20">
-                              {loadingVariants ? (
-                                <CompactPickerEmpty>
-                                  Buscando productos...
-                                </CompactPickerEmpty>
-                              ) : !defaultLocation?.location_id ? (
-                                <CompactPickerEmpty>
-                                  Configura una sede para operar ventas.
-                                </CompactPickerEmpty>
-                              ) : styles.length === 0 ? (
-                                <CompactPickerEmpty>
-                                  No hay productos vendibles para la sede
-                                  actual.
-                                </CompactPickerEmpty>
-                              ) : searchableStyles.length === 0 ? (
-                                <CompactPickerEmpty>
-                                  No encontramos coincidencias para esta
-                                  busqueda.
-                                </CompactPickerEmpty>
-                              ) : (
-                                <CompactPickerList
-                                  className="max-h-72 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                                  style={{ scrollbarWidth: "none" }}
-                                >
-                                  <div className="divide-y divide-[color:color-mix(in_srgb,var(--ops-border-strong)_72%,transparent)]">
-                                    {searchableStyles.map((style, index) => {
-                                      const isHighlighted =
-                                        index === highlightedProductIndex;
-                                      return (
-                                        <CompactPickerOption
-                                          key={style.style_id}
-                                          active={isHighlighted}
-                                          onMouseEnter={() =>
-                                            setHighlightedProductIndex(index)
-                                          }
-                                          onClick={() =>
-                                            selectProductStyle(style)
-                                          }
-                                          className="py-2.5"
-                                        >
-                                          <div className="flex items-center justify-between gap-3">
-                                            <div className="min-w-0 flex gap-3">
-                                              <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                                                {style.style_name}
-                                              </p>
-                                              <p className="mt-0.5 text-[11px] text-[var(--ops-text-muted)]">
-                                                {style.variants.length} variante
-                                                {style.variants.length === 1
-                                                  ? ""
-                                                  : "s"}
-                                              </p>
-                                            </div>
-                                            <span
-                                              className={`${style.totalStock > 0 ? "sales-chip sales-chip-success" : "sales-chip sales-chip-danger"} rounded-full px-2 py-0.5 text-[11px] font-semibold`}
-                                            >
-                                              stock: {style.totalStock}
-                                            </span>
-                                          </div>
-                                        </CompactPickerOption>
-                                      );
-                                    })}
-                                  </div>
-                                </CompactPickerList>
-                              )}
-                            </CompactPickerPopover>
-                          ) : null}
-                        </div>
-
-                        <div className="border-y border-[var(--ops-border-strong)] py-3">
-                          {!selectedProductStyle ? (
-                            <div className="rounded-lg border border-dashed border-[var(--ops-border-soft)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-4 py-6 text-sm text-[var(--ops-text-muted)]">
-                              Selecciona un producto para configurar talla,
-                              color y agregarlo a la venta.
-                            </div>
-                          ) : (
-                            <div className="grid gap-3 lg:grid-cols-[178px_180px_minmax(0,1fr)_116px] lg:items-end">
-                              <div>
-                                <label className={COMPACT_LABEL_CLASS}>
-                                  Talla
-                                </label>
-                                <OpsSelectMenu
-                                  value={selectedSizeCode}
-                                  onValueChange={setSelectedSizeCode}
-                                  placeholder={
-                                    sizeSelectOptions.length
-                                      ? "Seleccionar talla"
-                                      : "Sin tallas"
-                                  }
-                                  options={sizeSelectOptions}
-                                />
-                              </div>
-
-                              <div>
-                                <label className={COMPACT_LABEL_CLASS}>
-                                  Color
-                                </label>
-                                <OpsSelectMenu
-                                  value={selectedColorCode}
-                                  onValueChange={setSelectedColorCode}
-                                  placeholder={
-                                    colorSelectOptions.length
-                                      ? "Seleccionar color"
-                                      : "Sin colores"
-                                  }
-                                  options={colorSelectOptions}
-                                />
-                              </div>
-
-                              <div className="rounded-lg border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-3 py-2.5">
-                                {!selectedVariant ? (
-                                  <p className="text-sm text-[var(--ops-text-muted)]">
-                                    Completa talla y color.
-                                  </p>
-                                ) : (
-                                  <div className="flex flex-wrap items-center gap-2 text-sm">
-                                    <SemanticChip
-                                      tone={buildVariantTone(
-                                        previewWholesaleApplies &&
-                                          selectedVariant.wholesale_price !==
-                                            null &&
-                                          selectedVariant.wholesale_price !==
-                                            undefined,
-                                      )}
-                                      className="px-2 py-0.5"
-                                    >
-                                      {previewWholesaleApplies &&
-                                      selectedVariant.wholesale_price !==
-                                        null &&
-                                      selectedVariant.wholesale_price !==
-                                        undefined
-                                        ? "Mayorista activo"
-                                        : "Retail vigente"}
-                                    </SemanticChip>
-                                    <span className="font-medium text-[var(--ops-text)]">
-                                      {selectedVariantAutoPrice !== null &&
-                                      selectedVariantAutoPrice !== undefined
-                                        ? `S/. ${formatMoney(selectedVariantAutoPrice)}`
-                                        : "Sin precio"}
-                                    </span>
-                                    <span
-                                      className={`${Number(selectedVariant.stock || 0) > 0 ? "sales-chip sales-chip-success" : "sales-chip sales-chip-danger"} rounded-full px-2 py-0.5 text-[11px] font-semibold`}
-                                    >
-                                      Stock {Number(selectedVariant.stock || 0)}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-
-                              <Button
-                                type="button"
-                                variant="accent"
-                                size="lg"
-                                onClick={() =>
-                                  selectedVariant && addToCart(selectedVariant)
-                                }
-                                disabled={
-                                  !selectedVariant ||
-                                  (selectedVariant.retail_price === null &&
-                                    selectedVariant.wholesale_price === null) ||
-                                  (selectedVariant.retail_price === undefined &&
-                                    selectedVariant.wholesale_price ===
-                                      undefined) ||
-                                  Number(selectedVariant.stock || 0) <= 0
-                                }
-                                className="h-10 rounded-lg px-4"
-                              >
-                                {!selectedVariant
-                                  ? "Agregar"
-                                  : Number(selectedVariant.stock || 0) <= 0
-                                    ? "Sin stock"
-                                    : (selectedVariant.retail_price === null &&
-                                          selectedVariant.wholesale_price ===
-                                            null) ||
-                                        (selectedVariant.retail_price ===
-                                          undefined &&
-                                          selectedVariant.wholesale_price ===
-                                            undefined)
-                                      ? "Sin precio"
-                                      : "Agregar"}
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      </section>
-
-                      <section
-                        className={`relative z-0 space-y-3 xl:order-3 xl:col-span-2 ${
-                          activeStage === "products" ? "" : "hidden"
-                        }`}
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <ShoppingBasket className="h-5 w-5 text-[var(--ripnel-accent)]" />
-                            <h2 className="text-lg font-semibold text-[var(--ops-text)]">
-                              Detalle de venta
-                            </h2>
-                          </div>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span
-                                className={`inline-flex cursor-help items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${
-                                  totals.wholesaleApplied
-                                    ? buildSemanticChipClass("success")
-                                    : buildSemanticChipClass("neutral")
-                                }`}
-                              >
-                                {totals.wholesaleApplied
-                                  ? "Mayorista activo"
-                                  : "Retail vigente"}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="bottom" sideOffset={8}>
-                              {totals.wholesaleApplied
-                                ? `Aplica desde ${posContext?.pricing?.wholesale_min_qty_total || 3} unidades en la venta.`
-                                : "Se aplica el precio vigente de lista hasta alcanzar el umbral mayorista."}
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-
-                        {cart.length === 0 ? (
-                          <div className="mt-4 rounded-lg border border-dashed border-[var(--ops-border-soft)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-4 py-8 text-center text-sm text-[var(--ops-text-muted)]">
-                            Aun no hay productos agregados a la venta.
-                          </div>
-                        ) : (
-                          <div className="overflow-x-auto">
-                            <div className="min-w-[980px] border-y border-[var(--ops-border-strong)]">
-                              <table className="w-full border-collapse">
-                                <thead className="bg-[var(--ops-surface-muted)]">
-                                  <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                                    <th className="px-4 py-3">Producto</th>
-                                    <th className="px-4 py-3">Talla</th>
-                                    <th className="px-4 py-3">Color</th>
-                                    <th className="px-4 py-3 text-center">
-                                      Cantidad
-                                    </th>
-                                    <th className="px-4 py-3 text-right">
-                                      Precio aplicado
-                                    </th>
-                                    <th className="px-4 py-3 text-right">
-                                      Subtotal
-                                    </th>
-                                    <th className="px-4 py-3 text-right">
-                                      Acciones
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                                  {totals.items.map((item) => (
-                                    <tr
-                                      key={item.variant_id}
-                                      className="transition hover:bg-[var(--ops-surface-muted)]"
-                                    >
-                                      <td className="px-4 py-[var(--ops-row-py)] align-top">
-                                        <p className="text-sm font-semibold text-[var(--ops-text)]">
-                                          {item.style_name}
-                                        </p>
-                                        {item.price_override?.reason ? (
-                                          <p className="mt-1 text-[11px] text-[var(--ripnel-accent-hover)]">
-                                            Ajuste manual:{" "}
-                                            {item.price_override.reason}
-                                          </p>
-                                        ) : null}
-                                      </td>
-                                      <td className="px-4 py-[var(--ops-row-py)] align-top text-sm text-[var(--ops-text)]">
-                                        {item.size_name || item.size_code}
-                                      </td>
-                                      <td className="px-4 py-[var(--ops-row-py)] align-top text-sm text-[var(--ops-text)]">
-                                        {item.color_name || item.color_code}
-                                      </td>
-                                      <td className="px-4 py-[var(--ops-row-py)] align-top">
-                                        <div className="flex justify-center">
-                                          <div className="sales-field flex items-center gap-1 rounded-lg px-1.5 py-1">
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                updateQty(item.variant_id, -1)
-                                              }
-                                              className="sales-field-interactive rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1 text-[var(--ops-text-muted)]"
-                                            >
-                                              <Minus className="h-3 w-3" />
-                                            </button>
-                                            <span className="min-w-8 text-center text-sm font-semibold text-[var(--ops-text)]">
-                                              {item.quantity}
-                                            </span>
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                updateQty(item.variant_id, 1)
-                                              }
-                                              disabled={
-                                                item.quantity >= item.stock
-                                              }
-                                              className="sales-field-interactive rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1 text-[var(--ops-text-muted)] disabled:opacity-40"
-                                            >
-                                              <Plus className="h-3 w-3" />
-                                            </button>
-                                          </div>
-                                        </div>
-                                      </td>
-                                      <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
-                                        <div className="space-y-1">
-                                          <p className="text-sm font-semibold text-[var(--ops-text)]">
-                                            S/.{" "}
-                                            {formatMoney(
-                                              item.unit_price_before_discount,
-                                            )}
-                                          </p>
-                                          <p className="text-[11px] text-[var(--ops-text-muted)]">
-                                            {item.price_type_applied ===
-                                            "wholesale"
-                                              ? "Mayorista"
-                                              : "Retail"}
-                                          </p>
-                                        </div>
-                                      </td>
-                                      <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
-                                        <p className="text-sm font-semibold text-[var(--ops-text)]">
-                                          S/.{" "}
-                                          {formatMoney(
-                                            item.line_subtotal_before_discount,
-                                          )}
-                                        </p>
-                                      </td>
-                                      <td className="px-4 py-[var(--ops-row-py)] align-top">
-                                        <div className="flex items-center justify-end gap-1">
-                                          <Tooltip>
-                                            <TooltipTrigger asChild>
-                                              <button
-                                                type="button"
-                                                onClick={() =>
-                                                  openPriceSheet(item)
-                                                }
-                                                className="sales-field-interactive rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1.5 text-[var(--ops-text-muted)] transition"
-                                                aria-label={
-                                                  item.price_override
-                                                    ? "Editar precio"
-                                                    : "Ajustar precio"
-                                                }
-                                              >
-                                                <PencilLine className="h-4 w-4" />
-                                              </button>
-                                            </TooltipTrigger>
-                                            <TooltipContent
-                                              side="bottom"
-                                              sideOffset={8}
-                                            >
-                                              {item.price_override
-                                                ? "Editar precio"
-                                                : "Ajustar precio"}
-                                            </TooltipContent>
-                                          </Tooltip>
-                                          {item.price_override ? (
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                clearPriceAdjustment(
-                                                  item.variant_id,
-                                                )
-                                              }
-                                              className="rounded-lg p-1 text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface)] hover:text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]"
-                                              aria-label="Quitar ajuste"
-                                            >
-                                              <CircleAlert className="h-4 w-4" />
-                                            </button>
-                                          ) : null}
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              removeFromCart(item.variant_id)
-                                            }
-                                            className={`rounded-lg border p-1.5 transition hover:bg-[var(--ops-surface-muted)] ${buildSemanticChipClass("danger")}`}
-                                            aria-label="Quitar producto"
-                                          >
-                                            <Trash2 className="h-4 w-4" />
-                                          </button>
-                                        </div>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        )}
-                      </section>
-                    </div>
-
-                    <div className="contents">
-                      <section
-                        ref={customerSectionRef}
-                        onMouseEnter={() => setActiveStage("customer")}
-                        className={`relative space-y-3 xl:order-1 xl:col-span-2 ${
-                          activeStage === "customer"
-                            ? customerPickerOpen || documentPickerOpen
-                              ? "z-30"
-                              : "z-0"
-                            : "hidden"
-                        }`}
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <Users className="h-5 w-5 text-[var(--ripnel-accent)]" />
-                            <h2 className="text-lg font-semibold text-[var(--ops-text)]">
-                              Cliente
-                            </h2>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-2">
-                            {genericCustomer && !isGenericCustomerSelected ? (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => selectCustomer(genericCustomer)}
-                                className="rounded-lg px-3"
-                              >
-                                Usar mostrador
-                              </Button>
-                            ) : null}
-                            <Button
-                              type="button"
-                              variant="accent"
-                              size="sm"
-                              onClick={() => openCustomerSheet("create")}
-                              className="rounded-lg px-4"
-                            >
-                              <UserPlus className="h-4 w-4" />
-                              Crear cliente
-                            </Button>
-                          </div>
-                        </div>
-
-                        <div className="space-y-3">
-                          <div className="grid gap-3 lg:grid-cols-[180px_minmax(0,1fr)]">
-                            <div ref={documentPickerRef} className="relative">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setDocumentPickerOpen((current) => !current)
-                                }
-                                className="sales-field sales-field-interactive flex h-full w-full items-center justify-between rounded-xl px-3 py-2 text-sm"
-                              >
-                                <span className="flex min-w-0 items-center gap-2">
-                                  {renderDocumentIcon(
-                                    activeDocumentOption.value,
-                                    "h-4 w-4 shrink-0 text-[var(--ripnel-accent)]",
-                                  )}
-                                  <span className="truncate">
-                                    {activeDocumentOption.label}
-                                  </span>
-                                </span>
-                                <ChevronDown className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
-                              </button>
-
-                              {documentPickerOpen ? (
-                                <CompactPickerPopover className="absolute left-0 right-0 top-[calc(100%+0.45rem)] z-30">
-                                  <CompactPickerList>
-                                    {DOC_TYPES.map((docType) => {
-                                      const selected =
-                                        documentType === docType.value;
-                                      return (
-                                        <CompactPickerOption
-                                          key={docType.value}
-                                          selected={selected}
-                                          onClick={() => {
-                                            setDocumentType(docType.value);
-                                            setDocumentPickerOpen(false);
-                                            setActiveStage("customer");
-                                          }}
-                                          className="flex items-center gap-2 text-sm"
-                                        >
-                                          {renderDocumentIcon(
-                                            docType.value,
-                                            "h-4 w-4 shrink-0",
-                                          )}
-                                          <span>{docType.label}</span>
-                                        </CompactPickerOption>
-                                      );
-                                    })}
-                                  </CompactPickerList>
-                                </CompactPickerPopover>
-                              ) : null}
-                            </div>
-
-                            <div ref={customerPickerRef} className="relative">
-                              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
-                              <input
-                                ref={customerSearchInputRef}
-                                type="text"
-                                value={customerInputValue}
-                                onFocus={() => {
-                                  setCustomerPickerOpen(true);
-                                  setHighlightedCustomerIndex(0);
-                                }}
-                                onChange={(event) => {
-                                  setCustomerQuery(event.target.value);
-                                  if (selectedCustomer) {
-                                    setSelectedCustomer(null);
-                                  }
-                                  setCustomerPickerOpen(true);
-                                  setHighlightedCustomerIndex(0);
-                                }}
-                                onKeyDown={(event) => {
-                                  if (event.key === "Escape") {
-                                    setCustomerPickerOpen(false);
-                                    return;
-                                  }
-
-                                  if (!customerResults.length) {
-                                    return;
-                                  }
-
-                                  if (event.key === "ArrowDown") {
-                                    event.preventDefault();
-                                    setCustomerPickerOpen(true);
-                                    setHighlightedCustomerIndex((current) =>
-                                      Math.min(
-                                        current + 1,
-                                        customerResults.length - 1,
-                                      ),
-                                    );
-                                  }
-
-                                  if (event.key === "ArrowUp") {
-                                    event.preventDefault();
-                                    setCustomerPickerOpen(true);
-                                    setHighlightedCustomerIndex((current) =>
-                                      Math.max(current - 1, 0),
-                                    );
-                                  }
-
-                                  if (
-                                    event.key === "Enter" &&
-                                    customerPickerOpen
-                                  ) {
-                                    event.preventDefault();
-                                    if (
-                                      customerResults[highlightedCustomerIndex]
-                                    ) {
-                                      selectCustomer(
-                                        customerResults[
-                                          highlightedCustomerIndex
-                                        ],
-                                      );
-                                    }
-                                  }
-                                }}
-                                placeholder={customerInputPlaceholder}
-                                className="sales-field w-full rounded-xl py-2.5 pl-9 pr-10 text-sm"
-                              />
-                              {selectedCustomer || customerQuery ? (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setCustomerQuery("");
-                                    setSelectedCustomer(null);
-                                    focusCustomerSearch();
-                                  }}
-                                  className="absolute right-3 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] text-[var(--ops-text-muted)] transition hover:border-[var(--ripnel-accent)] hover:text-[var(--ripnel-accent-hover)]"
-                                  aria-label="Limpiar cliente"
-                                >
-                                  <X className="h-3.5 w-3.5" />
-                                </button>
-                              ) : null}
-
-                              {customerPickerOpen ? (
-                                <CompactPickerPopover className="absolute left-0 right-0 top-[calc(100%+0.45rem)] z-30">
-                                  {loadingCustomers ? (
-                                    <CompactPickerEmpty>
-                                      Buscando clientes...
-                                    </CompactPickerEmpty>
-                                  ) : customerResults.length > 0 ? (
-                                    <CompactPickerList
-                                      className="max-h-60 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                                      style={{ scrollbarWidth: "none" }}
-                                    >
-                                      <div className="divide-y divide-[color:color-mix(in_srgb,var(--ops-border-strong)_72%,transparent)]">
-                                        {customerResults.map(
-                                          (customer, index) => {
-                                            const isHighlighted =
-                                              index ===
-                                              highlightedCustomerIndex;
-                                            return (
-                                              <CompactPickerOption
-                                                key={customer.customer_id}
-                                                active={isHighlighted}
-                                                onMouseEnter={() =>
-                                                  setHighlightedCustomerIndex(
-                                                    index,
-                                                  )
-                                                }
-                                                onClick={() =>
-                                                  selectCustomer(customer)
-                                                }
-                                                className="py-2.5"
-                                              >
-                                                <span className="block truncate text-sm font-semibold text-[var(--ops-text)]">
-                                                  {buildCustomerDisplayName(
-                                                    customer,
-                                                  )}
-                                                </span>
-                                                <span className="mt-0.5 block truncate text-[11px] text-[var(--ops-text-muted)]">
-                                                  {buildCustomerDocument(
-                                                    customer,
-                                                  )}
-                                                </span>
-                                              </CompactPickerOption>
-                                            );
-                                          },
-                                        )}
-                                      </div>
-                                    </CompactPickerList>
-                                  ) : (
-                                    <CompactPickerEmpty>
-                                      No encontramos coincidencias. Puedes crear
-                                      el cliente y seguir con la venta.
-                                    </CompactPickerEmpty>
-                                  )}
-                                </CompactPickerPopover>
-                              ) : null}
-                            </div>
-                          </div>
-
-                          {!selectedCustomer ? (
-                            <div className="rounded-lg border border-dashed border-[var(--ops-border-soft)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-4 py-6 text-sm text-[var(--ops-text-muted)]">
-                              Selecciona un cliente desde el buscador o usa
-                              Cliente mostrador para continuar.
-                            </div>
-                          ) : (
-                            <div className="border-y border-[var(--ops-border-strong)] py-3">
-                              <div className="flex flex-wrap items-start gap-3 xl:grid xl:grid-cols-[minmax(0,1.15fr)_max-content_minmax(0,1fr)_max-content_max-content] xl:items-center">
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                                    {buildCustomerDisplayName(selectedCustomer)}
-                                  </p>
-                                </div>
-
-                                <div className="min-w-0">
-                                  <p className="truncate text-xs text-[var(--ops-text-muted)]">
-                                    {buildCustomerDocument(selectedCustomer)}
-                                  </p>
-                                </div>
-
-                                <div className="min-w-0">
-                                  <p className="truncate text-xs text-[var(--ops-text-muted)]">
-                                    {selectedCustomer.address ||
-                                      (isGenericCustomerSelected
-                                        ? "Cliente mostrador"
-                                        : "Sin direccion registrada")}
-                                  </p>
-                                </div>
-
-                                <span
-                                  className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                                    customerStepReady
-                                      ? buildSemanticChipClass("success")
-                                      : buildSemanticChipClass("warning")
-                                  }`}
-                                >
-                                  {customerStepReady
-                                    ? isGenericCustomerSelected
-                                      ? "Mostrador confirmado"
-                                      : "Listo para el comprobante"
-                                    : customerIsValid
-                                      ? "Cliente elegido"
-                                      : documentType === "factura"
-                                        ? "Falta RUC o direccion"
-                                        : documentType === "boleta"
-                                          ? "Falta DNI o CE valido"
-                                          : "Confirma el cliente"}
-                                </span>
-
-                                <div className="flex flex-wrap items-center gap-2 justify-self-end">
-                                  {customerStepReady ? (
-                                    <Button
-                                      type="button"
-                                      variant="accent"
-                                      size="sm"
-                                      onClick={() => goToStage("payment")}
-                                      className="rounded-lg px-3"
-                                    >
-                                      Ir a cobro
-                                    </Button>
-                                  ) : null}
-
-                                  {canEditSelectedCustomer ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => openCustomerSheet("edit")}
-                                      className="sales-field-interactive inline-flex items-center gap-1.5 rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-1.5 text-xs font-medium text-[var(--ops-text)] transition"
-                                    >
-                                      <PencilLine className="h-3.5 w-3.5" />
-                                      Editar
-                                    </button>
-                                  ) : null}
-
-                                  {genericCustomer &&
-                                  !isGenericCustomerSelected ? (
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        selectCustomer(genericCustomer)
-                                      }
-                                      className="inline-flex cursor-pointer items-center rounded-lg px-2 py-1.5 text-xs font-semibold text-[var(--ripnel-accent-hover)] transition hover:bg-[var(--ripnel-accent-soft)]"
-                                    >
-                                      Usar mostrador
-                                    </button>
-                                  ) : null}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {selectedCustomer && !customerStepReady ? (
-                            <div
-                              className={`rounded-lg border px-3 py-2.5 text-sm ${buildSemanticChipClass("warning")}`}
-                            >
-                              {documentType === "boleta"
-                                ? "Para boleta debes seleccionar un cliente con DNI o CE valido."
-                                : documentType === "factura"
-                                  ? "Para factura debes seleccionar un cliente con RUC y direccion fiscal."
-                                  : "Confirma a quien corresponde la venta antes de pasar al cobro."}
-                            </div>
-                          ) : null}
-                        </div>
-                      </section>
-
-                      <section
-                        ref={paymentSectionRef}
-                        onMouseEnter={() => setActiveStage("payment")}
-                        className={`relative z-0 space-y-3 xl:order-4 xl:col-span-2 ${
-                          activeStage === "payment" ? "" : "hidden"
-                        }`}
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <CreditCard className="h-5 w-5 text-[var(--ripnel-accent)]" />
-                            <h2 className="text-lg font-semibold text-[var(--ops-text)]">
-                              Cobro
-                            </h2>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="sales-chip rounded-full px-2.5 py-1 text-[11px] font-semibold">
-                              {cartCount} item{cartCount === 1 ? "" : "s"}
-                            </span>
-                            <span
-                              className={`${customerIsValid ? "sales-chip sales-chip-success" : "sales-chip sales-chip-warning"} rounded-full px-2.5 py-1 text-[11px] font-semibold`}
-                            >
-                              {activeDocumentOption.label}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="space-y-4">
-                          {cartCount > 0 ? (
-                            <div className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-3">
-                              <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div className="space-y-1">
-                                  <div className="flex items-center gap-2">
-                                    <p className="text-sm font-semibold text-[var(--ops-text)]">
-                                      Ajustes comerciales
-                                    </p>
-                                    <SemanticChip
-                                      tone={
-                                        totals.saleDiscountAmount > 0
-                                          ? "warning"
-                                          : "neutral"
-                                      }
-                                    >
-                                      {totals.saleDiscountAmount > 0
-                                        ? `Descuento actual S/. ${formatMoney(totals.saleDiscountAmount)}`
-                                        : "Sin descuento"}
-                                    </SemanticChip>
-                                  </div>
-                                  <p className="text-xs text-[var(--ops-text-muted)]">
-                                    El descuento afecta el total del documento y
-                                    se traza por separado.
-                                  </p>
-                                </div>
-
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setDiscountModalOpen(true)}
-                                  className="rounded-lg"
-                                >
-                                  Ajustar descuento
-                                </Button>
-                              </div>
-
-                              {saleDiscountError ? (
-                                <p
-                                  className={`mt-3 rounded-lg border px-3 py-2 text-sm ${buildSemanticChipClass("warning")}`}
-                                >
-                                  {saleDiscountError}
-                                </p>
-                              ) : null}
-                            </div>
-                          ) : null}
-
-                          <div className="border-y border-[var(--ops-border-strong)] py-3">
-                            <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-                              <p className="text-sm font-semibold text-[var(--ops-text)]">
-                                Metodo de pago
-                              </p>
-                              <div className="inline-flex rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] p-1">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setPaymentModeWithDefaults("single")
-                                  }
-                                  className={`cursor-pointer rounded-lg px-3 py-1.5 text-[11px] font-semibold transition ${
-                                    paymentMode === "single"
-                                      ? "bg-[var(--ops-surface)] text-[var(--ripnel-accent-hover)] shadow-sm"
-                                      : "text-[var(--ops-text-muted)]"
-                                  }`}
-                                >
-                                  Pago unico
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setPaymentModeWithDefaults("mixed")
-                                  }
-                                  className={`cursor-pointer rounded-lg px-3 py-1.5 text-[11px] font-semibold transition ${
-                                    paymentMode === "mixed"
-                                      ? "bg-[var(--ops-surface)] text-[var(--ripnel-accent-hover)] shadow-sm"
-                                      : "text-[var(--ops-text-muted)]"
-                                  }`}
-                                >
-                                  Pago mixto
-                                </button>
-                              </div>
-                            </div>
-                            {paymentMode === "single" ? (
-                              <div className="grid grid-cols-2 gap-2">
-                                {PAYMENT_METHODS.map((method) => {
-                                  const selected =
-                                    paymentMethod === method.value;
-
-                                  return (
-                                    <button
-                                      key={method.value}
-                                      type="button"
-                                      onClick={() =>
-                                        setPaymentMethod(method.value)
-                                      }
-                                      className={`cursor-pointer rounded-lg border px-3 py-2.5 text-sm transition ${
-                                        selected
-                                          ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_40%,var(--ops-border-strong))] bg-[var(--ripnel-accent-soft)] font-semibold text-[var(--ripnel-accent-hover)]"
-                                          : "border-[var(--ops-border-strong)] bg-[var(--ops-surface)] text-[var(--ops-text)] hover:border-[color:color-mix(in_srgb,var(--ripnel-accent)_28%,var(--ops-border-strong))]"
-                                      }`}
-                                    >
-                                      <div className="flex items-center justify-center gap-2">
-                                        {renderPaymentMethodIcon(
-                                          method.value,
-                                          "h-4 w-4",
-                                        )}
-                                        <span>{method.label}</span>
-                                      </div>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            ) : (
-                              <div className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-3">
-                                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                                  <SemanticChip
-                                    tone={
-                                      Math.abs(
-                                        mixedPaymentsPreview.difference,
-                                      ) < 0.01
-                                        ? "success"
-                                        : mixedPaymentsPreview.difference < 0
-                                          ? "danger"
-                                          : "warning"
-                                    }
-                                  >
-                                    {Math.abs(mixedPaymentsPreview.difference) <
-                                    0.01
-                                      ? "Pago cuadrado"
-                                      : mixedPaymentsPreview.difference > 0
-                                        ? `Faltan S/. ${formatMoney(mixedPaymentsPreview.difference)}`
-                                        : `Excede S/. ${formatMoney(Math.abs(mixedPaymentsPreview.difference))}`}
-                                  </SemanticChip>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="xs"
-                                    onClick={addMixedPaymentDraft}
-                                    className="rounded-lg"
-                                  >
-                                    Agregar linea
-                                  </Button>
-                                </div>
-
-                                <div className="divide-y divide-[var(--ops-border-strong)]">
-                                  {mixedPayments.map((payment, index) => {
-                                    const paymentReferenceMeta =
-                                      getPaymentReferenceMeta(payment.method);
-
-                                    return (
-                                      <div
-                                        key={payment.id}
-                                        className="grid gap-2 py-3 md:grid-cols-[minmax(0,0.9fr)_112px_minmax(0,1fr)_auto] md:items-end"
-                                      >
-                                        <div>
-                                          <div className="mb-1.5 flex items-center gap-2">
-                                            <span className="sales-chip sales-chip-accent rounded-full px-2 text-[11px] font-semibold">
-                                              {index + 1}
-                                            </span>
-                                            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                                              Linea de pago
-                                            </p>
-                                          </div>
-                                          <select
-                                            value={payment.method}
-                                            onChange={(event) =>
-                                              updateMixedPaymentDraft(
-                                                payment.id,
-                                                "method",
-                                                event.target.value,
-                                              )
-                                            }
-                                            className={INPUT_CLASS}
-                                          >
-                                            {PAYMENT_METHODS.map((method) => (
-                                              <option
-                                                key={method.value}
-                                                value={method.value}
-                                              >
-                                                {method.label}
-                                              </option>
-                                            ))}
-                                          </select>
-                                        </div>
-
-                                        <div>
-                                          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[var(--ops-text-muted)]">
-                                            Monto
-                                          </label>
-                                          <input
-                                            value={payment.amount}
-                                            onChange={(event) =>
-                                              updateMixedPaymentDraft(
-                                                payment.id,
-                                                "amount",
-                                                event.target.value,
-                                              )
-                                            }
-                                            placeholder="0.00"
-                                            className={INPUT_CLASS}
-                                          />
-                                        </div>
-
-                                        <div>
-                                          <div className="mb-1 flex items-center gap-1.5">
-                                            <label className="block text-[11px] font-medium uppercase tracking-wide text-[var(--ops-text-muted)]">
-                                              {paymentReferenceMeta.label}
-                                            </label>
-                                            <Tooltip>
-                                              <TooltipTrigger asChild>
-                                                <button
-                                                  type="button"
-                                                  className="rounded-full p-0.5 text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface)] hover:text-[var(--ops-text)]"
-                                                  aria-label={`Informacion de ${paymentReferenceMeta.label.toLowerCase()}`}
-                                                >
-                                                  <Info className="h-3.5 w-3.5" />
-                                                </button>
-                                              </TooltipTrigger>
-                                              <TooltipContent
-                                                side="bottom"
-                                                sideOffset={8}
-                                              >
-                                                {paymentReferenceMeta.helper}
-                                              </TooltipContent>
-                                            </Tooltip>
-                                          </div>
-                                          <input
-                                            value={payment.reference}
-                                            onChange={(event) =>
-                                              updateMixedPaymentDraft(
-                                                payment.id,
-                                                "reference",
-                                                event.target.value,
-                                              )
-                                            }
-                                            placeholder={
-                                              paymentReferenceMeta.placeholder
-                                            }
-                                            className={`${INPUT_CLASS} ${
-                                              payment.method === "cash"
-                                                ? "bg-[var(--ops-surface-muted)]"
-                                                : ""
-                                            }`}
-                                          />
-                                        </div>
-
-                                        <div className="flex md:justify-end">
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              removeMixedPaymentDraft(
-                                                payment.id,
-                                              )
-                                            }
-                                            className="cursor-pointer rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-2.5 py-2 text-xs font-semibold text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface-muted)] disabled:cursor-not-allowed disabled:opacity-40"
-                                            disabled={mixedPayments.length <= 2}
-                                          >
-                                            Quitar
-                                          </button>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-
-                                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
-                                  <span className="text-[var(--ops-text-muted)]">
-                                    Asignado: S/.{" "}
-                                    {formatMoney(
-                                      mixedPaymentsPreview.enteredTotal,
-                                    )}
-                                  </span>
-                                  <span className="font-semibold text-[var(--ops-text)]">
-                                    Total: S/. {formatMoney(totals.total)}
-                                  </span>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </section>
-
-                      <article
-                        ref={summarySectionRef}
-                        className={`sales-panel rounded-xl p-4 shadow-sm xl:order-5 ${
-                          activeStage === "summary" ? "" : "hidden"
-                        }`}
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <span className="sales-chip sales-chip-accent rounded-full px-2.5 py-1 text-sm font-semibold">
-                              <Receipt className="h-4 w-4" />
-                            </span>
-                            <div>
-                              <h2 className="text-lg font-semibold text-[var(--ops-text)]">
-                                Resumen de venta
-                              </h2>
-                            </div>
-                          </div>
-
-                          <SemanticChip
-                            tone={submitDisabled ? "warning" : "success"}
-                            className="px-3 text-xs"
-                          >
-                            {submitDisabled
-                              ? "Pendiente por validar"
-                              : "Listo para finalizar"}
-                          </SemanticChip>
-                        </div>
-
-                        <div className="mt-4 space-y-3">
-                          <section className="border-y border-[var(--ops-border-strong)] py-3">
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="flex items-center gap-2">
-                                <Users className="h-4 w-4 text-[var(--ripnel-accent)]" />
-                                <h3 className="text-sm font-semibold text-[var(--ops-text)]">
-                                  Cliente
-                                </h3>
-                              </div>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => goToStage("customer")}
-                                className="rounded-lg"
-                              >
-                                <PencilLine className="h-3.5 w-3.5" />
-                                Editar
-                              </Button>
-                            </div>
-
-                            <div className="mt-3 grid gap-3 text-sm md:grid-cols-3">
-                              <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                                  Comprobante
-                                </p>
-                                <p className="mt-1 font-medium text-[var(--ops-text)]">
-                                  {activeDocumentOption.label}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                                  Cliente
-                                </p>
-                                <p className="mt-1 font-medium text-[var(--ops-text)]">
-                                  {selectedCustomerName}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                                  Documento
-                                </p>
-                                <p className="mt-1 font-medium text-[var(--ops-text)]">
-                                  {selectedCustomerDocument}
-                                </p>
-                              </div>
-                            </div>
-                          </section>
-
-                          <section className="border-b border-[var(--ops-border-strong)] pb-3">
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="flex items-center gap-2">
-                                <ShoppingBasket className="h-4 w-4 text-[var(--ripnel-accent)]" />
-                                <h3 className="text-sm font-semibold text-[var(--ops-text)]">
-                                  Productos ({cartCount})
-                                </h3>
-                              </div>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => goToStage("products")}
-                                className="rounded-lg"
-                              >
-                                <PencilLine className="h-3.5 w-3.5" />
-                                Editar
-                              </Button>
-                            </div>
-
-                            <div className="mt-3 overflow-x-auto">
-                              <div className="min-w-[640px] border-y border-[var(--ops-border-strong)]">
-                                <div className="hidden bg-[var(--ops-surface-muted)] px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)] md:grid md:grid-cols-[minmax(0,1.5fr)_120px_90px_120px] md:gap-4">
-                                  <span>Producto</span>
-                                  <span>Variacion</span>
-                                  <span className="text-center">Cant.</span>
-                                  <span className="text-right">Subtotal</span>
-                                </div>
-                                <div className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                                  {totals.items.map((item) => (
-                                    <div
-                                      key={item.variant_id}
-                                      className="grid gap-2 px-4 py-3 text-sm md:grid-cols-[minmax(0,1.5fr)_120px_90px_120px] md:items-center md:gap-4"
-                                    >
-                                      <div className="min-w-0">
-                                        <p className="truncate font-medium text-[var(--ops-text)]">
-                                          {item.style_name}
-                                        </p>
-                                        <p className="mt-0.5 text-[11px] text-[var(--ops-text-muted)]">
-                                          {item.sku}
-                                        </p>
-                                      </div>
-                                      <p className="text-[var(--ops-text-muted)]">
-                                        {item.color_name || item.color_code} /{" "}
-                                        {item.size_name || item.size_code}
-                                      </p>
-                                      <p className="text-center font-medium text-[var(--ops-text)]">
-                                        {item.quantity}
-                                      </p>
-                                      <p className="text-left font-semibold text-[var(--ops-text)] md:text-right">
-                                        S/.{" "}
-                                        {formatMoney(
-                                          item.line_subtotal_before_discount,
-                                        )}
-                                      </p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          </section>
-
-                          <section className="border-b border-[var(--ops-border-strong)] pb-3">
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="flex items-center gap-2">
-                                <CreditCard className="h-4 w-4 text-[var(--ripnel-accent)]" />
-                                <h3 className="text-sm font-semibold text-[var(--ops-text)]">
-                                  Cobro
-                                </h3>
-                              </div>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => goToStage("payment")}
-                                className="rounded-lg"
-                              >
-                                <PencilLine className="h-3.5 w-3.5" />
-                                Editar
-                              </Button>
-                            </div>
-
-                            <div className="mt-3 grid gap-3 text-sm md:grid-cols-3">
-                              <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                                  Modalidad
-                                </p>
-                                <p className="mt-1 font-medium text-[var(--ops-text)]">
-                                  {paymentMode === "mixed"
-                                    ? "Pago mixto"
-                                    : "Pago unico"}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                                  Medio principal
-                                </p>
-                                <p className="mt-1 font-medium text-[var(--ops-text)]">
-                                  {paymentSummaryLabel}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                                  Cobro asignado
-                                </p>
-                                <p className="mt-1 font-medium text-[var(--ops-text)]">
-                                  S/.{" "}
-                                  {formatMoney(
-                                    paymentMode === "mixed"
-                                      ? mixedPaymentsPreview.enteredTotal
-                                      : totals.total,
-                                  )}
-                                </p>
-                              </div>
-                            </div>
-
-                            {paymentMode === "mixed" ? (
-                              <div className="mt-3 divide-y divide-[var(--ops-border-strong)] border-y border-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                                {mixedPayments.map((payment) => {
-                                  return (
-                                    <div
-                                      key={payment.id}
-                                      className="grid gap-2 px-3 py-2.5 text-sm md:grid-cols-[minmax(0,1fr)_112px_minmax(0,1fr)] md:items-center"
-                                    >
-                                      <div className="flex items-center gap-2 font-medium text-[var(--ops-text)]">
-                                        {renderPaymentMethodIcon(
-                                          payment.method,
-                                          "h-4 w-4 text-[var(--ripnel-accent)]",
-                                        )}
-                                        {getPaymentMethodLabel(payment.method)}
-                                      </div>
-                                      <span className="font-medium text-[var(--ops-text)]">
-                                        S/.{" "}
-                                        {formatMoney(
-                                          parseAmountInput(payment.amount) || 0,
-                                        )}
-                                      </span>
-                                      <span className="truncate text-[var(--ops-text-muted)]">
-                                        {trimOrNull(payment.reference) ||
-                                          "Sin referencia"}
-                                      </span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            ) : null}
-                          </section>
-                        </div>
-                      </article>
-
-                      <article
-                        className={`sales-panel rounded-xl p-4 shadow-sm xl:order-6 xl:sticky xl:top-20 xl:self-start ${
-                          activeStage === "summary" ? "" : "hidden"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Receipt className="h-4 w-4 text-[var(--ripnel-accent)]" />
-                          <h2 className="text-base font-semibold text-[var(--ops-text)]">
-                            Totales
-                          </h2>
-                        </div>
-                        <div className="mt-4 space-y-2 text-sm">
-                          <div
-                            className={`rounded-lg border px-3 py-2 ${
-                              cashReady
-                                ? buildSemanticChipClass("success")
-                                : buildSemanticChipClass("warning")
-                            }`}
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <span className="font-semibold">
-                                Estado de caja:{" "}
-                                {cashReady
-                                  ? "Abierta"
-                                  : buildCashLabel(cashStatus)}
-                              </span>
-                              {!cashReady ? (
-                                canOpenCashModule ? (
-                                  <Link
-                                    href="/caja"
-                                    className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
-                                  >
-                                    Ir a Caja del dia
-                                  </Link>
-                                ) : (
-                                  <span className="text-xs">
-                                    Solicita apertura a caja/admin.
-                                  </span>
-                                )
-                              ) : null}
-                            </div>
-                          </div>
-
-                          <div className="flex justify-between text-[var(--ops-text-muted)]">
-                            <span>Subtotal base</span>
-                            <span>S/. {formatMoney(totals.baseSubtotal)}</span>
-                          </div>
-                          {totals.saleDiscountAmount > 0 ? (
-                            <div className="flex justify-between text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]">
-                              <span>Descuento general</span>
-                              <span>
-                                - S/. {formatMoney(totals.saleDiscountAmount)}
-                              </span>
-                            </div>
-                          ) : null}
-                          <div className="flex justify-between border-t border-[var(--ops-border-strong)] pt-2 text-base font-bold text-[var(--ops-text)]">
-                            <span>Total documento</span>
-                            <span>S/. {formatMoney(totals.total)}</span>
-                          </div>
-                          {totals.taxRate > 0 ? (
-                            <div className="flex justify-between text-[var(--ops-text-muted)]">
-                              <span>
-                                IGV incluido (
-                                {(totals.taxRate * 100).toFixed(0)}%)
-                              </span>
-                              <span>S/. {formatMoney(totals.tax)}</span>
-                            </div>
-                          ) : null}
-                        </div>
-
-                        <div className="mt-4 space-y-2">
-                          <div className="sales-panel-muted rounded-xl px-3 py-2.5">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                              Cobro asignado
-                            </p>
-                            <p className="mt-1 text-xl font-semibold text-[var(--ops-text)]">
-                              S/.{" "}
-                              {formatMoney(
-                                paymentMode === "mixed"
-                                  ? mixedPaymentsPreview.enteredTotal
-                                  : totals.total,
-                              )}
-                            </p>
-                          </div>
-                          <div className="sales-panel-muted rounded-xl px-3 py-2.5">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                              Estado
-                            </p>
-                            <p
-                              className={`mt-1 text-sm font-semibold ${
-                                submitDisabled
-                                  ? "text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]"
-                                  : "text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
-                              }`}
-                            >
-                              {summaryStatusMessage}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="mt-4">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                            Acciones
-                          </p>
-                          <div className="mt-2 space-y-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="w-full justify-start"
-                              disabled
-                            >
-                              <Receipt className="h-4 w-4" />
-                              Imprimir comprobante
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="w-full justify-start"
-                              disabled
-                            >
-                              <Users className="h-4 w-4" />
-                              Enviar por correo
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="w-full justify-start"
-                              disabled
-                            >
-                              <History className="h-4 w-4" />
-                              Descargar PDF
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="w-full justify-start"
-                              disabled
-                            >
-                              <BadgeCheck className="h-4 w-4" />
-                              Guardar venta como borrador
-                            </Button>
-                          </div>
-                        </div>
-
-                        {totals.hasMissingPrice ? (
-                          <p
-                            className={`mt-3 rounded-lg border px-3 py-2 text-sm ${buildSemanticChipClass("warning")}`}
-                          >
-                            Hay items sin precio vigente. Ajustalos antes del
-                            cierre.
-                          </p>
-                        ) : null}
-
-                        {error ? (
-                          <p
-                            className={`mt-3 rounded-lg border px-3 py-2 text-sm ${buildSemanticChipClass("danger")}`}
-                          >
-                            {error}
-                          </p>
-                        ) : null}
-
-                        <button
-                          type="button"
-                          onClick={confirmSale}
-                          disabled={submitDisabled}
-                          className="mt-4 w-full cursor-pointer rounded-lg bg-[var(--ripnel-accent)] px-4 py-3 text-sm font-bold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          {submitting ? "Procesando..." : "Finalizar venta"}
-                        </button>
-                      </article>
-                    </div>
+                    <SummaryStage
+                      active={activeStage === "summary"}
+                      activeDocumentOption={activeDocumentOption}
+                      selectedCustomerName={selectedCustomerName}
+                      selectedCustomerDocument={selectedCustomerDocument}
+                      selectedCustomer={selectedCustomer}
+                      isGenericCustomerSelected={isGenericCustomerSelected}
+                      customerStepReady={customerStepReady}
+                      cartCount={cartCount}
+                      totals={totals}
+                      paymentMode={paymentMode}
+                      paymentSummaryLabel={paymentSummaryLabel}
+                      mixedPaymentsPreview={mixedPaymentsPreview}
+                      mixedPayments={mixedPayments}
+                      cashReady={cashReady}
+                      cashStatus={cashStatus}
+                      canOpenCashModule={canOpenCashModule}
+                      posContext={posContext}
+                      summaryStatusMessage={summaryStatusMessage}
+                      submitDisabled={submitDisabled}
+                      submitting={submitting}
+                      error={error}
+                      goToStage={goToStage}
+                      confirmSale={confirmSale}
+                      onActivate={() => setActiveStage("summary")}
+                    />
                   </section>
                 </div>
               </div>

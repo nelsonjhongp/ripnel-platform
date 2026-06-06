@@ -17,18 +17,12 @@ import {
   TAX_RATE,
 } from "./pos-types"
 
-export function round2(value: number): number {
-  return Math.round(value * 100) / 100
-}
+import { round2, formatMoney } from "@/lib/format-utils"
+export { round2, formatMoney }
 
 export function trimOrNull(value: unknown): string | null {
   const normalized = String(value || "").trim()
   return normalized || null
-}
-
-export function formatMoney(value: unknown): string {
-  const normalized = Number(value)
-  return Number.isFinite(normalized) ? normalized.toFixed(2) : "--"
 }
 
 export function parseAmountInput(value: unknown): number | null {
@@ -44,15 +38,15 @@ export function parseAmountInput(value: unknown): number | null {
 
 export function buildSemanticChipClass(tone = "neutral"): string {
   if (tone === "success") {
-    return "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
+    return "border-[var(--ops-tone-success-border)] bg-[var(--ops-tone-success-bg)] text-[var(--ops-tone-success-text)]"
   }
 
   if (tone === "warning") {
-    return "border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]"
+    return "border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)] text-[var(--ops-tone-warning-text)]"
   }
 
   if (tone === "danger") {
-    return "border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#be123c_74%,var(--ops-text))]"
+    return "border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] text-[var(--ops-tone-danger-text)]"
   }
 
   if (tone === "accent") {
@@ -62,7 +56,7 @@ export function buildSemanticChipClass(tone = "neutral"): string {
   return "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] text-[var(--ops-text-muted)]"
 }
 
-export function buildVariantTone(isWholesale: boolean): string {
+export function buildVariantTone(isWholesale: boolean): "success" | "neutral" {
   return isWholesale ? "success" : "neutral"
 }
 
@@ -592,7 +586,6 @@ export function explainApiError(
   error: unknown,
   fallback: string
 ): string {
-  // Uses duck-typing to avoid importing ApiError class
   const e = error as { status?: number; message?: string }
   if (!e || typeof e !== "object" || !("status" in e)) {
     return fallback
@@ -602,7 +595,7 @@ export function explainApiError(
     return "Tu usuario no tiene permisos para operar ventas en este modulo."
   }
 
-  if (e.status === 409) {
+  if (e.status === 409 || e.status === 400) {
     return e.message || fallback
   }
 
