@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronRight, History, Info, RefreshCw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronRight, History, RefreshCw } from "lucide-react";
 
 import { Pagination } from "@/components/ui/pagination";
 
@@ -13,21 +13,17 @@ import {
   LoadingPage,
 } from "@/components/feedback/status-page";
 import {
-  Tooltip,
-  TooltipContent,
   TooltipProvider,
-  TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ApiError, apiFetch } from "@/lib/api";
+import { useApiGet } from "@/hooks/use-api-get";
+import { usePagination } from "@/hooks/use-pagination";
 import {
   CashClosing,
   formatAmount,
   formatBusinessDate,
-  formatDateTime,
-  getCashStatusLabel,
-  getCashStatusTone,
 } from "@/lib/cash";
-const PAGE_SIZE = 10;
+import { formatDateTime } from "@/lib/date-utils";
 
 type RangeFilter = "7d" | "30d";
 type StatusFilter = "all" | "open" | "closed";
@@ -44,34 +40,8 @@ function explainCashHistoryError(error: unknown) {
   return error.message || "No se pudo cargar el historial de caja.";
 }
 
-function HelpTooltip({ content }: { content: string }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)]"
-          aria-label="Más información"
-        >
-          <Info className="h-3.5 w-3.5" />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="top" sideOffset={8} className="max-w-72">
-        {content}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-function CashStatusBadge({ status }: { status: CashClosing["status"] }) {
-  return (
-    <span
-      className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getCashStatusTone(status)}`}
-    >
-      {getCashStatusLabel(status)}
-    </span>
-  );
-}
+import { CashStatusBadge } from "./cash-status-badge"
+import { HelpTooltip } from "@/components/ui/help-tooltip"
 
 function SummaryMetric({
   label,
@@ -93,50 +63,14 @@ function SummaryMetric({
 }
 
 export default function CashHistoryPage() {
-  const [history, setHistory] = useState<CashClosing[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [range, setRange] = useState<RangeFilter>("7d");
   const [status, setStatus] = useState<StatusFilter>("all");
-  const [page, setPage] = useState(1);
 
-  const loadHistory = useCallback(
-    async (nextRange = range, nextStatus = status) => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const params = new URLSearchParams({ range: nextRange });
-        if (nextStatus !== "all") {
-          params.set("status", nextStatus);
-        }
-
-        const data = await apiFetch<CashClosing[]>(
-          `/api/cash?${params.toString()}`,
-          {
-            cache: "no-store",
-          },
-        );
-        setHistory(Array.isArray(data) ? data : []);
-      } catch (loadError) {
-        setHistory([]);
-        setError(explainCashHistoryError(loadError));
-      } finally {
-        setLoading(false);
-      }
-    },
-    [range, status],
+  const { data: historyData, loading, error, refetch } = useApiGet(
+    () => apiFetch<CashClosing[]>(`/api/cash/history?range=${range}&status=${status}`, { cache: "no-store" }),
+    [range, status]
   );
-
-  useEffect(() => {
-    // defer loadHistory to avoid synchronous setState inside effect
-    void Promise.resolve().then(() => loadHistory(range, status));
-  }, [range, status, loadHistory]);
-
-  useEffect(() => {
-    // defer setPage to avoid synchronous setState inside effect
-    void Promise.resolve().then(() => setPage(1));
-  }, [range, status]);
+  const history = historyData ?? [];
 
   const stats = useMemo(() => {
     const openCount = history.filter((item) => item.status === "open").length;
@@ -156,19 +90,11 @@ export default function CashHistoryPage() {
     };
   }, [history]);
 
-  const totalPages = Math.max(Math.ceil(history.length / PAGE_SIZE), 1);
-  const visibleRows = useMemo(() => {
-    const start = (page - 1) * PAGE_SIZE;
-    return history.slice(start, start + PAGE_SIZE);
-  }, [history, page]);
+  const { paginatedItems: visibleRows, totalPages, safePage, setPage } = usePagination(history)
 
   useEffect(() => {
-    void Promise.resolve().then(() => {
-      if (page > totalPages) {
-        setPage(totalPages);
-      }
-    });
-  }, [page, totalPages]);
+    void Promise.resolve().then(() => setPage(1));
+  }, [range, status, setPage]);
 
   if (loading) {
     return (
@@ -211,7 +137,7 @@ export default function CashHistoryPage() {
 
                 <button
                   type="button"
-                  onClick={() => loadHistory(range, status)}
+                  onClick={refetch}
                   className="sales-field sales-field-interactive inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--ops-text)] shadow-sm"
                 >
                   <RefreshCw className="h-4 w-4" />
@@ -376,7 +302,7 @@ export default function CashHistoryPage() {
 
                   <div className="mt-4 border-t border-[var(--ops-border-strong)] pt-4">
                     <Pagination
-                      page={page}
+                      page={safePage}
                       totalPages={totalPages}
                       onPageChange={setPage}
                     />

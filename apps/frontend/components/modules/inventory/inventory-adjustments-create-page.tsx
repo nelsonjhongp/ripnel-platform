@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, LoaderCircle, PackagePlus, Search, Trash2 } from "lucide-react";
 import {
-  AdminSelectMenu,
   AdminTextarea,
 } from "@/components/admin/admin-ui";
+import { OpsSelectMenu } from "@/components/ui/ops-selection";
 import { InlineStatusCard } from "@/components/feedback/status-page";
 import { ForbiddenPage } from "@/components/feedback/status-page";
 import { Button } from "@/components/ui/button";
@@ -19,8 +19,10 @@ import {
   OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
+import { apiFetchData } from "@/lib/api";
 import { appRoutes } from "@/lib/routes";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useApiGet } from "@/hooks/use-api-get";
 import {
   type AdjustmentDetailData,
   type AdjustmentListData,
@@ -31,7 +33,6 @@ import {
   type DraftAdjustmentLine,
   formatAdjustmentIntent,
   type Location,
-  requestAdjustmentJson,
 } from "./inventory-adjustments-shared";
 
 export function InventoryAdjustmentsCreatePage() {
@@ -39,8 +40,6 @@ export function InventoryAdjustmentsCreatePage() {
   const { user } = useAuth();
   const initialSearchParams =
     typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [loadingLocations, setLoadingLocations] = useState(true);
   const [savingAdjustment, setSavingAdjustment] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createLocationId, setCreateLocationId] = useState(() => initialSearchParams.get("location_id") || "");
@@ -56,52 +55,33 @@ export function InventoryAdjustmentsCreatePage() {
     String(user?.role_name || "").toUpperCase()
   );
 
-  async function loadAdjustmentContext() {
-    setLoadingLocations(true);
-    setCreateError(null);
+  const { data: adjustmentData, loading: loadingLocations } = useApiGet(
+    () => apiFetchData<AdjustmentListData>("/api/inventory/adjustments", { cache: "no-store" }),
+    []
+  );
 
-    try {
-      const data = await requestAdjustmentJson<AdjustmentListData>("/api/inventory/adjustments");
-      const availableLocations = data?.meta.available_locations || [];
-      setLocations(availableLocations);
-      setCreateLocationId((current) => {
-        if (current && availableLocations.some((location) => location.location_id === current)) {
-          return current;
-        }
+  const locations = useMemo(() => adjustmentData?.meta?.available_locations || [], [adjustmentData]);
 
-        if (
-          data?.meta.selected_location_id &&
-          availableLocations.some(
-            (location) => location.location_id === data.meta.selected_location_id
-          )
-        ) {
-          return data.meta.selected_location_id;
-        }
+  const fallbackCreateLocationId = useMemo(() => {
+    if (!adjustmentData) return "";
 
-        return (
-          availableLocations.find((location) => location.is_default)?.location_id ||
-          availableLocations[0]?.location_id ||
-          ""
-        );
-      });
-    } catch (requestError) {
-      setCreateError(
-        requestError instanceof Error ? requestError.message : "No se pudieron cargar sedes"
-      );
-    } finally {
-      setLoadingLocations(false);
+    if (
+      adjustmentData.meta.selected_location_id &&
+      locations.some((location) => location.location_id === adjustmentData.meta.selected_location_id)
+    ) {
+      return adjustmentData.meta.selected_location_id;
     }
-  }
 
-  useEffect(() => {
-    void Promise.resolve().then(() => {
-      void loadAdjustmentContext();
-    });
-  }, []);
+    return (
+      locations.find((location) => location.is_default)?.location_id ||
+      locations[0]?.location_id ||
+      ""
+    );
+  }, [adjustmentData, locations]);
   const effectiveCreateLocationId =
     createLocationId && locations.some((location) => location.location_id === createLocationId)
       ? createLocationId
-      : "";
+      : fallbackCreateLocationId;
 
   useEffect(() => {
     const normalizedQuery = variantQuery.trim();
@@ -119,12 +99,11 @@ export function InventoryAdjustmentsCreatePage() {
           location_id: effectiveCreateLocationId,
           query: normalizedQuery,
         });
-        const data = await requestAdjustmentJson<AdjustmentVariantsData>(
+        const data = await apiFetchData<AdjustmentVariantsData>(
           `/api/inventory/adjustment-variants?${params.toString()}`,
-          { signal: controller.signal }
+          { signal: controller.signal, cache: "no-store" }
         );
         setVariantResults(data?.rows || []);
-        setLocations(data?.meta.available_locations || []);
       } catch (requestError) {
         if (controller.signal.aborted) {
           return;
@@ -236,8 +215,9 @@ export function InventoryAdjustmentsCreatePage() {
         throw new Error("Debes agregar al menos una variante");
       }
 
-      await requestAdjustmentJson<AdjustmentDetailData>("/api/inventory/adjustments", {
+      await apiFetchData<AdjustmentDetailData>("/api/inventory/adjustments", {
         method: "POST",
+        cache: "no-store",
         body: JSON.stringify({
           location_id: effectiveCreateLocationId,
           reason: buildAdjustmentReason(adjustmentIntent, createReason),
@@ -315,7 +295,7 @@ export function InventoryAdjustmentsCreatePage() {
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                   Sede
                 </label>
-                <AdminSelectMenu
+                <OpsSelectMenu
                   value={effectiveCreateLocationId}
                   onValueChange={setCreateLocationId}
                   placeholder="Selecciona una sede"
@@ -328,7 +308,7 @@ export function InventoryAdjustmentsCreatePage() {
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                   Tipo operativo
                 </label>
-                <AdminSelectMenu
+                <OpsSelectMenu
                   value={adjustmentIntent}
                   onValueChange={(value) => setAdjustmentIntent(value as AdjustmentIntent)}
                   placeholder="Selecciona una intención"

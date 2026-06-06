@@ -2,10 +2,9 @@
 
 import Link from "next/link"
 import type { ReactNode } from "react"
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { LucideIcon } from "lucide-react"
 import {
-  ArrowRight,
   CircleDollarSign,
   ClipboardList,
   CreditCard,
@@ -34,7 +33,7 @@ import {
 import { AttentionPanel, type AttentionPanelItem } from "@/components/dashboard/attention-panel"
 import { DashboardChartCard } from "@/components/dashboard/dashboard-chart-card"
 import { CommercialActivityCard } from "@/components/dashboard/commercial-activity-card"
-import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state"
+import { OpsEmptyState } from "@/components/ui/ops-empty-state"
 import {
   formatCashStatus,
   formatCurrencyPEN,
@@ -42,21 +41,20 @@ import {
 } from "@/components/dashboard/dashboard-formatters"
 import { DashboardKpiCard, type DashboardKpiTone } from "@/components/dashboard/dashboard-kpi-card"
 import { useAuth } from "@/components/auth/AuthProvider"
+import { useApiGet } from "@/hooks/use-api-get"
 import { ErrorPage, ProtectedLoadingPage } from "@/components/feedback/status-page"
 import { useSidebarTopbarActions } from "@/components/sidebar"
 import { Button } from "@/components/ui/button"
 import { FilterDropdown } from "@/components/ui/filter-dropdown"
-import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
+import { OpsCardActionLink } from "@/components/ui/ops-card-action-link"
+import { OpsInlineBadge } from "@/components/ui/ops-inline-badge"
+import { OpsMetricRow } from "@/components/ui/ops-metric-row"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { fetchCommercialActivity, fetchCustomerAnalytics, fetchDashboardOverview } from "@/lib/api-dashboard"
-import { ApiError } from "@/lib/api"
 import type {
   CashSection,
-  CommercialActivityResponse,
-  CustomerAnalytics,
   DashboardMetricComparison,
-  DashboardOverview,
   InventorySection,
   PostsalesSection,
   SalesToday,
@@ -65,6 +63,7 @@ import type {
 import {
   appRoutes,
 } from "@/lib/routes"
+import { formatDateTime } from "@/lib/date-utils"
 import { cn } from "@/lib/utils"
 
 const PIE_COLORS = [
@@ -89,21 +88,6 @@ const ALL_LOCATIONS_VALUE = "all"
 
 function todayPeruISO() {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/Lima" })
-}
-
-function explainDashboardError(error: unknown) {
-  if (!(error instanceof ApiError)) return "No pudimos preparar el dashboard."
-  if (error.status === 409) return "Necesitas una sede default activa."
-  if (error.status === 401) return "Tu sesion ya no es valida. Vuelve a iniciar sesion."
-  return error.message || "No pudimos preparar el dashboard."
-}
-
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return "—"
-  return new Date(value).toLocaleString("es-PE", {
-    dateStyle: "short",
-    timeStyle: "short",
-  })
 }
 
 function buildAttentionBadge(value: number, tone: AttentionPanelItem["tone"]) {
@@ -173,15 +157,8 @@ function normalizeComparison(
 export default function DashboardPage() {
   const { loading: authLoading } = useAuth()
 
-  const [overview, setOverview] = useState<DashboardOverview | null>(null)
-  const [analytics, setAnalytics] = useState<CustomerAnalytics | null>(null)
-  const [commercialActivity, setCommercialActivity] = useState<CommercialActivityResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [period, setPeriod] = useState<"week" | "month" | "quarter">("week")
   const [selectedLocation, setSelectedLocation] = useState<string>("")
-  const latestLoadIdRef = useRef(0)
 
   const dateRange = useMemo(() => {
     const today = todayPeruISO()
@@ -196,63 +173,44 @@ export default function DashboardPage() {
     }
   }, [period])
 
-  const loadAll = useCallback(async (options: { silent?: boolean } = {}) => {
-    const silent = options.silent === true
-    const activityGroup = "daily"
-    const scopeParams = buildDashboardScopeParams(selectedLocation)
-    const loadId = latestLoadIdRef.current + 1
-    latestLoadIdRef.current = loadId
+  const { data: overview, loading: loadingOverview, error: overviewError, refetch: refetchOverview } = useApiGet(
+    () => fetchDashboardOverview({
+      date_from: dateRange.date_from,
+      date_to: dateRange.date_to,
+      ...buildDashboardScopeParams(selectedLocation),
+    }),
+    [dateRange.date_from, dateRange.date_to, selectedLocation]
+  )
 
-    if (silent) setRefreshing(true)
-    else setLoading(true)
-    setError(null)
+  const { data: analytics, loading: loadingAnalytics, error: analyticsError, refetch: refetchAnalytics } = useApiGet(
+    () => fetchCustomerAnalytics({
+      date_from: dateRange.date_from,
+      date_to: dateRange.date_to,
+      limit: 8,
+      ...buildDashboardScopeParams(selectedLocation),
+    }),
+    [dateRange.date_from, dateRange.date_to, selectedLocation]
+  )
 
-    try {
-      const [overviewData, analyticsData, activityData] = await Promise.all([
-        fetchDashboardOverview({
-          date_from: dateRange.date_from,
-          date_to: dateRange.date_to,
-          ...scopeParams,
-        }),
-        fetchCustomerAnalytics({
-          date_from: dateRange.date_from,
-          date_to: dateRange.date_to,
-          limit: 8,
-          ...scopeParams,
-        }),
-        fetchCommercialActivity({
-          date_from: dateRange.date_from,
-          date_to: dateRange.date_to,
-          group: activityGroup,
-          ...scopeParams,
-        }),
-      ])
+  const { data: commercialActivity, loading: loadingActivity, error: activityError, refetch: refetchActivity } = useApiGet(
+    () => fetchCommercialActivity({
+      date_from: dateRange.date_from,
+      date_to: dateRange.date_to,
+      group: "daily",
+      ...buildDashboardScopeParams(selectedLocation),
+    }),
+    [dateRange.date_from, dateRange.date_to, selectedLocation]
+  )
 
-      if (latestLoadIdRef.current !== loadId) return
+  const loading = loadingOverview || loadingAnalytics || loadingActivity
+  const error = overviewError || analyticsError || activityError
+  const refreshing = loading && !!overview
 
-      setOverview(overviewData)
-      setAnalytics(analyticsData)
-      setCommercialActivity(activityData)
-    } catch (loadError) {
-      if (latestLoadIdRef.current !== loadId) return
-
-      setError(explainDashboardError(loadError))
-      if (!silent) {
-        setOverview(null)
-        setAnalytics(null)
-        setCommercialActivity(null)
-      }
-    } finally {
-      if (latestLoadIdRef.current !== loadId) return
-
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }, [dateRange.date_from, dateRange.date_to, selectedLocation])
-
-  useEffect(() => {
-    void Promise.resolve().then(() => loadAll())
-  }, [loadAll])
+  const refetchAll = () => {
+    refetchOverview()
+    refetchAnalytics()
+    refetchActivity()
+  }
 
   useEffect(() => {
     const availableLocations = overview?.context.scope.available_locations ?? []
@@ -520,7 +478,7 @@ export default function DashboardPage() {
         variant="ops"
         title="No pudimos abrir el dashboard"
         description={error || "El dashboard no esta disponible."}
-        onReset={() => loadAll()}
+        onReset={refetchAll}
       />
     )
   }
@@ -565,7 +523,7 @@ export default function DashboardPage() {
         variant="outline"
         size="icon-sm"
         className="rounded-xl border-[var(--ops-border-strong)] bg-[var(--ops-surface)]"
-        onClick={() => loadAll({ silent: true })}
+        onClick={refetchAll}
         disabled={refreshing}
         aria-label="Actualizar"
       >
@@ -637,7 +595,7 @@ export default function DashboardPage() {
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <DashboardEmptyState compact description="Sin productos vendidos para destacar en este periodo." />
+                <OpsEmptyState variant="compact" description="Sin productos vendidos para destacar en este periodo." />
               )}
             </DashboardChartCard>
             </div>
@@ -679,7 +637,7 @@ export default function DashboardPage() {
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <DashboardEmptyState compact description="Sin clientes suficientes para construir un ranking en este periodo." />
+                <OpsEmptyState variant="compact" description="Sin clientes suficientes para construir un ranking en este periodo." />
               )}
             </DashboardChartCard>
             </div>
@@ -769,7 +727,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ) : (
-                <DashboardEmptyState compact description="Sin pagos registrados para construir la mezcla de cobro." />
+                <OpsEmptyState variant="compact" description="Sin pagos registrados para construir la mezcla de cobro." />
               )}
             </DashboardChartCard>
             </div>
@@ -818,57 +776,6 @@ function DashboardInfoCard({
   )
 }
 
-function InlineBadge({
-  label,
-  tone = "neutral",
-}: {
-  label: string
-  tone?: "neutral" | "success" | "warning" | "danger" | "purple"
-}) {
-  return (
-    <OpsStatusBadge tone={tone === "purple" ? "accent" : tone} size="xs" className="uppercase tracking-[0.12em]">
-      {label}
-    </OpsStatusBadge>
-  )
-}
-
-function MetricRow({
-  label,
-  value,
-  tone = "default",
-}: {
-  label: string
-  value: string
-  tone?: "default" | "warning" | "danger"
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 text-sm">
-      <span className="text-[13px] text-[var(--ops-text-muted)]">{label}</span>
-      <span
-        className={cn(
-          "font-semibold",
-          tone === "warning" && "text-[var(--ops-chart-4)]",
-          tone === "danger" && "text-[var(--ops-chart-5)]",
-          tone === "default" && "text-[var(--ops-text)]"
-        )}
-      >
-        {value}
-      </span>
-    </div>
-  )
-}
-
-function CardActionLink({ href, label }: { href: string; label: string }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--ripnel-accent-hover)] transition hover:text-[var(--ripnel-accent)]"
-    >
-      {label}
-      <ArrowRight className="h-3.5 w-3.5" />
-    </Link>
-  )
-}
 
 function SalesPerformanceCard({ section }: { section: SalesToday | null }) {
   const saleCount = Number(section?.sale_count || 0)
@@ -887,7 +794,7 @@ function SalesPerformanceCard({ section }: { section: SalesToday | null }) {
       icon={ShoppingCart}
     >
       {!section ? (
-        <DashboardEmptyState compact description="No tienes visibilidad comercial para este periodo." />
+        <OpsEmptyState variant="compact" description="No tienes visibilidad comercial para este periodo." />
       ) : (
         <div className="space-y-3.5">
           <div className="grid grid-cols-2 gap-2">
@@ -932,7 +839,7 @@ function SalesPerformanceCard({ section }: { section: SalesToday | null }) {
                 {averageTicket == null ? "—" : formatCurrencyPEN(averageTicket)}
               </span>
             </div>
-            <MetricRow label="Ultima venta" value={formatDateTime(section.last_confirmed_at)} />
+            <OpsMetricRow label="Ultima venta" value={formatDateTime(section.last_confirmed_at)} />
           </div>
 
           <div className="space-y-1">
@@ -947,7 +854,7 @@ function SalesPerformanceCard({ section }: { section: SalesToday | null }) {
             ))}
           </div>
 
-          <CardActionLink href={appRoutes.transactionHistory} label="Ver ventas" />
+          <OpsCardActionLink href={appRoutes.transactionHistory} label="Ver ventas" />
         </div>
       )}
     </DashboardInfoCard>
@@ -961,7 +868,7 @@ function InventoryCard({ section }: { section: InventorySection | null }) {
       icon={PackageSearch}
     >
       {!section ? (
-        <DashboardEmptyState compact description="No hay visibilidad de inventario para este usuario." />
+        <OpsEmptyState variant="compact" description="No hay visibilidad de inventario para este usuario." />
       ) : (
         <div className="space-y-3.5">
           <div className="grid grid-cols-2 gap-2">
@@ -1006,10 +913,10 @@ function InventoryCard({ section }: { section: InventorySection | null }) {
               ))}
             </div>
           ) : (
-            <DashboardEmptyState compact description="No hay variantes criticas en el alcance seleccionado." />
+            <OpsEmptyState variant="compact" description="No hay variantes criticas en el alcance seleccionado." />
           )}
 
-          <CardActionLink href={`${appRoutes.inventory}?status=con-alertas`} label="Ver stock" />
+          <OpsCardActionLink href={`${appRoutes.inventory}?status=con-alertas`} label="Ver stock" />
         </div>
       )}
     </DashboardInfoCard>
@@ -1047,7 +954,7 @@ function OperationsCard({
                     : "Resumen consolidado del alcance seleccionado."}
               </p>
             </div>
-            <InlineBadge
+            <OpsInlineBadge
               label={
                 cash?.closing
                   ? formatCashStatus(cash.closing.status)
@@ -1059,16 +966,16 @@ function OperationsCard({
             />
           </div>
           <div className="space-y-1.5">
-            <MetricRow label="Ventas" value={formatCurrencyPEN(cash?.sales_summary?.consistency?.sales_total)} />
-            <MetricRow label="Pagos" value={formatCurrencyPEN(cash?.sales_summary?.consistency?.payment_total)} />
-            <MetricRow
+            <OpsMetricRow label="Ventas" value={formatCurrencyPEN(cash?.sales_summary?.consistency?.sales_total)} />
+            <OpsMetricRow label="Pagos" value={formatCurrencyPEN(cash?.sales_summary?.consistency?.payment_total)} />
+            <OpsMetricRow
               label="Diferencia"
               value={cash?.sales_summary ? formatCurrencyPEN(cashDifference) : "—"}
               tone={!cash?.sales_summary ? "default" : cashDifference === 0 ? "default" : cashDifference && cashDifference > 0 ? "warning" : "danger"}
             />
           </div>
           <div>
-            <CardActionLink href={appRoutes.cash} label="Ver caja" />
+            <OpsCardActionLink href={appRoutes.cash} label="Ver caja" />
           </div>
         </div>
 
@@ -1080,18 +987,18 @@ function OperationsCard({
                 Casos disponibles segun reglas activas.
               </p>
             </div>
-            <InlineBadge
+            <OpsInlineBadge
               label={`${formatNumber(Number(postsales?.eligible_exchange_count || 0))} casos`}
               tone={Number(postsales?.eligible_exchange_count || 0) > 0 ? "warning" : "neutral"}
             />
           </div>
           <div className="space-y-1.5">
-            <MetricRow label="Elegibles" value={formatNumber(Number(postsales?.eligible_exchange_count || 0))} />
-            <MetricRow label="Anulables" value={formatNumber(Number(postsales?.eligible_cancel_count || 0))} />
-            <MetricRow label="Bloqueadas" value={formatNumber(Number(postsales?.blocked_cancel_count || 0))} />
+            <OpsMetricRow label="Elegibles" value={formatNumber(Number(postsales?.eligible_exchange_count || 0))} />
+            <OpsMetricRow label="Anulables" value={formatNumber(Number(postsales?.eligible_cancel_count || 0))} />
+            <OpsMetricRow label="Bloqueadas" value={formatNumber(Number(postsales?.blocked_cancel_count || 0))} />
           </div>
           <div>
-            <CardActionLink href={appRoutes.postsales} label="Revisar postventa" />
+            <OpsCardActionLink href={appRoutes.postsales} label="Revisar postventa" />
           </div>
         </div>
 
@@ -1103,7 +1010,7 @@ function OperationsCard({
                 Flujo de aprobación, despacho y recepción entre sedes.
               </p>
             </div>
-            <InlineBadge
+            <OpsInlineBadge
               label={`${formatNumber(
                 Number(transfers?.pending_receipts_count || 0) +
                   Number(transfers?.pending_approval_count || 0) +
@@ -1120,12 +1027,12 @@ function OperationsCard({
             />
           </div>
           <div className="space-y-1.5">
-            <MetricRow label="Por recibir" value={formatNumber(Number(transfers?.pending_receipts_count || 0))} />
-            <MetricRow label="Por aprobar" value={formatNumber(Number(transfers?.pending_approval_count || 0))} />
-            <MetricRow label="Por despachar" value={formatNumber(Number(transfers?.pending_dispatch_count || 0))} />
+            <OpsMetricRow label="Por recibir" value={formatNumber(Number(transfers?.pending_receipts_count || 0))} />
+            <OpsMetricRow label="Por aprobar" value={formatNumber(Number(transfers?.pending_approval_count || 0))} />
+            <OpsMetricRow label="Por despachar" value={formatNumber(Number(transfers?.pending_dispatch_count || 0))} />
           </div>
           <div>
-            <CardActionLink
+            <OpsCardActionLink
               href={appRoutes.transfers}
               label="Ver transferencias"
             />

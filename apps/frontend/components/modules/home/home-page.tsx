@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import {
   ArrowLeftRight,
@@ -21,68 +21,30 @@ import {
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ErrorPage, LoadingPage } from "@/components/feedback/status-page";
-import { HomeEmptyState } from "@/components/home/home-empty-state";
 import { HomeHeader, type HomeHeaderAction } from "@/components/home/home-hero";
-import { HomeKpiCard } from "@/components/home/home-kpi-card";
-import { HomePendingItem } from "@/components/home/home-pending-item";
 import { HomeCriticalStockTable } from "@/components/home/home-critical-stock-table";
 import { OpsActionTile } from "@/components/ui/ops-action-tile";
+import { OpsEmptyState } from "@/components/ui/ops-empty-state";
+import { OpsMetricCard } from "@/components/ui/ops-metric-card";
 import { OpsMetricStripItem } from "@/components/ui/ops-metric-strip-item";
+import { OpsPendingRow } from "@/components/ui/ops-pending-row";
 import { OpsSummaryBand } from "@/components/ui/ops-summary-band";
 import type { HomeOverview } from "@/components/home/home-types";
-import { apiFetch, ApiError } from "@/lib/api";
+import { useApiGet } from "@/hooks/use-api-get";
+import { apiFetch } from "@/lib/api";
+import { formatDate, formatDateTime } from "@/lib/date-utils";
+import { formatCurrency } from "@/lib/format-utils";
 import { appRoutes } from "@/lib/routes";
-
-function explainHomeError(error: unknown) {
-  if (!(error instanceof ApiError)) {
-    return "No pudimos preparar tu inicio operativo.";
-  }
-
-  if (error.status === 409) {
-    return "Necesitas una sede default activa para preparar tu inicio.";
-  }
-
-  if (error.status === 401) {
-    return "Tu sesión ya no es válida. Vuelve a iniciar sesión.";
-  }
-
-  return error.message || "No pudimos preparar tu inicio operativo.";
-}
-
-function formatCurrency(value: number | null | undefined) {
-  return `S/. ${Number(value || 0).toFixed(2)}`;
-}
-
-function formatDate(value: string | null | undefined) {
-  if (!value) return "";
-
-  return new Date(`${value}T00:00:00`).toLocaleDateString("es-PE", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
 
 function buildHeaderMetadata(
   locationName: string,
   roleName: string | null,
   businessDate: string,
 ) {
-  return [locationName, roleName || null, formatDate(businessDate)].filter(
+  const dateLabel = businessDate ? formatDate(businessDate) : null;
+  return [locationName, roleName || null, dateLabel].filter(
     (value): value is string => Boolean(value),
   );
-}
-
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return "";
-
-  return new Date(value).toLocaleString("es-PE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 function resolveHeaderActionIcon(href: string) {
@@ -164,42 +126,13 @@ const quickActionToneMap: Record<
 
 export default function InicioPage() {
   const { loading: authLoading, has } = useAuth();
-  const [overview, setOverview] = useState<HomeOverview | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
-
-    async function loadOverview() {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const data = await apiFetch<HomeOverview>("/api/home/overview", {
-          cache: "no-store",
-        });
-
-        if (active) {
-          setOverview(data);
-        }
-      } catch (loadError) {
-        if (!active) return;
-        setOverview(null);
-        setError(explainHomeError(loadError));
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadOverview();
-
-    return () => {
-      active = false;
-    };
-  }, []);
+  const { data: overview, loading, error, refetch } = useApiGet(
+    () => apiFetch<HomeOverview>("/api/home/overview", {
+      cache: "no-store",
+    }),
+    []
+  )
 
   const headerMetadata = useMemo(() => {
     if (!overview) return [];
@@ -324,20 +257,20 @@ export default function InicioPage() {
                   key={item.key}
                   className="border-b border-[var(--ops-border-soft)] last:border-b-0"
                 >
-                  <HomePendingItem
-                    icon={
-                      priorityIconMap[item.key] ?? (
-                        <CircleAlert className="h-4 w-4" />
-                      )
-                    }
-                    title={item.title}
-                    description={item.description}
-                    cta={priorityCtaMap[item.key] ?? "Resolver"}
-                    href={item.href}
-                    tone={
-                      priorityToneMap[item.key] ??
-                      (item.tone === "warning" ? "warning" : "info")
-                    }
+                <OpsPendingRow
+                  icon={
+                    priorityIconMap[item.key] ?? (
+                      <CircleAlert className="h-4 w-4" />
+                    )
+                  }
+                  title={item.title}
+                  description={item.description}
+                  ctaLabel={priorityCtaMap[item.key] ?? "Resolver"}
+                  ctaHref={item.href}
+                  tone={
+                    priorityToneMap[item.key] ??
+                    (item.tone === "warning" ? "warning" : "info")
+                  }
                   />
                 </div>
               ))}
@@ -347,7 +280,7 @@ export default function InicioPage() {
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {personalSales?.visible && (
-            <HomeKpiCard
+            <OpsMetricCard
               icon={<BarChart3 className="h-4 w-4" />}
               label="Ventas hoy"
               value={personalSales.today.sale_count}
@@ -358,7 +291,7 @@ export default function InicioPage() {
           )}
 
           {cashSection?.visible && (
-            <HomeKpiCard
+            <OpsMetricCard
               icon={<Wallet className="h-4 w-4" />}
               label="Caja"
               value={formatCashState(cashSection.closing?.status)}
@@ -375,7 +308,7 @@ export default function InicioPage() {
           )}
 
           {inventorySection?.visible && (
-            <HomeKpiCard
+            <OpsMetricCard
               icon={<TriangleAlert className="h-4 w-4" />}
               label="Stock critico"
               value={`${inventorySection.zero_stock_count} en cero`}
@@ -392,7 +325,7 @@ export default function InicioPage() {
           )}
 
           {transferSection?.visible && (
-            <HomeKpiCard
+            <OpsMetricCard
               icon={<ArrowLeftRight className="h-4 w-4" />}
               label="Transferencias"
               value={`${transferSection.counts.open_for_store_count + transferSection.counts.pending_receipts_count} pendientes`}
@@ -505,7 +438,8 @@ export default function InicioPage() {
                         </div>
                       </div>
                     ) : (
-                      <HomeEmptyState
+                      <OpsEmptyState
+                        variant="compact"
                         title="Sin ventas personales todavía"
                         description="Cuando confirmes una venta en tu sede activa, aparecerá aquí como referencia rápida."
                       />
@@ -739,7 +673,8 @@ export default function InicioPage() {
 
         {!hasAnyContent && (
           <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-6">
-            <HomeEmptyState
+            <OpsEmptyState
+              variant="compact"
               title="Sin indicadores visibles para tu sesión"
               description="El inicio mostrará módulos operativos cuando tu usuario tenga sede activa y capacidades asociadas."
             />

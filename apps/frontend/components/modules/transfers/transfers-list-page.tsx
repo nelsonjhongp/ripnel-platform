@@ -1,18 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
-  CheckCheck,
   Eye,
   LoaderCircle,
   Plus,
   RefreshCw,
   RotateCcw,
-  SendHorizonal,
-  ShieldCheck,
-  X,
 } from "lucide-react";
 
 import {
@@ -23,8 +19,11 @@ import {
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ForbiddenPage, InlineStatusCard, LoadingPage } from "@/components/feedback/status-page";
 import { apiFetch, type ApiEnvelope, unwrapApiData } from "@/lib/api";
-import { resolveTransferCapabilities } from "@/lib/capabilities";
+import { useApiGet } from "@/hooks/use-api-get";
+import { useTransferCapabilities } from "@/hooks/use-transfer-capabilities";
+import { usePagination } from "@/hooks/use-pagination";
 import { appRoutes } from "@/lib/routes";
+import { formatDateTimeParts } from "@/lib/date-utils";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
 import { Pagination } from "@/components/ui/pagination";
@@ -48,6 +47,9 @@ import {
   formatTransferQueueLabel,
   TRANSFER_QUEUE_OPTIONS,
   TRANSFER_SCOPE_OPTIONS,
+  TRANSFER_ACTION_CONFIG,
+  type TransferActionConfig,
+  type TransferActionKey,
   type TransferInboxItem,
   type TransferInboxResponse,
   type TransferPendingStage,
@@ -55,84 +57,8 @@ import {
 } from "./transfers-shared";
 
 type TransferRecord = TransferInboxItem;
-type TransferActionKey = "approve" | "ship" | "receive" | "cancel";
 type TransferRowAction = TransferActionKey | "detail";
 
-const ACTION_CONFIG: Record<
-  TransferActionKey,
-  {
-    label: string;
-    confirmLabel: string;
-    successMessage: string;
-    busyMessage: string;
-    path: (transferId: string) => string;
-    icon: ReactNode;
-    tone?: "danger" | "accent" | "neutral";
-    description: (transfer: TransferRecord) => ReactNode;
-  }
-> = {
-  approve: {
-    label: "Aprobar",
-    confirmLabel: "Aprobar solicitud",
-    successMessage: "Solicitud aprobada para despacho.",
-    busyMessage: "Aprobando...",
-    path: (transferId) => `/api/transfers/${transferId}/approve`,
-    icon: <ShieldCheck className="h-3.5 w-3.5" />,
-    tone: "accent",
-    description: (transfer) => (
-      <>
-        La transferencia <strong>{transfer.transfer_number || "sin número"}</strong> quedará lista
-        para despacho desde <strong>{transfer.from_location_name}</strong>.
-      </>
-    ),
-  },
-  ship: {
-    label: "Despachar",
-    confirmLabel: "Despachar transferencia",
-    successMessage: "Transferencia despachada.",
-    busyMessage: "Despachando...",
-    path: (transferId) => `/api/transfers/${transferId}/ship`,
-    icon: <SendHorizonal className="h-3.5 w-3.5" />,
-    tone: "accent",
-    description: (transfer) => (
-      <>
-        La transferencia <strong>{transfer.transfer_number || "sin número"}</strong> descontará
-        stock del origen y quedará lista para recepción en{" "}
-        <strong>{transfer.to_location_name}</strong>.
-      </>
-    ),
-  },
-  receive: {
-    label: "Recibir",
-    confirmLabel: "Confirmar recepción",
-    successMessage: "Transferencia recepcionada.",
-    busyMessage: "Recepcionando...",
-    path: (transferId) => `/api/transfers/${transferId}/receive`,
-    icon: <CheckCheck className="h-3.5 w-3.5" />,
-    tone: "accent",
-    description: (transfer) => (
-      <>
-        La transferencia <strong>{transfer.transfer_number || "sin número"}</strong> ingresará
-        stock en <strong>{transfer.to_location_name}</strong>.
-      </>
-    ),
-  },
-  cancel: {
-    label: "Cancelar",
-    confirmLabel: "Cancelar transferencia",
-    successMessage: "Transferencia cancelada.",
-    busyMessage: "Cancelando...",
-    path: (transferId) => `/api/transfers/${transferId}/cancel`,
-    icon: <X className="h-3.5 w-3.5" />,
-    tone: "danger",
-    description: (transfer) => (
-      <>
-        La transferencia <strong>{transfer.transfer_number || "sin número"}</strong> quedará
-        anulada y no continuará el flujo entre sedes.
-      </>
-    ),
-  },
-};
 
 function normalizeSearchValue(value: string) {
   return value.trim().toLowerCase();
@@ -245,22 +171,7 @@ function formatProductsCount(value: number) {
   return `${value} ${value === 1 ? "producto" : "productos"}`;
 }
 
-function formatDateTimeParts(value: string | null) {
-  if (!value) {
-    return { date: "-", time: "" };
-  }
 
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return { date: value, time: "" };
-  }
-
-  return {
-    date: new Intl.DateTimeFormat("es-PE", { dateStyle: "short" }).format(date),
-    time: new Intl.DateTimeFormat("es-PE", { timeStyle: "short" }).format(date),
-  };
-}
 
 function getPrimaryRowAction(queue: TransferPendingStage, transfer: TransferRecord): TransferRowAction {
   if (queue === "pending_approval" && transfer.available_actions.approve) {
@@ -313,12 +224,12 @@ function buildSecondaryMenuItems(
     }
 
     items.push({
-      label: ACTION_CONFIG[action].label,
+      label: TRANSFER_ACTION_CONFIG[action].label,
       icon:
         busyAction?.transferId === transfer.transfer_id && busyAction.action === action ? (
           <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
         ) : (
-          ACTION_CONFIG[action].icon
+          TRANSFER_ACTION_CONFIG[action].icon
         ),
       tone: action === "cancel" ? "danger" : "neutral",
       disabled: busyAction?.transferId === transfer.transfer_id,
@@ -368,14 +279,27 @@ export function TransfersListPage({
   const router = useRouter();
   const { loading: authLoading, permissions, user } = useAuth();
   const defaultQueue = initialQueue || "open_for_store";
-  const [inbox, setInbox] = useState<TransferInboxResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [selectedQueue, setSelectedQueue] = useState<TransferPendingStage>(defaultQueue);
   const [scope, setScope] = useState<TransferScope>("current");
+
+  const {
+    data: inbox,
+    loading,
+    error,
+    refetch,
+  } = useApiGet<TransferInboxResponse>(
+    () => {
+      const params = new URLSearchParams({ scope });
+      return apiFetch<ApiEnvelope<TransferInboxResponse> | TransferInboxResponse>(
+        `/api/transfers/inbox?${params.toString()}`,
+        { cache: "no-store" }
+      ).then(unwrapApiData);
+    },
+    [scope]
+  );
+  const [notice, setNotice] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [selectedQueue, setSelectedQueue] = useState<TransferPendingStage>(defaultQueue);
   const [busyAction, setBusyAction] = useState<{
     transferId: string;
     action: TransferActionKey;
@@ -385,91 +309,25 @@ export function TransfersListPage({
     transfer: TransferRecord;
   } | null>(null);
 
-  const transferCapabilities = useMemo(
-    () => resolveTransferCapabilities({ permissions, roleName: user?.role_name }),
-    [permissions, user?.role_name]
-  );
-
-  async function refreshTransferData(nextScope = scope) {
-    setLoading(true);
-
-    try {
-      const params = new URLSearchParams({ scope: nextScope });
-      const inboxPayload = await apiFetch<ApiEnvelope<TransferInboxResponse> | TransferInboxResponse>(
-        `/api/transfers/inbox?${params.toString()}`,
-        { cache: "no-store" }
-      );
-      const inboxData = unwrapApiData(inboxPayload);
-
-      setInbox(inboxData);
-      setError(null);
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error ? requestError.message : "No se pudo cargar transferencias"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadTransferDataForScope() {
-      try {
-        const params = new URLSearchParams({ scope });
-        const inboxPayload = await apiFetch<ApiEnvelope<TransferInboxResponse> | TransferInboxResponse>(
-          `/api/transfers/inbox?${params.toString()}`,
-          { cache: "no-store" }
-        );
-
-        if (!active) {
-          return;
-        }
-
-        const inboxData = unwrapApiData(inboxPayload);
-
-        setInbox(inboxData);
-        setError(null);
-      } catch (requestError) {
-        if (!active) {
-          return;
-        }
-
-        setError(
-          requestError instanceof Error ? requestError.message : "No se pudo cargar transferencias"
-        );
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadTransferDataForScope();
-
-    return () => {
-      active = false;
-    };
-  }, [scope]);
+  const transferCapabilities = useTransferCapabilities();
 
   async function handleTransferAction(action: TransferActionKey, transferId: string) {
     setBusyAction({ transferId, action });
-    setError(null);
+    setActionError(null);
     setNotice(null);
 
     try {
-      await apiFetch(ACTION_CONFIG[action].path(transferId), {
+      await apiFetch(TRANSFER_ACTION_CONFIG[action].path(transferId), {
         method: "POST",
         body: JSON.stringify({}),
       });
-      setNotice(ACTION_CONFIG[action].successMessage);
-      await refreshTransferData(scope);
+      setNotice(TRANSFER_ACTION_CONFIG[action].successMessage);
+      refetch();
     } catch (requestError) {
-      setError(
+      setActionError(
         requestError instanceof Error
           ? requestError.message
-          : `No se pudo ejecutar la acción ${ACTION_CONFIG[action].label.toLowerCase()}`
+          : `No se pudo ejecutar la acción ${TRANSFER_ACTION_CONFIG[action].label.toLowerCase()}`
       );
     } finally {
       setBusyAction(null);
@@ -486,12 +344,14 @@ export function TransfersListPage({
     return queueRows.filter((transfer) => matchesTransferQuery(transfer, normalizedQuery));
   }, [query, queueRows]);
 
-  const pageSize = 10;
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
-  const safePage = Math.min(currentPage, totalPages);
-  const paginatedTransfers = filteredRows.slice((safePage - 1) * pageSize, safePage * pageSize);
-  const firstVisible = filteredRows.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
-  const lastVisible = Math.min(safePage * pageSize, filteredRows.length);
+  const {
+    paginatedItems: paginatedTransfers,
+    firstVisible,
+    lastVisible,
+    totalPages,
+    safePage,
+    setPage: setCurrentPage,
+  } = usePagination(filteredRows);
   const hasActiveFilters = query !== "" || selectedQueue !== defaultQueue || scope !== "current";
 
   if (authLoading) {
@@ -524,7 +384,7 @@ export function TransfersListPage({
                   <Button
                     variant="outline"
                     size="icon-sm"
-                    onClick={() => void refreshTransferData(scope)}
+                    onClick={() => refetch()}
                     disabled={loading}
                     className="rounded-lg"
                     aria-label="Actualizar transferencias"
@@ -569,6 +429,7 @@ export function TransfersListPage({
               value={selectedQueue}
               options={TRANSFER_QUEUE_OPTIONS}
               onChange={(value) => {
+                setActionError(null);
                 setSelectedQueue(value as TransferPendingStage);
                 setCurrentPage(1);
               }}
@@ -580,7 +441,7 @@ export function TransfersListPage({
                 value={scope}
                 options={TRANSFER_SCOPE_OPTIONS}
                 onChange={(value) => {
-                  setLoading(true);
+                  setActionError(null);
                   setScope(value as TransferScope);
                   setCurrentPage(1);
                 }}
@@ -601,6 +462,8 @@ export function TransfersListPage({
                     variant="outline"
                     size="icon-sm"
                     onClick={() => {
+                      setActionError(null);
+                      setNotice(null);
                       setQuery("");
                       setSelectedQueue(defaultQueue);
                       setScope("current");
@@ -640,12 +503,12 @@ export function TransfersListPage({
                       Cargando transferencias...
                     </td>
                   </tr>
-                ) : error ? (
+                ) : error || actionError ? (
                   <tr>
                     <td colSpan={9} className="px-4 py-6">
                       <InlineStatusCard
                         title="No pudimos cargar transferencias"
-                        description={error}
+                        description={actionError || error || ""}
                         tone="danger"
                         variant="ops"
                       />
@@ -766,7 +629,7 @@ export function TransfersListPage({
                                 {busyPrimaryAction ? (
                                   <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
                                 ) : null}
-                                {ACTION_CONFIG[primaryAction].label}
+                                {TRANSFER_ACTION_CONFIG[primaryAction].label}
                               </Button>
                             )}
                             {menuItems.length > 0 ? (
@@ -805,14 +668,14 @@ export function TransfersListPage({
 
       <AdminConfirmModal
         open={Boolean(pendingAction)}
-        title={pendingAction ? ACTION_CONFIG[pendingAction.action].confirmLabel : "Confirmar acción"}
+        title={pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction.action].confirmLabel : "Confirmar acción"}
         description={
           pendingAction
-            ? ACTION_CONFIG[pendingAction.action].description(pendingAction.transfer)
+            ? TRANSFER_ACTION_CONFIG[pendingAction.action].description(pendingAction.transfer)
             : ""
         }
-        confirmLabel={pendingAction ? ACTION_CONFIG[pendingAction.action].confirmLabel : "Confirmar"}
-        confirmTone={pendingAction ? ACTION_CONFIG[pendingAction.action].tone || "accent" : "accent"}
+        confirmLabel={pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction.action].confirmLabel : "Confirmar"}
+        confirmTone={pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction.action].tone || "accent" : "accent"}
         busy={
           Boolean(
             pendingAction &&

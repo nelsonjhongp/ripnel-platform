@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { LoaderCircle, RefreshCw, Save } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DateFilterPicker } from "@/components/ui/date-filter-picker"
@@ -8,23 +8,15 @@ import { OpsMetricPill } from "@/components/ui/ops-metric-pill"
 import { OpsSectionDivider, OpsTableBlock, OpsTableWrap } from "@/components/ui/ops-page-shell"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import {
   createPricingRule,
   fetchPricingRules,
   updatePricingRule,
 } from "@/lib/api-prices"
+import { formatDate } from "@/lib/date-utils";
 import type { PricingRuleRow } from "@/lib/prices-types"
-
-function formatDate(value: string | null) {
-  if (!value) return "-"
-
-  return new Intl.DateTimeFormat("es-PE", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(value))
-}
+import { useApiGet } from "@/hooks/use-api-get"
 
 function createRuleDraft(rule: PricingRuleRow | null) {
   if (!rule) {
@@ -45,31 +37,12 @@ function createRuleDraft(rule: PricingRuleRow | null) {
 }
 
 export function PricingRulesPage() {
-  const [rules, setRules] = useState<PricingRuleRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { data: rulesData, loading, error, refetch } = useApiGet(() => fetchPricingRules(), [])
+  const rules = rulesData ?? []
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [draft, setDraft] = useState<ReturnType<typeof createRuleDraft> | null>(null)
-
-  const loadRules = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const data = await fetchPricingRules()
-      setRules(data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudieron cargar las reglas")
-      setRules([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void Promise.resolve().then(() => loadRules())
-  }, [loadRules])
 
   const wholesaleRule = useMemo(
     () =>
@@ -85,7 +58,7 @@ export function PricingRulesPage() {
   const updateDraft = useCallback(
     (updater: (current: ReturnType<typeof createRuleDraft>) => ReturnType<typeof createRuleDraft>) => {
       setDraft((current) => updater(current ?? createRuleDraft(wholesaleRule)))
-      setError(null)
+      setSubmitError(null)
       setMessage(null)
     },
     [wholesaleRule]
@@ -94,12 +67,12 @@ export function PricingRulesPage() {
   const handleRefresh = useCallback(() => {
     setDraft(null)
     setMessage(null)
-    void loadRules()
-  }, [loadRules])
+    refetch()
+  }, [refetch])
 
   async function handleSubmit() {
     setSubmitting(true)
-    setError(null)
+    setSubmitError(null)
     setMessage(null)
 
     try {
@@ -119,11 +92,11 @@ export function PricingRulesPage() {
         })
       }
 
-      await loadRules()
+      refetch()
       setDraft(null)
       setMessage("Regla mayorista guardada correctamente")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar la regla")
+      setSubmitError(err instanceof Error ? err.message : "No se pudo guardar la regla")
     } finally {
       setSubmitting(false)
     }
@@ -224,9 +197,9 @@ export function PricingRulesPage() {
               </div>
             ) : null}
 
-            {error ? (
+            {submitError ? (
               <div className="mt-4 rounded-lg border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-3 py-2 text-sm text-[color:color-mix(in_srgb,#be123c_74%,var(--ops-text))]">
-                {error}
+                {submitError}
               </div>
             ) : null}
 
@@ -301,13 +274,9 @@ export function PricingRulesPage() {
                           {rule.valid_to ? formatDate(rule.valid_to) : "Sin fin"}
                         </td>
                         <td className="px-4 py-[var(--ops-row-py)] align-top">
-                          <span
-                            className={rule.active
-                              ? "inline-flex rounded-full border border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
-                              : "inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]"}
-                          >
+                          <OpsStatusBadge tone={rule.active ? "success" : "neutral"}>
                             {rule.active ? "Activa" : "Inactiva"}
-                          </span>
+                          </OpsStatusBadge>
                         </td>
                       </tr>
                     ))

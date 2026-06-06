@@ -151,4 +151,29 @@ export function buildApiUrl(path: string) {
   return `${getApiBaseUrl()}${path}`;
 }
 
+export function formatApiFetchError(
+  error: unknown,
+  fallback: string
+): string {
+  const e = error as { status?: number; message?: string; name?: string }
+
+  if (!e || typeof e !== "object") {
+    return fallback
+  }
+
+  if (e.status === 401) {
+    return "La sesion ya no es valida. Inicia sesion otra vez para continuar."
+  }
+
+  if (e.status === 403) {
+    return e.message || fallback
+  }
+
+  if (e.status === 409 || e.status === 400) {
+    return e.message || fallback
+  }
+
+  return e.message || fallback
+}
+
 export { apiBaseUrl };

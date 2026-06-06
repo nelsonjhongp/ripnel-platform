@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { usePagination } from "@/hooks/use-pagination";
 import {
   Boxes,
   CircleAlert,
@@ -21,8 +22,10 @@ import {
 } from "@/components/admin/admin-ui";
 import { ApiEnvelope, apiFetch, unwrapApiData } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { formatDate } from "@/lib/date-utils";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsEmptyState } from "@/components/ui/ops-empty-state";
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
 import {
   OpsFiltersRow,
@@ -40,18 +43,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import type { ProductStatus, StatusFilter, StyleBase } from "@/types/products";
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
 
-type StyleItem = {
-  style_id: string;
-  style_code: string | null;
-  name: string;
-  description: string | null;
-  active: boolean;
-  created_at: string;
-  garment_type_name: string;
-  fabric_name: string | null;
-  fabric_detail_name: string | null;
-  target_name: string | null;
+type StyleItem = StyleBase & {
   configured_size_count: number;
   configured_color_count: number;
   expected_variant_count: number;
@@ -61,31 +56,12 @@ type StyleItem = {
   missing_retail_size_count: number;
   missing_wholesale_size_count: number;
   total_stock_qty: number;
-  status:
-    | "inactive"
-    | "draft"
-    | "pending_variants"
-    | "pending_prices"
-    | "ready_no_stock"
-    | "ready";
+  status: ProductStatus;
   next_step_label: string;
   warnings: {
     missing_wholesale_prices: boolean;
     stock_without_retail_price: boolean;
   };
-};
-
-type StyleBase = {
-  style_id: string;
-  style_code: string | null;
-  name: string;
-  description: string | null;
-  active: boolean;
-  created_at: string;
-  garment_type_name: string;
-  fabric_name: string | null;
-  fabric_detail_name: string | null;
-  target_name: string | null;
 };
 
 type SizeItem = {
@@ -160,8 +136,6 @@ type VariantFormState = {
   colorIds: string[];
 };
 
-type StatusFilter = "all" | "active" | "inactive";
-
 const STYLE_PAGE_SIZE = 10;
 const VARIANT_PAGE_SIZE = 10;
 
@@ -230,28 +204,13 @@ async function requestVariantsBaseData() {
   };
 }
 
-function getStatusBadgeClass(status: StyleItem["status"]) {
-  if (status === "ready") {
-    return "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]";
-  }
-
-  if (status === "ready_no_stock") {
-    return "border-[color:color-mix(in_srgb,#3b82f6_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#3b82f6_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#2563eb_74%,var(--ops-text))]";
-  }
-
-  if (status === "pending_prices") {
-    return "border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#e11d48_74%,var(--ops-text))]";
-  }
-
-  if (status === "pending_variants") {
-    return "border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#d97706_74%,var(--ops-text))]";
-  }
-
-  if (status === "draft") {
-    return "border-[color:color-mix(in_srgb,#334155_60%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#1e293b_90%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f1f5f9_94%,var(--ops-text))]";
-  }
-
-  return "border-[color:color-mix(in_srgb,#94a3b8_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#94a3b8_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#475569_74%,var(--ops-text))]";
+function variantStatusTone(status: StyleItem["status"]) {
+  if (status === "ready") return "success" as const
+  if (status === "ready_no_stock") return "accent" as const
+  if (status === "pending_prices") return "danger" as const
+  if (status === "pending_variants") return "warning" as const
+  if (status === "draft") return "warning" as const
+  return "neutral" as const
 }
 
 function getStatusLabel(status: StyleItem["status"]) {
@@ -293,10 +252,8 @@ export function VariantsPage({
   const [formState, setFormState] = useState<VariantFormState>(initialFormState);
   const [styleSearch, setStyleSearch] = useState("");
   const [styleStatusFilter, setStyleStatusFilter] = useState<StatusFilter>("all");
-  const [stylePage, setStylePage] = useState(1);
   const [variantSearch, setVariantSearch] = useState("");
   const [variantStatusFilter, setVariantStatusFilter] = useState<StatusFilter>("all");
-  const [variantPage, setVariantPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingSelected, setLoadingSelected] = useState(false);
   const [savingConfig, setSavingConfig] = useState(false);
@@ -311,32 +268,6 @@ export function VariantsPage({
   );
   const resolvedSelectedStyleId = selectedStyleExists ? selectedStyleId : "";
 
-  const resetVariantViewState = useCallback(() => {
-    setSelectedSnapshot(null);
-    setSelectedWorkspace(null);
-    setFormState(initialFormState);
-    setVariantSearch("");
-    setVariantStatusFilter("all");
-    setVariantPage(1);
-  }, []);
-
-  function handleSelectStyle(styleId: string) {
-    setSelectedStyleId(styleId);
-    setSuccessMessage(null);
-    setError(null);
-    setVariantSearch("");
-    setVariantStatusFilter("all");
-    setVariantPage(1);
-  }
-
-  function handleClearSelectedStyle() {
-    setSelectedStyleId("");
-    setSuccessMessage(null);
-    setError(null);
-    resetVariantViewState();
-    router.push("/productos/variantes");
-  }
-
   const loadBaseData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -350,7 +281,11 @@ export function VariantsPage({
 
       if (selectedStyleId && !stylesData.some((style) => style.style_id === selectedStyleId)) {
         setSelectedStyleId("");
-        resetVariantViewState();
+        setSelectedSnapshot(null);
+        setSelectedWorkspace(null);
+        setFormState(initialFormState);
+        setVariantSearch("");
+        setVariantStatusFilter("all");
       }
     } catch (requestError) {
       setError(
@@ -361,7 +296,7 @@ export function VariantsPage({
     } finally {
       setLoading(false);
     }
-  }, [resetVariantViewState, selectedStyleId]);
+  }, [selectedStyleId]);
 
   async function loadStyleSnapshot(styleId: string) {
     setLoadingSelected(true);
@@ -490,31 +425,49 @@ export function VariantsPage({
     [styles]
   );
 
-  const styleTotalPages = Math.max(1, Math.ceil(filteredStyles.length / STYLE_PAGE_SIZE));
-  const safeStylePage = Math.min(stylePage, styleTotalPages);
+  const {
+    paginatedItems: paginatedStyles,
+    firstVisible: styleFirstVisible,
+    lastVisible: styleLastVisible,
+    totalPages: styleTotalPages,
+    safePage: safeStylePage,
+    setPage: setStylePage,
+  } = usePagination(filteredStyles, STYLE_PAGE_SIZE);
 
-  const paginatedStyles = useMemo(() => {
-    const start = (safeStylePage - 1) * STYLE_PAGE_SIZE;
-    return filteredStyles.slice(start, start + STYLE_PAGE_SIZE);
-  }, [filteredStyles, safeStylePage]);
+  const {
+    paginatedItems: paginatedVariants,
+    firstVisible: variantFirstVisible,
+    lastVisible: variantLastVisible,
+    totalPages: variantTotalPages,
+    safePage: safeVariantPage,
+    setPage: setVariantPage,
+  } = usePagination(filteredVariants, VARIANT_PAGE_SIZE);
 
-  const styleFirstVisible =
-    paginatedStyles.length === 0 ? 0 : (safeStylePage - 1) * STYLE_PAGE_SIZE + 1;
-  const styleLastVisible =
-    paginatedStyles.length === 0 ? 0 : styleFirstVisible + paginatedStyles.length - 1;
+  const resetVariantViewState = useCallback(() => {
+    setSelectedSnapshot(null);
+    setSelectedWorkspace(null);
+    setFormState(initialFormState);
+    setVariantSearch("");
+    setVariantStatusFilter("all");
+    setVariantPage(1);
+  }, [setVariantPage]);
 
-  const variantTotalPages = Math.max(1, Math.ceil(filteredVariants.length / VARIANT_PAGE_SIZE));
-  const safeVariantPage = Math.min(variantPage, variantTotalPages);
+  function handleSelectStyle(styleId: string) {
+    setSelectedStyleId(styleId);
+    setSuccessMessage(null);
+    setError(null);
+    setVariantSearch("");
+    setVariantStatusFilter("all");
+    setVariantPage(1);
+  }
 
-  const paginatedVariants = useMemo(() => {
-    const start = (safeVariantPage - 1) * VARIANT_PAGE_SIZE;
-    return filteredVariants.slice(start, start + VARIANT_PAGE_SIZE);
-  }, [filteredVariants, safeVariantPage]);
-
-  const variantFirstVisible =
-    paginatedVariants.length === 0 ? 0 : (safeVariantPage - 1) * VARIANT_PAGE_SIZE + 1;
-  const variantLastVisible =
-    paginatedVariants.length === 0 ? 0 : variantFirstVisible + paginatedVariants.length - 1;
+  function handleClearSelectedStyle() {
+    setSelectedStyleId("");
+    setSuccessMessage(null);
+    setError(null);
+    resetVariantViewState();
+    router.push("/productos/variantes");
+  }
 
   const selectedProduct = selectedWorkspace?.product || null;
 
@@ -738,8 +691,8 @@ export function VariantsPage({
                           </tr>
                         ) : paginatedStyles.length === 0 ? (
                           <tr>
-                            <td colSpan={8} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                              No hay styles para este filtro.
+                            <td colSpan={8} className="px-4 py-10">
+                              <OpsEmptyState variant="compact" description="No hay styles para este filtro." />
                             </td>
                           </tr>
                         ) : (
@@ -760,7 +713,7 @@ export function VariantsPage({
                                     {style.style_code || "Sin codigo"}
                                   </span>
                                   <span className="text-[11px] text-[var(--ops-text-muted)]">
-                                    {new Date(style.created_at).toLocaleDateString("es-PE")}
+                                    {formatDate(style.created_at)}
                                   </span>
                                 </div>
                               </td>
@@ -782,13 +735,9 @@ export function VariantsPage({
                                 </p>
                               </td>
                               <td className="px-4 py-[var(--ops-row-py)]">
-                                <span
-                                  className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getStatusBadgeClass(
-                                    style.status
-                                  )}`}
-                                >
+                                <OpsStatusBadge tone={variantStatusTone(style.status)}>
                                   {getStatusLabel(style.status)}
-                                </span>
+                                </OpsStatusBadge>
                               </td>
                               <td className="px-4 py-[var(--ops-row-py)] text-right">
                                 <Button
@@ -855,23 +804,13 @@ export function VariantsPage({
                               </span>
                             ) : null}
                             {selectedProduct ? (
-                              <span
-                                className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(
-                                  selectedProduct.status
-                                )}`}
-                              >
+                              <OpsStatusBadge tone={variantStatusTone(selectedProduct.status)}>
                                 {getStatusLabel(selectedProduct.status)}
-                              </span>
+                              </OpsStatusBadge>
                             ) : null}
-                            <span
-                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${
-                                selectedSnapshot.style.active
-                                  ? "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
-                                  : "border-[color:color-mix(in_srgb,#94a3b8_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#94a3b8_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#475569_74%,var(--ops-text))]"
-                              }`}
-                            >
+                            <OpsStatusBadge tone={selectedSnapshot.style.active ? "success" : "neutral"}>
                               {selectedSnapshot.style.active ? "Activo" : "Inactivo"}
-                            </span>
+                            </OpsStatusBadge>
                           </div>
                           <div className="mt-3 grid gap-2 text-sm md:grid-cols-2 text-[var(--ops-text-muted)]">
                             <p>
@@ -1171,8 +1110,8 @@ export function VariantsPage({
                         <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
                           {paginatedVariants.length === 0 ? (
                             <tr>
-                              <td colSpan={6} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                                No hay variantes para este filtro.
+                              <td colSpan={6} className="px-4 py-10">
+                                <OpsEmptyState variant="compact" description="No hay variantes para este filtro." />
                               </td>
                             </tr>
                           ) : (
@@ -1201,16 +1140,9 @@ export function VariantsPage({
                                 <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{variant.sku}</td>
                                 <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{variant.barcode || "Pendiente"}</td>
                                 <td className="px-4 py-[var(--ops-row-py)]">
-                                  <span
-                                    className={cn(
-                                      "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-                                      variant.active
-                                        ? "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
-                                        : "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]"
-                                    )}
-                                  >
+                                  <OpsStatusBadge tone={variant.active ? "success" : "neutral"}>
                                     {variant.active ? "Activa" : "Inactiva"}
-                                  </span>
+                                  </OpsStatusBadge>
                                 </td>
                                 <td className="px-4 py-[var(--ops-row-py)] text-right">
                                   <AdminRowActionsMenu

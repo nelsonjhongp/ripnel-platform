@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useState } from "react"
 import {
   PencilLine,
   Plus,
@@ -33,26 +33,23 @@ import {
   OpsPageShell,
   OpsSectionDivider,
   OpsTableBlock,
-  OpsTableFooter,
-  OpsTableWrap,
 } from "@/components/ui/ops-page-shell"
+import { OpsDataTable } from "@/components/ui/ops-data-table"
+import { OpsEmptyState } from "@/components/ui/ops-empty-state"
 import { Pagination } from "@/components/ui/pagination"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { apiFetch, apiFetchData, unwrapApiData } from "@/lib/api"
+import { apiFetchData } from "@/lib/api"
+import { useApiGet } from "@/hooks/use-api-get"
+import { activeBadgeLabel } from "@/lib/badge-utils"
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
+import { usePagination } from "@/hooks/use-pagination"
 import { appRoutes } from "@/lib/routes"
 
-const PAGE_SIZE = 10
-
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<CustomerRecord[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState("")
   const [docFilter, setDocFilter] = useState("all")
   const [sort, setSort] = useState<"desc" | "asc">("desc")
-  const [currentPage, setCurrentPage] = useState(1)
-
   const [editingCustomer, setEditingCustomer] = useState<CustomerRecord | null>(null)
   const [editState, setEditState] = useState<CustomerFormState>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
@@ -60,69 +57,25 @@ export default function CustomersPage() {
   const [activeChangeCustomer, setActiveChangeCustomer] = useState<CustomerRecord | null>(null)
   const [savingActiveChange, setSavingActiveChange] = useState(false)
 
-  const abortRef = useRef<AbortController | null>(null)
-
-  async function fetchCustomers(nextQuery: string, nextDocFilter: string, nextSort: "desc" | "asc") {
-    if (abortRef.current) {
-      abortRef.current.abort()
-    }
-
-    const controller = new AbortController()
-    abortRef.current = controller
-
-    setLoading(true)
-    setError(null)
-
-    try {
+  // TODO: Add debounce to useApiGet or use a debounced query value
+  const { data: customersData, loading, error, refetch: refetchCustomers } = useApiGet(
+    () => {
       const params = new URLSearchParams()
-      const normalizedQuery = nextQuery.trim()
-
-      if (normalizedQuery) {
-        params.set("q", normalizedQuery)
-      }
-
-      if (nextDocFilter !== "all") {
-        params.set("document_type", nextDocFilter)
-      }
-      params.set("sort", nextSort)
-
-      const payload = await apiFetch<{ ok: boolean; data: CustomerRecord[] } | CustomerRecord[]>(
-        `/api/customers?${params.toString()}`,
-        {
-          signal: controller.signal,
-          cache: "no-store",
-        }
-      )
-
-      const nextCustomers = unwrapApiData<CustomerRecord[]>(payload)
-      setCustomers(Array.isArray(nextCustomers) ? nextCustomers : [])
-    } catch (loadError: unknown) {
-      if (loadError instanceof Error && loadError.name === "AbortError") {
-        return
-      }
-
-      setCustomers([])
-      setError(loadError instanceof Error ? loadError.message : "No se pudieron cargar los clientes")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void fetchCustomers(query, docFilter, sort)
-    }, 180)
-
-    return () => {
-      window.clearTimeout(timer)
-    }
-  }, [docFilter, query, sort])
+      if (query.trim()) params.set("q", query.trim())
+      if (docFilter !== "all") params.set("document_type", docFilter)
+      params.set("sort", sort)
+      const url = `/api/customers${params.toString() ? `?${params.toString()}` : ""}`
+      return apiFetchData<CustomerRecord[]>(url, { cache: "no-store" })
+    },
+    [query, docFilter, sort]
+  )
+  const customers = customersData ?? []
 
   function clearFilters() {
     setQuery("")
     setDocFilter("all")
     setSort("desc")
-    setCurrentPage(1)
+    setPage(1)
   }
 
   function openEditModal(customer: CustomerRecord) {
@@ -158,11 +111,7 @@ export default function CustomersPage() {
         body: JSON.stringify(buildCustomerPayload(editState)),
       })
 
-      setCustomers((current) =>
-        current.map((customer) =>
-          customer.customer_id === editingCustomer.customer_id ? data : customer
-        )
-      )
+      refetchCustomers()
       closeEditModal()
     } catch (submitError: unknown) {
       setSaveError(submitError instanceof Error ? submitError.message : "No se pudo guardar el cliente")
@@ -180,20 +129,16 @@ export default function CustomersPage() {
     setSaveError(null)
 
     try {
-      const data = await apiFetchData<CustomerRecord>(`/api/customers/${activeChangeCustomer.customer_id}`, {
+      await apiFetchData<CustomerRecord>(`/api/customers/${activeChangeCustomer.customer_id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ active: !activeChangeCustomer.active }),
       })
 
-      setCustomers((current) =>
-        current.map((customer) =>
-          customer.customer_id === activeChangeCustomer.customer_id ? data : customer
-        )
-      )
+      refetchCustomers()
       if (editingCustomer?.customer_id === activeChangeCustomer.customer_id) {
-        setEditingCustomer(data)
-        setEditState(toFormState(data))
+        setEditingCustomer(null)
+        setEditState(EMPTY_FORM)
       }
       setActiveChangeCustomer(null)
     } catch (submitError: unknown) {
@@ -217,14 +162,7 @@ export default function CustomersPage() {
     { value: "asc", label: "Más antigua" },
   ]
 
-  const totalPages = Math.max(1, Math.ceil(customers.length / PAGE_SIZE))
-  const safeCurrentPage = Math.min(currentPage, totalPages)
-  const paginatedCustomers = useMemo(() => {
-    const start = (safeCurrentPage - 1) * PAGE_SIZE
-    return customers.slice(start, start + PAGE_SIZE)
-  }, [customers, safeCurrentPage])
-  const firstVisible = paginatedCustomers.length === 0 ? 0 : (safeCurrentPage - 1) * PAGE_SIZE + 1
-  const lastVisible = paginatedCustomers.length === 0 ? 0 : firstVisible + paginatedCustomers.length - 1
+  const { paginatedItems: paginatedCustomers, totalPages, safePage, firstVisible, lastVisible, setPage } = usePagination(customers)
   const hasActiveFilters = query.trim().length > 0 || docFilter !== "all" || sort !== "desc"
 
   return (
@@ -244,7 +182,7 @@ export default function CustomersPage() {
                       type="button"
                       variant="outline"
                       size="icon-sm"
-                      onClick={() => fetchCustomers(query, docFilter, sort)}
+                      onClick={refetchCustomers}
                       disabled={loading}
                       aria-label="Actualizar clientes"
                       className="rounded-lg"
@@ -289,7 +227,7 @@ export default function CustomersPage() {
                       value={query}
                       onChange={(event) => {
                         setQuery(event.target.value)
-                        setCurrentPage(1)
+                        setPage(1)
                       }}
                       placeholder="Nombre, razón social, documento, correo, teléfono o código"
                       className="h-full w-full bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
@@ -303,7 +241,7 @@ export default function CustomersPage() {
                   options={docFilterOptions}
                   onChange={(value) => {
                     setDocFilter(value)
-                    setCurrentPage(1)
+                    setPage(1)
                   }}
                 />
 
@@ -313,7 +251,7 @@ export default function CustomersPage() {
                   options={sortOptions}
                   onChange={(v) => {
                     setSort(v as "desc" | "asc")
-                    setCurrentPage(1)
+                    setPage(1)
                   }}
                 />
 
@@ -337,126 +275,102 @@ export default function CustomersPage() {
                 </Tooltip>
               </OpsFiltersRow>
 
-              <OpsTableWrap minWidth="1080px">
-                  <table className="w-full border-collapse">
-                    <thead className="bg-[var(--ops-surface-muted)]">
-                      <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                        <th className="px-4 py-3">Cliente</th>
-                        <th className="px-4 py-3">Documento</th>
-                        <th className="px-4 py-3">Contacto</th>
-                        <th className="px-4 py-3">Tipo</th>
-                        <th className="px-4 py-3">Estado</th>
-                        <th className="px-4 py-3">Alta</th>
-                        <th className="w-[4.5rem] px-4 py-3 text-right">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                      {loading ? (
-                        <tr>
-                          <td colSpan={7} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                            Cargando clientes...
-                          </td>
-                        </tr>
-                      ) : error ? (
-                        <tr>
-                          <td colSpan={7} className="px-4 py-6">
-                            <InlineStatusCard
-                              title="No pudimos cargar clientes"
-                              description={error}
-                              tone="danger"
-                              variant="ops"
-                            />
-                          </td>
-                        </tr>
-                      ) : paginatedCustomers.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                            No hay clientes registrados con este filtro.
-                          </td>
-                        </tr>
-                      ) : (
-                        paginatedCustomers.map((customer) => (
-                          <tr
-                            key={customer.customer_id}
-                            className="transition hover:bg-[var(--ops-surface-muted)]"
-                          >
-                            <td className="px-4 py-[var(--ops-row-py)]">
-                              <p className="text-sm font-semibold text-[var(--ops-text)]">
-                                {buildDisplayName(customer)}
-                              </p>
-                              <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                                {customer.internal_code || "Sin código"}
-                              </p>
-                            </td>
-                            <td className="px-4 py-[var(--ops-row-py)]">
-                              <p className="text-sm text-[var(--ops-text)]">
-                                {customer.document_number || "Sin documento"}
-                              </p>
-                              <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                                {DOC_TYPE_LABELS[customer.document_type] || customer.document_type}
-                              </p>
-                            </td>
-                            <td className="px-4 py-[var(--ops-row-py)]">
-                              <p className="text-sm text-[var(--ops-text)]">{customer.email || "Sin email"}</p>
-                              <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                                {customer.phone || "Sin teléfono"}
-                              </p>
-                            </td>
-                            <td className="px-4 py-[var(--ops-row-py)]">
-                              <span className="inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]">
-                                {CUSTOMER_TYPE_LABELS[customer.customer_type] || customer.customer_type}
-                              </span>
-                            </td>
-                            <td className="px-4 py-[var(--ops-row-py)]">
-                              <span
-                                className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                                  customer.active
-                                    ? "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
-                                    : "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]"
-                                }`}
-                              >
-                                {customer.active ? "Activo" : "Inactivo"}
-                              </span>
-                            </td>
-                            <td className="px-4 py-[var(--ops-row-py)] text-xs text-[var(--ops-text-muted)]">
-                              {formatCustomerDate(customer.created_at)}
-                            </td>
-                            <td className="w-[4.5rem] px-4 py-[var(--ops-row-py)]">
-                              <AdminRowActionsMenu
-                                ariaLabel={`Acciones para ${buildDisplayName(customer)}`}
-                                items={[
-                                  {
-                                    label: "Editar",
-                                    icon: <PencilLine className="h-3.5 w-3.5" />,
-                                    onSelect: () => openEditModal(customer),
-                                  },
-                                  {
-                                    label: customer.active ? "Inactivar" : "Activar",
-                                    icon: <Power className="h-3.5 w-3.5" />,
-                                    tone: customer.active ? "danger" : "neutral",
-                                    onSelect: () => setActiveChangeCustomer(customer),
-                                  },
-                                ]}
-                              />
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-              </OpsTableWrap>
-
-              <OpsTableFooter>
-                <span className="text-sm text-[var(--ops-text-muted)]">
-                  {customers.length === 0 ? "0 resultados" : `${firstVisible}-${lastVisible} de ${customers.length}`}
-                </span>
-                <Pagination
-                  page={safeCurrentPage}
-                  totalPages={totalPages}
-                  onPageChange={setCurrentPage}
-                  className="self-end md:self-auto"
-                />
-              </OpsTableFooter>
+              {!loading && !error && customers.length === 0 ? (
+                <OpsEmptyState variant="compact" description="No hay clientes registrados todavía." />
+              ) : (
+                <OpsDataTable
+                  columns={[
+                    { key: "cliente", header: "Cliente" },
+                    { key: "documento", header: "Documento" },
+                    { key: "contacto", header: "Contacto" },
+                    { key: "tipo", header: "Tipo" },
+                    { key: "estado", header: "Estado" },
+                    { key: "alta", header: "Alta" },
+                    { key: "acciones", header: "", className: "w-[4.5rem] text-right" },
+                  ]}
+                  minWidth="1080px"
+                  loading={loading}
+                  loadingMessage="Cargando clientes..."
+                  error={error}
+                  errorTitle="No pudimos cargar clientes"
+                  isEmpty={customers.length > 0 && paginatedCustomers.length === 0}
+                  emptyMessage="No hay clientes registrados con este filtro."
+                  footer={
+                    <>
+                      <span className="text-sm text-[var(--ops-text-muted)]">
+                        {customers.length === 0 ? "0 resultados" : `${firstVisible}-${lastVisible} de ${customers.length}`}
+                      </span>
+                      <Pagination
+                        page={safePage}
+                        totalPages={totalPages}
+                        onPageChange={setPage}
+                        className="self-end md:self-auto"
+                      />
+                    </>
+                  }
+                >
+                  {paginatedCustomers.map((customer) => (
+                    <tr
+                      key={customer.customer_id}
+                      className="transition hover:bg-[var(--ops-surface-muted)]"
+                    >
+                      <td className="px-4 py-[var(--ops-row-py)]">
+                        <p className="text-sm font-semibold text-[var(--ops-text)]">
+                          {buildDisplayName(customer)}
+                        </p>
+                        <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                          {customer.internal_code || "Sin código"}
+                        </p>
+                      </td>
+                      <td className="px-4 py-[var(--ops-row-py)]">
+                        <p className="text-sm text-[var(--ops-text)]">
+                          {customer.document_number || "Sin documento"}
+                        </p>
+                        <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                          {DOC_TYPE_LABELS[customer.document_type] || customer.document_type}
+                        </p>
+                      </td>
+                      <td className="px-4 py-[var(--ops-row-py)]">
+                        <p className="text-sm text-[var(--ops-text)]">{customer.email || "Sin email"}</p>
+                        <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                          {customer.phone || "Sin teléfono"}
+                        </p>
+                      </td>
+                      <td className="px-4 py-[var(--ops-row-py)]">
+                        <span className="inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]">
+                          {CUSTOMER_TYPE_LABELS[customer.customer_type] || customer.customer_type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-[var(--ops-row-py)]">
+                        <OpsStatusBadge tone={customer.active ? "success" : "neutral"}>
+                          {activeBadgeLabel(customer.active)}
+                        </OpsStatusBadge>
+                      </td>
+                      <td className="px-4 py-[var(--ops-row-py)] text-xs text-[var(--ops-text-muted)]">
+                        {formatCustomerDate(customer.created_at)}
+                      </td>
+                      <td className="w-[4.5rem] px-4 py-[var(--ops-row-py)]">
+                        <AdminRowActionsMenu
+                          ariaLabel={`Acciones para ${buildDisplayName(customer)}`}
+                          items={[
+                            {
+                              label: "Editar",
+                              icon: <PencilLine className="h-3.5 w-3.5" />,
+                              onSelect: () => openEditModal(customer),
+                            },
+                            {
+                              label: customer.active ? "Inactivar" : "Activar",
+                              icon: <Power className="h-3.5 w-3.5" />,
+                              tone: customer.active ? "danger" : "neutral",
+                              onSelect: () => setActiveChangeCustomer(customer),
+                            },
+                          ]}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </OpsDataTable>
+              )}
             </OpsTableBlock>
           </OpsSectionDivider>
 

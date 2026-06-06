@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { usePagination } from "@/hooks/use-pagination";
 import Link from "next/link";
 import {
   Eye,
@@ -23,6 +24,7 @@ import { ForbiddenPage } from "@/components/feedback/status-page";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsEmptyState } from "@/components/ui/ops-empty-state";
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
 import {
   OpsFiltersRow,
@@ -41,7 +43,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { apiFetchData } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useApiGet } from "@/hooks/use-api-get";
 import { appRoutes } from "@/lib/routes";
 import {
   type AdjustmentDetail,
@@ -54,7 +58,6 @@ import {
   formatAdjustmentStatus,
   getAdjustmentDifferenceClasses,
   getAdjustmentStatusClasses,
-  requestAdjustmentJson,
   type Location,
   resolveAdjustmentIntent,
 } from "./inventory-adjustments-shared";
@@ -92,15 +95,10 @@ function AdjustmentIntentChip({
 
 export function InventoryAdjustmentsPage() {
   const { user } = useAuth();
-  const [adjustments, setAdjustments] = useState<AdjustmentSummary[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [loadingAdjustments, setLoadingAdjustments] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | AdjustmentStatus>("all");
   const [locationFilter, setLocationFilter] = useState("all");
-  const [page, setPage] = useState(1);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -113,28 +111,13 @@ export function InventoryAdjustmentsPage() {
     String(user?.role_name || "").toUpperCase()
   );
 
-  async function loadAdjustments() {
-    setLoadingAdjustments(true);
-    setError(null);
+  const { data: adjustmentData, loading: loadingAdjustments, error, refetch: refreshAdjustments } = useApiGet(
+    () => apiFetchData<AdjustmentListData>("/api/inventory/adjustments", { cache: "no-store" }),
+    []
+  );
 
-    try {
-      const data = await requestAdjustmentJson<AdjustmentListData>("/api/inventory/adjustments");
-      setAdjustments(data?.rows || []);
-      setLocations(data?.meta.available_locations || []);
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error ? requestError.message : "No se pudo cargar ajustes"
-      );
-    } finally {
-      setLoadingAdjustments(false);
-    }
-  }
-
-  useEffect(() => {
-    void Promise.resolve().then(() => {
-      void loadAdjustments();
-    });
-  }, []);
+  const adjustments = adjustmentData?.rows || [];
+  const locations = adjustmentData?.meta.available_locations || [];
   const effectiveLocationFilter =
     locationFilter === "all" || locations.some((location) => location.location_id === locationFilter)
       ? locationFilter
@@ -168,14 +151,14 @@ export function InventoryAdjustmentsPage() {
     [adjustments]
   );
 
-  const totalPages = Math.max(1, Math.ceil(filteredAdjustments.length / 10));
-  const safePage = Math.min(page, totalPages);
-  const pageStart = (safePage - 1) * 10;
-  const paginatedAdjustments = filteredAdjustments.slice(pageStart, pageStart + 10);
-  const visibleFrom = filteredAdjustments.length ? pageStart + 1 : 0;
-  const visibleTo = filteredAdjustments.length
-    ? Math.min(pageStart + 10, filteredAdjustments.length)
-    : 0;
+  const {
+    paginatedItems: paginatedAdjustments,
+    firstVisible,
+    lastVisible,
+    totalPages,
+    safePage,
+    setPage,
+  } = usePagination(filteredAdjustments);
   const hasActiveFilters =
     Boolean(query.trim()) || statusFilter !== "all" || effectiveLocationFilter !== "all";
 
@@ -188,11 +171,11 @@ export function InventoryAdjustmentsPage() {
     setCancelModalOpen(false);
 
     try {
-      const data = await requestAdjustmentJson<AdjustmentDetailData>(
-        `/api/inventory/adjustments/${adjustmentId}`
+      const data = await apiFetchData<AdjustmentDetailData>(
+        `/api/inventory/adjustments/${adjustmentId}`,
+        { cache: "no-store" }
       );
       setDetail(data.adjustment);
-      setLocations(data.meta.available_locations || []);
     } catch (requestError) {
       setDetailError(
         requestError instanceof Error ? requestError.message : "No se pudo cargar el detalle"
@@ -217,19 +200,17 @@ export function InventoryAdjustmentsPage() {
 
     setConfirmingAdjustment(true);
     setDetailError(null);
-    setError(null);
-    setNotice(null);
 
     try {
-      await requestAdjustmentJson<AdjustmentDetailData>(
+      await apiFetchData<AdjustmentDetailData>(
         `/api/inventory/adjustments/${detail.adjustment_id}/confirm`,
-        { method: "POST", body: JSON.stringify({}) }
+        { method: "POST", body: JSON.stringify({}), cache: "no-store" }
       );
 
       setConfirmModalOpen(false);
       closeDetail();
       setNotice("Ajuste confirmado y aplicado al inventario.");
-      await loadAdjustments();
+      void refreshAdjustments();
     } catch (requestError) {
       setDetailError(
         requestError instanceof Error ? requestError.message : "No se pudo confirmar el ajuste"
@@ -246,19 +227,17 @@ export function InventoryAdjustmentsPage() {
 
     setCancellingAdjustment(true);
     setDetailError(null);
-    setError(null);
-    setNotice(null);
 
     try {
-      await requestAdjustmentJson<AdjustmentDetailData>(
+      await apiFetchData<AdjustmentDetailData>(
         `/api/inventory/adjustments/${detail.adjustment_id}/cancel`,
-        { method: "POST", body: JSON.stringify({}) }
+        { method: "POST", body: JSON.stringify({}), cache: "no-store" }
       );
 
       setCancelModalOpen(false);
       closeDetail();
       setNotice("Ajuste cancelado.");
-      await loadAdjustments();
+      void refreshAdjustments();
     } catch (requestError) {
       setDetailError(
         requestError instanceof Error ? requestError.message : "No se pudo cancelar el ajuste"
@@ -284,9 +263,9 @@ export function InventoryAdjustmentsPage() {
               variant="outline"
               size="sm"
               className="rounded-lg"
-              onClick={() => {
-                void loadAdjustments();
-              }}
+                onClick={() => {
+                  void refreshAdjustments();
+                }}
             >
                 <RefreshCw className="h-4 w-4" />
                 Actualizar
@@ -474,11 +453,8 @@ export function InventoryAdjustmentsPage() {
                   ))
                 ) : (
                   <tr>
-                    <td
-                      colSpan={8}
-                      className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
-                    >
-                      No hay ajustes para los filtros actuales.
+                    <td colSpan={8} className="px-4 py-10">
+                      <OpsEmptyState variant="compact" description="No hay ajustes para los filtros actuales." />
                     </td>
                   </tr>
                 )}
@@ -489,7 +465,7 @@ export function InventoryAdjustmentsPage() {
           <OpsTableFooter>
             <span className="text-sm text-[var(--ops-text-muted)]">
               {filteredAdjustments.length
-                ? `${visibleFrom}-${visibleTo} de ${filteredAdjustments.length}`
+                ? `${firstVisible}-${lastVisible} de ${filteredAdjustments.length}`
                 : "0 resultados"}
             </span>
             <Pagination

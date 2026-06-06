@@ -1,9 +1,11 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 
 import { apiFetchData } from "@/lib/api"
+import { useApiGet } from "@/hooks/use-api-get"
+import { EMPTY_USER_FORM, type UserFormState } from "@/types/admin"
 import { AdminFormPageShell } from "@/components/admin/admin-form-page-shell"
 import {
   AdminActionButton,
@@ -12,11 +14,9 @@ import {
   AdminFormActionsBar,
   AdminInput,
   AdminInlineMessage,
-  AdminMultiSelectMenu,
-  AdminSelectionChip,
   AdminSection,
-  AdminSelectMenu,
 } from "@/components/admin/admin-ui"
+import { OpsMultiSelectMenu, OpsSelectionChip, OpsSelectMenu } from "@/components/ui/ops-selection"
 
 type Role = {
   role_id: string
@@ -33,46 +33,20 @@ type Location = {
   active: boolean
 }
 
-type UserFormState = {
-  full_name: string
-  username: string
-  email: string
-  role_id: string
-  active: boolean
-  location_ids: string[]
-  default_location_id: string
-}
-
-const emptyUserForm: UserFormState = {
-  full_name: "",
-  username: "",
-  email: "",
-  role_id: "",
-  active: true,
-  location_ids: [],
-  default_location_id: "",
-}
-
-async function requestJson<T>(path: string, init?: RequestInit) {
-  return apiFetchData<T>(path, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
-    cache: "no-store",
-    ...init,
-  })
-}
-
 export default function UsersCreatePage() {
   const router = useRouter()
-  const [roles, setRoles] = useState<Role[]>([])
-  const [availableLocations, setAvailableLocations] = useState<Location[]>([])
-  const [loadingRoles, setLoadingRoles] = useState(true)
-  const [loadingLocations, setLoadingLocations] = useState(true)
-  const [rolesError, setRolesError] = useState<string | null>(null)
-  const [locationsError, setLocationsError] = useState<string | null>(null)
-  const [userForm, setUserForm] = useState<UserFormState>(emptyUserForm)
+  const { data: rolesData, loading: loadingRoles, error: rolesError } = useApiGet(
+    () => apiFetchData<Role[]>("/api/roles"),
+    []
+  )
+  const roles = (rolesData || []).filter((role) => role.active)
+
+  const { data: locationsData, loading: loadingLocations, error: locationsError } = useApiGet(
+    () => apiFetchData<Location[]>("/api/locations"),
+    []
+  )
+  const availableLocations = (locationsData || []).filter((location) => location.active)
+  const [userForm, setUserForm] = useState<UserFormState>(EMPTY_USER_FORM)
   const [savingUser, setSavingUser] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -104,38 +78,6 @@ export default function UsersCreatePage() {
     value: location.value,
     label: location.label,
   }))
-
-  useEffect(() => {
-    async function loadRoles() {
-      setLoadingRoles(true)
-      setRolesError(null)
-
-      try {
-        const data = await requestJson<Role[]>("/api/roles")
-        setRoles(data.filter((role) => role.active))
-      } catch (loadError) {
-        setRolesError(loadError instanceof Error ? loadError.message : "No se pudo cargar roles")
-      } finally {
-        setLoadingRoles(false)
-      }
-    }
-
-    async function loadLocations() {
-      setLoadingLocations(true)
-      setLocationsError(null)
-
-      try {
-        const data = await requestJson<Location[]>("/api/locations")
-        setAvailableLocations(data.filter((location) => location.active))
-      } catch (loadError) {
-        setLocationsError(loadError instanceof Error ? loadError.message : "No se pudo cargar sedes")
-      } finally {
-        setLoadingLocations(false)
-      }
-    }
-
-    void Promise.all([loadRoles(), loadLocations()])
-  }, [])
 
   function toggleUserFormLocation(locationId: string) {
     setUserForm((current) => {
@@ -185,7 +127,7 @@ export default function UsersCreatePage() {
         throw new Error("Elige una sede por defecto para el usuario.")
       }
 
-      const createdUser = await requestJson<{ username: string; temporary_password?: string }>("/api/users", {
+      const createdUser = await apiFetchData<{ username: string; temporary_password?: string }>("/api/users", {
         method: "POST",
         body: JSON.stringify({
           full_name: userForm.full_name,
@@ -201,6 +143,7 @@ export default function UsersCreatePage() {
       })
 
       if (createdUser.temporary_password) {
+        // TODO: Replace with toast notification in Phase 3
         window.alert(
           `Usuario creado.\nUsuario: ${createdUser.username}\nClave temporal: ${createdUser.temporary_password}\n\nEntrega esta clave al usuario para su primer ingreso.`
         )
@@ -262,7 +205,7 @@ export default function UsersCreatePage() {
                 </AdminField>
 
                 <AdminField label="Rol" hint={rolesError || undefined}>
-                  <AdminSelectMenu
+                  <OpsSelectMenu
                     value={userForm.role_id}
                     onValueChange={(value) => setUserForm((current) => ({ ...current, role_id: value }))}
                     placeholder={
@@ -300,7 +243,7 @@ export default function UsersCreatePage() {
                 <div className="space-y-4">
                   <AdminField label="Sedes asignadas">
                     <div className="space-y-3">
-                      <AdminMultiSelectMenu
+                      <OpsMultiSelectMenu
                         selectedValues={userForm.location_ids}
                         onToggle={toggleUserFormLocation}
                         placeholder="Seleccionar sedes"
@@ -310,7 +253,7 @@ export default function UsersCreatePage() {
                       {selectedLocationOptions.length ? (
                         <div className="flex flex-wrap gap-1.5">
                           {selectedLocationOptions.map((location) => (
-                            <AdminSelectionChip
+                            <OpsSelectionChip
                               key={location.value}
                               label={location.label}
                               onRemove={() => toggleUserFormLocation(location.value)}
@@ -327,7 +270,7 @@ export default function UsersCreatePage() {
 
                   <AdminField label="Sede por defecto">
                     <div className="space-y-3">
-                      <AdminSelectMenu
+                      <OpsSelectMenu
                         value={userForm.default_location_id}
                         onValueChange={chooseUserFormDefaultLocation}
                         placeholder={
@@ -342,7 +285,7 @@ export default function UsersCreatePage() {
                           {defaultLocationOptions
                             .filter((location) => location.value === userForm.default_location_id)
                             .map((location) => (
-                              <AdminSelectionChip key={location.value} label={location.label} selected />
+                              <OpsSelectionChip key={location.value} label={location.label} selected />
                             ))}
                         </div>
                       ) : null}

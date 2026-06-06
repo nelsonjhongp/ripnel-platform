@@ -3,8 +3,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  type KeyboardEvent,
-  type Ref,
   useCallback,
   useEffect,
   useMemo,
@@ -14,9 +12,7 @@ import {
 import {
   ClipboardList,
   RotateCcw,
-  Search,
   Trash2,
-  X,
 } from "lucide-react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -27,16 +23,11 @@ import {
 } from "@/components/feedback/status-page";
 import type { ApiEnvelope } from "@/lib/api";
 import { apiFetch, unwrapApiData } from "@/lib/api";
-import { resolveTransferCapabilities } from "@/lib/capabilities";
-import { cn } from "@/lib/utils";
+import { useApiGet } from "@/hooks/use-api-get";
+import { useTransferCapabilities } from "@/hooks/use-transfer-capabilities";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { AdminInlineMessage } from "@/components/admin/admin-ui";
-import {
-  CompactPickerEmpty,
-  CompactPickerList,
-  CompactPickerOption,
-  CompactPickerPopover,
-} from "@/components/ui/compact-picker";
+import { SearchablePicker } from "@/components/ui/searchable-picker";
 import { Button } from "@/components/ui/button";
 import { OpsPageShell, OpsSectionDivider } from "@/components/ui/ops-page-shell";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -45,10 +36,12 @@ import {
   RequestDraftTable,
   RequestProductComposer,
   RequestRouteField,
-  type RequestCandidate,
-  type RequestLocationOption,
-  type RequestProductGroup,
 } from "./transfers-request-ui";
+import type {
+  RequestCandidate,
+  RequestLocationOption,
+  RequestProductGroup,
+} from "./transfers-shared";
 import { useTransferDraft } from "./use-transfer-draft";
 import type { OpsOption } from "@/components/ui/ops-selection";
 
@@ -145,134 +138,6 @@ function buildProductOptionSummary(product: RequestProductGroup) {
   };
 }
 
-function RequestProductPickerField({
-  value,
-  onChange,
-  onFocus,
-  onKeyDown,
-  onClear,
-  inputRef,
-  requestPickerRef,
-  requestPickerOpen,
-  loading,
-  error,
-  emptyMessage,
-  products,
-  highlightedIndex,
-  onHighlight,
-  onSelect,
-  selectedProductKey,
-  placeholder,
-  disabled = false,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  onFocus: () => void;
-  onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
-  onClear: () => void;
-  inputRef?: Ref<HTMLInputElement>;
-  requestPickerRef: { current: HTMLDivElement | null };
-  requestPickerOpen: boolean;
-  loading: boolean;
-  error: string | null;
-  emptyMessage: string;
-  products: RequestProductGroup[];
-  highlightedIndex: number;
-  onHighlight: (index: number) => void;
-  onSelect: (product: RequestProductGroup) => void;
-  selectedProductKey?: string;
-  placeholder: string;
-  disabled?: boolean;
-}) {
-  return (
-    <div ref={requestPickerRef} className="relative space-y-1.5">
-      <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-        Buscar producto
-      </label>
-
-      <div
-        className={cn(
-          "sales-field flex h-10 items-center gap-2 rounded-lg px-3 transition",
-          disabled
-            ? "cursor-not-allowed border-dashed bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_82%,var(--ops-surface))] text-[var(--ops-text-muted)]"
-            : "hover:bg-[var(--ops-surface-muted)]"
-        )}
-      >
-        <Search className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
-        <input
-          ref={inputRef}
-          type="text"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          onFocus={onFocus}
-          onKeyDown={onKeyDown}
-          placeholder={placeholder}
-          aria-label="Seleccionar producto para solicitar transferencia"
-          disabled={disabled}
-          className="h-full w-full bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)] disabled:cursor-not-allowed"
-        />
-        {value && !disabled ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            onClick={onClear}
-            className="rounded-lg text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)]"
-            aria-label="Limpiar búsqueda de producto"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        ) : null}
-      </div>
-
-      {requestPickerOpen ? (
-        <CompactPickerPopover className="absolute left-0 right-0 top-[calc(100%+1px)] z-30 rounded-xl border border-[var(--ops-border-strong)]">
-          {error ? (
-            <CompactPickerEmpty>{error}</CompactPickerEmpty>
-          ) : loading && products.length === 0 ? (
-            <CompactPickerEmpty>Buscando productos disponibles...</CompactPickerEmpty>
-          ) : products.length === 0 ? (
-            <CompactPickerEmpty>{emptyMessage}</CompactPickerEmpty>
-          ) : (
-            <CompactPickerList
-              className="max-h-72 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              style={{ scrollbarWidth: "none" }}
-            >
-              <div className="divide-y divide-[var(--ops-border-strong)]">
-                {products.slice(0, 8).map((product, index) => (
-                  <CompactPickerOption
-                    key={product.product_key}
-                    active={index === highlightedIndex}
-                    selected={selectedProductKey === product.product_key}
-                    onMouseEnter={() => onHighlight(index)}
-                    onClick={() => onSelect(product)}
-                    className="px-4 py-3"
-                  >
-                    {(() => {
-                      const { colorsCount, sizesCount } = buildProductOptionSummary(product);
-
-                      return (
-                        <div className="flex min-w-0 items-center">
-                          <p className="min-w-0 truncate text-sm text-[var(--ops-text)]">
-                            <span className="font-semibold">{product.style_name}</span>
-                            <span className="text-[var(--ops-text-muted)]">
-                              {` · ${colorsCount} ${colorsCount === 1 ? "color" : "colores"} · ${sizesCount} ${sizesCount === 1 ? "talla" : "tallas"} · stock: ${product.total_available} u.`}
-                            </span>
-                          </p>
-                        </div>
-                      );
-                    })()}
-                  </CompactPickerOption>
-                ))}
-              </div>
-            </CompactPickerList>
-          )}
-        </CompactPickerPopover>
-      ) : null}
-    </div>
-  );
-}
-
 export function TransfersRequestPage() {
   const router = useRouter();
   const initialSearchParams =
@@ -280,7 +145,6 @@ export function TransfersRequestPage() {
       ? new URLSearchParams()
       : new URLSearchParams(window.location.search);
   const { loading: authLoading, defaultLocation, permissions, user } = useAuth();
-  const [locations, setLocations] = useState<LocationOption[]>([]);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [requestQuery, setRequestQuery] = useState("");
   const [requestCandidates, setRequestCandidates] = useState<RequestCandidate[]>([]);
@@ -295,12 +159,16 @@ export function TransfersRequestPage() {
   const [clearDraftModalOpen, setClearDraftModalOpen] = useState(false);
   const [noteMode, setNoteMode] = useState<"preset" | "manual">("preset");
   const [selectedNotePreset, setSelectedNotePreset] = useState("");
-  const requestPickerRef = useRef<HTMLDivElement | null>(null);
   const requestSearchInputRef = useRef<HTMLInputElement | null>(null);
 
-  const transferCapabilities = useMemo(
-    () => resolveTransferCapabilities({ permissions, roleName: user?.role_name }),
-    [permissions, user?.role_name]
+  const transferCapabilities = useTransferCapabilities();
+
+  const { data: locations } = useApiGet<LocationOption[]>(
+    () =>
+      apiFetch<ApiEnvelope<LocationOption[]> | LocationOption[]>("/api/locations", {
+        cache: "no-store",
+      }).then((p) => (unwrapApiData(p) || []).filter((l) => l.active)),
+    []
   );
 
   const {
@@ -352,20 +220,6 @@ export function TransfersRequestPage() {
     []
   );
 
-  async function loadLocations() {
-    try {
-      const payload = await apiFetch<
-        ApiEnvelope<LocationOption[]> | LocationOption[]
-      >("/api/locations", {
-        cache: "no-store",
-      });
-      const data = unwrapApiData(payload);
-      setLocations((data || []).filter((location) => location.active));
-    } catch {
-      // Error handled by hook
-    }
-  }
-
   const loadRequestCandidates = useCallback(async (queryValue: string) => {
     const normalizedQuery = queryValue.trim();
 
@@ -394,12 +248,6 @@ export function TransfersRequestPage() {
   }, [originId]);
 
   useEffect(() => {
-    void Promise.resolve().then(() => {
-      void loadLocations();
-    });
-  }, []);
-
-  useEffect(() => {
     if (!originId) {
       return;
     }
@@ -414,19 +262,6 @@ export function TransfersRequestPage() {
 
     return () => clearTimeout(timer);
   }, [loadRequestCandidates, originId, requestQuery, requestPickerOpen]);
-
-  useEffect(() => {
-    if (!requestPickerOpen) return;
-
-    function handlePointerDown(event: MouseEvent) {
-      if (requestPickerRef.current && !requestPickerRef.current.contains(event.target as Node)) {
-        setRequestPickerOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, [requestPickerOpen]);
 
   const activeRequestCandidates = useMemo(
     () => (requestPickerOpen || requestQuery.trim() || selectedRequestProduct ? requestCandidates : []),
@@ -528,8 +363,8 @@ export function TransfersRequestPage() {
 
   const requestLocationOptions = useMemo<RequestLocationOption[]>(() => {
     const destinationLocationId = defaultLocation?.location_id;
-    const activeLocations = locations.filter(
-      (location) => location.active && location.location_id !== destinationLocationId
+    const activeLocations = (locations || []).filter(
+      (location) => location.location_id !== destinationLocationId
     );
 
     return [
@@ -679,66 +514,59 @@ export function TransfersRequestPage() {
                       <TransferSectionHeading step={2} title="Agregar productos" />
 
                       <div className="ops-surface space-y-4 rounded-xl border p-4 sm:p-5">
-                        <RequestProductPickerField
+                        <SearchablePicker
                           value={requestInputValue}
                           onChange={(value) => {
                             if (!hasOriginSelected || requestCompleted) return;
                             setRequestQuery(value);
-                            setRequestPickerOpen(true);
-                            setHighlightedRequestIndex(0);
-                            clearDuplicateDraftVariant();
                             if (selectedRequestProduct) {
                               setSelectedRequestProduct(null);
                             }
+                            clearDuplicateDraftVariant();
                           }}
                           onFocus={() => {
                             if (!hasOriginSelected || requestCompleted) return;
-                            setRequestPickerOpen(true);
                             if (!requestQuery) {
                               setHighlightedRequestIndex(0);
                             }
                           }}
-                          onKeyDown={(event) => {
-                            if (!hasOriginSelected || requestCompleted) {
-                              return;
-                            }
-
-                            if (event.key === "Escape") {
-                              setRequestPickerOpen(false);
-                              return;
-                            }
-
-                            if (!requestProducts.length) {
-                              return;
-                            }
-
-                            if (event.key === "ArrowDown") {
-                              event.preventDefault();
-                              setRequestPickerOpen(true);
-                              setHighlightedRequestIndex((current) =>
-                                Math.min(current + 1, Math.min(requestProducts.length, 8) - 1)
-                              );
-                            }
-
-                            if (event.key === "ArrowUp") {
-                              event.preventDefault();
-                              setRequestPickerOpen(true);
-                              setHighlightedRequestIndex((current) => Math.max(current - 1, 0));
-                            }
-
-                            if (event.key === "Enter" && requestPickerOpen) {
-                              event.preventDefault();
-                              const selectedProduct =
-                                requestProducts[visibleHighlightedRequestIndex];
-                              if (!selectedProduct) {
-                                return;
-                              }
-
-                              setRequestQuery("");
-                              setSelectedRequestProduct(selectedProduct);
-                              setRequestPickerOpen(false);
-                              clearDuplicateDraftVariant();
-                            }
+                          placeholder={
+                            hasOriginSelected
+                              ? "Buscar producto por nombre, SKU o categoría..."
+                              : "Selecciona origen primero"
+                          }
+                          disabled={!hasOriginSelected || requestCompleted}
+                          label="Buscar producto"
+                          open={requestPickerOpen}
+                          onOpenChange={setRequestPickerOpen}
+                          items={requestProducts}
+                          loading={activeLoadingCandidates}
+                          error={activeRequestQueryError}
+                          loadingMessage="Buscando productos disponibles..."
+                          emptyMessage={requestSearchEmptyMessage}
+                          maxVisibleItems={8}
+                          highlightedIndex={visibleHighlightedRequestIndex}
+                          onHighlightChange={setHighlightedRequestIndex}
+                          inputRef={requestSearchInputRef}
+                          getItemKey={(product) => product.product_key}
+                          renderItem={(product) => {
+                            const { colorsCount, sizesCount } = buildProductOptionSummary(product);
+                            return (
+                              <div className="flex min-w-0 items-center">
+                                <p className="min-w-0 truncate text-sm text-[var(--ops-text)]">
+                                  <span className="font-semibold">{product.style_name}</span>
+                                  <span className="text-[var(--ops-text-muted)]">
+                                    {` · ${colorsCount} ${colorsCount === 1 ? "color" : "colores"} · ${sizesCount} ${sizesCount === 1 ? "talla" : "tallas"} · stock: ${product.total_available} u.`}
+                                  </span>
+                                </p>
+                              </div>
+                            );
+                          }}
+                          onSelect={(product) => {
+                            setRequestQuery("");
+                            setSelectedRequestProduct(product);
+                            setRequestPickerOpen(false);
+                            clearDuplicateDraftVariant();
                           }}
                           onClear={() => {
                             setRequestQuery("");
@@ -750,28 +578,8 @@ export function TransfersRequestPage() {
                               requestSearchInputRef.current?.focus();
                             });
                           }}
-                          inputRef={requestSearchInputRef}
-                          requestPickerRef={requestPickerRef}
-                          requestPickerOpen={requestPickerOpen}
-                          loading={activeLoadingCandidates}
-                          error={activeRequestQueryError}
-                          emptyMessage={requestSearchEmptyMessage}
-                          products={requestProducts}
-                          highlightedIndex={visibleHighlightedRequestIndex}
-                          onHighlight={setHighlightedRequestIndex}
-                          onSelect={(product) => {
-                            setRequestQuery("");
-                            setSelectedRequestProduct(product);
-                            setRequestPickerOpen(false);
-                            clearDuplicateDraftVariant();
-                          }}
-                          selectedProductKey={selectedRequestProduct?.product_key}
-                          placeholder={
-                            hasOriginSelected
-                              ? "Buscar producto por nombre, SKU o categoría..."
-                              : "Selecciona origen primero"
-                          }
-                          disabled={!hasOriginSelected || requestCompleted}
+                          showClear={Boolean(requestInputValue && !(!hasOriginSelected || requestCompleted))}
+                          selectedItemKey={selectedRequestProduct?.product_key}
                         />
 
                         <div className="pt-1">

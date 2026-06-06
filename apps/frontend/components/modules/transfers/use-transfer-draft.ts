@@ -1,9 +1,7 @@
 import { useCallback, useState } from "react";
 import type { ApiEnvelope } from "@/lib/api";
 import { apiFetch, unwrapApiData } from "@/lib/api";
-import type { DraftLine } from "./transfers-request-ui";
-import type { RequestCandidateSource, RequestProductVariant } from "./transfers-request-ui";
-import type { RequestProductGroup } from "./transfers-request-ui";
+import type { DraftLine, RequestCandidateSource, RequestProductVariant, RequestProductGroup } from "./transfers-shared";
 
 type InventoryItem = {
   location_id: string;

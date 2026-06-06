@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   ArrowLeft,
   ChevronRight,
-  Info,
   LineChart,
   MapPinned,
   RefreshCw,
@@ -31,10 +30,7 @@ import {
   LoadingPage,
 } from "@/components/feedback/status-page";
 import {
-  Tooltip,
-  TooltipContent,
   TooltipProvider,
-  TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ApiError, apiFetch } from "@/lib/api";
 import {
@@ -43,44 +39,16 @@ import {
   LocationOption,
   formatAmount,
   formatBusinessDate,
-  formatDateTime,
-  getCashStatusLabel,
-  getCashStatusTone,
 } from "@/lib/cash";
+import { formatDateTime } from "@/lib/date-utils";
 
 const PAGE_SIZE = 20;
 
 type RangeFilter = "7d" | "30d";
 type StatusFilter = "all" | "open" | "closed";
 
-function HelpTooltip({ content }: { content: string }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)]"
-          aria-label="Más información"
-        >
-          <Info className="h-3.5 w-3.5" />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="top" sideOffset={8} className="max-w-72">
-        {content}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-function CashStatusBadge({ status }: { status: "open" | "closed" }) {
-  return (
-    <span
-      className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getCashStatusTone(status)}`}
-    >
-      {getCashStatusLabel(status)}
-    </span>
-  );
-}
+import { CashStatusBadge } from "./cash-status-badge"
+import { HelpTooltip } from "@/components/ui/help-tooltip"
 
 function explainControlError(error: unknown, fallback: string) {
   if (!(error instanceof ApiError)) {

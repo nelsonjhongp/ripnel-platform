@@ -1,16 +1,12 @@
+import { formatCurrency, formatNumber as libFormatNumber } from "@/lib/format-utils"
+
 export function formatCurrencyPEN(value: number | null | undefined) {
-  return new Intl.NumberFormat("es-PE", {
-    style: "currency",
-    currency: "PEN",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(Number(value ?? 0))
+  if (value == null) return formatCurrency(0)
+  return formatCurrency(value)
 }
 
 export function formatNumber(value: number | null | undefined) {
-  return new Intl.NumberFormat("es-PE", {
-    maximumFractionDigits: 0,
-  }).format(Number(value ?? 0))
+  return libFormatNumber(value ?? 0)
 }
 
 export function formatDocumentStatus(status: string | null | undefined) {

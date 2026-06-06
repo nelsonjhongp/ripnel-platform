@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { fetchCatalogItems, createCatalogItem } from "@/lib/api-catalogs";
+import { useApiGet } from "@/hooks/use-api-get";
 import type { CatalogRecord } from "@/lib/api-catalogs";
 import { AdminFormPageShell } from "@/components/admin/admin-form-page-shell";
 import { AdminInlineMessage } from "@/components/admin/admin-ui";
@@ -26,43 +27,14 @@ export function CatalogFormPage({
   duplicateStrategy,
 }: CatalogFormPageProps) {
   const router = useRouter();
-  const [items, setItems] = useState<CatalogRecord[]>([]);
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [requestVersion, setRequestVersion] = useState(0);
 
-  useEffect(() => {
-    let cancelled = false;
-    void Promise.resolve().then(async () => {
-      setLoading(true);
-      setLoadError(null);
-
-      try {
-        const data = await fetchCatalogItems(endpoint);
-        if (!cancelled) {
-          setItems(data);
-        }
-      } catch (requestError) {
-        if (!cancelled) {
-          setLoadError(
-            requestError instanceof Error
-              ? requestError.message
-              : "No se pudo cargar el catalogo"
-          );
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [endpoint, requestVersion]);
+  const { data, loading, error: loadError, refetch } = useApiGet(
+    () => fetchCatalogItems(endpoint),
+    [endpoint]
+  );
+  const catalogItems = data ?? [];
 
   async function handleSubmit(body: Record<string, unknown>) {
     setSubmitting(true);
@@ -81,10 +53,6 @@ export function CatalogFormPage({
     } finally {
       setSubmitting(false);
     }
-  }
-
-  function reloadItems() {
-    setRequestVersion((current) => current + 1);
   }
 
   const readOnlyFieldKeys = fields
@@ -107,7 +75,7 @@ export function CatalogFormPage({
           <AdminInlineMessage tone="danger">{loadError}</AdminInlineMessage>
           <button
             type="button"
-            onClick={reloadItems}
+            onClick={() => refetch()}
             className="inline-flex rounded-lg border border-[var(--ops-border-strong)] px-3 py-2 text-sm font-medium text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
           >
             Reintentar carga
@@ -115,7 +83,7 @@ export function CatalogFormPage({
         </div>
       ) : (
         <CatalogItemForm
-          catalogItems={items}
+          catalogItems={catalogItems}
           fields={fields}
           idKey=""
           duplicateStrategy={duplicateStrategy}

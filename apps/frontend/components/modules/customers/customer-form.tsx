@@ -8,10 +8,11 @@ import {
   AdminInlineMessage,
   AdminInput,
   AdminSection,
-  AdminSelectMenu,
   AdminTextarea,
 } from "@/components/admin/admin-ui"
+import { OpsSelectMenu } from "@/components/ui/ops-selection"
 import { cn } from "@/lib/utils"
+import { formatDate } from "@/lib/date-utils"
 
 export type CustomerRecord = {
   customer_id: string
@@ -85,13 +86,7 @@ export function buildDisplayName(customer: CustomerRecord) {
   return customer.full_name || customer.business_name || customer.commercial_name || "Cliente sin nombre"
 }
 
-export function formatCustomerDate(iso: string) {
-  return new Date(iso).toLocaleDateString("es-PE", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  })
-}
+export const formatCustomerDate = formatDate
 
 export function validateCustomerInput(
   input: Pick<
@@ -223,7 +218,7 @@ export function CustomerForm({
           <AdminSection title="Identidad comercial">
             <div className="grid gap-4 md:grid-cols-2">
               <AdminField label="Tipo de documento">
-                <AdminSelectMenu
+                <OpsSelectMenu
                   value={state.document_type}
                   onValueChange={(value) =>
                     patch({
@@ -270,7 +265,7 @@ export function CustomerForm({
               </AdminField>
 
               <AdminField label="Tipo de cliente">
-                <AdminSelectMenu
+                <OpsSelectMenu
                   value={state.customer_type}
                   onValueChange={(value) => patch({ customer_type: value })}
                   placeholder="Selecciona un tipo"

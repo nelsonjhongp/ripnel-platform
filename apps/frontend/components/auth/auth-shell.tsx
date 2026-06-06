@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { ArrowLeft, AlertCircle } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -93,25 +93,6 @@ export function AuthCard({
         {children}
       </CardContent>
     </Card>
-  )
-}
-
-type AuthAlertProps = {
-  tone: "warning" | "danger"
-  children: ReactNode
-}
-
-export function AuthAlert({ tone, children }: AuthAlertProps) {
-  const toneClasses =
-    tone === "warning"
-      ? "border-[var(--color-warning-border,#fcd34d)] bg-[var(--color-warning-bg,#fffbeb)] text-[var(--color-warning-text,#b45309)] dark:border-[rgb(245_158_11_/_0.3)] dark:bg-[rgb(245_158_11_/_0.12)] dark:text-[rgb(253_230_138)]"
-      : "border-[var(--color-danger-border,#fda4af)] bg-[var(--color-danger-bg,#fff1f2)] text-[var(--color-danger-text,#be123c)] dark:border-[rgb(244_63_94_/_0.3)] dark:bg-[rgb(244_63_94_/_0.12)] dark:text-[rgb(254_205_211)]"
-
-  return (
-    <div className={cn("flex items-start gap-2 rounded-lg border px-3.5 py-2.5 text-[0.8125rem] font-medium leading-[1.4]", toneClasses)}>
-      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-      <span>{children}</span>
-    </div>
   )
 }
 

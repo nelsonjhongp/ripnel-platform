@@ -7,33 +7,25 @@ import {
   ArrowRightLeft,
   Banknote,
   CheckCircle2,
-  Info,
   Smartphone,
 } from "lucide-react";
 
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import {
   ErrorPage,
-  ForbiddenPage,
   LoadingPage,
-  NotFoundPage,
 } from "@/components/feedback/status-page";
 import {
-  Tooltip,
-  TooltipContent,
   TooltipProvider,
-  TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ApiError, apiFetch } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { apiFetch } from "@/lib/api";
 import {
   CashClosingDetail,
   formatAmount,
   formatBusinessDate,
-  formatDateTime,
-  getCashStatusLabel,
-  getCashStatusTone,
 } from "@/lib/cash";
+import { formatDateTime } from "@/lib/date-utils";
+import { useApiGet } from "@/hooks/use-api-get";
 
 const METHOD_CONFIG = [
   { key: "cash" as const, label: "Efectivo", icon: Banknote },
@@ -42,74 +34,9 @@ const METHOD_CONFIG = [
   { key: "transfer" as const, label: "Transferencia", icon: ArrowRightLeft },
 ];
 
-function HelpTooltip({ content }: { content: string }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)]"
-          aria-label="Más información"
-        >
-          <Info className="h-3.5 w-3.5" />
-        </button>
-      </TooltipTrigger>
-      <TooltipContent side="top" sideOffset={8} className="max-w-72">
-        {content}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-function MetricPill({
-  label,
-  value,
-  tone = "default",
-}: {
-  label: string;
-  value: string | number;
-  tone?: "default" | "accent" | "warning";
-}) {
-  const toneClass =
-    tone === "accent"
-      ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))] text-[var(--ops-text)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--ripnel-accent)_14%,transparent)]"
-      : tone === "warning"
-        ? "border-[color:color-mix(in_srgb,#f59e0b_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
-        : "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text)]";
-  const labelClass =
-    tone === "accent"
-      ? "text-[color:color-mix(in_srgb,var(--ripnel-accent)_72%,var(--ops-text))]"
-      : tone === "warning"
-        ? "text-[color:color-mix(in_srgb,#f59e0b_82%,var(--ops-text))]"
-        : "text-[var(--ops-text-muted)]";
-  const valueClass =
-    tone === "accent"
-      ? "text-[var(--ops-text)]"
-      : tone === "warning"
-        ? "text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
-        : "text-[var(--ops-text)]";
-
-  return (
-    <div
-      className={cn(
-        "inline-flex items-center gap-2.5 rounded-full border px-3 py-2",
-        toneClass,
-      )}
-    >
-      <span
-        className={cn(
-          "text-[11px] font-semibold uppercase tracking-[0.16em]",
-          labelClass,
-        )}
-      >
-        {label}
-      </span>
-      <span className={cn("text-base font-semibold leading-none", valueClass)}>
-        {value}
-      </span>
-    </div>
-  );
-}
+import { CashStatusBadge } from "./cash-status-badge"
+import { HelpTooltip } from "@/components/ui/help-tooltip"
+import { OpsMetricPill } from "@/components/ui/ops-metric-pill"
 
 export default function CashHistoryDetailPage({
   params,
@@ -117,9 +44,10 @@ export default function CashHistoryDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const [cashId, setCashId] = useState<string | null>(null);
-  const [closing, setClosing] = useState<CashClosingDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const { data: closing, loading, error, refetch } = useApiGet(
+    cashId ? () => apiFetch<CashClosingDetail>(`/api/cash/${cashId}`) : null,
+    [cashId]
+  );
 
   useEffect(() => {
     let active = true;
@@ -134,46 +62,6 @@ export default function CashHistoryDetailPage({
       active = false;
     };
   }, [params]);
-
-  useEffect(() => {
-    if (!cashId) return;
-
-    let active = true;
-
-    async function loadClosing() {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const data = await apiFetch<CashClosingDetail>(`/api/cash/${cashId}`, {
-          cache: "no-store",
-        });
-
-        if (active) {
-          setClosing(data);
-        }
-      } catch (loadError) {
-        if (active) {
-          setClosing(null);
-          setError(
-            loadError instanceof Error
-              ? loadError
-              : new Error("No se pudo cargar la caja."),
-          );
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadClosing();
-
-    return () => {
-      active = false;
-    };
-  }, [cashId]);
 
   const consistencyTone = useMemo(() => {
     if (!closing?.sales_summary.consistency.is_consistent) {
@@ -193,20 +81,12 @@ export default function CashHistoryDetailPage({
     );
   }
 
-  if (error instanceof ApiError && error.status === 404) {
-    return <NotFoundPage variant="ops" />;
-  }
-
-  if (error instanceof ApiError && error.status === 403) {
-    return <ForbiddenPage variant="ops" />;
-  }
-
   if (error || !closing) {
     return (
       <ErrorPage
         title="No pudimos abrir el detalle de caja"
         description={
-          error?.message ||
+          error ||
           "La sesión solicitada no está disponible para esta sede."
         }
         variant="ops"
@@ -242,30 +122,26 @@ export default function CashHistoryDetailPage({
                   </h1>
                 </div>
 
-                <span
-                  className={`inline-flex rounded-full border px-3 py-1.5 text-sm font-semibold ${getCashStatusTone(closing.status)}`}
-                >
-                  {getCashStatusLabel(closing.status)}
-                </span>
+                <CashStatusBadge status={closing.status} className="px-3 py-1.5 text-sm" />
               </div>
             </header>
 
             <div className="flex flex-wrap items-center gap-2">
-              <MetricPill
+              <OpsMetricPill
                 label="Total caja"
                 value={formatAmount(closing.total_all)}
                 tone="accent"
               />
-              <MetricPill
+              <OpsMetricPill
                 label="Ventas"
                 value={closing.sales_summary.sale_count}
                 tone="accent"
               />
-              <MetricPill
+              <OpsMetricPill
                 label="Apertura"
                 value={formatDateTime(closing.created_at)}
               />
-              <MetricPill
+              <OpsMetricPill
                 label="Cierre"
                 value={
                   closing.closed_at

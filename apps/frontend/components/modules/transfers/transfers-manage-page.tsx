@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { ArrowRightLeft, Boxes, LoaderCircle, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
@@ -9,14 +9,15 @@ import {
 } from "@/components/feedback/status-page";
 import type { ApiEnvelope } from "@/lib/api";
 import { apiFetch, unwrapApiData } from "@/lib/api";
-import { resolveTransferCapabilities } from "@/lib/capabilities";
+import { useApiGet } from "@/hooks/use-api-get";
+import { useTransferCapabilities } from "@/hooks/use-transfer-capabilities";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { Button } from "@/components/ui/button";
 import {
   AdminInlineMessage,
-  AdminSelectMenu,
   AdminTextarea,
 } from "@/components/admin/admin-ui";
+import { OpsSelectMenu } from "@/components/ui/ops-selection";
 import {
   OpsPageShell,
   OpsSectionDivider,
@@ -50,17 +51,30 @@ type InventoryItem = {
 
 export function TransfersManagePage() {
   const { loading: authLoading, defaultLocation, permissions, user } = useAuth();
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [originId, setOriginId] = useState("");
   const [destinationId, setDestinationId] = useState("");
-  const [loadingLocations, setLoadingLocations] = useState(false);
-  const [loadingInventory, setLoadingInventory] = useState(false);
 
-  const transferCapabilities = useMemo(
-    () => resolveTransferCapabilities({ permissions, roleName: user?.role_name }),
-    [permissions, user?.role_name]
+  const transferCapabilities = useTransferCapabilities();
+
+  const { data: locations, loading: loadingLocations } = useApiGet<Location[]>(
+    () =>
+      apiFetch<ApiEnvelope<Location[]> | Location[]>("/api/locations", {
+        cache: "no-store",
+      }).then((p) => (unwrapApiData(p) || []).filter((l: Location) => l.active)),
+    []
   );
+
+  const { data: inventoryRaw, loading: loadingInventory, refetch: refetchInventory } = useApiGet<InventoryItem[]>(
+    originId
+      ? () =>
+          apiFetch<ApiEnvelope<InventoryItem[]> | InventoryItem[]>(
+            `/api/inventory?location_id=${originId}`,
+            { cache: "no-store" }
+          ).then((p) => (unwrapApiData(p) || []).filter((i: InventoryItem) => i.qty > 0))
+      : null,
+    [originId]
+  );
+  const inventory = inventoryRaw ?? [];
 
   const {
     draftLines,
@@ -83,58 +97,10 @@ export function TransfersManagePage() {
     setSelectedRequestProduct: () => {},
     requestQuery: "",
     loadRequestCandidates: async () => {},
-    loadInventory: async (locationId: string) => {
-      await loadInventory(locationId);
+    loadInventory: async () => {
+      refetchInventory();
     },
   });
-
-  async function loadLocations() {
-    setLoadingLocations(true);
-    try {
-      const payload = await apiFetch<ApiEnvelope<Location[]> | Location[]>("/api/locations", {
-        cache: "no-store",
-      });
-      const data = unwrapApiData(payload);
-      setLocations((data || []).filter((location: Location) => location.active));
-    } catch {
-      // Error handled by hook
-    } finally {
-      setLoadingLocations(false);
-    }
-  }
-
-  async function loadInventory(locationId: string) {
-    if (!locationId) {
-      setInventory([]);
-      return;
-    }
-
-    setLoadingInventory(true);
-    try {
-      const payload = await apiFetch<ApiEnvelope<InventoryItem[]> | InventoryItem[]>(
-        `/api/inventory?location_id=${locationId}`,
-        { cache: "no-store" }
-      );
-      const data = unwrapApiData(payload);
-      setInventory((data || []).filter((item: InventoryItem) => item.qty > 0));
-    } catch {
-      // Error handled by hook
-    } finally {
-      setLoadingInventory(false);
-    }
-  }
-
-  useEffect(() => {
-    void Promise.resolve().then(() => {
-      void loadLocations();
-    });
-  }, []);
-
-  useEffect(() => {
-    void Promise.resolve().then(() => {
-      void loadInventory(originId);
-    });
-  }, [originId]);
 
   const availableInventory = useMemo(() => {
     return inventory.filter(
@@ -143,7 +109,7 @@ export function TransfersManagePage() {
   }, [inventory, draftLines]);
 
   const destinationOptions = useMemo(() => {
-    return locations
+    return (locations || [])
       .filter((location) => location.location_id !== originId)
       .map((location) => ({
         value: location.location_id,
@@ -153,7 +119,7 @@ export function TransfersManagePage() {
   }, [locations, originId]);
 
   const originOptions = useMemo(() => {
-    return locations
+    return (locations || [])
       .filter((location) => location.location_id !== destinationId)
       .map((location) => ({
         value: location.location_id,
@@ -223,7 +189,7 @@ export function TransfersManagePage() {
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                   Origen
                 </label>
-                <AdminSelectMenu
+                <OpsSelectMenu
                   value={originId}
                   onValueChange={setOriginId}
                   placeholder="Selecciona una sede"
@@ -236,7 +202,7 @@ export function TransfersManagePage() {
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                   Destino
                 </label>
-                <AdminSelectMenu
+                <OpsSelectMenu
                   value={destinationId}
                   onValueChange={setDestinationId}
                   placeholder="Selecciona una sede"

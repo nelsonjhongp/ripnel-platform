@@ -13,8 +13,8 @@ import {
   AdminInput,
   AdminInlineMessage,
   AdminSection,
-  AdminSelectMenu,
 } from "@/components/admin/admin-ui"
+import { OpsSelectMenu } from "@/components/ui/ops-selection"
 
 type LocationType = "store" | "warehouse" | "workshop" | "third_party"
 
@@ -98,7 +98,7 @@ export default function LocationsCreatePage() {
                 </AdminField>
 
                 <AdminField label="Tipo">
-                  <AdminSelectMenu
+                  <OpsSelectMenu
                     value={formState.type}
                     onValueChange={(value) => setFormState((current) => ({ ...current, type: value as LocationType }))}
                     placeholder="Selecciona un tipo"

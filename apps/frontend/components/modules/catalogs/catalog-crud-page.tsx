@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   LoaderCircle,
   PencilLine,
@@ -30,9 +30,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { usePagination } from "@/hooks/use-pagination";
+import { useApiGet } from "@/hooks/use-api-get";
 import { fetchCatalogItems, updateCatalogItem } from "@/lib/api-catalogs";
 import type { CatalogRecord } from "@/lib/api-catalogs";
 import type { CatalogListFieldConfig, CatalogFieldConfig } from "@/lib/product-master-metadata";
+import { OpsEmptyState } from "@/components/ui/ops-empty-state";
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
+import { activeBadgeLabel } from "@/lib/badge-utils";
 import { CatalogItemForm, buildInitialState } from "./catalog-item-form";
 
 type CatalogCrudPageProps = {
@@ -48,8 +53,6 @@ type CatalogCrudPageProps = {
   entityLabel: string;
   duplicateStrategy: "name" | "name+code";
 };
-
-const PAGE_SIZE = 10;
 
 function formatValue(value: unknown) {
   if (typeof value === "boolean") return value ? "Si" : "No";
@@ -90,41 +93,21 @@ export function CatalogCrudPage({
   entityLabel,
   duplicateStrategy,
 }: CatalogCrudPageProps) {
-  const [items, setItems] = useState<CatalogRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
-  const [page, setPage] = useState(1);
   const [pendingToggleItem, setPendingToggleItem] = useState<CatalogRecord | null>(null);
   const [toggling, setToggling] = useState(false);
   const [editingItem, setEditingItem] = useState<CatalogRecord | null>(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
-  const loadItems = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      setItems(await fetchCatalogItems(endpoint));
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "No se pudo cargar el catalogo"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [endpoint]);
-
-  useEffect(() => {
-    void Promise.resolve().then(() => {
-      void loadItems();
-    });
-  }, [loadItems]);
+  const { data, loading, error, refetch } = useApiGet(
+    () => fetchCatalogItems(endpoint),
+    [endpoint]
+  );
+  const items = data ?? [];
 
   const filteredItems = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -144,41 +127,27 @@ export function CatalogCrudPage({
     });
   }, [items, listFields, search, statusFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const pageStart = (safePage - 1) * PAGE_SIZE;
-  const paginatedItems = filteredItems.slice(pageStart, pageStart + PAGE_SIZE);
-  const visibleFrom = filteredItems.length ? pageStart + 1 : 0;
-  const visibleTo = filteredItems.length
-    ? Math.min(pageStart + PAGE_SIZE, filteredItems.length)
-    : 0;
+  const { paginatedItems, totalPages, safePage, firstVisible, lastVisible, setPage } =
+    usePagination(filteredItems);
   const hasActiveFilters = Boolean(search.trim()) || statusFilter !== "all";
-
-  function updateItemInList(nextItem: CatalogRecord) {
-    setItems((current) =>
-      current.map((item) =>
-        getItemId(item, idKey) === getItemId(nextItem, idKey) ? nextItem : item
-      )
-    );
-  }
 
   async function handleToggleActive() {
     if (!pendingToggleItem) return;
 
     setToggling(true);
-    setError(null);
+    setMutationError(null);
     setSuccessMessage(null);
 
     try {
       const result = await updateCatalogItem(endpoint, getItemId(pendingToggleItem, idKey), {
         active: !pendingToggleItem.active,
       });
-      updateItemInList(result);
       setSuccessMessage(
         result.active ? "Registro activado correctamente." : "Registro inactivado correctamente."
       );
+      void refetch();
     } catch (requestError) {
-      setError(
+      setMutationError(
         requestError instanceof Error
           ? requestError.message
           : "No se pudo actualizar el estado"
@@ -207,9 +176,9 @@ export function CatalogCrudPage({
 
     try {
       const result = await updateCatalogItem(endpoint, getItemId(editingItem, idKey), body);
-      updateItemInList(result);
       setSuccessMessage("Registro actualizado correctamente.");
       setEditingItem(null);
+      void refetch();
     } catch (requestError) {
       setEditError(
         requestError instanceof Error
@@ -239,9 +208,9 @@ export function CatalogCrudPage({
                     type="button"
                     variant="outline"
                     size="icon-sm"
-                    className="rounded-lg"
-                    onClick={loadItems}
-                    disabled={loading}
+                     className="rounded-lg"
+                     onClick={() => refetch()}
+                     disabled={loading}
                     aria-label="Actualizar"
                   >
                     <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -309,8 +278,8 @@ export function CatalogCrudPage({
               </Tooltip>
             </OpsFiltersRow>
 
-            {error ? (
-              <AdminInlineMessage tone="danger">{error}</AdminInlineMessage>
+            {error || mutationError ? (
+              <AdminInlineMessage tone="danger">{error || mutationError}</AdminInlineMessage>
             ) : null}
 
             {successMessage ? (
@@ -385,15 +354,9 @@ export function CatalogCrudPage({
                           </td>
                         ))}
                         <td className="px-4 py-[var(--ops-row-py)]">
-                          <span
-                            className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                              item.active
-                                ? "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
-                                : "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]"
-                            }`}
-                          >
-                            {item.active ? "Activo" : "Inactivo"}
-                          </span>
+                          <OpsStatusBadge tone={item.active ? "success" : "neutral"}>
+                            {activeBadgeLabel(!!item.active)}
+                          </OpsStatusBadge>
                         </td>
                         <td className="px-4 py-[var(--ops-row-py)]">
                           <AdminRowActionsMenu
@@ -417,10 +380,11 @@ export function CatalogCrudPage({
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={listFields.length + 3} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                        {items.length
-                          ? "No hay resultados para este filtro."
-                          : emptyDescription}
+                      <td colSpan={listFields.length + 3}>
+                        <OpsEmptyState
+                          variant="compact"
+                          description={items.length ? "No hay resultados para este filtro." : emptyDescription}
+                        />
                       </td>
                     </tr>
                   )}
@@ -430,7 +394,7 @@ export function CatalogCrudPage({
 
             <OpsTableFooter>
               <span className="text-sm text-[var(--ops-text-muted)]">
-                {filteredItems.length ? `${visibleFrom}-${visibleTo} de ${filteredItems.length}` : "0 resultados"}
+                {filteredItems.length ? `${firstVisible}-${lastVisible} de ${filteredItems.length}` : "0 resultados"}
               </span>
               <Pagination
                 page={safePage}

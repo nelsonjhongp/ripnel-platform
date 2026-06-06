@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
-  CheckCheck,
   CheckCircle2,
   CircleAlert,
   ClipboardList,
@@ -15,12 +14,8 @@ import {
   MapPin,
   Package,
   RefreshCw,
-  SendHorizonal,
-  ShieldCheck,
   Truck,
-  X,
   XCircle,
-  type LucideIcon,
 } from "lucide-react";
 
 import { useSidebarTopbarBreadcrumbs } from "@/components/sidebar/SidebarShell";
@@ -41,24 +36,29 @@ import {
   OpsTableBlock,
   OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
+import { OpsInfoCard } from "@/components/ui/ops-info-card";
+import { OpsMetricStripItem } from "@/components/ui/ops-metric-strip-item";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ApiError, apiFetch, type ApiEnvelope, unwrapApiData } from "@/lib/api";
+import { useApiGet } from "@/hooks/use-api-get";
 import { appRoutes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import {
-  formatDateTime,
   formatTransferNextStep,
   formatTransferPrimaryAction,
   formatTransferStatus,
   getTransferStatusClasses,
+  TRANSFER_ACTION_CONFIG,
+  type TransferActionKey,
   type TransferAvailableActions,
   type TransferDetail,
   type TransferLineDetail,
+  type TransferSummary,
 } from "./transfers-shared";
+import { formatDateTime } from "@/lib/date-utils";
 
 type TransferStatus = TransferDetail["status"];
-type TransferActionKey = keyof TransferAvailableActions;
 type TimelineState = "complete" | "current" | "pending" | "cancelled";
 
 const TRANSFER_STAGE_ORDER: TransferStatus[] = [
@@ -68,77 +68,6 @@ const TRANSFER_STAGE_ORDER: TransferStatus[] = [
   "received",
   "cancelled",
 ];
-
-const ACTION_CONFIG: Record<
-  TransferActionKey,
-  {
-    label: string;
-    confirmLabel: string;
-    path: (transferId: string) => string;
-    successMessage: string;
-    icon: ReactNode;
-    tone: "accent" | "danger";
-    description: (transfer: TransferDetail) => ReactNode;
-  }
-> = {
-  approve: {
-    label: "Aprobar",
-    confirmLabel: "Aprobar solicitud",
-    path: (transferId) => `/api/transfers/${transferId}/approve`,
-    successMessage: "Solicitud aprobada para despacho.",
-    icon: <ShieldCheck className="h-3.5 w-3.5" />,
-    tone: "accent",
-    description: (transfer) => (
-      <>
-        La transferencia <strong>{transfer.transfer_number || "sin número"}</strong> quedará
-        lista para despacho desde <strong>{transfer.from_location_name}</strong>.
-      </>
-    ),
-  },
-  ship: {
-    label: "Despachar",
-    confirmLabel: "Despachar transferencia",
-    path: (transferId) => `/api/transfers/${transferId}/ship`,
-    successMessage: "Transferencia despachada.",
-    icon: <SendHorizonal className="h-3.5 w-3.5" />,
-    tone: "accent",
-    description: (transfer) => (
-      <>
-        La transferencia <strong>{transfer.transfer_number || "sin número"}</strong> descontará
-        stock del origen y quedará lista para recepción en{" "}
-        <strong>{transfer.to_location_name}</strong>.
-      </>
-    ),
-  },
-  receive: {
-    label: "Recepcionar",
-    confirmLabel: "Confirmar recepción",
-    path: (transferId) => `/api/transfers/${transferId}/receive`,
-    successMessage: "Transferencia recepcionada.",
-    icon: <CheckCheck className="h-3.5 w-3.5" />,
-    tone: "accent",
-    description: (transfer) => (
-      <>
-        La transferencia <strong>{transfer.transfer_number || "sin número"}</strong> ingresará
-        stock en <strong>{transfer.to_location_name}</strong>.
-      </>
-    ),
-  },
-  cancel: {
-    label: "Cancelar",
-    confirmLabel: "Cancelar transferencia",
-    path: (transferId) => `/api/transfers/${transferId}/cancel`,
-    successMessage: "Transferencia cancelada.",
-    icon: <X className="h-3.5 w-3.5" />,
-    tone: "danger",
-    description: (transfer) => (
-      <>
-        La transferencia <strong>{transfer.transfer_number || "sin número"}</strong> quedará
-        anulada y no continuará el flujo entre sedes.
-      </>
-    ),
-  },
-};
 
 function getTransferBannerCopy(transfer: TransferDetail) {
   if (transfer.status === "requested") {
@@ -224,15 +153,11 @@ function getPendingMetricLabel(status: TransferStatus) {
 }
 
 function getPendingMetricTone(status: TransferStatus) {
-  if (status === "received") {
-    return "success" as const;
-  }
-
-  if (status === "shipped" || status === "requested" || status === "approved") {
+  if (status === "received" || status === "shipped" || status === "requested" || status === "approved") {
     return "warning" as const;
   }
 
-  return "default" as const;
+  return "accent" as const;
 }
 
 function getLinePendingValue(status: TransferStatus, line: TransferLineDetail) {
@@ -321,63 +246,6 @@ function getTimelineStateClasses(state: TimelineState) {
   };
 }
 
-function MetricCard({
-  label,
-  value,
-  tone = "default",
-}: {
-  label: string;
-  value: string | number;
-  tone?: "default" | "accent" | "warning" | "success";
-}) {
-  const toneClass =
-    tone === "accent"
-      ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_26%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_78%,var(--ops-surface))]"
-      : tone === "warning"
-        ? "border-[color:color-mix(in_srgb,#f59e0b_26%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))]"
-        : tone === "success"
-          ? "border-[color:color-mix(in_srgb,#10b981_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_10%,var(--ops-surface))]"
-          : "border-[var(--ops-border-strong)] bg-[var(--ops-surface)]";
-
-  return (
-    <div className={cn("rounded-xl border px-4 py-3.5", toneClass)}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-        {label}
-      </p>
-      <p className="mt-2 text-[1.75rem] leading-none font-semibold tracking-[-0.03em] text-[var(--ops-text)]">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function InfoCard({
-  title,
-  icon: Icon,
-  children,
-  className,
-}: {
-  title: string;
-  icon: LucideIcon;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <section
-      className={cn(
-        "rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4",
-        className
-      )}
-    >
-      <div className="flex items-center gap-2">
-        <Icon className="h-4 w-4 text-[var(--ops-text-muted)]" />
-        <h2 className="text-sm font-semibold text-[var(--ops-text)]">{title}</h2>
-      </div>
-      <div className="mt-4 space-y-4">{children}</div>
-    </section>
-  );
-}
-
 function SummaryItem({
   label,
   value,
@@ -401,28 +269,11 @@ export function TransferDetailPage({
   params: Promise<{ transferId: string }>;
 }) {
   const [transferId, setTransferId] = useState<string | null>(null);
-  const [transfer, setTransfer] = useState<TransferDetail | null>(null);
-  const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState<Error | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [reloadNonce, setReloadNonce] = useState(0);
   const [pendingAction, setPendingAction] = useState<TransferActionKey | null>(null);
   const [busyAction, setBusyAction] = useState<TransferActionKey | null>(null);
-
-  useSidebarTopbarBreadcrumbs(
-    transfer
-      ? [
-          { label: "Inicio", href: appRoutes.home },
-          { label: "Transferencias", href: appRoutes.transfers },
-          { label: transfer.transfer_number || "Transferencia" },
-        ]
-      : [
-          { label: "Inicio", href: appRoutes.home },
-          { label: "Transferencias", href: appRoutes.transfers },
-          { label: "Transferencia" },
-        ]
-  );
 
   useEffect(() => {
     let active = true;
@@ -438,48 +289,41 @@ export function TransferDetailPage({
     };
   }, [params]);
 
-  useEffect(() => {
-    if (!transferId) {
-      return;
-    }
-
-    let active = true;
-
-    async function loadTransfer() {
-      setLoading(true);
-      setPageError(null);
-      setActionError(null);
-
-      try {
-        const payload = await apiFetch<ApiEnvelope<TransferDetail> | TransferDetail>(
-          `/api/transfers/${transferId}`,
-          { cache: "no-store" }
-        );
-        const data = unwrapApiData(payload);
-
-        if (active) {
-          setTransfer(data);
+  const {
+    data: transfer,
+    loading,
+    refetch,
+  } = useApiGet<TransferDetail>(
+    transferId
+      ? () => {
+          setPageError(null);
+          return apiFetch<ApiEnvelope<TransferDetail> | TransferDetail>(
+            `/api/transfers/${transferId}`,
+            { cache: "no-store" }
+          )
+            .then(unwrapApiData)
+            .catch((err) => {
+              setPageError(err instanceof Error ? err : new Error("No se pudo cargar la transferencia."));
+              throw err;
+            });
         }
-      } catch (loadError) {
-        if (active) {
-          setTransfer(null);
-          setPageError(
-            loadError instanceof Error ? loadError : new Error("No se pudo cargar la transferencia.")
-          );
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    }
+      : null,
+    [transferId]
+  );
 
-    void loadTransfer();
-
-    return () => {
-      active = false;
-    };
-  }, [reloadNonce, transferId]);
+  useSidebarTopbarBreadcrumbs(
+    transfer
+      ? [
+          { label: "Inicio", href: appRoutes.home },
+          { label: "Transferencias", href: appRoutes.transfers },
+          { label: transfer.transfer_number || "Transferencia" },
+        ]
+      : [
+          { label: "Inicio", href: appRoutes.home },
+          { label: "Transferencias", href: appRoutes.transfers },
+          { label: "Transferencia" },
+        ]
+  );
 
   async function handleTransferAction(action: TransferActionKey) {
     if (!transferId) {
@@ -491,17 +335,17 @@ export function TransferDetailPage({
     setNotice(null);
 
     try {
-      await apiFetch(ACTION_CONFIG[action].path(transferId), {
+      await apiFetch(TRANSFER_ACTION_CONFIG[action].path(transferId), {
         method: "POST",
         body: JSON.stringify({}),
       });
-      setNotice(ACTION_CONFIG[action].successMessage);
-      setReloadNonce((current) => current + 1);
+      setNotice(TRANSFER_ACTION_CONFIG[action].successMessage);
+      refetch();
     } catch (requestError) {
       setActionError(
         requestError instanceof Error
           ? requestError.message
-          : `No se pudo ejecutar ${ACTION_CONFIG[action].label.toLowerCase()}.`
+          : `No se pudo ejecutar ${TRANSFER_ACTION_CONFIG[action].label.toLowerCase()}.`
       );
     } finally {
       setBusyAction(null);
@@ -669,7 +513,7 @@ export function TransferDetailPage({
                       variant="outline"
                       size="icon-sm"
                       className="rounded-lg"
-                      onClick={() => setReloadNonce((current) => current + 1)}
+                      onClick={() => refetch()}
                       aria-label="Actualizar detalle"
                     >
                       <RefreshCw className="h-3.5 w-3.5" />
@@ -692,7 +536,7 @@ export function TransferDetailPage({
                   {busyAction === action ? (
                     <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
                   ) : (
-                    ACTION_CONFIG[action].icon
+                    TRANSFER_ACTION_CONFIG[action].icon
                   )}
                   {formatTransferPrimaryAction(action)}
                 </Button>
@@ -787,11 +631,15 @@ export function TransferDetailPage({
         </section>
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          <MetricCard label="Líneas" value={totals.lines} />
-          <MetricCard label="Total solicitado" value={totals.requested} tone="accent" />
-          <MetricCard label="Total despachado" value={totals.shipped} tone="warning" />
-          <MetricCard label="Total recibido" value={totals.received} tone="success" />
-          <MetricCard
+          <OpsMetricStripItem label="Líneas" value={totals.lines} isNeutral />
+          <OpsMetricStripItem label="Total solicitado" value={totals.requested} tone="accent" />
+          <OpsMetricStripItem label="Total despachado" value={totals.shipped} tone="warning" />
+          <OpsMetricStripItem
+            label="Total recibido"
+            value={totals.received}
+            tone="accent"
+          />
+          <OpsMetricStripItem
             label={getPendingMetricLabel(transfer.status)}
             value={totals.pendingDisplay}
             tone={getPendingMetricTone(transfer.status)}
@@ -842,7 +690,7 @@ export function TransferDetailPage({
         </OpsTableBlock>
 
         <div className="grid gap-4 xl:grid-cols-[1fr_1.15fr_0.9fr]">
-          <InfoCard title="Ruta de transferencia" icon={MapPin}>
+          <OpsInfoCard title="Ruta de transferencia" icon={MapPin}>
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center">
               <div className="space-y-1.5">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
@@ -874,9 +722,9 @@ export function TransferDetailPage({
             </div>
 
             <SummaryItem label="Impacto en stock" value={getTransferImpactCopy(transfer.status)} />
-          </InfoCard>
+          </OpsInfoCard>
 
-          <InfoCard title="Trazabilidad" icon={ClipboardList}>
+          <OpsInfoCard title="Trazabilidad" icon={ClipboardList}>
             <div className="space-y-3">
               <div className="grid gap-1.5 border-b border-[var(--ops-border-soft)] pb-3 md:grid-cols-[160px_minmax(0,1fr)]">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
@@ -930,13 +778,13 @@ export function TransferDetailPage({
                 </div>
               ) : null}
             </div>
-          </InfoCard>
+          </OpsInfoCard>
 
-          <InfoCard title="Notas" icon={FileText}>
+          <OpsInfoCard title="Notas" icon={FileText}>
             <p className="text-sm leading-6 text-[var(--ops-text)]">
               {transfer.notes?.trim() || "Sin notas registradas."}
             </p>
-          </InfoCard>
+          </OpsInfoCard>
         </div>
 
         <OpsTableBlock>
@@ -1033,13 +881,13 @@ export function TransferDetailPage({
       <AdminConfirmModal
         open={Boolean(pendingAction)}
         title={
-          pendingAction ? ACTION_CONFIG[pendingAction].confirmLabel : "Confirmar acción"
+          pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction].confirmLabel : "Confirmar acción"
         }
-        description={pendingAction ? ACTION_CONFIG[pendingAction].description(transfer) : ""}
+        description={pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction].description(transfer as unknown as TransferSummary) : ""}
         confirmLabel={
-          pendingAction ? ACTION_CONFIG[pendingAction].confirmLabel : "Confirmar"
+          pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction].confirmLabel : "Confirmar"
         }
-        confirmTone={pendingAction ? ACTION_CONFIG[pendingAction].tone : "accent"}
+        confirmTone={pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction].tone : "accent"}
         busy={Boolean(pendingAction && busyAction === pendingAction)}
         onCancel={() => setPendingAction(null)}
         onConfirm={() => {

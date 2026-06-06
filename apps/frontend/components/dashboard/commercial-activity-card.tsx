@@ -14,7 +14,7 @@ import {
 } from "recharts"
 
 import { DashboardChartCard } from "@/components/dashboard/dashboard-chart-card"
-import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state"
+import { OpsEmptyState } from "@/components/ui/ops-empty-state"
 import { formatCurrencyPEN, formatNumber } from "@/components/dashboard/dashboard-formatters"
 import type {
   CommercialActivityCell,
@@ -86,11 +86,10 @@ export function CommercialActivityCard({
       contentClassName="p-3"
     >
       {!data?.visible ? (
-        <DashboardEmptyState compact dashed={false} description="No hay visibilidad comercial para este perfil." />
+        <OpsEmptyState variant="compact" description="No hay visibilidad comercial para este perfil." />
       ) : isEmpty ? (
-        <DashboardEmptyState
-          compact
-          dashed={false}
+        <OpsEmptyState
+          variant="compact"
           description="Sin ventas registradas en este periodo."
           action={
             <Link

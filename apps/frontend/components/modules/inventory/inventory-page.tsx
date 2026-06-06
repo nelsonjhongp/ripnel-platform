@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LoaderCircle, RefreshCw, RotateCcw } from "lucide-react";
+import { usePagination } from "@/hooks/use-pagination";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown, type FilterDropdownOption } from "@/components/ui/filter-dropdown";
+import { OpsEmptyState } from "@/components/ui/ops-empty-state";
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
 import {
   OpsFiltersRow,
@@ -26,6 +28,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { apiFetch, unwrapApiData } from "@/lib/api";
+import { useApiGet } from "@/hooks/use-api-get";
 import { buildInventoryDetailRoute } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import {
@@ -41,8 +44,6 @@ import {
   type LocationStatusFilter,
   type ProductStatusFilter,
 } from "./inventory-summary-shared";
-
-const PAGE_SIZE = 10;
 
 const PRODUCT_STATUS_OPTIONS: FilterDropdownOption[] = [
   { value: "all", label: "Todos" },
@@ -133,12 +134,6 @@ export default function InventoryPage() {
   const [locationStatus, setLocationStatus] = useState<LocationStatusFilter>(
     normalizeLocationStatusFilter(searchParams.get("location_health"))
   );
-  const [productPage, setProductPage] = useState(1);
-  const [locationPage, setLocationPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [productSummary, setProductSummary] = useState<InventoryProductSummaryResponse | null>(null);
-  const [locationSummary, setLocationSummary] = useState<InventoryLocationSummaryResponse | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
 
   const productParams = useMemo(
@@ -161,46 +156,28 @@ export default function InventoryPage() {
     [locationQuery, locationStatus]
   );
 
-  const loadSummaries = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const { data: productData, loading: loadingProducts, error: productError } = useApiGet(
+    () =>
+      apiFetch<InventoryProductSummaryResponse>(
+        `/api/inventory/summary/products?${productParams.toString()}`,
+        { cache: "no-store", suppressAuthEvent: true }
+      ).then(unwrapApiData),
+    [productParams.toString(), refreshNonce]
+  );
 
-    try {
-      const [productsPayload, locationsPayload] = await Promise.all([
-        apiFetch<{ ok: boolean; data: InventoryProductSummaryResponse }>(
-          `/api/inventory/summary/products?${productParams.toString()}`,
-          {
-            cache: "no-store",
-            suppressAuthEvent: true,
-          }
-        ),
-        apiFetch<{ ok: boolean; data: InventoryLocationSummaryResponse }>(
-          `/api/inventory/summary/locations?${locationParams.toString()}`,
-          {
-            cache: "no-store",
-            suppressAuthEvent: true,
-          }
-        ),
-      ]);
+  const { data: locationData, loading: loadingLocations, error: locationError } = useApiGet(
+    () =>
+      apiFetch<InventoryLocationSummaryResponse>(
+        `/api/inventory/summary/locations?${locationParams.toString()}`,
+        { cache: "no-store", suppressAuthEvent: true }
+      ).then(unwrapApiData),
+    [locationParams.toString(), refreshNonce]
+  );
 
-      setProductSummary(unwrapApiData(productsPayload) ?? null);
-      setLocationSummary(unwrapApiData(locationsPayload) ?? null);
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error ? requestError.message : "No se pudo cargar el stock actual."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [locationParams, productParams]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadSummaries();
-    }, 0);
-
-    return () => window.clearTimeout(timer);
-  }, [loadSummaries, refreshNonce]);
+  const productSummary = productData;
+  const locationSummary = locationData;
+  const loading = loadingProducts || loadingLocations;
+  const error = productError || locationError;
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -284,19 +261,23 @@ export default function InventoryPage() {
     };
   }, [locationRows]);
 
-  const productTotalPages = Math.max(1, Math.ceil(productRows.length / PAGE_SIZE));
-  const safeProductPage = Math.min(productPage, productTotalPages);
-  const paginatedProducts = productRows.slice(
-    (safeProductPage - 1) * PAGE_SIZE,
-    safeProductPage * PAGE_SIZE
-  );
+  const {
+    paginatedItems: paginatedProducts,
+    firstVisible: productsFirstVisible,
+    lastVisible: productsLastVisible,
+    totalPages: productsTotalPages,
+    safePage: productsSafePage,
+    setPage: setProductPage,
+  } = usePagination(productRows);
 
-  const locationTotalPages = Math.max(1, Math.ceil(locationRows.length / PAGE_SIZE));
-  const safeLocationPage = Math.min(locationPage, locationTotalPages);
-  const paginatedLocations = locationRows.slice(
-    (safeLocationPage - 1) * PAGE_SIZE,
-    safeLocationPage * PAGE_SIZE
-  );
+  const {
+    paginatedItems: paginatedLocations,
+    firstVisible: locationsFirstVisible,
+    lastVisible: locationsLastVisible,
+    totalPages: locationsTotalPages,
+    safePage: locationsSafePage,
+    setPage: setLocationPage,
+  } = usePagination(locationRows);
 
   const hasProductFilters =
     Boolean(query.trim()) ||
@@ -489,9 +470,7 @@ export default function InventoryPage() {
                     ) : paginatedProducts.length === 0 ? (
                       <tr>
                         <td colSpan={showLocationsColumn ? 7 : 6} className="px-4 py-10">
-                          <div className="rounded-xl border border-dashed border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-4 py-6 text-center text-sm text-[var(--ops-text-muted)]">
-                            No encontramos productos para los filtros actuales.
-                          </div>
+                          <OpsEmptyState variant="compact" description="No encontramos productos para los filtros actuales." />
                         </td>
                       </tr>
                     ) : (
@@ -549,8 +528,8 @@ export default function InventoryPage() {
                     : productSummary?.meta.scope_label || "Todas las sedes"}
                 </p>
                 <Pagination
-                  page={safeProductPage}
-                  totalPages={productTotalPages}
+                  page={productsSafePage}
+                  totalPages={productsTotalPages}
                   onPageChange={setProductPage}
                 />
               </OpsTableFooter>
@@ -625,9 +604,7 @@ export default function InventoryPage() {
                     ) : paginatedLocations.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="px-4 py-10">
-                          <div className="rounded-xl border border-dashed border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-4 py-6 text-center text-sm text-[var(--ops-text-muted)]">
-                            No encontramos sedes para los filtros actuales.
-                          </div>
+                          <OpsEmptyState variant="compact" description="No encontramos sedes para los filtros actuales." />
                         </td>
                       </tr>
                     ) : (
@@ -678,8 +655,8 @@ export default function InventoryPage() {
                   Vista consolidada por ubicación visible.
                 </p>
                 <Pagination
-                  page={safeLocationPage}
-                  totalPages={locationTotalPages}
+                  page={locationsSafePage}
+                  totalPages={locationsTotalPages}
                   onPageChange={setLocationPage}
                 />
               </OpsTableFooter>

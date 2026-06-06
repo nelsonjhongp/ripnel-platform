@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { type ReactNode, useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   CheckCircle2,
   CircleAlert,
@@ -20,6 +20,9 @@ import { DateFilterPicker } from "@/components/ui/date-filter-picker"
 import { FilterDropdown } from "@/components/ui/filter-dropdown"
 import { OpsSearchField } from "@/components/ui/ops-page-shell"
 import { Pagination } from "@/components/ui/pagination"
+import { OpsEmptyState } from "@/components/ui/ops-empty-state"
+import { OpsMetricPill } from "@/components/ui/ops-metric-pill"
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import {
   Tooltip,
@@ -27,20 +30,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { ApiError, apiFetch } from "@/lib/api"
+import { formatApiFetchError, apiFetch } from "@/lib/api";
+import { usePagination } from "@/hooks/use-pagination"
 import { appRoutes, buildSaleDetailRoute } from "@/lib/routes"
-import { cn } from "@/lib/utils"
-
-type PostsaleAvailability = {
-  exchange: {
-    allowed: boolean
-    reasons: string[]
-  }
-  cancel: {
-    allowed: boolean
-    reasons: string[]
-  }
-}
+import { type PostsaleAvailability } from "@/types/postsales"
 
 type EligibleSale = {
   sale_id: string
@@ -60,8 +53,6 @@ type EligibleSale = {
   availability: PostsaleAvailability
 }
 
-const PAGE_SIZE = 10
-
 const STATUS_OPTIONS = [
   { value: "all", label: "Todas" },
   { value: "confirmed", label: "Confirmadas" },
@@ -69,10 +60,10 @@ const STATUS_OPTIONS = [
   { value: "draft", label: "Borradores" },
 ] as const
 
-const STATUS_STYLES: Record<string, string> = {
-  confirmed: "sales-chip sales-chip-success",
-  cancelled: "sales-chip sales-chip-danger",
-  draft: "sales-chip sales-chip-warning",
+const STATUS_TONES: Record<string, "success" | "danger" | "warning" | "neutral"> = {
+  confirmed: "success",
+  cancelled: "danger",
+  draft: "warning",
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -81,10 +72,10 @@ const STATUS_LABELS: Record<string, string> = {
   draft: "Borrador",
 }
 
-const CASH_STYLES: Record<string, string> = {
-  open: "sales-chip sales-chip-success",
-  closed: "sales-chip sales-chip-danger",
-  missing: "sales-chip sales-chip-warning",
+const CASH_TONES: Record<string, "success" | "danger" | "warning" | "neutral"> = {
+  open: "success",
+  closed: "danger",
+  missing: "warning",
 }
 
 const CASH_LABELS: Record<string, string> = {
@@ -93,82 +84,11 @@ const CASH_LABELS: Record<string, string> = {
   missing: "Sin caja",
 }
 
-function explainPostsaleError(error: unknown) {
-  if (!(error instanceof ApiError)) {
-    return "No se pudo cargar la cola operativa de postventa."
-  }
-
-  if (error.status === 403) {
-    return "Tu rol no tiene acceso a este módulo de postventa."
-  }
-
-  if (error.status === 409) {
-    return "Necesitas una sede default activa para operar postventa."
-  }
-
-  return error.message || "No se pudo cargar la cola operativa de postventa."
-}
-
 function formatDateLabel(value: string | null, fallback: string) {
   return new Date(value || fallback).toLocaleString("es-PE", {
     dateStyle: "short",
     timeStyle: "short",
   })
-}
-
-function MetricPill({
-  label,
-  value,
-  tone = "default",
-}: {
-  label: string
-  value: number
-  tone?: "default" | "accent" | "warning"
-}) {
-  const toneClass =
-    tone === "accent"
-      ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))] text-[var(--ops-text)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--ripnel-accent)_14%,transparent)]"
-      : tone === "warning"
-        ? "border-[color:color-mix(in_srgb,#f59e0b_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
-        : "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text)]"
-  const labelClass =
-    tone === "accent"
-      ? "text-[color:color-mix(in_srgb,var(--ripnel-accent)_72%,var(--ops-text))]"
-      : tone === "warning"
-        ? "text-[color:color-mix(in_srgb,#f59e0b_82%,var(--ops-text))]"
-        : "text-[var(--ops-text-muted)]"
-  const valueClass =
-    tone === "accent"
-      ? "text-[var(--ops-text)]"
-      : tone === "warning"
-        ? "text-[color:color-mix(in_srgb,#f59e0b_78%,var(--ops-text))]"
-        : "text-[var(--ops-text)]"
-
-  return (
-    <div className={cn("inline-flex items-center gap-2.5 rounded-full border px-3 py-2", toneClass)}>
-      <span className={cn("text-[11px] font-semibold uppercase tracking-[0.16em]", labelClass)}>
-        {label}
-      </span>
-      <span className={cn("text-base font-semibold leading-none", valueClass)}>{value}</span>
-    </div>
-  )
-}
-
-function MiniBadge({
-  label,
-  toneClass,
-  icon,
-}: {
-  label: string
-  toneClass: string
-  icon?: ReactNode
-}) {
-  return (
-    <span className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold", toneClass)}>
-      {icon}
-      <span>{label}</span>
-    </span>
-  )
 }
 
 function SaleActions({
@@ -224,7 +144,6 @@ export default function PostsalePage() {
   const [dateTo, setDateTo] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     let active = true
@@ -260,7 +179,7 @@ export default function PostsalePage() {
           }
 
           setSales([])
-          setError(explainPostsaleError(loadError))
+          setError(formatApiFetchError(loadError, "No se pudo cargar la cola operativa de postventa."))
         } finally {
           if (active) {
             setLoading(false)
@@ -290,24 +209,17 @@ export default function PostsalePage() {
     }
   }, [sales])
 
-  const totalPages = Math.max(1, Math.ceil(sales.length / PAGE_SIZE))
-  const safeCurrentPage = Math.min(currentPage, totalPages)
-  const paginatedSales = useMemo(() => {
-    const start = (safeCurrentPage - 1) * PAGE_SIZE
-    return sales.slice(start, start + PAGE_SIZE)
-  }, [safeCurrentPage, sales])
+  const { paginatedItems: paginatedSales, totalPages, safePage, firstVisible, lastVisible, setPage } = usePagination(sales)
 
   const hasActiveFilters =
     Boolean(search.trim()) || status !== "confirmed" || Boolean(dateFrom) || Boolean(dateTo)
-  const firstVisible = sales.length === 0 ? 0 : (safeCurrentPage - 1) * PAGE_SIZE + 1
-  const lastVisible = sales.length === 0 ? 0 : firstVisible + paginatedSales.length - 1
 
   function clearFilters() {
     setSearch("")
     setStatus("confirmed")
     setDateFrom("")
     setDateTo("")
-    setCurrentPage(1)
+    setPage(1)
   }
 
   return (
@@ -333,9 +245,9 @@ export default function PostsalePage() {
             />
 
             <div className="flex flex-wrap items-center gap-2">
-              <MetricPill label="Evaluadas" value={stats.count} />
-              <MetricPill label="Cambio habilitado" value={stats.exchangeReady} tone="accent" />
-              <MetricPill label="Anulación habilitada" value={stats.cancelReady} tone="warning" />
+              <OpsMetricPill label="Evaluadas" value={stats.count} />
+              <OpsMetricPill label="Cambio habilitado" value={stats.exchangeReady} tone="accent" />
+              <OpsMetricPill label="Anulación habilitada" value={stats.cancelReady} tone="warning" />
             </div>
 
             <div className="space-y-4 border-t border-[var(--ops-border-strong)] pt-4">
@@ -344,7 +256,7 @@ export default function PostsalePage() {
                   value={search}
                   onChange={(value) => {
                     setSearch(value)
-                    setCurrentPage(1)
+                    setPage(1)
                   }}
                   placeholder="Buscar por nro. venta o cliente"
                   ariaLabel="Buscar ventas elegibles"
@@ -356,7 +268,7 @@ export default function PostsalePage() {
                   options={STATUS_OPTIONS}
                   onChange={(value) => {
                     setStatus(value)
-                    setCurrentPage(1)
+                    setPage(1)
                   }}
                 />
 
@@ -365,7 +277,7 @@ export default function PostsalePage() {
                   value={dateFrom}
                   onChange={(value) => {
                     setDateFrom(value)
-                    setCurrentPage(1)
+                    setPage(1)
                   }}
                   ariaLabel="Fecha desde"
                   max={dateTo || undefined}
@@ -376,7 +288,7 @@ export default function PostsalePage() {
                   value={dateTo}
                   onChange={(value) => {
                     setDateTo(value)
-                    setCurrentPage(1)
+                    setPage(1)
                   }}
                   ariaLabel="Fecha hasta"
                   min={dateFrom || undefined}
@@ -435,8 +347,8 @@ export default function PostsalePage() {
                         </tr>
                       ) : paginatedSales.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                            No se encontraron ventas para los filtros aplicados.
+                          <td colSpan={8} className="px-4 py-10">
+                            <OpsEmptyState variant="compact" description="No se encontraron ventas para los filtros aplicados." />
                           </td>
                         </tr>
                       ) : (
@@ -471,9 +383,8 @@ export default function PostsalePage() {
 
                             <td className="px-4 py-[var(--ops-row-py)]">
                               <div className="flex flex-wrap gap-1.5">
-                                <MiniBadge
-                                  label={STATUS_LABELS[sale.status] || sale.status}
-                                  toneClass={STATUS_STYLES[sale.status] || "sales-chip sales-chip-neutral"}
+                                <OpsStatusBadge
+                                  tone={STATUS_TONES[sale.status] || "neutral"}
                                   icon={
                                     sale.status === "confirmed" ? (
                                       <CheckCircle2 className="h-3.5 w-3.5" />
@@ -483,12 +394,15 @@ export default function PostsalePage() {
                                       <CircleAlert className="h-3.5 w-3.5" />
                                     )
                                   }
-                                />
-                                <MiniBadge
-                                  label={CASH_LABELS[sale.cash_status] || CASH_LABELS.missing}
-                                  toneClass={CASH_STYLES[sale.cash_status] || CASH_STYLES.missing}
+                                >
+                                  {STATUS_LABELS[sale.status] || sale.status}
+                                </OpsStatusBadge>
+                                <OpsStatusBadge
+                                  tone={CASH_TONES[sale.cash_status] || "neutral"}
                                   icon={<Wallet className="h-3.5 w-3.5" />}
-                                />
+                                >
+                                  {CASH_LABELS[sale.cash_status] || CASH_LABELS.missing}
+                                </OpsStatusBadge>
                               </div>
                             </td>
 
@@ -503,22 +417,24 @@ export default function PostsalePage() {
 
                             <td className="px-4 py-[var(--ops-row-py)]">
                               <div className="flex flex-wrap gap-1.5">
-                                <MiniBadge
-                                  label={sale.availability.exchange.allowed ? "Cambio ok" : "Cambio bloqueado"}
-                                  toneClass={
+                                <OpsStatusBadge
+                                  tone={
                                     sale.availability.exchange.allowed
-                                      ? "sales-chip sales-chip-success"
-                                      : "sales-chip sales-chip-neutral"
+                                      ? "success"
+                                      : "neutral"
                                   }
-                                />
-                                <MiniBadge
-                                  label={sale.availability.cancel.allowed ? "Anulación ok" : "Anulación bloqueada"}
-                                  toneClass={
+                                >
+                                  {sale.availability.exchange.allowed ? "Cambio ok" : "Cambio bloqueado"}
+                                </OpsStatusBadge>
+                                <OpsStatusBadge
+                                  tone={
                                     sale.availability.cancel.allowed
-                                      ? "sales-chip sales-chip-warning"
-                                      : "sales-chip sales-chip-neutral"
+                                      ? "warning"
+                                      : "neutral"
                                   }
-                                />
+                                >
+                                  {sale.availability.cancel.allowed ? "Anulación ok" : "Anulación bloqueada"}
+                                </OpsStatusBadge>
                               </div>
                             </td>
 
@@ -539,9 +455,9 @@ export default function PostsalePage() {
                 </span>
 
                 <Pagination
-                  page={safeCurrentPage}
+                  page={safePage}
                   totalPages={totalPages}
-                  onPageChange={setCurrentPage}
+                  onPageChange={setPage}
                   className="self-end md:self-auto"
                 />
               </div>

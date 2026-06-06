@@ -7,7 +7,9 @@ import { LoaderCircle, Plus, RefreshCw, RotateCcw } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ForbiddenPage, InlineStatusCard, LoadingPage } from "@/components/feedback/status-page";
 import { apiFetch, type ApiEnvelope, unwrapApiData } from "@/lib/api";
-import { resolveTransferCapabilities } from "@/lib/capabilities";
+import { useApiGet } from "@/hooks/use-api-get";
+import { useTransferCapabilities } from "@/hooks/use-transfer-capabilities";
+import { usePagination } from "@/hooks/use-pagination";
 import { appRoutes } from "@/lib/routes";
 import { Button } from "@/components/ui/button";
 import { DateFilterPicker } from "@/components/ui/date-filter-picker";
@@ -32,7 +34,6 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
-  formatDateTime,
   formatTransferScopeRole,
   formatTransferStatus,
   getTransferStatusClasses,
@@ -40,6 +41,7 @@ import {
   type TransferScope,
   type TransferSummary,
 } from "./transfers-shared";
+import { formatDateTime } from "@/lib/date-utils";
 
 type TransferHistoryStatus = "closed" | "received" | "cancelled";
 
@@ -65,124 +67,33 @@ const HISTORY_STATUS_OPTIONS: ReadonlyArray<{
   },
 ];
 
-function explainHistoryError(error: unknown) {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return "No se pudo cargar el historial de transferencias";
-}
-
 export function TransfersHistoryPage() {
   const { loading: authLoading, permissions, user } = useAuth();
-  const [items, setItems] = useState<TransferSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<TransferHistoryStatus>("closed");
   const [scope, setScope] = useState<TransferScope>("current");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const [debouncedQuery, setDebouncedQuery] = useState("");
 
-  const transferCapabilities = useMemo(
-    () => resolveTransferCapabilities({ permissions, roleName: user?.role_name }),
-    [permissions, user?.role_name]
-  );
+  const transferCapabilities = useTransferCapabilities();
 
   useEffect(() => {
-    let active = true;
-    const controller = new AbortController();
+    const timer = setTimeout(() => setDebouncedQuery(query), 250);
+    return () => clearTimeout(timer);
+  }, [query]);
 
-    const timeoutId = window.setTimeout(async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const params = new URLSearchParams({ scope, status });
-
-        if (query.trim()) {
-          params.set("query", query.trim());
-        }
-
-        if (dateFrom) {
-          params.set("date_from", dateFrom);
-        }
-
-        if (dateTo) {
-          params.set("date_to", dateTo);
-        }
-
-        const payload = await apiFetch<ApiEnvelope<TransferSummary[]> | TransferSummary[]>(
-          `/api/transfers?${params.toString()}`,
-          {
-            cache: "no-store",
-            signal: controller.signal,
-          }
-        );
-
-        if (!active) {
-          return;
-        }
-
-        setItems(unwrapApiData(payload) || []);
-      } catch (requestError) {
-        if (!active || controller.signal.aborted) {
-          return;
-        }
-
-        setItems([]);
-        setError(explainHistoryError(requestError));
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    }, 250);
-
-    return () => {
-      active = false;
-      controller.abort();
-      window.clearTimeout(timeoutId);
-    };
-  }, [dateFrom, dateTo, query, scope, status]);
-
-  const receivedCount = useMemo(
-    () => items.filter((transfer) => transfer.status === "received").length,
-    [items]
-  );
-  const cancelledCount = useMemo(
-    () => items.filter((transfer) => transfer.status === "cancelled").length,
-    [items]
-  );
-
-  const pageSize = 10;
-  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
-  const safePage = Math.min(currentPage, totalPages);
-  const paginatedItems = items.slice((safePage - 1) * pageSize, safePage * pageSize);
-  const firstVisible = items.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
-  const lastVisible = Math.min(safePage * pageSize, items.length);
-  const hasActiveFilters =
-    Boolean(query.trim()) || status !== "closed" || scope !== "current" || Boolean(dateFrom) || Boolean(dateTo);
-
-  function clearFilters() {
-    setQuery("");
-    setStatus("closed");
-    setScope("current");
-    setDateFrom("");
-    setDateTo("");
-    setCurrentPage(1);
-  }
-
-  async function refreshHistory() {
-    setLoading(true);
-    setError(null);
-
-    try {
+  const {
+    data: itemsRaw,
+    loading,
+    error,
+    refetch,
+  } = useApiGet<TransferSummary[]>(
+    () => {
       const params = new URLSearchParams({ scope, status });
 
-      if (query.trim()) {
-        params.set("query", query.trim());
+      if (debouncedQuery.trim()) {
+        params.set("query", debouncedQuery.trim());
       }
 
       if (dateFrom) {
@@ -193,18 +104,43 @@ export function TransfersHistoryPage() {
         params.set("date_to", dateTo);
       }
 
-      const payload = await apiFetch<ApiEnvelope<TransferSummary[]> | TransferSummary[]>(
+      return apiFetch<ApiEnvelope<TransferSummary[]> | TransferSummary[]>(
         `/api/transfers?${params.toString()}`,
         { cache: "no-store" }
-      );
+      ).then((payload) => unwrapApiData(payload) || []);
+    },
+    [debouncedQuery, scope, status, dateFrom, dateTo]
+  );
+  const items = itemsRaw ?? [];
 
-      setItems(unwrapApiData(payload) || []);
-    } catch (requestError) {
-      setItems([]);
-      setError(explainHistoryError(requestError));
-    } finally {
-      setLoading(false);
-    }
+  const receivedCount = useMemo(
+    () => items.filter((transfer) => transfer.status === "received").length,
+    [items]
+  );
+  const cancelledCount = useMemo(
+    () => items.filter((transfer) => transfer.status === "cancelled").length,
+    [items]
+  );
+
+  const {
+    paginatedItems,
+    firstVisible,
+    lastVisible,
+    totalPages,
+    safePage,
+    setPage: setCurrentPage,
+  } = usePagination(items);
+  const hasActiveFilters =
+    Boolean(query.trim()) || status !== "closed" || scope !== "current" || Boolean(dateFrom) || Boolean(dateTo);
+
+  function clearFilters() {
+    setQuery("");
+    setDebouncedQuery("");
+    setStatus("closed");
+    setScope("current");
+    setDateFrom("");
+    setDateTo("");
+    setCurrentPage(1);
   }
 
   if (authLoading) {
@@ -245,7 +181,7 @@ export function TransfersHistoryPage() {
                   <Button
                     variant="outline"
                     size="icon-sm"
-                    onClick={() => void refreshHistory()}
+                    onClick={() => { setDebouncedQuery(query); refetch(); }}
                     disabled={loading}
                     className="rounded-lg"
                     aria-label="Actualizar historial"

@@ -17,32 +17,15 @@ import {
   createPrice,
   fetchPriceWorkspace,
 } from "@/lib/api-prices"
+import { formatDate } from "@/lib/date-utils";
+import { formatCurrency } from "@/lib/format-utils";
 import type {
   PriceType,
   PriceWorkspace,
-} from "@/lib/prices-types"
+} from "@/lib/prices-types";
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import { cn } from "@/lib/utils"
-
-function formatCurrency(value: number | null) {
-  if (value === null || value === undefined) return "-"
-
-  return new Intl.NumberFormat("es-PE", {
-    style: "currency",
-    currency: "PEN",
-    minimumFractionDigits: 2,
-  }).format(value)
-}
-
-function formatDate(value: string | null) {
-  if (!value) return "-"
-
-  return new Intl.DateTimeFormat("es-PE", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(value))
-}
+import { useApiGet } from "@/hooks/use-api-get"
 
 function getTodayInputValue() {
   const current = new Date()
@@ -75,9 +58,10 @@ export function PricesWorkspacePage() {
   const searchParams = useSearchParams()
   const selectedStyleId = searchParams.get("style_id") || ""
 
-  const [workspace, setWorkspace] = useState<PriceWorkspace | null>(null)
-  const [workspaceLoading, setWorkspaceLoading] = useState(false)
-  const [workspaceError, setWorkspaceError] = useState<string | null>(null)
+  const { data: workspace, loading: workspaceLoading, error: workspaceError, refetch } = useApiGet(
+    selectedStyleId ? () => fetchPriceWorkspace(selectedStyleId) : null,
+    [selectedStyleId]
+  )
 
   const [selectedSizeId, setSelectedSizeId] = useState("")
   const [selectedPriceType, setSelectedPriceType] = useState<PriceType>("retail")
@@ -99,36 +83,15 @@ export function PricesWorkspacePage() {
     resetPriceDraftState(setPriceInput, setStartDateInput, setEndDateInput, setActiveInput)
   }, [])
 
-  const loadWorkspace = useCallback(async (styleId: string) => {
-    if (!styleId) {
-      setWorkspace(null)
-      return
-    }
-
-    setWorkspaceLoading(true)
-    setWorkspaceError(null)
-
-    try {
-      const data = await fetchPriceWorkspace(styleId)
-      setWorkspace(data)
-    } catch (err) {
-      setWorkspaceError(err instanceof Error ? err.message : "No se pudo cargar el workspace")
-      setWorkspace(null)
-    } finally {
-      setWorkspaceLoading(false)
-    }
-  }, [])
-
   useEffect(() => {
-    void Promise.resolve().then(async () => {
+    queueMicrotask(() => {
       setSelectedSizeId("")
       setSelectedPriceType("retail")
       setSelectedPriceRecordId("")
       resetDraft()
       clearSubmitFeedback()
-      await loadWorkspace(selectedStyleId)
     })
-  }, [clearSubmitFeedback, loadWorkspace, resetDraft, selectedStyleId])
+  }, [clearSubmitFeedback, resetDraft, selectedStyleId])
 
   useEffect(() => {
     if (!selectedStyleId) {
@@ -215,8 +178,8 @@ export function PricesWorkspacePage() {
 
   const handleRefreshWorkspace = useCallback(() => {
     clearSubmitFeedback()
-    void loadWorkspace(selectedStyleId)
-  }, [clearSubmitFeedback, loadWorkspace, selectedStyleId])
+    refetch()
+  }, [clearSubmitFeedback, refetch])
 
   async function handleSubmit() {
     if (!workspace || !selectedSize) {
@@ -240,7 +203,7 @@ export function PricesWorkspacePage() {
 
       const savedRow = await createPrice(payload)
 
-      await loadWorkspace(workspace.product.style_id)
+      refetch()
       setSelectedPriceRecordId(savedRow.style_size_price_id)
       setSubmitMessage("Precio creado correctamente")
     } catch (err) {
@@ -427,21 +390,13 @@ export function PricesWorkspacePage() {
                               </td>
                               <td className="px-4 py-[var(--ops-row-py)]">
                                 {size.has_current_retail_price && size.has_current_wholesale_price ? (
-                                  <span className="inline-flex rounded-full border border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]">
-                                    Completo
-                                  </span>
+                                  <OpsStatusBadge tone="success">Completo</OpsStatusBadge>
                                 ) : !size.has_current_retail_price && !size.has_current_wholesale_price ? (
-                                  <span className="inline-flex rounded-full border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[color:color-mix(in_srgb,#be123c_74%,var(--ops-text))]">
-                                    Faltan precios
-                                  </span>
+                                  <OpsStatusBadge tone="danger">Faltan precios</OpsStatusBadge>
                                 ) : !size.has_current_retail_price ? (
-                                  <span className="inline-flex rounded-full border border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]">
-                                    Falta retail
-                                  </span>
+                                  <OpsStatusBadge tone="warning">Falta retail</OpsStatusBadge>
                                 ) : (
-                                  <span className="inline-flex rounded-full border border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]">
-                                    Falta mayorista
-                                  </span>
+                                  <OpsStatusBadge tone="warning">Falta mayorista</OpsStatusBadge>
                                 )}
                               </td>
                             </tr>
@@ -506,13 +461,9 @@ export function PricesWorkspacePage() {
                                   <p>Hasta {formatDate(selectedRow.end_date)}</p>
                                 ) : null}
                               </div>
-                              <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
-                                selectedRow.active
-                                  ? "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
-                                  : "border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]"
-                              }`}>
+                              <OpsStatusBadge tone={selectedRow.active ? "success" : "neutral"}>
                                 {selectedRow.active ? "Activo" : "Inactivo"}
-                              </span>
+                              </OpsStatusBadge>
                             </div>
                           ) : (
                             <div className="rounded-lg border border-dashed border-[var(--ops-border-soft)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-4 py-4 text-center text-xs text-[var(--ops-text-muted)]">
