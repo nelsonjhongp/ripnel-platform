@@ -477,7 +477,7 @@ export function AppSidebar({
         {...props}
       >
         <SidebarHeader className="border-b border-sidebar-border px-3 pb-3 pt-4">
-          <div className="flex items-center gap-2.5">
+          <Link href="/demo" className="flex items-center gap-2.5">
             <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full ring-1 ring-sidebar-border">
               <Image
                 src="/ripnel-logo.svg"
@@ -493,7 +493,7 @@ export function AppSidebar({
               </p>
               <p className="text-xs text-sidebar-foreground/65">Sistema ERP</p>
             </div>
-          </div>
+          </Link>
 
           <div className="mt-3">
             <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/45 select-none">
@@ -511,8 +511,8 @@ export function AppSidebar({
                           ? "Sede no disponible"
                           : defaultLocation?.name || "Sin sede asignada"}
                     </p>
-                  </div>
-                </div>
+            </div>
+          </div>
                 <button
                   type="button"
                   onClick={() => router.push(appRoutes.account)}
