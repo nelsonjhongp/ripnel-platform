@@ -15,9 +15,9 @@ const toneClasses: Record<NonNullable<OpsActionTileProps["tone"]>, string> = {
   accent:
     "bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))] text-[var(--ripnel-accent-hover)]",
   warning:
-    "bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] text-amber-700 dark:text-amber-400",
+    "bg-[var(--ops-tone-warning-bg)] text-amber-700 dark:text-amber-400",
   success:
-    "bg-[color:color-mix(in_srgb,#10b981_10%,var(--ops-surface))] text-emerald-700 dark:text-emerald-400",
+    "bg-[var(--ops-tone-success-bg)] text-emerald-700 dark:text-emerald-400",
   info:
     "bg-[color:color-mix(in_srgb,#38bdf8_10%,var(--ops-surface))] text-sky-700 dark:text-sky-400",
   neutral:

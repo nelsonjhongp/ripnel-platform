@@ -16,11 +16,11 @@ const toneClasses: Record<NonNullable<OpsActionLinkProps["tone"]>, string> = {
   accent:
     "border-[color:color-mix(in_srgb,var(--ripnel-accent)_26%,var(--ops-border-strong))] text-[var(--ripnel-accent-hover)] hover:bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_52%,var(--ops-surface))]",
   success:
-    "border-[color:color-mix(in_srgb,#10b981_28%,var(--ops-border-strong))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))] hover:bg-[color:color-mix(in_srgb,#10b981_10%,var(--ops-surface))]",
+    "border-[var(--ops-tone-success-border)] text-[var(--ops-tone-success-text)] hover:bg-[var(--ops-tone-success-bg)]",
   warning:
-    "border-[color:color-mix(in_srgb,#f59e0b_30%,var(--ops-border-strong))] text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))] hover:bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))]",
+    "border-[var(--ops-tone-warning-border)] text-[var(--ops-tone-warning-text)] hover:bg-[var(--ops-tone-warning-bg)]",
   danger:
-    "border-[color:color-mix(in_srgb,#f43f5e_28%,var(--ops-border-strong))] text-[color:color-mix(in_srgb,#be123c_74%,var(--ops-text))] hover:bg-[color:color-mix(in_srgb,#f43f5e_10%,var(--ops-surface))]",
+    "border-[var(--ops-tone-danger-border)] text-[var(--ops-tone-danger-text)] hover:bg-[var(--ops-tone-danger-bg)]",
   info:
     "border-[color:color-mix(in_srgb,#38bdf8_28%,var(--ops-border-strong))] text-[color:color-mix(in_srgb,#0369a1_74%,var(--ops-text))] hover:bg-[color:color-mix(in_srgb,#38bdf8_10%,var(--ops-surface))]",
   neutral:

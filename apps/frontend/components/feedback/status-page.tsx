@@ -14,9 +14,9 @@ const defaultToneClasses: Record<StatusTone, string> = {
 const opsToneClasses: Record<StatusTone, string> = {
   neutral: "border-[var(--ops-border-strong)] bg-[var(--ops-surface)] text-[var(--ops-text)]",
   warning:
-    "border-[color:color-mix(in_srgb,#f59e0b_44%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[var(--ops-text)]",
+    "border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)] text-[var(--ops-text)]",
   danger:
-    "border-[color:color-mix(in_srgb,#f43f5e_40%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_13%,var(--ops-surface))] text-[var(--ops-text)]",
+    "border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] text-[var(--ops-text)]",
 };
 
 export type StatusAction =

@@ -14,8 +14,8 @@ export interface OpsPendingRowProps {
 }
 
 const iconToneClasses: Record<NonNullable<OpsPendingRowProps["tone"]>, string> = {
-  critical: "bg-[color:color-mix(in_srgb,#f43f5e_10%,var(--ops-surface))] text-rose-700 dark:text-rose-400",
-  warning: "bg-[color:color-mix(in_srgb,#f59e0b_12%,var(--ops-surface))] text-amber-700 dark:text-amber-400",
+  critical: "bg-[var(--ops-tone-danger-bg)] text-rose-700 dark:text-rose-400",
+  warning: "bg-[var(--ops-tone-warning-bg)] text-amber-700 dark:text-amber-400",
   info: "bg-[color:color-mix(in_srgb,#38bdf8_10%,var(--ops-surface))] text-sky-700 dark:text-sky-400",
 }
 
@@ -27,9 +27,9 @@ const accentToneClasses: Record<NonNullable<OpsPendingRowProps["tone"]>, string>
 
 const buttonToneClasses: Record<NonNullable<OpsPendingRowProps["tone"]>, string> = {
   critical:
-    "border-rose-200 text-rose-700 hover:bg-[color:color-mix(in_srgb,#f43f5e_8%,var(--ops-surface))] dark:text-rose-400",
+    "border-rose-200 text-rose-700 hover:bg-[var(--ops-tone-danger-bg)] dark:text-rose-400",
   warning:
-    "border-amber-200 text-amber-700 hover:bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] dark:text-amber-400",
+    "border-amber-200 text-amber-700 hover:bg-[var(--ops-tone-warning-bg)] dark:text-amber-400",
   info:
     "border-sky-200 text-sky-700 hover:bg-[color:color-mix(in_srgb,#38bdf8_8%,var(--ops-surface))] dark:text-sky-400",
 }

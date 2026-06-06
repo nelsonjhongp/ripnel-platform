@@ -22,7 +22,7 @@ function stripToneClass(
   }
 
   if (tone === "warning") {
-    return "border-[color:color-mix(in_srgb,#f59e0b_20%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] text-amber-800 dark:text-amber-300"
+    return "border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)] text-amber-800 dark:text-amber-300"
   }
 
   return "border-[color:color-mix(in_srgb,#38bdf8_20%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#38bdf8_8%,var(--ops-surface))] text-sky-800 dark:text-sky-300"
