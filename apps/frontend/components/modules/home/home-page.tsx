@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Boxes, Clock3, ShieldCheck, Store, Wallet } from "lucide-react"
+import { Boxes, Clock3, Info, ShieldCheck, Store, Wallet } from "lucide-react"
 
 import { useAuth } from "@/components/auth/AuthProvider"
 import { ErrorPage, LoadingPage } from "@/components/feedback/status-page"
@@ -222,7 +222,11 @@ export default function InicioPage() {
           <div className="grid gap-6 xl:grid-cols-2">
             <div className="space-y-6">
               {transferRequests?.visible ? (
-                <HomeTransferRequests section={transferRequests} formatDateTime={formatDateTime} />
+                <HomeTransferRequests
+                  section={transferRequests}
+                  formatDateTime={formatDateTime}
+                  infoTooltip="Solicitudes de transferencia entre tiendas. Aquí ves las solicitudes abiertas, pendientes de despacho y recepciones pendientes para tu sede activa."
+                />
               ) : null}
             </div>
 
@@ -232,6 +236,7 @@ export default function InicioPage() {
                   eyebrow="Inventario"
                   title="Stock sensible"
                   action={{ label: "Ver inventario", href: appRoutes.inventory }}
+                  infoTooltip="Variantes con stock crítico en tu sede activa. 'En cero' son unidades sin existencia; 'Bajo mínimo' están por debajo del umbral configurado."
                 >
                   <div className="grid gap-2 sm:grid-cols-2">
                     <div className="sales-panel-muted rounded-xl p-4">

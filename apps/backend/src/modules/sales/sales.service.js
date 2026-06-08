@@ -916,19 +916,23 @@ async function getSaleProformaPdf(input = {}) {
   const { location } = await resolveOperatingContext(input.user_id);
   const sale = await getSaleByLocation(input.sale_id, location.location_id);
 
-  if (sale.document_type !== 'proforma') {
-    throw new AppError('Only proforma sales can be downloaded from this endpoint', 400);
-  }
-
-  const pdfBuffer = await renderProformaSalePdfBuffer(sale);
-  const fileNameBase = String(sale.sale_number || sale.sale_id || 'proforma')
+  const label = sale.document_type === 'proforma' ? 'Proforma' : 'Comprobante';
+  const pdfBuffer = await renderProformaSalePdfBuffer({ ...sale, _label: label });
+  const fileNameBase = String(sale.sale_number || sale.sale_id || 'comprobante')
     .replace(/[^a-zA-Z0-9_-]/g, '-')
     .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '') || 'proforma';
+    .replace(/^-|-$/g, '') || 'comprobante';
+
+  let customerEmail = null;
+  if (sale.customer_email) {
+    customerEmail = sale.customer_email;
+  }
 
   return {
     fileName: `${fileNameBase}.pdf`,
     pdfBuffer,
+    customerEmail,
+    saleNumber: sale.sale_number,
   };
 }
 

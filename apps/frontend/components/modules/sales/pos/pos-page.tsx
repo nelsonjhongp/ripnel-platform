@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary"
 import Link from "next/link"
-import { Dialog as DialogPrimitive } from "radix-ui"
+
 import type { LucideIcon } from "lucide-react"
 import {
   Banknote,
   BadgeCheck,
+  Check,
   CircleAlert,
   ChevronDown,
   CreditCard,
@@ -64,8 +65,6 @@ import { appRoutes, buildSaleDetailRoute } from "@/lib/routes"
 import {
   DOC_TYPES,
   PAYMENT_METHODS,
-  SALE_DISCOUNT_OPTIONS,
-  SALE_DISCOUNT_REASON_OPTIONS,
   GENERIC_CUSTOMER_CODE,
 } from "./pos-types"
 import type {
@@ -179,9 +178,8 @@ export default function NuevaVentaPage() {
   const [paymentMode, setPaymentMode] = useState<"single" | "mixed">("single")
   const [mixedPayments, setMixedPayments] = useState<PaymentDraft[]>(() => createDefaultMixedPayments(0, "cash"))
   const [saleDiscount, setSaleDiscount] = useState<SaleDiscountState>({
-    mode: "none",
+    mode: "percent",
     value: "",
-    reason: "",
   })
 
   const [customerQuery, setCustomerQuery] = useState("")
@@ -203,7 +201,6 @@ export default function NuevaVentaPage() {
   const [customerFormError, setCustomerFormError] = useState<string | null>(null)
   const [customerSaving, setCustomerSaving] = useState(false)
   const [priceSheetOpen, setPriceSheetOpen] = useState(false)
-  const [discountModalOpen, setDiscountModalOpen] = useState(false)
   const [priceTargetId, setPriceTargetId] = useState<string | null>(null)
   const [priceForm, setPriceForm] = useState<PriceFormState>({
     unit_price_final: "",
@@ -572,33 +569,29 @@ export default function NuevaVentaPage() {
   )
 
   const saleDiscountError = useMemo(() => {
-    if (saleDiscount.mode === "none" || cart.length === 0) {
+    if (cart.length === 0) {
       return null
     }
 
-    const discountValue = parseAmountInput(saleDiscount.value)
-    if (discountValue === null || discountValue <= 0) {
-      return "Ingresa un descuento valido."
-    }
-
-    if (saleDiscount.mode === "percent" && discountValue > 100) {
-      return "El descuento porcentual no puede superar 100%."
-    }
-
-    if (saleDiscount.mode === "amount" && discountValue > totals.baseSubtotal) {
-      return "El descuento no puede superar el subtotal base."
+    const discountValue = saleDiscount.value ? parseAmountInput(saleDiscount.value) : null
+    if (discountValue !== null) {
+      if (discountValue <= 0) {
+        return "Ingresa un descuento valido mayor a cero."
+      }
+      if (saleDiscount.mode === "percent" && discountValue > 100) {
+        return "El descuento porcentual no puede superar 100%."
+      }
+      if (saleDiscount.mode === "fixed" && discountValue > totals.total) {
+        return "El descuento fijo no puede superar el total de la venta."
+      }
     }
 
     if (totals.total <= 0) {
       return "El total final debe ser mayor a cero."
     }
 
-    if (!trimOrNull(saleDiscount.reason)) {
-      return "Ingresa el motivo del descuento."
-    }
-
     return null
-  }, [cart.length, saleDiscount, totals.baseSubtotal, totals.total])
+  }, [cart.length, saleDiscount.mode, saleDiscount.value, totals.total])
 
   const mixedPaymentsPreview = useMemo(() => {
     if (paymentMode !== "mixed") {
@@ -849,14 +842,6 @@ export default function NuevaVentaPage() {
           : undefined
   const selectedCustomerName = buildCustomerDisplayName(selectedCustomer)
   const selectedCustomerDocument = buildCustomerDocument(selectedCustomer)
-  const discountReasonSelection = SALE_DISCOUNT_REASON_OPTIONS.some(
-    (option) => option.value === saleDiscount.reason
-  )
-    ? saleDiscount.reason
-    : saleDiscount.reason
-      ? "custom"
-      : ""
-  const saleDiscountTargetTotal = Math.max(round2(totals.baseSubtotal - totals.saleDiscountAmount), 0)
 
   function goToStage(stageId: Stage) {
     setActiveStage(stageId)
@@ -1215,11 +1200,10 @@ export default function NuevaVentaPage() {
         })),
       }
 
-      if (saleDiscount.mode !== "none" && totals.saleDiscountAmount > 0) {
+      if (totals.saleDiscountAmount > 0) {
         payload.sale_discount = {
           mode: saleDiscount.mode,
           value: parseAmountInput(saleDiscount.value),
-          reason: trimOrNull(saleDiscount.reason),
         }
       }
 
@@ -1238,21 +1222,7 @@ export default function NuevaVentaPage() {
         sale_id: sale.sale_id,
         sale_number: sale.sale_number,
       })
-      setCart([])
-      setCustomerQuery("")
-      setSelectedCustomer(genericCustomer)
-      setDocumentType("none")
-      setPaymentMethod("cash")
-      setPaymentMode("single")
-      setMixedPayments(createDefaultMixedPayments(0, "cash"))
-      setSaleDiscount({
-        mode: "none",
-        value: "",
-        reason: "",
-      })
-      setDiscountModalOpen(false)
-      setActiveStage("products")
-      closePriceSheet()
+      setActiveStage("summary")
       await refreshPosContext()
     } catch (submitError) {
       setError(explainApiError(submitError, "No se pudo confirmar la venta."))
@@ -1684,7 +1654,7 @@ export default function NuevaVentaPage() {
                                   selectedVariant.wholesale_price === undefined) ||
                                 Number(selectedVariant.stock || 0) <= 0
                               }
-                              className="h-10 rounded-lg px-4"
+                              className="h-12 w-full rounded-lg px-6 text-base font-semibold shadow-sm"
                             >
                               {!selectedVariant
                                 ? "Agregar"
@@ -2178,32 +2148,54 @@ export default function NuevaVentaPage() {
                         {cartCount > 0 ? (
                           <div className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-3">
                             <div className="flex flex-wrap items-center justify-between gap-3">
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                  <p className="text-sm font-semibold text-[var(--ops-text)]">
-                                    Ajustes comerciales
-                                  </p>
-                                  <SemanticChip tone={totals.saleDiscountAmount > 0 ? "warning" : "neutral"}>
-                                    {totals.saleDiscountAmount > 0
-                                      ? `Descuento actual S/. ${formatMoney(totals.saleDiscountAmount)}`
-                                      : "Sin descuento"}
-                                  </SemanticChip>
+                              <p className="text-sm font-semibold text-[var(--ops-text)]">Descuento general</p>
+                              <div className="flex items-center gap-2">
+                                <div className="inline-flex rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] p-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSaleDiscount({ mode: "percent", value: saleDiscount.value })}
+                                    className={`cursor-pointer rounded-md px-2 py-1 text-[11px] font-semibold transition ${
+                                      saleDiscount.mode === "percent"
+                                        ? "bg-[var(--ops-surface)] text-[var(--ops-text)] shadow-sm"
+                                        : "text-[var(--ops-text-muted)]"
+                                    }`}
+                                  >
+                                    %
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSaleDiscount({ mode: "fixed", value: saleDiscount.value })}
+                                    className={`cursor-pointer rounded-md px-2 py-1 text-[11px] font-semibold transition ${
+                                      saleDiscount.mode === "fixed"
+                                        ? "bg-[var(--ops-surface)] text-[var(--ops-text)] shadow-sm"
+                                        : "text-[var(--ops-text-muted)]"
+                                    }`}
+                                  >
+                                    S/.
+                                  </button>
                                 </div>
-                                <p className="text-xs text-[var(--ops-text-muted)]">
-                                  El descuento afecta el total del documento y se traza por separado.
-                                </p>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={saleDiscount.value}
+                                  onChange={(e) => {
+                                    const val = e.target.value.replace(/[^0-9.]/g, "")
+                                    setSaleDiscount({ mode: saleDiscount.mode, value: val })
+                                  }}
+                                  className="w-14 rounded-lg border border-[var(--ops-border-strong)] px-2 py-1 text-center text-sm"
+                                  placeholder="0"
+                                />
+                                <span className="text-sm font-semibold text-[var(--ops-text)]">
+                                  {saleDiscount.mode === "percent" ? "%" : "S/."}
+                                </span>
                               </div>
-
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setDiscountModalOpen(true)}
-                                className="rounded-lg"
-                              >
-                                Ajustar descuento
-                              </Button>
                             </div>
+
+                            {totals.saleDiscountAmount > 0 ? (
+                              <p className="mt-1 text-xs text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]">
+                                Descuento: -S/. {formatMoney(totals.saleDiscountAmount)}
+                              </p>
+                            ) : null}
 
                             {saleDiscountError ? (
                               <p className={`mt-3 rounded-lg border px-3 py-2 text-sm ${buildSemanticChipClass("warning")}`}>
@@ -2421,9 +2413,16 @@ export default function NuevaVentaPage() {
                           </div>
                         </div>
 
-                        <SemanticChip tone={submitDisabled ? "warning" : "success"} className="px-3 text-xs">
-                          {submitDisabled ? "Pendiente por validar" : "Listo para finalizar"}
-                        </SemanticChip>
+                        {submitDisabled ? (
+                          <SemanticChip tone="warning" className="px-3 text-xs">
+                            Pendiente por validar
+                          </SemanticChip>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-green-500/30 bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">
+                            <Check className="h-3.5 w-3.5" />
+                            Listo para finalizar
+                          </span>
+                        )}
                       </div>
 
                       <div className="mt-4 space-y-3">
@@ -2700,19 +2699,96 @@ export default function NuevaVentaPage() {
                           Acciones
                         </p>
                         <div className="mt-2 space-y-2">
-                          <Button type="button" variant="outline" className="w-full justify-start" disabled>
+                          {confirmedSale ? (
+                            <Button
+                              type="button"
+                              variant="accent"
+                              className="w-full justify-center font-semibold"
+                              onClick={() => {
+                                setConfirmedSale(null)
+                                setCart([])
+                                setCustomerQuery("")
+                                setSelectedCustomer(genericCustomer)
+                                setDocumentType("none")
+                                setPaymentMethod("cash")
+                                setPaymentMode("single")
+                                setMixedPayments(createDefaultMixedPayments(0, "cash"))
+                                setSaleDiscount({ mode: "percent", value: "" })
+                                setActiveStage("products")
+                                closePriceSheet()
+                              }}
+                            >
+                              <Plus className="h-4 w-4" />
+                              Nueva venta
+                            </Button>
+                          ) : null}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full justify-start"
+                            disabled={!confirmedSale}
+                            onClick={() => {
+                              if (!confirmedSale) return
+                              const pdfUrl = `/api/sales/${confirmedSale.sale_id}/receipt-pdf`
+                              const printWindow = window.open(pdfUrl, '_blank')
+                              if (printWindow) {
+                                printWindow.onload = () => {
+                                  setTimeout(() => { printWindow.print() }, 500)
+                                }
+                              }
+                            }}
+                          >
                             <Receipt className="h-4 w-4" />
                             Imprimir comprobante
                           </Button>
-                          <Button type="button" variant="outline" className="w-full justify-start" disabled>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full justify-start"
+                            disabled={!confirmedSale}
+                            onClick={async () => {
+                              if (!confirmedSale) return
+                              try {
+                                const res = await apiFetch(`/api/sales/${confirmedSale.sale_id}/send-email`, {
+                                  method: "POST",
+                                })
+                                alert(`Comprobante enviado al correo registrado del cliente.`)
+                              } catch {
+                                alert('No se pudo enviar el correo. Verifica que el cliente tenga un email registrado.')
+                              }
+                            }}
+                          >
                             <Users className="h-4 w-4" />
                             Enviar por correo
                           </Button>
-                          <Button type="button" variant="outline" className="w-full justify-start" disabled>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full justify-start"
+                            disabled={!confirmedSale}
+                            onClick={() => {
+                              if (confirmedSale) {
+                                const a = document.createElement('a')
+                                a.href = `/api/sales/${confirmedSale.sale_id}/receipt-pdf`
+                                a.download = `recibo-${confirmedSale.sale_number || confirmedSale.sale_id}.pdf`
+                                a.click()
+                              }
+                            }}
+                          >
                             <History className="h-4 w-4" />
                             Descargar PDF
                           </Button>
-                          <Button type="button" variant="outline" className="w-full justify-start" disabled>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full justify-start"
+                            disabled={!confirmedSale}
+                            onClick={() => {
+                              if (confirmedSale) {
+                                window.location.href = `/ventas/${confirmedSale.sale_id}`
+                              }
+                            }}
+                          >
                             <BadgeCheck className="h-4 w-4" />
                             Guardar venta como borrador
                           </Button>
@@ -2737,7 +2813,7 @@ export default function NuevaVentaPage() {
                         disabled={submitDisabled}
                         className="mt-4 w-full cursor-pointer rounded-lg bg-[var(--ripnel-accent)] px-4 py-3 text-sm font-bold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        {submitting ? "Procesando..." : "Finalizar venta"}
+                        {submitting ? "Procesando..." : <><Check className="mr-1.5 inline-block h-4 w-4" /> Finalizar venta</>}
                       </button>
                     </article>
                   </div>
@@ -2747,164 +2823,7 @@ export default function NuevaVentaPage() {
           </div>
         </TooltipProvider>
 
-        <DialogPrimitive.Root open={discountModalOpen} onOpenChange={setDiscountModalOpen}>
-          <DialogPrimitive.Portal>
-            <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/15 backdrop-blur-[2px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
-            <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,760px)] -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-5 shadow-xl outline-none data-open:animate-in data-open:zoom-in-95 data-closed:animate-out data-closed:zoom-out-95">
-              <div className="flex items-start justify-between gap-4 border-b border-[var(--ops-border-strong)] pb-4">
-                <div>
-                  <DialogPrimitive.Title className="text-lg font-semibold text-[var(--ops-text)]">
-                    Ajustes comerciales
-                  </DialogPrimitive.Title>
-                  <DialogPrimitive.Description className="mt-1 text-sm text-[var(--ops-text-muted)]">
-                    El descuento afecta el total del documento. Los precios base del producto se mantienen visibles por separado.
-                  </DialogPrimitive.Description>
-                </div>
-                <DialogPrimitive.Close asChild>
-                  <button
-                    type="button"
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--ops-border-strong)] text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)]"
-                    aria-label="Cerrar ajustes comerciales"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </DialogPrimitive.Close>
-              </div>
 
-              <div className="mt-4 grid gap-4">
-                <div className="grid gap-3 lg:grid-cols-[180px_120px_minmax(0,1fr)]">
-                  <div>
-                    <label className={COMPACT_LABEL_CLASS}>Tipo</label>
-                    <OpsSelectMenu
-                      value={saleDiscount.mode}
-                      onValueChange={(value) =>
-                        setSaleDiscount((current) => ({
-                          ...current,
-                          mode: value,
-                          value: value === "none" ? "" : current.value,
-                          reason: value === "none" ? "" : current.reason,
-                        }))
-                      }
-                      placeholder="Tipo de descuento"
-                      options={SALE_DISCOUNT_OPTIONS}
-                    />
-                  </div>
-
-                  {saleDiscount.mode !== "none" ? (
-                    <div>
-                      <label className={COMPACT_LABEL_CLASS}>
-                        {saleDiscount.mode === "percent" ? "Porcentaje" : "Monto"}
-                      </label>
-                      <input
-                        value={saleDiscount.value}
-                        onChange={(event) =>
-                          setSaleDiscount((current) => ({
-                            ...current,
-                            value: event.target.value,
-                          }))
-                        }
-                        inputMode="decimal"
-                        placeholder={saleDiscount.mode === "percent" ? "10" : "20.00"}
-                        className={INPUT_CLASS}
-                      />
-                    </div>
-                  ) : (
-                    <div className="hidden lg:block" aria-hidden="true" />
-                  )}
-
-                  <div className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-3 py-2 text-xs">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-[var(--ops-text-muted)]">Subtotal base</span>
-                      <span className="font-semibold text-[var(--ops-text)]">
-                        S/. {formatMoney(totals.baseSubtotal)}
-                      </span>
-                    </div>
-                    <div className="mt-1 flex items-center justify-between gap-3">
-                      <span className="text-[var(--ops-text-muted)]">Descuento</span>
-                      <span className="font-semibold text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]">
-                        - S/. {formatMoney(totals.saleDiscountAmount)}
-                      </span>
-                    </div>
-                    <div className="mt-1 flex items-center justify-between gap-3 border-t border-[var(--ops-border-strong)] pt-1">
-                      <span className="font-semibold text-[var(--ops-text)]">Total documento</span>
-                      <span className="font-semibold text-[var(--ops-text)]">
-                        S/. {formatMoney(saleDiscountTargetTotal)}
-                      </span>
-                    </div>
-                    {totals.taxRate > 0 ? (
-                      <div className="mt-1 flex items-center justify-between gap-3">
-                        <span className="text-[var(--ops-text-muted)]">
-                          IGV incluido ({(totals.taxRate * 100).toFixed(0)}%)
-                        </span>
-                        <span className="font-semibold text-[var(--ops-text)]">
-                          S/. {formatMoney(totals.tax)}
-                        </span>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-
-                {saleDiscount.mode !== "none" ? (
-                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                    <div>
-                      <label className={COMPACT_LABEL_CLASS}>Motivo</label>
-                      <OpsSelectMenu
-                        value={discountReasonSelection}
-                        onValueChange={(value) =>
-                          setSaleDiscount((current) => ({
-                            ...current,
-                            reason: value === "custom" ? "" : value,
-                          }))
-                        }
-                        placeholder="Seleccionar motivo"
-                        options={SALE_DISCOUNT_REASON_OPTIONS}
-                      />
-                    </div>
-
-                    {discountReasonSelection === "custom" ? (
-                      <div>
-                        <label className={COMPACT_LABEL_CLASS}>Detalle</label>
-                        <input
-                          value={saleDiscount.reason}
-                          onChange={(event) =>
-                            setSaleDiscount((current) => ({
-                              ...current,
-                              reason: event.target.value,
-                            }))
-                          }
-                          placeholder="Motivo personalizado"
-                          className={INPUT_CLASS}
-                        />
-                      </div>
-                    ) : (
-                      <div className="rounded-lg border border-dashed border-[var(--ops-border-soft)] px-3 py-2 text-sm text-[var(--ops-text-muted)]">
-                        El descuento quedará trazado en el comprobante y en el resumen final.
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="rounded-lg border border-dashed border-[var(--ops-border-soft)] px-3 py-2 text-sm text-[var(--ops-text-muted)]">
-                    Sin descuento general aplicado.
-                  </div>
-                )}
-
-                {saleDiscountError ? (
-                  <p className={`rounded-lg border px-3 py-2 text-sm ${buildSemanticChipClass("warning")}`}>
-                    {saleDiscountError}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="mt-5 flex justify-end gap-3 border-t border-[var(--ops-border-strong)] pt-4">
-                <DialogPrimitive.Close asChild>
-                  <Button type="button" variant="outline" className="rounded-lg">
-                    Cerrar
-                  </Button>
-                </DialogPrimitive.Close>
-              </div>
-            </DialogPrimitive.Content>
-          </DialogPrimitive.Portal>
-        </DialogPrimitive.Root>
 
         <SheetContent side="right" className="w-full border-l border-[var(--ops-border-strong)] bg-[var(--ops-surface)] sm:max-w-lg">
           <SheetHeader className="border-b border-[var(--ops-border-strong)] px-5 py-4">

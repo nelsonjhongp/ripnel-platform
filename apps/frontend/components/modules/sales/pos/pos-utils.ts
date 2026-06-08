@@ -112,20 +112,17 @@ export function computeSaleDiscountAmount(
   subtotalAmount: number,
   saleDiscount: SaleDiscountState | null
 ): number {
-  if (!saleDiscount || saleDiscount.mode === "none") {
-    return 0
-  }
-
+  if (!saleDiscount) return 0
   const value = parseAmountInput(saleDiscount.value)
-  if (value === null || subtotalAmount <= 0) {
+  if (value === null || value < 0 || subtotalAmount <= 0) {
     return 0
   }
 
-  if (saleDiscount.mode === "percent") {
-    return round2((subtotalAmount * value) / 100)
+  if (saleDiscount.mode === 'fixed') {
+    return round2(Math.min(value, subtotalAmount))
   }
 
-  return Math.min(round2(value), subtotalAmount)
+  return round2((subtotalAmount * value) / 100)
 }
 
 export interface PreparedCartItem extends CartItem {

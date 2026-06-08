@@ -21,15 +21,18 @@ function flowTone(flow: string) {
 export function HomeTransferRequests({
   section,
   formatDateTime,
+  infoTooltip,
 }: {
   section: NonNullable<HomeOverview["sections"]["transfer_requests"]>
   formatDateTime: (value: string | null | undefined) => string
+  infoTooltip?: string
 }) {
   return (
     <HomeSectionCard
       eyebrow="Transferencias"
       title="Solicitudes entre tiendas"
       action={section.primary_action}
+      infoTooltip={infoTooltip}
     >
       <div className="grid gap-2 md:grid-cols-3">
         <div className="sales-panel-muted rounded-xl p-4">

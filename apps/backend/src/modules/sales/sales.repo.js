@@ -384,7 +384,7 @@ async function findSaleById(saleId, locationId = null) {
     locationCondition = ` AND s.location_id = $${values.length}`;
   }
 
-  const result = await query(
+   const result = await query(
     `SELECT
        s.sale_id,
        s.location_id,
@@ -396,6 +396,7 @@ async function findSaleById(saleId, locationId = null) {
        s.customer_doc_type,
        s.customer_doc_number,
        s.customer_address_text,
+       c.email AS customer_email,
        s.subtotal_amount,
        s.tax_amount,
        s.tax_rate,
@@ -414,6 +415,7 @@ async function findSaleById(saleId, locationId = null) {
      FROM sales s
      INNER JOIN locations l ON l.location_id = s.location_id
      INNER JOIN users u ON u.user_id = s.seller_user_id
+     LEFT JOIN customers c ON c.customer_id = s.customer_id
      WHERE s.sale_id = $1
        ${locationCondition}`,
     values
