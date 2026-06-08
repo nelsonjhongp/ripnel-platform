@@ -174,6 +174,9 @@ Ver `DESIGN.md` y `docs/` para guías detalladas. Principios clave:
 
 - [Workflow Backend + Supabase](./docs/backend-supabase-workflow.md)
 - [Acceso del equipo a Supabase](./docs/supabase-team-access.md)
+- [Sistema de diseno](./DESIGN.md)
+- [Estandar de paginas frontend](./docs/frontend-page-standard.md)
+- [Criterios UI/UX operativos](./docs/frontend-ui-ux-operativo.md)
 - [Flujo de producto](./docs/product-flow.md)
 - [Scope de Ventas MVP](./docs/sales-mvp-scope.md)
 - [Flujo funcional de ventas](./docs/sales-flow.md)

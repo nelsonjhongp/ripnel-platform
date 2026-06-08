@@ -159,27 +159,6 @@ export function SettingsFormRow({
   );
 }
 
-export function SettingsStatusMessage({
-  tone,
-  children,
-}: {
-  tone: "success" | "danger";
-  children: ReactNode;
-}) {
-  return (
-    <div
-      role={tone === "danger" ? "alert" : "status"}
-      aria-live="polite"
-      className={cn(
-        "border-t border-[var(--ops-border-strong)] px-4 py-3 text-sm",
-        tone === "danger" ? "text-rose-500" : "text-emerald-500"
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
 export function PanelSection({
   title,
   description,

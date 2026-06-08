@@ -71,9 +71,10 @@ export type HomeOverview = {
     transfer_requests: {
       visible: boolean
       counts: {
-        drafts_for_store_count: number
-        drafts_to_ship_count: number
-        pending_receive_count: number
+        open_for_store_count: number
+        pending_approval_count: number
+        pending_dispatch_count: number
+        pending_receipts_count: number
       }
       latest: Array<{
         transfer_id: string

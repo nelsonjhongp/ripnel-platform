@@ -6,7 +6,8 @@ import { useState } from "react"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 
 import { useAuth } from "@/components/auth/AuthProvider"
-import { AuthAlert, AuthCard, AuthField, AuthShell } from "@/components/auth/auth-shell"
+import { AuthCard, AuthField, AuthShell } from "@/components/auth/auth-shell"
+import { AdminInlineMessage } from "@/components/admin/admin-ui"
 import { Button } from "@/components/ui/button"
 import {
   InputGroup,
@@ -88,8 +89,8 @@ export default function LoginRipnel() {
         subtitle="Accede al sistema de gestión operativa"
       >
         <form className="flex flex-col gap-[1.125rem]" onSubmit={handleSubmit}>
-          {reasonMessage && !error ? <AuthAlert tone="warning">{reasonMessage}</AuthAlert> : null}
-          {error ? <AuthAlert tone="danger">{error}</AuthAlert> : null}
+          {reasonMessage && !error ? <AdminInlineMessage tone="warning">{reasonMessage}</AdminInlineMessage> : null}
+          {error ? <AdminInlineMessage tone="danger">{error}</AdminInlineMessage> : null}
 
           <AuthField htmlFor="username" label="Usuario o correo">
             <InputGroup className="h-11 rounded-[0.625rem] border-[var(--ops-border-strong)] bg-[var(--ops-field)] shadow-none focus-within:border-[var(--ripnel-accent)] focus-within:ring-[color:var(--ripnel-accent-soft)]">

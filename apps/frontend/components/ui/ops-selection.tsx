@@ -19,6 +19,8 @@ export type OpsOption = {
   helper?: string
   disabled?: boolean
   leading?: ReactNode
+  trailing?: ReactNode
+  layout?: "stacked" | "between"
 }
 
 const opsPickerTriggerClass =
@@ -27,6 +29,18 @@ const opsPickerContentClass =
   "max-h-64 min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto overscroll-contain border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1"
 
 function OpsOptionContent({ option }: { option: OpsOption }) {
+  if (option.layout === "between") {
+    return (
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          {option.leading ? <span className="shrink-0">{option.leading}</span> : null}
+          <p className="truncate text-sm font-medium text-[var(--ops-text)]">{option.label}</p>
+        </div>
+        {option.trailing ? <span className="shrink-0">{option.trailing}</span> : null}
+      </div>
+    )
+  }
+
   return (
     <div className="flex min-w-0 items-start gap-2">
       {option.leading ? <span className="mt-0.5 shrink-0">{option.leading}</span> : null}
@@ -47,6 +61,7 @@ export function OpsSelectMenu({
   options,
   disabled = false,
   triggerLabel,
+  triggerContent,
 }: {
   value: string
   onValueChange: (value: string) => void
@@ -54,6 +69,7 @@ export function OpsSelectMenu({
   options: OpsOption[]
   disabled?: boolean
   triggerLabel?: (option: OpsOption | null) => string
+  triggerContent?: (option: OpsOption | null) => ReactNode
 }) {
   const selectedOption = options.find((option) => option.value === value) || null
 
@@ -61,9 +77,17 @@ export function OpsSelectMenu({
     <DropdownMenu>
       <DropdownMenuTrigger asChild disabled={disabled}>
         <button type="button" className={opsPickerTriggerClass} disabled={disabled}>
-          <span className={selectedOption ? "text-[var(--ops-text)]" : "text-[var(--ops-text-muted)]"}>
-            {selectedOption ? (triggerLabel ? triggerLabel(selectedOption) : selectedOption.label) : placeholder}
-          </span>
+          {selectedOption ? (
+            triggerContent ? (
+              <span className="min-w-0 flex-1">{triggerContent(selectedOption)}</span>
+            ) : (
+              <span className="truncate text-[var(--ops-text)]">
+                {triggerLabel ? triggerLabel(selectedOption) : selectedOption.label}
+              </span>
+            )
+          ) : (
+            <span className="truncate text-[var(--ops-text-muted)]">{placeholder}</span>
+          )}
           <ChevronDown className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
         </button>
       </DropdownMenuTrigger>

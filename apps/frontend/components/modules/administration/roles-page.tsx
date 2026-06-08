@@ -1,15 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { PencilLine, Plus, Power, RefreshCw, RotateCcw } from "lucide-react";
-import { buildApiUrl } from "@/lib/api";
+import { apiFetchData } from "@/lib/api";
+import { useApiGet } from "@/hooks/use-api-get";
+import { EMPTY_ROLE_FORM, type RoleFormState } from "@/types/admin";
+import { activeBadgeLabel } from "@/lib/badge-utils";
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
+import { usePagination } from "@/hooks/use-pagination";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
   AdminActionButton,
   AdminCheckboxField,
   AdminConfirmModal,
   AdminField,
+  AdminInlineMessage,
   AdminInput,
   AdminModalShell,
   AdminRowActionsMenu,
@@ -22,6 +28,7 @@ import {
 } from "@/components/admin/role-permission-picker";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsEmptyState } from "@/components/ui/ops-empty-state";
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
 import {
   OpsFiltersRow,
@@ -29,9 +36,8 @@ import {
   OpsSearchField,
   OpsSectionDivider,
   OpsTableBlock,
-  OpsTableFooter,
-  OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
+import { OpsDataTable } from "@/components/ui/ops-data-table";
 import { Pagination } from "@/components/ui/pagination";
 import {
   Tooltip,
@@ -39,12 +45,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-type ApiResponse<T> = {
-  ok: boolean;
-  data: T;
-  message?: string;
-};
 
 type Role = {
   role_id: string;
@@ -56,47 +56,8 @@ type Role = {
   permissions: RolePermission[];
 };
 
-type RoleFormState = {
-  name: string;
-  description: string;
-  active: boolean;
-  permission_keys: string[];
-};
 
-async function requestJson<T>(path: string, init?: RequestInit) {
-  const response = await fetch(buildApiUrl(path), {
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
-    cache: "no-store",
-    credentials: "include",
-    ...init,
-  });
 
-  const payload = (await response.json().catch(() => null)) as ApiResponse<T> | null;
-
-  if (!response.ok || !payload?.ok) {
-    throw new Error(payload?.message || "Request failed");
-  }
-
-  return payload.data;
-}
-
-const emptyRoleForm: RoleFormState = {
-  name: "",
-  description: "",
-  active: true,
-  permission_keys: [],
-};
-
-const PAGE_SIZE = 10;
-
-function statusBadgeClass(active: boolean) {
-  return active
-    ? "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
-    : "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]";
-}
 
 function roleBadgeClass(active: boolean) {
   return active
@@ -120,60 +81,27 @@ function formatPermissionChip(permission: RolePermission) {
 }
 
 export default function RolesPage() {
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [availablePermissions, setAvailablePermissions] = useState<RolePermission[]>([]);
-  const [loadingRoles, setLoadingRoles] = useState(true);
-  const [loadingPermissions, setLoadingPermissions] = useState(true);
-  const [rolesError, setRolesError] = useState<string | null>(null);
-  const [permissionsError, setPermissionsError] = useState<string | null>(null);
+  const { data: rolesData, loading: loadingRoles, error: rolesError, refetch: refetchRoles } = useApiGet(
+    () => apiFetchData<Role[]>("/api/roles"),
+    []
+  );
+  const roles = (rolesData || []).map((role) => ({ ...role, permissions: role.permissions || [] }));
+
+  const { data: permissionsData, loading: loadingPermissions, error: permissionsError } = useApiGet(
+    () => apiFetchData<RolePermission[]>("/api/roles/permissions"),
+    []
+  );
+  const availablePermissions = permissionsData || [];
 
   const [roleQuery, setRoleQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
-  const [rolePage, setRolePage] = useState(1);
-
   const [showRoleForm, setShowRoleForm] = useState(false);
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
-  const [roleForm, setRoleForm] = useState<RoleFormState>(emptyRoleForm);
+  const [roleForm, setRoleForm] = useState<RoleFormState>(EMPTY_ROLE_FORM);
   const [savingRole, setSavingRole] = useState(false);
   const [activeChangeRole, setActiveChangeRole] = useState<Role | null>(null);
   const [savingActiveChange, setSavingActiveChange] = useState(false);
-
-  const loadRoles = useCallback(async () => {
-    setLoadingRoles(true);
-    setRolesError(null);
-
-    try {
-      const data = await requestJson<Role[]>("/api/roles");
-      setRoles(data.map((role) => ({ ...role, permissions: role.permissions || [] })));
-    } catch (error) {
-      setRolesError(error instanceof Error ? error.message : "No se pudo cargar roles");
-    } finally {
-      setLoadingRoles(false);
-    }
-  }, []);
-
-  const loadPermissions = useCallback(async () => {
-    setLoadingPermissions(true);
-    setPermissionsError(null);
-
-    try {
-      const data = await requestJson<RolePermission[]>("/api/roles/permissions");
-      setAvailablePermissions(data);
-    } catch (error) {
-      setPermissionsError(
-        error instanceof Error ? error.message : "No se pudo cargar permisos"
-      );
-    } finally {
-      setLoadingPermissions(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void Promise.resolve().then(() => {
-      void loadRoles();
-      void loadPermissions();
-    });
-  }, [loadRoles, loadPermissions]);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const filteredRoles = useMemo(() => {
     const query = roleQuery.trim().toLowerCase();
@@ -201,19 +129,12 @@ export default function RolesPage() {
     return result;
   }, [roleQuery, roles, sortOrder]);
 
-  const totalRolePages = Math.max(1, Math.ceil(filteredRoles.length / PAGE_SIZE));
-  const safeRolePage = Math.min(rolePage, totalRolePages);
-  const paginatedRoles = filteredRoles.slice(
-    (safeRolePage - 1) * PAGE_SIZE,
-    safeRolePage * PAGE_SIZE
-  );
-  const roleRangeStart = filteredRoles.length === 0 ? 0 : (safeRolePage - 1) * PAGE_SIZE + 1;
-  const roleRangeEnd = Math.min(filteredRoles.length, safeRolePage * PAGE_SIZE);
+  const { paginatedItems: paginatedRoles, totalPages, safePage, firstVisible, lastVisible, setPage } = usePagination(filteredRoles)
 
   const clearFilters = () => {
     setRoleQuery("");
     setSortOrder("desc");
-    setRolePage(1);
+    setPage(1);
   };
 
   const hasActiveFilters = roleQuery.trim() !== "" || sortOrder !== "desc";
@@ -229,16 +150,17 @@ export default function RolesPage() {
       });
     } else {
       setEditingRoleId(null);
-      setRoleForm(emptyRoleForm);
+      setRoleForm(EMPTY_ROLE_FORM);
     }
 
+    setSaveError(null);
     setShowRoleForm(true);
   }
 
   function closeRoleForm() {
     setShowRoleForm(false);
     setEditingRoleId(null);
-    setRoleForm(emptyRoleForm);
+    setRoleForm(EMPTY_ROLE_FORM);
   }
 
   async function submitRoleForm(event: FormEvent<HTMLFormElement>) {
@@ -254,21 +176,21 @@ export default function RolesPage() {
       };
 
       if (editingRoleId) {
-        await requestJson<Role>(`/api/roles/${editingRoleId}`, {
+        await apiFetchData<Role>(`/api/roles/${editingRoleId}`, {
           method: "PATCH",
           body: JSON.stringify(payload),
         });
       } else {
-        await requestJson<Role>("/api/roles", {
+        await apiFetchData<Role>("/api/roles", {
           method: "POST",
           body: JSON.stringify(payload),
         });
       }
 
       closeRoleForm();
-      await loadRoles();
+      refetchRoles();
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "No se pudo guardar el rol");
+      setSaveError(error instanceof Error ? error.message : "No se pudo guardar el rol");
     } finally {
       setSavingRole(false);
     }
@@ -283,14 +205,14 @@ export default function RolesPage() {
     setSavingActiveChange(true);
 
     try {
-      await requestJson<Role>(`/api/roles/${activeChangeRole.role_id}`, {
+      await apiFetchData<Role>(`/api/roles/${activeChangeRole.role_id}`, {
         method: "PATCH",
         body: JSON.stringify({ active: targetState }),
       });
       setActiveChangeRole(null);
-      await loadRoles();
+      refetchRoles();
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "No se pudo actualizar el rol");
+      setSaveError(error instanceof Error ? error.message : "No se pudo actualizar el rol");
     } finally {
       setSavingActiveChange(false);
     }
@@ -337,7 +259,7 @@ export default function RolesPage() {
                     variant="outline"
                     size="icon-sm"
                     className="rounded-lg"
-                    onClick={loadRoles}
+                    onClick={refetchRoles}
                     aria-label="Actualizar roles"
                   >
                     <RefreshCw className="h-4 w-4" />
@@ -365,12 +287,12 @@ export default function RolesPage() {
                 value={roleQuery}
                 onChange={(value) => {
                   setRoleQuery(value);
-                  setRolePage(1);
+                  setPage(1);
                 }}
                 placeholder="Buscar por nombre o descripción"
                 ariaLabel="Buscar roles"
               />
-            <FilterDropdown label="Orden" value={sortOrder} options={[{ value: "desc", label: "Más reciente" }, { value: "asc", label: "Más antiguo" }]} onChange={(v) => { setSortOrder(v as "desc" | "asc"); setRolePage(1); }} />
+            <FilterDropdown label="Orden" value={sortOrder} options={[{ value: "desc", label: "Más reciente" }, { value: "asc", label: "Más antiguo" }]} onChange={(v) => { setSortOrder(v as "desc" | "asc"); setPage(1); }} />
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button onClick={clearFilters} disabled={!hasActiveFilters} variant="outline" size="icon-sm" className="mt-auto h-10 w-10 rounded-lg" aria-label="Limpiar filtros">
@@ -381,127 +303,109 @@ export default function RolesPage() {
             </Tooltip>
           </OpsFiltersRow>
 
-          {rolesError && (
-            <div role="alert" aria-live="polite" className="rounded-xl border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-4 py-2.5 text-sm text-[color:color-mix(in_srgb,#be123c_74%,var(--ops-text))]">
-              {rolesError}
-            </div>
-          )}
-
           {permissionsError && (
             <div role="alert" aria-live="polite" className="rounded-xl border border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] px-4 py-2.5 text-sm text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]">
               {permissionsError}
             </div>
           )}
 
-          <OpsTableWrap minWidth="1100px">
-            {loadingRoles ? (
-              <div className="px-4 py-6 text-sm text-[var(--ops-text-muted)]">Cargando roles…</div>
-            ) : filteredRoles.length === 0 ? (
-              <div className="px-4 py-6 text-sm text-[var(--ops-text-muted)]">
-                No hay roles para este filtro.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-[var(--ops-border-strong)] text-sm">
-                  <thead className="bg-[var(--ops-surface-muted)]">
-                    <tr>
-                      <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                        Rol
-                      </th>
-                      <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                        Descripción
-                      </th>
-                      <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                        Permisos
-                      </th>
-                      <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                        Estado
-                      </th>
-                      <th className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                        Actualizado
-                      </th>
-                      <th className="w-[4.5rem] px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                        Acciones
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                    {paginatedRoles.map((role) => (
-                      <tr key={role.role_id} className="transition hover:bg-[var(--ops-surface-muted)]">
-                        <td className="px-4 py-[var(--ops-row-py)] align-top">
+          {!loadingRoles && !rolesError && roles.length === 0 ? (
+            <OpsEmptyState variant="compact" description="No hay roles registrados todavía." />
+          ) : (
+            <OpsDataTable
+              columns={[
+                { key: "rol", header: "Rol" },
+                { key: "descripcion", header: "Descripción" },
+                { key: "permisos", header: "Permisos" },
+                { key: "estado", header: "Estado" },
+                { key: "actualizado", header: "Actualizado" },
+                { key: "acciones", header: "", className: "w-[4.5rem] text-right" },
+              ]}
+              minWidth="1100px"
+              loading={loadingRoles}
+              loadingMessage="Cargando roles..."
+              error={!loadingRoles ? rolesError : null}
+              errorTitle="Error al cargar roles"
+              isEmpty={!loadingRoles && !rolesError && filteredRoles.length === 0 && roles.length > 0}
+              emptyMessage="No hay roles para este filtro."
+              footer={
+                !loadingRoles && !rolesError && filteredRoles.length > 0 ? (
+                  <>
+                    <span className="text-sm tabular-nums text-[var(--ops-text-muted)]">
+                      {firstVisible}-{lastVisible} de {filteredRoles.length}
+                    </span>
+                    <Pagination
+                      page={safePage}
+                      totalPages={totalPages}
+                      onPageChange={setPage}
+                      className="self-end md:self-auto"
+                    />
+                  </>
+                ) : undefined
+              }
+            >
+              {paginatedRoles.map((role) => (
+                <tr key={role.role_id} className="transition hover:bg-[var(--ops-surface-muted)]">
+                  <td className="px-4 py-[var(--ops-row-py)] align-top">
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${roleBadgeClass(role.active)}`}
+                    >
+                      {role.name}
+                    </span>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] align-top text-sm text-[var(--ops-text-muted)]">
+                    {role.description || "-"}
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] align-top">
+                    {role.permissions.length === 0 ? (
+                      <span className="text-xs text-[var(--ops-text-muted)]">Sin permisos</span>
+                    ) : (
+                      <div className="flex max-w-xl flex-wrap gap-2">
+                        {role.permissions.map((permission) => (
                           <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${roleBadgeClass(role.active)}`}
+                            key={`${role.role_id}-${permission.permission_id}`}
+                            className="inline-flex rounded-full border border-[var(--ops-border-soft)] bg-[var(--ripnel-accent-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--ripnel-accent-hover)]"
+                            title={permission.description || permission.key}
                           >
-                            {role.name}
+                            {formatPermissionChip(permission)}
                           </span>
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top text-sm text-[var(--ops-text-muted)]">
-                          {role.description || "-"}
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top">
-                          {role.permissions.length === 0 ? (
-                            <span className="text-xs text-[var(--ops-text-muted)]">Sin permisos</span>
-                          ) : (
-                            <div className="flex max-w-xl flex-wrap gap-2">
-                              {role.permissions.map((permission) => (
-                                <span
-                                  key={`${role.role_id}-${permission.permission_id}`}
-                                  className="inline-flex rounded-full border border-[var(--ops-border-soft)] bg-[var(--ripnel-accent-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--ripnel-accent-hover)]"
-                                  title={permission.description || permission.key}
-                                >
-                                  {formatPermissionChip(permission)}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top">
-                          <span
-                            className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium ${statusBadgeClass(role.active)}`}
-                          >
-                            {role.active ? "Activo" : "Inactivo"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top text-xs text-[var(--ops-text-muted)]">
-                          {new Date(role.updated_at).toLocaleString("es-PE")}
-                        </td>
-                        <td className="w-[4.5rem] px-4 py-[var(--ops-row-py)] align-top">
-                          <AdminRowActionsMenu
-                            ariaLabel={`Acciones para ${role.name}`}
-                            items={[
-                              {
-                                label: "Editar",
-                                icon: <PencilLine className="h-3.5 w-3.5" />,
-                                onSelect: () => openRoleForm(role),
-                              },
-                              {
-                                label: role.active ? "Inactivar" : "Activar",
-                                icon: <Power className="h-3.5 w-3.5" />,
-                                tone: role.active ? "danger" : "neutral",
-                                onSelect: () => setActiveChangeRole(role),
-                              },
-                            ]}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </OpsTableWrap>
-          {!loadingRoles && filteredRoles.length > 0 ? (
-            <OpsTableFooter>
-              <div className="text-xs font-medium text-[var(--ops-text-muted)]">
-                {roleRangeStart}-{roleRangeEnd} de {filteredRoles.length}
-              </div>
-              <Pagination
-                page={safeRolePage}
-                totalPages={totalRolePages}
-                onPageChange={setRolePage}
-              />
-            </OpsTableFooter>
-          ) : null}
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] align-top">
+                    <OpsStatusBadge tone={role.active ? "success" : "neutral"}>
+                      {activeBadgeLabel(role.active)}
+                    </OpsStatusBadge>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] align-top text-xs text-[var(--ops-text-muted)]">
+                    {new Date(role.updated_at).toLocaleString("es-PE")}
+                  </td>
+                  <td className="w-[4.5rem] px-4 py-[var(--ops-row-py)] align-top">
+                    <AdminRowActionsMenu
+                      ariaLabel={`Acciones para ${role.name}`}
+                      items={[
+                        {
+                          label: "Editar",
+                          icon: <PencilLine className="h-3.5 w-3.5" />,
+                          onSelect: () => openRoleForm(role),
+                        },
+                        {
+                          label: role.active ? "Inactivar" : "Activar",
+                          icon: <Power className="h-3.5 w-3.5" />,
+                          tone: role.active ? "danger" : "neutral",
+                          onSelect: () => {
+                            setSaveError(null);
+                            setActiveChangeRole(role);
+                          },
+                        },
+                      ]}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </OpsDataTable>
+          )}
           </OpsTableBlock>
         </OpsSectionDivider>
 
@@ -532,6 +436,9 @@ export default function RolesPage() {
           }
         >
             <form id="role-edit-form" className="flex min-h-0 flex-1 flex-col" onSubmit={submitRoleForm}>
+              {saveError && (
+                <AdminInlineMessage tone="danger">{saveError}</AdminInlineMessage>
+              )}
               <div className="grid gap-4 xl:grid-cols-[0.78fr_1.22fr]">
                 <div className="space-y-4">
                   <AdminSection title="Identidad del rol">
@@ -600,6 +507,9 @@ export default function RolesPage() {
           description={
             activeChangeRole ? (
               <>
+                {saveError && (
+                  <AdminInlineMessage tone="danger">{saveError}</AdminInlineMessage>
+                )}
                 Vas a {activeChangeRole.active ? "inactivar" : "activar"} el rol{" "}
                 <span className="font-semibold text-[var(--ops-text)]">
                   {activeChangeRole.name}

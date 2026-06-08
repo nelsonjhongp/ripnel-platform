@@ -1,9 +1,11 @@
 const {
   listTransfers,
+  listTransferInbox,
   listPendingReceipts,
   listTransferRequestCandidates,
   getTransferById,
   createTransfer,
+  approveTransferById,
   shipTransferById,
   receiveTransferById,
   cancelTransferById,
@@ -13,6 +15,15 @@ async function getTransfers(req, res, next) {
   try {
     const transfers = await listTransfers(req.query, req.auth);
     res.json({ ok: true, data: transfers });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function getTransferInbox(req, res, next) {
+  try {
+    const inbox = await listTransferInbox(req.query, req.auth);
+    res.json({ ok: true, data: inbox });
   } catch (error) {
     next(error);
   }
@@ -63,6 +74,15 @@ async function postShipTransfer(req, res, next) {
   }
 }
 
+async function postApproveTransfer(req, res, next) {
+  try {
+    const transfer = await approveTransferById(req.params.transferId, req.body, req.auth);
+    res.json({ ok: true, data: transfer });
+  } catch (error) {
+    next(error);
+  }
+}
+
 async function postReceiveTransfer(req, res, next) {
   try {
     const transfer = await receiveTransferById(req.params.transferId, req.body, req.auth);
@@ -83,10 +103,12 @@ async function postCancelTransfer(req, res, next) {
 
 module.exports = {
   getTransfers,
+  getTransferInbox,
   getPendingReceipts,
   getTransferRequestCandidates,
   getTransfer,
   postTransfer,
+  postApproveTransfer,
   postShipTransfer,
   postReceiveTransfer,
   postCancelTransfer,

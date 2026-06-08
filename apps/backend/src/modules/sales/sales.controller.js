@@ -6,6 +6,7 @@ const {
   getSale,
   createSale,
   getSaleProformaPdf,
+  getSaleReceiptPdf,
 } = require('./sales.service');
 
 async function getSalesPosContext(req, res, next) {
@@ -59,9 +60,13 @@ async function getCustomersAnalytics(req, res, next) {
   try {
     const analytics = await getCustomerAnalytics({
       user_id: req.auth?.sub,
+      permissions: req.auth?.permissions,
+      role_name: req.auth?.role_name,
       date_from: req.query.date_from,
       date_to: req.query.date_to,
       limit: req.query.limit,
+      location_scope: req.query.location_scope,
+      location_id: req.query.location_id,
     });
     return res.json(analytics);
   } catch (error) {
@@ -108,6 +113,21 @@ async function getSaleProformaPdfFile(req, res, next) {
   }
 }
 
+async function getSaleReceiptPdfFile(req, res, next) {
+  try {
+    const result = await getSaleReceiptPdf({
+      sale_id: req.params.saleId,
+      user_id: req.auth?.sub,
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${result.fileName}"`);
+    return res.send(result.pdfBuffer);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 async function sendSaleEmail(req, res, next) {
   try {
     const result = await getSaleProformaPdf({
@@ -136,5 +156,4 @@ module.exports = {
   getSaleById,
   postSale,
   getSaleProformaPdfFile,
-  sendSaleEmail,
 };

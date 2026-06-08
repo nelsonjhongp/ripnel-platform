@@ -7,13 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { useTopbarNotifications, type TopbarNotificationItem } from "./NotificationsProvider"
-
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString("es-PE", {
-    dateStyle: "short",
-    timeStyle: "short",
-  })
-}
+import { formatDateTime } from "@/lib/date-utils"
 
 function severityClasses(severity: TopbarNotificationItem["severity"]) {
   if (severity === "danger") return "sales-chip-danger"

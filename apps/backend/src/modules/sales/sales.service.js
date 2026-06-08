@@ -1,6 +1,8 @@
 const { AppError } = require('../../shared/errors');
 const { pool } = require('../../shared/db');
+const { resolveDashboardScope } = require('../dashboard/dashboard-scope');
 const { renderProformaSalePdfBuffer } = require('./sales-proforma-pdf');
+const { renderReceiptSalePdfBuffer } = require('./sales-receipt-pdf');
 const {
   findSellableVariants,
   findActiveWholesaleMinQtyRule,
@@ -667,10 +669,16 @@ async function getCustomerAnalytics(input = {}) {
     throw new AppError('date_from cannot be greater than date_to', 400);
   }
 
-  const { location } = await resolveOperatingContext(input.user_id);
+  const dashboardScope = await resolveDashboardScope({
+    user_id: input.user_id,
+    permissions: input.permissions,
+    role_name: input.role_name,
+    location_scope: input.location_scope,
+    location_id: input.location_id,
+  });
 
   return findCustomerBiAnalytics({
-    locationId: location.location_id,
+    locationIds: dashboardScope.activeLocationIds,
     dateFrom,
     dateTo,
     limit,
@@ -936,6 +944,26 @@ async function getSaleProformaPdf(input = {}) {
   };
 }
 
+async function getSaleReceiptPdf(input = {}) {
+  const { location } = await resolveOperatingContext(input.user_id);
+  const sale = await getSaleByLocation(input.sale_id, location.location_id);
+
+  if (sale.document_type !== 'boleta' && sale.document_type !== 'factura') {
+    throw new AppError('Only boleta or factura sales can be downloaded from this endpoint', 400);
+  }
+
+  const pdfBuffer = await renderReceiptSalePdfBuffer(sale);
+  const fileNameBase = String(sale.sale_number || sale.sale_id || 'comprobante')
+    .replace(/[^a-zA-Z0-9_-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '') || 'comprobante';
+
+  return {
+    fileName: `${fileNameBase}.pdf`,
+    pdfBuffer,
+  };
+}
+
 module.exports = {
   getPosContext,
   listSellableVariants,
@@ -944,4 +972,5 @@ module.exports = {
   getSale,
   createSale,
   getSaleProformaPdf,
+  getSaleReceiptPdf,
 };

@@ -5,10 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, LoaderCircle, PackagePlus, Search, Trash2 } from "lucide-react";
 import {
-  AdminSelectMenu,
   AdminTextarea,
 } from "@/components/admin/admin-ui";
+import { OpsSelectMenu } from "@/components/ui/ops-selection";
 import { InlineStatusCard } from "@/components/feedback/status-page";
+import { ForbiddenPage } from "@/components/feedback/status-page";
 import { Button } from "@/components/ui/button";
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
 import {
@@ -18,24 +19,31 @@ import {
   OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
+import { apiFetchData } from "@/lib/api";
 import { appRoutes } from "@/lib/routes";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { useApiGet } from "@/hooks/use-api-get";
 import {
-  type AdjustmentDetail,
+  type AdjustmentDetailData,
+  type AdjustmentListData,
+  type AdjustmentIntent,
+  type AdjustmentVariantsData,
   type AdjustmentVariant,
+  buildAdjustmentReason,
   type DraftAdjustmentLine,
+  formatAdjustmentIntent,
   type Location,
-  requestAdjustmentJson,
 } from "./inventory-adjustments-shared";
 
 export function InventoryAdjustmentsCreatePage() {
   const router = useRouter();
+  const { user } = useAuth();
   const initialSearchParams =
     typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [loadingLocations, setLoadingLocations] = useState(true);
   const [savingAdjustment, setSavingAdjustment] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createLocationId, setCreateLocationId] = useState(() => initialSearchParams.get("location_id") || "");
+  const [adjustmentIntent, setAdjustmentIntent] = useState<AdjustmentIntent>("adjustment");
   const [createReason, setCreateReason] = useState("");
   const [createNotes, setCreateNotes] = useState("");
   const [draftLines, setDraftLines] = useState<DraftAdjustmentLine[]>([]);
@@ -43,31 +51,41 @@ export function InventoryAdjustmentsCreatePage() {
   const [variantResults, setVariantResults] = useState<AdjustmentVariant[]>([]);
   const [loadingVariants, setLoadingVariants] = useState(false);
   const [variantSearchError, setVariantSearchError] = useState<string | null>(null);
+  const canManageAdjustments = ["ADMIN", "ALMACEN"].includes(
+    String(user?.role_name || "").toUpperCase()
+  );
 
-  async function loadLocations() {
-    setLoadingLocations(true);
+  const { data: adjustmentData, loading: loadingLocations } = useApiGet(
+    () => apiFetchData<AdjustmentListData>("/api/inventory/adjustments", { cache: "no-store" }),
+    []
+  );
 
-    try {
-      const data = await requestAdjustmentJson<Location[]>("/api/locations");
-      setLocations((data || []).filter((location) => location.active));
-    } catch (requestError) {
-      setCreateError(
-        requestError instanceof Error ? requestError.message : "No se pudieron cargar sedes"
-      );
-    } finally {
-      setLoadingLocations(false);
+  const locations = useMemo(() => adjustmentData?.meta?.available_locations || [], [adjustmentData]);
+
+  const fallbackCreateLocationId = useMemo(() => {
+    if (!adjustmentData) return "";
+
+    if (
+      adjustmentData.meta.selected_location_id &&
+      locations.some((location) => location.location_id === adjustmentData.meta.selected_location_id)
+    ) {
+      return adjustmentData.meta.selected_location_id;
     }
-  }
 
-  useEffect(() => {
-    void Promise.resolve().then(() => {
-      void loadLocations();
-    });
-  }, []);
+    return (
+      locations.find((location) => location.is_default)?.location_id ||
+      locations[0]?.location_id ||
+      ""
+    );
+  }, [adjustmentData, locations]);
+  const effectiveCreateLocationId =
+    createLocationId && locations.some((location) => location.location_id === createLocationId)
+      ? createLocationId
+      : fallbackCreateLocationId;
 
   useEffect(() => {
     const normalizedQuery = variantQuery.trim();
-    if (!createLocationId || normalizedQuery.length < 2) {
+    if (!effectiveCreateLocationId || normalizedQuery.length < 2) {
       return;
     }
 
@@ -78,14 +96,14 @@ export function InventoryAdjustmentsCreatePage() {
 
       try {
         const params = new URLSearchParams({
-          location_id: createLocationId,
+          location_id: effectiveCreateLocationId,
           query: normalizedQuery,
         });
-        const data = await requestAdjustmentJson<AdjustmentVariant[]>(
+        const data = await apiFetchData<AdjustmentVariantsData>(
           `/api/inventory/adjustment-variants?${params.toString()}`,
-          { signal: controller.signal }
+          { signal: controller.signal, cache: "no-store" }
         );
-        setVariantResults(data || []);
+        setVariantResults(data?.rows || []);
       } catch (requestError) {
         if (controller.signal.aborted) {
           return;
@@ -107,29 +125,29 @@ export function InventoryAdjustmentsCreatePage() {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [createLocationId, variantQuery]);
+  }, [effectiveCreateLocationId, variantQuery]);
 
   const locationOptions = useMemo(
     () =>
       locations.map((location) => ({
         value: location.location_id,
         label: `${location.code} - ${location.name}`,
-        helper: location.type,
+        helper: location.type ?? undefined,
       })),
     [locations]
   );
 
   const filteredVariantResults = useMemo(
     () =>
-      (createLocationId && variantQuery.trim().length >= 2 ? variantResults : []).filter(
+      (effectiveCreateLocationId && variantQuery.trim().length >= 2 ? variantResults : []).filter(
         (variant) => !draftLines.some((line) => line.variant_id === variant.variant_id)
       ),
-    [createLocationId, draftLines, variantQuery, variantResults]
+    [draftLines, effectiveCreateLocationId, variantQuery, variantResults]
   );
 
   const selectedCreateLocation = useMemo(
-    () => locations.find((location) => location.location_id === createLocationId) ?? null,
-    [createLocationId, locations]
+    () => locations.find((location) => location.location_id === effectiveCreateLocationId) ?? null,
+    [effectiveCreateLocationId, locations]
   );
 
   const draftTotals = useMemo(
@@ -143,9 +161,9 @@ export function InventoryAdjustmentsCreatePage() {
     [draftLines]
   );
   const visibleVariantSearchError =
-    createLocationId && variantQuery.trim().length >= 2 ? variantSearchError : null;
+    effectiveCreateLocationId && variantQuery.trim().length >= 2 ? variantSearchError : null;
   const visibleLoadingVariants =
-    createLocationId && variantQuery.trim().length >= 2 ? loadingVariants : false;
+    effectiveCreateLocationId && variantQuery.trim().length >= 2 ? loadingVariants : false;
 
   function addDraftLine(variant: AdjustmentVariant) {
     setDraftLines((current) => [
@@ -189,7 +207,7 @@ export function InventoryAdjustmentsCreatePage() {
     setCreateError(null);
 
     try {
-      if (!createLocationId) {
+      if (!effectiveCreateLocationId) {
         throw new Error("Debes seleccionar una sede");
       }
 
@@ -197,11 +215,12 @@ export function InventoryAdjustmentsCreatePage() {
         throw new Error("Debes agregar al menos una variante");
       }
 
-      await requestAdjustmentJson<AdjustmentDetail>("/api/inventory/adjustments", {
+      await apiFetchData<AdjustmentDetailData>("/api/inventory/adjustments", {
         method: "POST",
+        cache: "no-store",
         body: JSON.stringify({
-          location_id: createLocationId,
-          reason: createReason.trim() || null,
+          location_id: effectiveCreateLocationId,
+          reason: buildAdjustmentReason(adjustmentIntent, createReason),
           notes: createNotes.trim() || null,
           lines: draftLines.map((line) => ({
             variant_id: line.variant_id,
@@ -223,17 +242,21 @@ export function InventoryAdjustmentsCreatePage() {
     }
   }
 
+  if (!canManageAdjustments) {
+    return <ForbiddenPage variant="ops" />;
+  }
+
   return (
     <OpsPageShell width="wide">
       <PosHeader
-        eyebrow="Apertura y regularizacion"
-        title="Nuevo ajuste"
+        eyebrow="Inventario"
+        title="Registrar ajuste de inventario"
         actions={
           <div className="flex flex-wrap gap-2">
             <Button asChild type="button" variant="outline" size="sm" className="rounded-lg">
               <Link href={appRoutes.inventoryAdjustments}>
                 <ArrowLeft className="h-4 w-4" />
-                Volver a ajustes
+                Volver a ajustes de inventario
               </Link>
             </Button>
             <Button
@@ -242,7 +265,7 @@ export function InventoryAdjustmentsCreatePage() {
               variant="accent"
               size="sm"
               className="rounded-lg"
-              disabled={savingAdjustment || !createLocationId || !draftLines.length}
+              disabled={savingAdjustment || !effectiveCreateLocationId || !draftLines.length}
             >
               {savingAdjustment ? (
                 <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -272,12 +295,35 @@ export function InventoryAdjustmentsCreatePage() {
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                   Sede
                 </label>
-                <AdminSelectMenu
-                  value={createLocationId}
+                <OpsSelectMenu
+                  value={effectiveCreateLocationId}
                   onValueChange={setCreateLocationId}
                   placeholder="Selecciona una sede"
                   options={locationOptions}
                   disabled={loadingLocations}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                  Tipo operativo
+                </label>
+                <OpsSelectMenu
+                  value={adjustmentIntent}
+                  onValueChange={(value) => setAdjustmentIntent(value as AdjustmentIntent)}
+                  placeholder="Selecciona una intención"
+                  options={[
+                    {
+                      value: "adjustment",
+                      label: formatAdjustmentIntent("adjustment"),
+                      helper: "Conteo físico o regularización",
+                    },
+                    {
+                      value: "opening",
+                      label: formatAdjustmentIntent("opening"),
+                      helper: "Carga inicial antes de operar en sistema",
+                    },
+                  ]}
                 />
               </div>
 
@@ -290,7 +336,11 @@ export function InventoryAdjustmentsCreatePage() {
                   value={createReason}
                   onChange={(event) => setCreateReason(event.target.value)}
                   className="sales-field h-10 w-full rounded-lg px-3 text-sm"
-                  placeholder="Motivo operativo del ajuste"
+                  placeholder={
+                    adjustmentIntent === "opening"
+                      ? "Ej. Stock previo a salida en vivo"
+                      : "Ej. Conteo físico, merma, regularización"
+                  }
                 />
               </div>
 
@@ -306,7 +356,7 @@ export function InventoryAdjustmentsCreatePage() {
                   value={createNotes}
                   onChange={(event) => setCreateNotes(event.target.value)}
                   rows={3}
-                  placeholder="Notas del conteo o contexto del ajuste"
+                  placeholder="Notas del ajuste"
                   className="min-h-[92px]"
                 />
               </div>
@@ -337,9 +387,9 @@ export function InventoryAdjustmentsCreatePage() {
                       type="text"
                       value={variantQuery}
                       onChange={(event) => setVariantQuery(event.target.value)}
-                      disabled={!createLocationId}
+                      disabled={!effectiveCreateLocationId}
                       placeholder={
-                        createLocationId
+                        effectiveCreateLocationId
                           ? "Buscar por SKU, style, talla o color"
                           : "Primero selecciona una sede"
                       }
@@ -408,7 +458,7 @@ export function InventoryAdjustmentsCreatePage() {
                   ))}
 
                   {!visibleLoadingVariants &&
-                  createLocationId &&
+                  effectiveCreateLocationId &&
                   variantQuery.trim().length >= 2 &&
                   !filteredVariantResults.length ? (
                     <div className="ops-empty-state-compact rounded-xl px-4 py-8 text-center text-sm">
@@ -430,7 +480,7 @@ export function InventoryAdjustmentsCreatePage() {
                   </p>
                 </div>
                 <span className="inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]">
-                  Draft
+                  {formatAdjustmentIntent(adjustmentIntent)}
                 </span>
               </div>
 

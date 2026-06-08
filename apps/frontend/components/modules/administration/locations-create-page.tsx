@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 
-import { buildApiUrl } from "@/lib/api"
+import { apiFetchData } from "@/lib/api"
 import { AdminFormPageShell } from "@/components/admin/admin-form-page-shell"
 import {
   AdminActionButton,
@@ -13,8 +13,8 @@ import {
   AdminInput,
   AdminInlineMessage,
   AdminSection,
-  AdminSelectMenu,
 } from "@/components/admin/admin-ui"
+import { OpsSelectMenu } from "@/components/ui/ops-selection"
 
 type LocationType = "store" | "warehouse" | "workshop" | "third_party"
 
@@ -51,7 +51,7 @@ export default function LocationsCreatePage() {
     setError(null)
 
     try {
-      const response = await fetch(buildApiUrl("/api/locations"), {
+      await apiFetchData("/api/locations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -62,12 +62,6 @@ export default function LocationsCreatePage() {
           active: formState.active,
         }),
       })
-
-      const payload = await response.json()
-
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo crear la ubicación")
-      }
 
       router.push("/administracion/ubicaciones")
     } catch (submitError) {
@@ -104,7 +98,7 @@ export default function LocationsCreatePage() {
                 </AdminField>
 
                 <AdminField label="Tipo">
-                  <AdminSelectMenu
+                  <OpsSelectMenu
                     value={formState.type}
                     onValueChange={(value) => setFormState((current) => ({ ...current, type: value as LocationType }))}
                     placeholder="Selecciona un tipo"

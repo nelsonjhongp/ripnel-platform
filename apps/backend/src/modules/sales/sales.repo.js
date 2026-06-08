@@ -270,7 +270,10 @@ async function findCustomerBiAnalytics(filters = {}) {
   const sortExpr = `COALESCE(s.confirmed_at, s.created_at)`;
   const businessDateExpr = `DATE(${sortExpr} AT TIME ZONE 'America/Lima')`;
 
-  if (filters.locationId) {
+  if (Array.isArray(filters.locationIds) && filters.locationIds.length > 0) {
+    values.push(filters.locationIds);
+    conditions.push(`s.location_id = ANY($${values.length}::uuid[])`);
+  } else if (filters.locationId) {
     values.push(filters.locationId);
     conditions.push(`s.location_id = $${values.length}`);
   }

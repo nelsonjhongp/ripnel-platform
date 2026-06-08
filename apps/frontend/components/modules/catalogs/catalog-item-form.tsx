@@ -11,9 +11,9 @@ import {
   AdminFormActionsBar,
   AdminInlineMessage,
   AdminInput,
-  AdminReadonlyFieldState,
   AdminTextarea,
 } from "@/components/admin/admin-ui";
+import { OpsReadonlyFieldState } from "@/components/ui/ops-selection";
 import type { CatalogFieldConfig } from "@/lib/product-master-metadata";
 
 function normalizeValue(value: unknown) {
@@ -116,7 +116,7 @@ export function CatalogItemForm({
         if (isReadonly) {
           return (
             <AdminField key={field.key} label={field.label} hint={field.helper}>
-              <AdminReadonlyFieldState
+              <OpsReadonlyFieldState
                 value={String(formState[field.key] || "")}
                 placeholder={field.placeholder ?? undefined}
               />

@@ -41,7 +41,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
       return (
         <div className="flex min-h-[60vh] items-center justify-center px-4">
-          <div className="mx-auto w-full max-w-md rounded-2xl border border-[color:color-mix(in_srgb,#f43f5e_40%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_13%,var(--ops-surface))] p-6 text-center shadow-sm">
+          <div className="mx-auto w-full max-w-md rounded-2xl border border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] p-6 text-center shadow-sm">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--ops-surface-muted)]">
               <AlertTriangle className="h-6 w-6 text-[var(--ops-text)]" />
             </div>

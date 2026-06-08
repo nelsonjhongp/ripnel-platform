@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
 import { ShoppingCart } from "lucide-react"
 import { resolveProductMasterRouteTitle } from "@/lib/product-master-metadata"
-import { appRoutes, buildTransferModuleRoute, transferRouteSlugs } from "@/lib/routes"
+import { appRoutes } from "@/lib/routes"
 
 export type TopbarAction = {
   key: string
@@ -19,14 +19,15 @@ const routeTitles: Record<string, string> = {
   [appRoutes.administrationUsers]: "Usuarios",
   [appRoutes.administrationRoles]: "Roles",
   [appRoutes.administrationLocations]: "Ubicaciones",
-  [appRoutes.inventory]: "Inventario",
-  [appRoutes.kardex]: "Movimientos de stock",
+  [appRoutes.inventory]: "Stock actual",
+  [appRoutes.inventoryMovements]: "Movimientos de stock",
   [appRoutes.purchaseSystem]: "Nueva venta",
   [appRoutes.transactionHistory]: "Historial de ventas",
   [appRoutes.postsales]: "Postventa",
-  [buildTransferModuleRoute(transferRouteSlugs.list)]: "Transferencias",
-  [buildTransferModuleRoute(transferRouteSlugs.requestProducts)]: "Solicitar productos",
-  [buildTransferModuleRoute(transferRouteSlugs.pendingReceipts)]: "Recepciones pendientes",
+  [appRoutes.transfers]: "Transferencias",
+  [appRoutes.transferRequest]: "Solicitar transferencia",
+  [appRoutes.transferPendingReceipts]: "Recepciones pendientes",
+  [appRoutes.transferHistory]: "Historial de transferencias",
   [appRoutes.prices]: "Listado de precios",
   [`${appRoutes.prices}/crear`]: "Gestion de precios",
   [`${appRoutes.prices}/reglas`]: "Reglas de precio",
@@ -53,13 +54,16 @@ export function resolveSidebarRouteTitle(pathname: string, explicitTitle?: strin
     .join(" ")
 }
 
-export function resolveSidebarDefaultActions(hasPermission: (permission: string) => boolean): TopbarAction[] {
+export function resolveSidebarDefaultActions(
+  pathname: string,
+  hasPermission: (permission: string) => boolean
+): TopbarAction[] {
   const actions: TopbarAction[] = []
 
-  if (hasPermission("sales.pos")) {
+  if (pathname !== appRoutes.home && hasPermission("sales.pos")) {
     actions.push({
       key: "quick-sale",
-      label: "Venta rapida",
+      label: "Venta rápida",
       href: appRoutes.purchaseSystem,
       icon: <ShoppingCart className="h-4 w-4" />,
       variant: "accent",

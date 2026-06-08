@@ -138,11 +138,44 @@ export function unwrapApiData<T>(payload: T | ApiEnvelope<T>): T {
   return payload as T;
 }
 
+export async function apiFetchData<T>(
+  path: string,
+  init: ApiFetchInit = {}
+): Promise<T> {
+  const payload = await apiFetch<T | ApiEnvelope<T>>(path, init);
+  return unwrapApiData(payload);
+}
+
 const apiBaseUrl = getApiBaseUrl();
 
 export function buildApiUrl(path: string) {
   const externalBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
   return externalBaseUrl ? `${externalBaseUrl}${path}` : path;
+}
+
+export function formatApiFetchError(
+  error: unknown,
+  fallback: string
+): string {
+  const e = error as { status?: number; message?: string; name?: string }
+
+  if (!e || typeof e !== "object") {
+    return fallback
+  }
+
+  if (e.status === 401) {
+    return "La sesion ya no es valida. Inicia sesion otra vez para continuar."
+  }
+
+  if (e.status === 403) {
+    return e.message || fallback
+  }
+
+  if (e.status === 409 || e.status === 400) {
+    return e.message || fallback
+  }
+
+  return e.message || fallback
 }
 
 export { apiBaseUrl };
