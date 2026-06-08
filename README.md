@@ -1,6 +1,6 @@
-# &#128085; RIPNEL Platform - MVP
+# RIPNEL Platform — MVP
 
-ERP MVP de RIPNEL orientado a inventario, ventas, precios y transferencias internas, con una arquitectura portable: frontend separado, backend con logica de negocio y PostgreSQL administrado en Supabase.
+ERP enfocado en inventario, ventas, precios y transferencias internas. Arquitectura portable: frontend separado, backend con lógica de negocio, PostgreSQL administrado en Supabase.
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-149ECA?style=for-the-badge&logo=react&logoColor=white)
@@ -9,159 +9,244 @@ ERP MVP de RIPNEL orientado a inventario, ventas, precios y transferencias inter
 ![Express](https://img.shields.io/badge/Express-5-1F2937?style=for-the-badge&logo=express&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-Postgres-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
-![Vercel](https://img.shields.io/badge/Vercel-Deploy-000000?style=for-the-badge&logo=vercel&logoColor=white)
-![Figma](https://img.shields.io/badge/Figma-Design-F24E1E?style=for-the-badge&logo=figma&logoColor=white)
 
-## Descripcion
-
-RIPNEL Platform busca cubrir el flujo base de un ERP comercial:
-
-- catalogos operativos;
-- ubicaciones;
-- estilos de producto;
-- variantes con SKU;
-- precios;
-- movimientos posteriores de inventario, ventas y transferencias.
-
-El proyecto esta pensado para evolucionar por modulos, manteniendo la logica de negocio en backend y usando SQL explicito sobre PostgreSQL.
+---
 
 ## Arquitectura del proyecto
 
-| Ruta | Rol |
+```
+ripnel-platform/
+├── apps/
+│   ├── frontend/              # Next.js 16 — App Router, Tailwind 4, shadcn/ui
+│   │   ├── app/               # Rutas y layouts (protegidas, públicas)
+│   │   ├── components/        # UI, módulos, layout, chatbot
+│   │   │   ├── modules/       # Páginas de cada módulo (sales, transfers, home, etc.)
+│   │   │   ├── home/          # Componentes del inicio
+│   │   │   ├── sidebar/       # Sidebar + topbar
+│   │   │   ├── ui/            # shadcn/ui + componentes operativos
+│   │   │   └── chatbot/       # Cliente del chatbot (ChatbotLazy wrapper)
+│   │   ├── lib/               # Utilidades, API client, rutas
+│   │   └── public/            # Assets estáticos
+│   └── backend/               # Node.js + Express, CommonJS
+│       └── src/
+│           ├── config/        # env.js, configuración
+│           ├── middlewares/    # Auth, error handler, validación
+│           ├── modules/       # auth, users, roles, locations, catalogs,
+│           │                  # styles, variants, prices, pricing-rules,
+│           │                  # inventory, transfers, customers, sales,
+│           │                  # postsales, cash, dashboard, home, products,
+│           │                  # notifications, chatbot
+│           └── shared/        # db (pg pool), schemas (zod), errors, email
+├── database/                  # Snapshots y scripts SQL de referencia
+├── supabase/                  # Migraciones, seed data
+└── docs/                      # Documentación técnica
+```
+
+### Reglas de arquitectura
+
+- Frontend llama backend para operaciones ERP. No conecta directo a tablas.
+- Backend trata Supabase como PostgreSQL administrado. No usa `supabase-js` como foundation.
+- SQL explícito con `pg`, sin ORM.
+- CommonJS en backend.
+- Módulos pequeños y específicos (routes, controller, service, repo).
+
+---
+
+## Stack
+
+| Capa | Tecnología |
 | --- | --- |
-| `apps/frontend` | Aplicacion web en Next.js con App Router |
-| `apps/backend` | API en Node.js + Express |
-| `database` | Snapshots y referencias SQL |
-| `supabase` | Migraciones, config local y seeds base |
-| `docs` | Documentacion tecnica estable del proyecto |
+| Frontend | Next.js 16, React 19, TypeScript 5, Tailwind CSS 4 |
+| UI | shadcn/ui, Radix UI primitives, lucide-react |
+| Tablas | @tanstack/react-table |
+| Formularios | react-day-picker, date-fns |
+| Drag & drop | @dnd-kit |
+| Notificaciones | sonner |
+| Backend | Node.js 22, Express 5 |
+| Base de datos | PostgreSQL 17 via `pg` + Supabase |
+| PDF | @react-pdf/renderer |
+| Email | nodemailer (SMTP) |
+| IA | Google Generative AI (Gemini 2.5 Flash) |
+| Cache semántico | text-embedding-004 |
 
-## Stack y reglas base
+---
 
-- Frontend: Next.js 16, React 19, Tailwind CSS 4, shadcn/ui, Radix UI.
-- Backend: Node.js + Express + `pg`.
-- Base de datos: PostgreSQL en Supabase.
-- Persistencia: SQL explicito, sin ORM.
-- Flujo ERP: el frontend consume backend; no habla directo con tablas para operaciones del negocio.
-
-## Inicio rapido
+## Inicio rápido
 
 ```bash
 npm install
-npm run dev:backend
-npm run dev:frontend
+# Terminal 1:
+npm run dev:backend    # http://localhost:3001
+# Terminal 2:
+npm run dev:frontend   # http://localhost:3000
 ```
 
-Frontend por defecto:
+### Variables de entorno
 
-- `http://localhost:3000`
+**Backend** — `apps/backend/.env`:
 
-## Variables de entorno
+| Variable | Descripción |
+| --- | --- |
+| `PORT` | Puerto del servidor (default 3001) |
+| `DATABASE_URL` | Cadena de conexión PostgreSQL |
+| `JWT_SECRET` | Secreto para firmar tokens JWT |
+| `FRONTEND_URL` | Origen del frontend para CORS |
+| `GEMINI_API_KEY` | API key de Google AI para chatbot |
+| `SMTP_HOST` | Servidor SMTP para envío de correos |
+| `SMTP_PORT` | Puerto SMTP |
+| `SMTP_USER` | Usuario SMTP |
+| `SMTP_PASS` | Contraseña SMTP |
+| `SMTP_FROM` | Dirección remitente |
 
-### Backend
+**Frontend** — `apps/frontend/.env.local`:
 
-Crear `apps/backend/.env` a partir de `apps/backend/.env.example`.
-
-Variables minimas:
-
-- `PORT`
-- `NODE_ENV`
-- `DATABASE_URL`
-- `JWT_SECRET`
-- `FRONTEND_URL`
-
-### Frontend
-
-Crear `apps/frontend/.env.local` a partir de `apps/frontend/.env.example`.
-
-Variable minima:
-## Flujo funcional actual
-
-El flujo base de producto sigue este orden:
-Editor de precios ahora selecciona por style_size_price_id y muestra style+talla en el selector.
-Cambio en list-prices.tsx.
-Antes buscaba por style_code (ambiguo si había varias tallas del mismo style).
-
-## Changelog — 2026-04-23 (resumen de trabajo reciente)
-
-Resumen profesional y ordenado de las acciones realizadas hoy (work in progress):
-
-- Objetivo general: restaurar módulos faltantes, mejorar la estabilidad del pipeline de desarrollo y eliminar avisos críticos de ESLint que bloqueaban el build.
-
-- Restauraciones principales:
-	- `apps/frontend/app/(protected)/account-mockup/page.tsx` — archivo restaurado desde un commit previo y recuperado al working tree.
-
-- Cambios operativos y de infraestructura:
-	- Añadido pipeline básico de CI: `/.github/workflows/ci.yml` (instalación, lint, build y comprobaciones básicas).
-	- Añadido `apps/backend/.env.example` con variables de entorno de ejemplo y placeholders operativos.
-
-- Correcciones de código (frontend):
-	- Resolución de múltiples avisos de ESLint sobre `react-hooks/set-state-in-effect`.
-	- Estrategia aplicada: diferir llamadas que provocaban `setState` dentro de `useEffect` usando microtasks (`void Promise.resolve().then(...)`) para evitar actualizaciones de estado síncronas en el cuerpo del efecto.
-	- Páginas corregidas (ejemplos representativos):
-		- `apps/frontend/app/(protected)/bi/page.tsx`
-		- `apps/frontend/app/(protected)/kardex/page.tsx`
-		- `apps/frontend/app/(protected)/postventa/page.tsx`
-		- `apps/frontend/app/(protected)/postventa/[saleId]/page.tsx`
-		- `apps/frontend/app/(protected)/purchase-system/page.jsx`
-		- otras páginas relacionadas con `inventory`, `dashboard`, `caja`, `administracion`.
-
-- Estado actual y observaciones:
-	- Los cambios están aplicados en el working tree; algunos archivos requieren commit.
-	- Backend arrancable localmente (escucha en `3001` durante pruebas). Frontend en conflicto si hay una instancia previa en `3000`.
-	- `npm ci` en CI fallará si no existe `package-lock.json` en el repo; se recomienda ejecutar `npm install` localmente y commitear `package-lock.json` para que `npm ci` funcione en GitHub Actions.
-
-- Siguientes pasos recomendados (priorizados):
-	1. Ejecutar localmente:
-
-		 ```bash
-		 npm.cmd install
-		 npm.cmd --workspace @ripnel/frontend run lint
-		 npm.cmd --workspace @ripnel/frontend run build
-		 ```
-
-	2. Verificar el estado del frontend dev server y detener instancias previas si es necesario (ej. `taskkill /PID <pid> /F` en Windows).
-	3. Commit + push de los cambios (incluyendo `package-lock.json` si se genera):
-
-		 ```bash
-		 git add .
-		 git commit -m "chore: restore account mockup; add CI; defer setState in effects to satisfy lint"
-		 git push
-		 ```
-
-	4. Revisar CI en GitHub Actions y confirmar que `npm ci` + `next build` pasan en el pipeline.
+| Variable | Descripción |
+| --- | --- |
+| `NEXT_PUBLIC_API_BASE_URL` | URL base del backend API |
 
 ---
-Generado y añadido el 2026-04-23 como resumen del trabajo del día.
-COMMIT
-Si algo falla: ROLLBACK.
-API real para pricing_rules implementada y conectada al frontend.
-Nuevos archivos backend:
-pricing-rules.repo.js
-pricing-rules.service.js
-pricing-rules.controller.js
-pricing-rules.routes.js
-Registro de rutas en app.js:
-GET /api/pricing-rules
-POST /api/pricing-rules
-PATCH /api/pricing-rules/:ruleId
-Vista rules conectada en list-prices.tsx:
-Carga reglas reales
-Crea regla si no existe
-Edita regla existente
-Muestra listado real de reglas
 
-## Notas de ventas
+## Módulos del sistema
 
-- `document_type` se mantiene como dato comercial interno de la venta (`none`, `proforma`, `boleta`, `factura`).
-- El backend ya no intenta emitir comprobantes externos ni expone colas/reintentos de emision.
-- `sales_receipts` queda como legado de base de datos fuera del flujo activo actual.
+### Módulos operativos
 
-## Documentacion tecnica
+| Módulo | Ruta frontend | Endpoints API |
+| --- | --- | --- |
+| Inicio | `/` | `GET /api/home/overview` |
+| Dashboard | `/dashboard` | `GET /api/dashboard/*` |
+| Ventas (POS) | `/ventas` | `GET/POST /api/sales/*` |
+| Historial de Ventas | `/historial-ventas` | `GET /api/sales` |
+| Postventa | `/postventa` | `GET/POST/PATCH /api/postsales/*` |
+| Caja | `/caja` | `GET/POST/PATCH /api/cash/*` |
+| Transferencias | `/transferencias` | `GET/POST /api/transfers/*` |
+| Inventario | `/inventario` | `GET/POST /api/inventory/*` |
+| Productos | `/productos` | `GET/POST /api/products/*` |
+| Precios | `/precios` | `GET/POST/PATCH /api/prices/*`, `/api/pricing-rules/*` |
+| Clientes | `/clientes` | `GET/POST/PATCH /api/customers/*` |
+| BI | `/bi` | Reportes y gráficos nativos |
+| Chatbot | Widget en layout | `POST /api/chatbot/*` |
+
+### Módulos de administración
+
+| Módulo | Ruta frontend | Endpoints API |
+| --- | --- | --- |
+| Usuarios | `/admin/usuarios` | `GET/POST/PATCH /api/users/*` |
+| Roles | `/admin/roles` | `GET/POST/PATCH /api/roles/*` |
+| Ubicaciones | `/admin/ubicaciones` | `GET/POST/PATCH /api/locations/*` |
+| Catálogos | `/admin/catalogos` | Tallas, colores, tipos de prenda, telas |
+
+---
+
+## Flujo de ventas (POS)
+
+1. El operador abre la caja del día en Caja.
+2. Desde Ventas, selecciona tipo de comprobante y cliente.
+3. Busca variantes por SKU/código, selecciona talla/color, define cantidad.
+4. Aplica descuento general (% o monto fijo).
+5. Define método de pago (único o mixto: efectivo, Yape, Plin, transferencia).
+6. Confirma la venta → descuenta stock, registra movimiento, genera comprobante.
+7. Acciones post-venta: imprimir, enviar por correo, descargar PDF, ir a detalle.
+
+### Reglas de negocio
+
+- `document_type`: `none`, `proforma`, `boleta`, `factura`.
+- `boleta` requiere cliente con DNI o CE.
+- `factura` requiere cliente con RUC y dirección fiscal.
+- El backend valida stock, precio vigente, caja abierta y consistencia de pagos.
+- IGV: 18% para boleta y factura, 0% para proforma y sin comprobante.
+- Descuento general por porcentaje (máx 100%) o monto fijo (máx total venta).
+- Precio mayorista se activa al alcanzar el umbral configurado en `pricing_rules`.
+
+---
+
+## Diseño y UX
+
+Ver `DESIGN.md` y `docs/` para guías detalladas. Principios clave:
+
+- Violeta `#b07ae4` como color primario de acción.
+- Densidad operativa: tablas compactas, controles pequeños, sin whitespace decorativo.
+- Poppins como tipografía principal.
+- Tooltips para ayuda contextual en vez de texto explicativo persistente.
+
+---
+
+## Documentación técnica
 
 - [Workflow Backend + Supabase](./docs/backend-supabase-workflow.md)
 - [Acceso del equipo a Supabase](./docs/supabase-team-access.md)
 - [Flujo de producto](./docs/product-flow.md)
-- [Scope de Ventas MVP Semana 9](./docs/sales-mvp-scope.md)
+- [Scope de Ventas MVP](./docs/sales-mvp-scope.md)
 - [Flujo funcional de ventas](./docs/sales-flow.md)
 - [Testing manual de ventas](./docs/testing-sales.md)
 - [Readiness check de ventas](./docs/sales-readiness-check.md)
+- [Estándar de página frontend](./docs/frontend-page-standard.md)
+- [Criterios UI/UX operativos](./docs/frontend-ui-ux-operativo.md)
+
+---
+
+## Changelog
+
+### 2026-06-07 — Receipt buttons, descuento fijo, chatbot, sales history
+
+#### Backend — Nuevo
+
+- **`src/shared/email.js`**: Servicio de envío de correos con nodemailer (SMTP desde `.env`). Función `sendReceiptEmail()` con adjunto PDF.
+- **`POST /api/sales/:saleId/send-email`**: Genera PDF del comprobante y lo envía al email registrado del cliente.
+- **`GET /api/sales/:saleId/receipt-pdf`**: Genera PDF para cualquier tipo de documento (boleta, factura, proforma), no solo proforma.
+- Variables SMTP agregadas a `src/config/env.js` (`smtpHost`, `smtpPort`, `smtpUser`, `smtpPass`, `smtpFrom`).
+- Dependencia: `nodemailer` instalada.
+
+#### Backend — Modificado
+
+- **`sales.repo.js`**: `findSaleById` ahora hace `LEFT JOIN customers` para incluir `customer_email`.
+- **`sales.service.js`**: `getSaleProformaPdf` eliminó la restricción de solo proforma, ahora retorna `customerEmail` y `saleNumber`.
+- **`sales-proforma-pdf.js`**: Título dinámico según `sale._label` (PROFORMA / COMPROBANTE).
+- **`chatbot.service.js`**: Agregadas funciones `calculate` (suma, resta, multiplicación, división) y `get_sales_by_date_range` (resumen de ventas entre fechas).
+
+#### Frontend — POS
+
+- **Botón "Agregar"**: ahora `w-full` con `shadow-sm` para mayor visibilidad.
+- **Descuento general**: agregado toggle % / S/. (monto fijo) con validación independiente para cada modo.
+- **"Finalizar venta"**: agregado icono `<Check>` antes del label.
+- **Flujo post-confirmación**: después de confirmar, el panel de resumen permanece visible (`activeStage = "summary"`) para que los botones de recibo estén habilitados y visibles.
+- **Botón "Nueva venta"**: aparece después de confirmar, resetea el estado completo para empezar otra venta.
+- **Botones de acciones**:
+  - *Imprimir comprobante*: abre PDF en nueva ventana y dispara `window.print()`.
+  - *Enviar por correo*: llama `POST /api/sales/:id/send-email`.
+  - *Descargar PDF*: usa `receipt-pdf` endpoint con `download` attribute.
+  - *Guardar como borrador*: redirige a `/ventas/:id` (detalle de venta).
+- `SaleDiscountState.mode` extendido a `'percent' | 'fixed'` (en `pos-types.ts`).
+- `computeSaleDiscountAmount` soporta modo `fixed` con tope en el subtotal.
+
+#### Frontend — Historial de Ventas
+
+- Botón "Postventa" más grande (`size="default"` + `font-semibold shadow-sm`).
+- Botón "CONTINUAR VENTA" en esquema de color amber (warning) para drafts.
+- Atajo de fechas "Este mes" agregado a los filtros rápidos.
+
+#### Frontend — Otros
+
+- **Logo**: agregado `style={{ width: "auto", height: "auto" }}` en `login.tsx` y `AppSidebar.tsx` para eliminar warning de aspecto en Next.js Image.
+
+### 2026-05-XX — Lighthouse, contraste, chatbot fixes
+
+- Chatbot: tools format corregido para Gemini SDK v0.21.0 (`[{ functionDeclarations: TOOLS }]`).
+- Error handler: `err.status` como fallback para status codes de Google AI SDK.
+- Chatbot: columnas SQL corregidas (`sd.qty` → `sd.quantity`, `sd.total_price` → `sd.line_total`).
+- Layout: `ChatbotWidget` movido a `next/dynamic` con `ssr:false` via wrapper `ChatbotLazy`.
+- Contraste: `--ops-text-muted` (#72687f → #5b5168) y `--muted-foreground` (#6f6f6f → #575757) en todos los themes.
+
+### 2026-04-23 — CI, ESLint, pricing rules
+
+- Pipeline CI en `.github/workflows/ci.yml`.
+- Correcciones de ESLint (`react-hooks/set-state-in-effect`) en páginas de BI, kardex, postventa, POS.
+- Backend: módulo `pricing-rules` con CRUD real (`GET/POST/PATCH /api/pricing-rules`).
+- Frontend: `list-prices.tsx` conectado a API real de reglas de precio.
+
+---
+
+## Notas de ventas
+
+- `document_type` es un dato comercial interno (`none`, `proforma`, `boleta`, `factura`).
+- El backend no emite comprobantes externos ni expone colas de emisión.
+- `sales_receipts` queda como legado de BD fuera del flujo activo.

@@ -10,6 +10,7 @@ const {
 	getSaleById,
 	postSale,
 	getSaleProformaPdfFile,
+	sendSaleEmail,
 } = require('./sales.controller');
 
 const router = express.Router();
@@ -21,6 +22,8 @@ router.get('/sellable-variants', getSellableVariants);
 router.get('/analytics/customers', getCustomersAnalytics);
 router.get('/', getSales);
 router.get('/:saleId/proforma-pdf', getSaleProformaPdfFile);
+router.get('/:saleId/receipt-pdf', getSaleProformaPdfFile);
+router.post('/:saleId/send-email', sendSaleEmail);
 router.get('/:saleId', getSaleById);
 router.post('/', validate(createSale), postSale);
 

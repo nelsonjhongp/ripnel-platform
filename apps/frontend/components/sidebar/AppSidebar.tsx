@@ -24,6 +24,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarRail,
 } from "@/components/ui/sidebar"
 import {
   Collapsible,
@@ -246,6 +247,7 @@ export function AppSidebar({
     <div className="flex min-h-dvh w-full flex-1 bg-background">
       <Sidebar
         variant="sidebar"
+        collapsible="icon"
         className="border-sidebar-border bg-sidebar text-sidebar-foreground"
         style={
           {
@@ -270,9 +272,10 @@ export function AppSidebar({
                 width={40}
                 height={40}
                 className="h-10 w-10 object-cover"
+                style={{ width: "auto", height: "auto" }}
               />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 group-data-[collapsible=icon]:hidden">
               <p className="truncate text-base font-semibold leading-5 text-sidebar-foreground">
                 Creaciones Ripnel
               </p>
@@ -280,7 +283,7 @@ export function AppSidebar({
             </div>
           </div>
 
-          <div className="mt-3 rounded-2xl bg-sidebar-accent/70 px-2.5 py-2">
+          <div className="mt-3 rounded-2xl bg-sidebar-accent/70 px-2.5 py-2 group-data-[collapsible=icon]:hidden">
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
                 <Store className="h-4 w-4 shrink-0 text-sidebar-foreground/65" />
@@ -346,7 +349,7 @@ export function AppSidebar({
                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-foreground">
                     <CircleUserRound className="h-5 w-5" />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 group-data-[collapsible=icon]:hidden">
                     <p className="truncate text-sm font-semibold text-sidebar-foreground">
                       {user?.full_name || "Usuario"}
                     </p>
@@ -360,11 +363,12 @@ export function AppSidebar({
                 onClick={handleLogout}
                 className="h-9 rounded-xl px-2.5 text-sm font-medium text-red-600 hover:bg-red-50/90 hover:text-red-700"
               >
-                <span>Cerrar sesion</span>
+                <span className="group-data-[collapsible=icon]:hidden">Cerrar sesion</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>
+        <SidebarRail />
       </Sidebar>
 
       <SidebarInset>{children}</SidebarInset>

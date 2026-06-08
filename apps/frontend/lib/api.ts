@@ -73,7 +73,8 @@ export async function apiFetch<T>(
   path: string,
   init: ApiFetchInit = {}
 ): Promise<T> {
-  const url = path.startsWith("http") ? path : `${getApiBaseUrl()}${path}`;
+  const externalBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const url = path.startsWith("http") ? path : externalBaseUrl ? `${externalBaseUrl}${path}` : path;
   const { suppressAuthEvent, ...requestInit } = init;
 
   const res = await fetch(url, {
@@ -82,7 +83,7 @@ export async function apiFetch<T>(
       "Content-Type": "application/json",
       ...(requestInit.headers || {}),
     },
-    credentials: "include",
+    credentials: externalBaseUrl ? "include" : "same-origin",
   });
 
   if (!res.ok) {
@@ -140,7 +141,8 @@ export function unwrapApiData<T>(payload: T | ApiEnvelope<T>): T {
 const apiBaseUrl = getApiBaseUrl();
 
 export function buildApiUrl(path: string) {
-  return `${getApiBaseUrl()}${path}`;
+  const externalBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  return externalBaseUrl ? `${externalBaseUrl}${path}` : path;
 }
 
 export { apiBaseUrl };

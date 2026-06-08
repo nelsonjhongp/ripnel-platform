@@ -20,6 +20,29 @@ function getLanDevOrigins() {
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: getLanDevOrigins(),
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "date-fns",
+      "radix-ui",
+      "@tanstack/react-table",
+      "recharts",
+      "vaul",
+      "sonner",
+    ],
+  },
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: "http://localhost:3001/api/:path*",
+      },
+      {
+        source: "/health",
+        destination: "http://localhost:3001/health",
+      },
+    ];
+  },
   async redirects() {
     return [
       {

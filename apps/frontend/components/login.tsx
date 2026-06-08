@@ -80,6 +80,7 @@ export default function LoginRipnel() {
             width={56}
             height={56}
             className="object-contain"
+            style={{ width: "auto", height: "auto" }}
             priority
           />
         }
