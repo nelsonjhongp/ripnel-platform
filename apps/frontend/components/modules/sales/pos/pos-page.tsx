@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
-import Link from "next/link";
-import { Dialog as DialogPrimitive } from "radix-ui";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary"
+import Link from "next/link"
+import { Dialog as DialogPrimitive } from "radix-ui"
 import {
   BadgeCheck,
   CircleAlert,
@@ -51,9 +51,8 @@ import { appRoutes, buildSaleDetailRoute } from "@/lib/routes";
 import {
   DOC_TYPES,
   PAYMENT_METHODS,
-  SALE_DISCOUNT_OPTIONS,
-  SALE_DISCOUNT_REASON_OPTIONS,
   GENERIC_CUSTOMER_CODE,
+  SALE_DISCOUNT_REASON_OPTIONS,
 } from "./pos-types";
 import type {
   CartItem,
@@ -136,7 +135,7 @@ export default function NuevaVentaPage() {
     mode: "none",
     value: "",
     reason: "",
-  });
+  })
 
   const [customerQuery, setCustomerQuery] = useState("");
   const [customerResults, setCustomerResults] = useState<PosCustomer[]>([]);
@@ -155,18 +154,14 @@ export default function NuevaVentaPage() {
   const [posContextLoading, setPosContextLoading] = useState(false);
   const [posContextError, setPosContextError] = useState<string | null>(null);
 
-  const [customerSheetOpen, setCustomerSheetOpen] = useState(false);
-  const [customerSheetMode, setCustomerSheetMode] = useState("create");
-  const [customerForm, setCustomerForm] = useState<CustomerFormState>(
-    createEmptyCustomerForm(),
-  );
-  const [customerFormError, setCustomerFormError] = useState<string | null>(
-    null,
-  );
-  const [customerSaving, setCustomerSaving] = useState(false);
-  const [priceSheetOpen, setPriceSheetOpen] = useState(false);
-  const [discountModalOpen, setDiscountModalOpen] = useState(false);
-  const [priceTargetId, setPriceTargetId] = useState<string | null>(null);
+  const [customerSheetOpen, setCustomerSheetOpen] = useState(false)
+  const [customerSheetMode, setCustomerSheetMode] = useState("create")
+  const [customerForm, setCustomerForm] = useState<CustomerFormState>(createEmptyCustomerForm())
+  const [customerFormError, setCustomerFormError] = useState<string | null>(null)
+  const [customerSaving, setCustomerSaving] = useState(false)
+  const [priceSheetOpen, setPriceSheetOpen] = useState(false)
+  const [discountModalOpen, setDiscountModalOpen] = useState(false)
+  const [priceTargetId, setPriceTargetId] = useState<string | null>(null)
   const [priceForm, setPriceForm] = useState<PriceFormState>({
     unit_price_final: "",
     reason: "",
@@ -223,13 +218,11 @@ export default function NuevaVentaPage() {
   }, []);
 
   useEffect(() => {
-    // defer refresh to avoid synchronous setState inside effect
     void Promise.resolve().then(() => refreshGenericCustomer());
   }, [refreshGenericCustomer]);
 
   useEffect(() => {
     if (!defaultLocation?.location_id) {
-      // defer clearing state to avoid synchronous setState inside effect
       void Promise.resolve().then(() => {
         setVariants([]);
         setProductPickerOpen(false);
@@ -543,20 +536,20 @@ export default function NuevaVentaPage() {
 
   const saleDiscountError = useMemo(() => {
     if (saleDiscount.mode === "none" || cart.length === 0) {
-      return null;
+      return null
     }
 
-    const discountValue = parseAmountInput(saleDiscount.value);
+    const discountValue = parseAmountInput(saleDiscount.value)
     if (discountValue === null || discountValue <= 0) {
-      return "Ingresa un descuento valido.";
+      return "Ingresa un descuento valido."
     }
 
     if (saleDiscount.mode === "percent" && discountValue > 100) {
-      return "El descuento porcentual no puede superar 100%.";
+      return "El descuento porcentual no puede superar 100%."
     }
 
-    if (saleDiscount.mode === "amount" && discountValue > totals.baseSubtotal) {
-      return "El descuento no puede superar el subtotal base.";
+    if (saleDiscount.mode === "fixed" && discountValue > totals.baseSubtotal) {
+      return "El descuento no puede superar el subtotal base."
     }
 
     if (totals.total <= 0) {
@@ -564,11 +557,11 @@ export default function NuevaVentaPage() {
     }
 
     if (!trimOrNull(saleDiscount.reason)) {
-      return "Ingresa el motivo del descuento.";
+      return "Ingresa el motivo del descuento."
     }
 
-    return null;
-  }, [cart.length, saleDiscount, totals.baseSubtotal, totals.total]);
+    return null
+  }, [cart.length, saleDiscount, totals.baseSubtotal, totals.total])
 
   const mixedPaymentsPreview = useMemo(() => {
     if (paymentMode !== "mixed") {
@@ -598,7 +591,7 @@ export default function NuevaVentaPage() {
     );
     const difference = round2(totals.total - enteredTotal);
 
-    let errorMessage = null;
+    let errorMessage: string | null = null;
 
     if (cart.length > 0) {
       if (positivePayments.length < 2) {
@@ -706,6 +699,7 @@ export default function NuevaVentaPage() {
   })();
   const submitDisabled =
     cart.length === 0 ||
+    Boolean(confirmedSale) ||
     !defaultLocation?.location_id ||
     locationsLoading ||
     posContextLoading ||
@@ -820,20 +814,17 @@ export default function NuevaVentaPage() {
         ? "Ir a cobro"
         : activeStage === "payment"
           ? "Ir a resumen"
-          : undefined;
-  const selectedCustomerName = buildCustomerDisplayName(selectedCustomer);
-  const selectedCustomerDocument = buildCustomerDocument(selectedCustomer);
+          : undefined
+  const selectedCustomerName = buildCustomerDisplayName(selectedCustomer)
+  const selectedCustomerDocument = buildCustomerDocument(selectedCustomer)
   const discountReasonSelection = SALE_DISCOUNT_REASON_OPTIONS.some(
-    (option) => option.value === saleDiscount.reason,
+    (option: { value: string }) => option.value === saleDiscount.reason
   )
     ? saleDiscount.reason
     : saleDiscount.reason
       ? "custom"
-      : "";
-  const saleDiscountTargetTotal = Math.max(
-    round2(totals.baseSubtotal - totals.saleDiscountAmount),
-    0,
-  );
+      : ""
+  const saleDiscountTargetTotal = Math.max(round2(totals.baseSubtotal - totals.saleDiscountAmount), 0)
 
   function goToStage(stageId: Stage) {
     setActiveStage(stageId);
@@ -1219,12 +1210,12 @@ export default function NuevaVentaPage() {
         })),
       };
 
-      if (saleDiscount.mode !== "none" && totals.saleDiscountAmount > 0) {
+      if (totals.saleDiscountAmount > 0) {
         payload.sale_discount = {
           mode: saleDiscount.mode,
           value: parseAmountInput(saleDiscount.value),
           reason: trimOrNull(saleDiscount.reason),
-        };
+        }
       }
 
       if (paymentMode === "mixed") {
@@ -1241,23 +1232,21 @@ export default function NuevaVentaPage() {
       setConfirmedSale({
         sale_id: sale.sale_id,
         sale_number: sale.sale_number,
-      });
-      setCart([]);
-      setCustomerQuery("");
-      setSelectedCustomer(genericCustomer);
-      setDocumentType("none");
-      setPaymentMethod("cash");
-      setPaymentMode("single");
-      setMixedPayments(createDefaultMixedPayments(0, "cash"));
+      })
+      setCustomerQuery("")
+      setSelectedCustomer(genericCustomer)
+      setDocumentType("none")
+      setPaymentMethod("cash")
+      setPaymentMode("single")
+      setMixedPayments(createDefaultMixedPayments(0, "cash"))
       setSaleDiscount({
         mode: "none",
         value: "",
         reason: "",
-      });
-      setDiscountModalOpen(false);
-      setActiveStage("products");
-      closePriceSheet();
-      await refreshPosContext();
+      })
+      setDiscountModalOpen(false)
+      closePriceSheet()
+      await refreshPosContext()
     } catch (submitError) {
       setError(explainApiError(submitError, "No se pudo confirmar la venta."));
       await refreshPosContext();
@@ -1392,10 +1381,18 @@ export default function NuevaVentaPage() {
                           Ver detalle
                         </Link>
                         <Link
-                          href={appRoutes.transactionHistory}
+                          href={`/api/sales/${confirmedSale.sale_id}/receipt-pdf`}
+                          target="_blank"
                           className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-1.5 text-sm font-medium text-[var(--ops-text)] hover:bg-[var(--ops-surface-muted)]"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            const w = window.open(`/api/sales/${confirmedSale.sale_id}/receipt-pdf`, "_blank")
+                            if (w) {
+                              w.onload = () => { w.print() }
+                            }
+                          }}
                         >
-                          Ver historial
+                          Imprimir
                         </Link>
                         {has("sales.postsale.view") ? (
                           <Link
@@ -1405,6 +1402,13 @@ export default function NuevaVentaPage() {
                             Ir a postventa
                           </Link>
                         ) : null}
+                        <a
+                          href={`/api/sales/${confirmedSale.sale_id}/receipt-pdf`}
+                          download
+                          className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-1.5 text-sm font-medium text-[var(--ops-text)] hover:bg-[var(--ops-surface-muted)]"
+                        >
+                          Descargar PDF
+                        </a>
                         <button
                           type="button"
                           onClick={() => setConfirmedSale(null)}
@@ -1599,10 +1603,7 @@ export default function NuevaVentaPage() {
             </div>
           </TooltipProvider>
 
-          <DialogPrimitive.Root
-            open={discountModalOpen}
-            onOpenChange={setDiscountModalOpen}
-          >
+          <DialogPrimitive.Root open={discountModalOpen} onOpenChange={setDiscountModalOpen}>
             <DialogPrimitive.Portal>
               <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/15 backdrop-blur-[2px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
               <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,760px)] -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-5 shadow-xl outline-none data-open:animate-in data-open:zoom-in-95 data-closed:animate-out data-closed:zoom-out-95">
@@ -1612,8 +1613,7 @@ export default function NuevaVentaPage() {
                       Ajustes comerciales
                     </DialogPrimitive.Title>
                     <DialogPrimitive.Description className="mt-1 text-sm text-[var(--ops-text-muted)]">
-                      El descuento afecta el total del documento. Los precios
-                      base del producto se mantienen visibles por separado.
+                      El descuento afecta el total del documento. Los precios base del producto se mantienen visibles por separado.
                     </DialogPrimitive.Description>
                   </div>
                   <DialogPrimitive.Close asChild>
@@ -1631,27 +1631,50 @@ export default function NuevaVentaPage() {
                   <div className="grid gap-3 lg:grid-cols-[180px_120px_minmax(0,1fr)]">
                     <div>
                       <label className={COMPACT_LABEL_CLASS}>Tipo</label>
-                      <OpsSelectMenu
-                        value={saleDiscount.mode}
-                        onValueChange={(value) =>
-                          setSaleDiscount((current) => ({
-                            ...current,
-                            mode: value,
-                            value: value === "none" ? "" : current.value,
-                            reason: value === "none" ? "" : current.reason,
-                          }))
-                        }
-                        placeholder="Tipo de descuento"
-                        options={SALE_DISCOUNT_OPTIONS}
-                      />
+                      <div className="inline-flex rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] p-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSaleDiscount((current) => ({
+                              ...current,
+                              mode: "percent",
+                              value: current.mode === "none" ? "" : current.value,
+                              reason: current.mode === "none" ? "" : current.reason,
+                            }))
+                          }
+                          className={`cursor-pointer rounded-lg px-3 py-1.5 text-[11px] font-semibold transition ${
+                            saleDiscount.mode === "percent"
+                              ? "bg-[var(--ops-surface)] text-[var(--ripnel-accent-hover)] shadow-sm"
+                              : "text-[var(--ops-text-muted)]"
+                          }`}
+                        >
+                          % Porcentaje
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSaleDiscount((current) => ({
+                              ...current,
+                              mode: "fixed",
+                              value: current.mode === "none" ? "" : current.value,
+                              reason: current.mode === "none" ? "" : current.reason,
+                            }))
+                          }
+                          className={`cursor-pointer rounded-lg px-3 py-1.5 text-[11px] font-semibold transition ${
+                            saleDiscount.mode === "fixed"
+                              ? "bg-[var(--ops-surface)] text-[var(--ripnel-accent-hover)] shadow-sm"
+                              : "text-[var(--ops-text-muted)]"
+                          }`}
+                        >
+                          S/. Monto fijo
+                        </button>
+                      </div>
                     </div>
 
                     {saleDiscount.mode !== "none" ? (
                       <div>
                         <label className={COMPACT_LABEL_CLASS}>
-                          {saleDiscount.mode === "percent"
-                            ? "Porcentaje"
-                            : "Monto"}
+                          {saleDiscount.mode === "percent" ? "Porcentaje" : "Monto"}
                         </label>
                         <input
                           value={saleDiscount.value}
@@ -1662,9 +1685,7 @@ export default function NuevaVentaPage() {
                             }))
                           }
                           inputMode="decimal"
-                          placeholder={
-                            saleDiscount.mode === "percent" ? "10" : "20.00"
-                          }
+                          placeholder={saleDiscount.mode === "percent" ? "10" : "20.00"}
                           className={INPUT_CLASS}
                         />
                       </div>
@@ -1674,25 +1695,19 @@ export default function NuevaVentaPage() {
 
                     <div className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-3 py-2 text-xs">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="text-[var(--ops-text-muted)]">
-                          Subtotal base
-                        </span>
+                        <span className="text-[var(--ops-text-muted)]">Subtotal base</span>
                         <span className="font-semibold text-[var(--ops-text)]">
                           S/. {formatMoney(totals.baseSubtotal)}
                         </span>
                       </div>
                       <div className="mt-1 flex items-center justify-between gap-3">
-                        <span className="text-[var(--ops-text-muted)]">
-                          Descuento
-                        </span>
+                        <span className="text-[var(--ops-text-muted)]">Descuento</span>
                         <span className="font-semibold text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]">
                           - S/. {formatMoney(totals.saleDiscountAmount)}
                         </span>
                       </div>
                       <div className="mt-1 flex items-center justify-between gap-3 border-t border-[var(--ops-border-strong)] pt-1">
-                        <span className="font-semibold text-[var(--ops-text)]">
-                          Total documento
-                        </span>
+                        <span className="font-semibold text-[var(--ops-text)]">Total documento</span>
                         <span className="font-semibold text-[var(--ops-text)]">
                           S/. {formatMoney(saleDiscountTargetTotal)}
                         </span>
@@ -1744,8 +1759,7 @@ export default function NuevaVentaPage() {
                         </div>
                       ) : (
                         <div className="rounded-lg border border-dashed border-[var(--ops-border-soft)] px-3 py-2 text-sm text-[var(--ops-text-muted)]">
-                          El descuento quedará trazado en el comprobante y en el
-                          resumen final.
+                          El descuento quedará trazado en el comprobante y en el resumen final.
                         </div>
                       )}
                     </div>
@@ -1756,9 +1770,7 @@ export default function NuevaVentaPage() {
                   )}
 
                   {saleDiscountError ? (
-                    <p
-                      className={`rounded-lg border px-3 py-2 text-sm ${buildSemanticChipClass("warning")}`}
-                    >
+                    <p className={`rounded-lg border px-3 py-2 text-sm ${buildSemanticChipClass("warning")}`}>
                       {saleDiscountError}
                     </p>
                   ) : null}
@@ -1766,11 +1778,7 @@ export default function NuevaVentaPage() {
 
                 <div className="mt-5 flex justify-end gap-3 border-t border-[var(--ops-border-strong)] pt-4">
                   <DialogPrimitive.Close asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="rounded-lg"
-                    >
+                    <Button type="button" variant="outline" className="rounded-lg">
                       Cerrar
                     </Button>
                   </DialogPrimitive.Close>

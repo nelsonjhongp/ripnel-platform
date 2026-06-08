@@ -128,6 +128,26 @@ async function getSaleReceiptPdfFile(req, res, next) {
   }
 }
 
+async function sendSaleEmail(req, res, next) {
+  try {
+    const result = await getSaleProformaPdf({
+      sale_id: req.params.saleId,
+      user_id: req.auth?.sub,
+    });
+    const { sendReceiptEmail } = require('../../shared/email');
+    await sendReceiptEmail({
+      to: result.customerEmail,
+      subject: `Comprobante de venta - ${result.saleNumber || result.fileName}`,
+      text: `Hola,\n\nAdjuntamos el comprobante de su venta ${result.saleNumber || ''}.\n\nSaludos,\nRIPNEL`,
+      pdfBuffer: result.pdfBuffer,
+      pdfFilename: result.fileName,
+    });
+    return res.json({ ok: true, sent_to: result.customerEmail });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   getSalesPosContext,
   getSellableVariants,
@@ -136,5 +156,4 @@ module.exports = {
   getSaleById,
   postSale,
   getSaleProformaPdfFile,
-  getSaleReceiptPdfFile,
 };

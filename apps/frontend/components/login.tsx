@@ -78,9 +78,10 @@ export default function LoginRipnel() {
           <Image
             src="/ripnel-logo.svg"
             alt="Ripnel"
-            width={1271}
-            height={898}
-            className="h-14 w-auto object-contain"
+            width={56}
+            height={56}
+            className="object-contain"
+            style={{ width: "auto", height: "auto" }}
             priority
           />
         }

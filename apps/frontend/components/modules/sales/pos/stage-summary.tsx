@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import {
+  Check,
   CreditCard,
   LoaderCircle,
   PencilLine,
@@ -404,7 +405,7 @@ export function SummaryStage(props: SummaryStageProps) {
               Procesando...
             </span>
           ) : (
-            "Finalizar venta"
+            <><Check className="mr-1.5 inline h-4 w-4" /> Finalizar venta</>
           )}
         </button>
       </article>

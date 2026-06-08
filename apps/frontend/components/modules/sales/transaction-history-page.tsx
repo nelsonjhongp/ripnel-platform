@@ -138,7 +138,7 @@ export default function TransactionHistoryPage() {
               eyebrow="Operacion comercial"
               title="Historial de ventas"
               actions={
-                <Button asChild variant="outline" size="sm" className="rounded-lg">
+                <Button asChild variant="accent" size="default" className="rounded-lg px-5 font-semibold shadow-sm">
                   <Link href="/postventa">Postventa</Link>
                 </Button>
               }
@@ -185,6 +185,61 @@ export default function TransactionHistoryPage() {
                     setCurrentPage(1)
                   }}
                 />
+
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const today = new Date().toISOString().slice(0, 10)
+                      setDateFrom(today)
+                      setDateTo(today)
+                      setCurrentPage(1)
+                    }}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${dateFrom && dateFrom === dateTo && dateFrom === new Date().toISOString().slice(0, 10) ? "bg-[var(--ripnel-accent)] text-white" : "bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)] hover:bg-[var(--ops-border-soft)]"}`}
+                  >
+                    Hoy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+                      setDateFrom(yesterday)
+                      setDateTo(yesterday)
+                      setCurrentPage(1)
+                    }}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${dateFrom && dateFrom === dateTo && dateFrom === new Date(Date.now() - 86400000).toISOString().slice(0, 10) ? "bg-[var(--ripnel-accent)] text-white" : "bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)] hover:bg-[var(--ops-border-soft)]"}`}
+                  >
+                    Ayer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const today = new Date()
+                      const dayOfWeek = today.getDay()
+                      const monday = new Date(today)
+                      monday.setDate(today.getDate() - ((dayOfWeek + 6) % 7))
+                      setDateFrom(monday.toISOString().slice(0, 10))
+                      setDateTo(today.toISOString().slice(0, 10))
+                      setCurrentPage(1)
+                    }}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${dateFrom && dateTo && (() => { const today = new Date(); const dayOfWeek = today.getDay(); const monday = new Date(today); monday.setDate(today.getDate() - ((dayOfWeek + 6) % 7)); return dateFrom === monday.toISOString().slice(0, 10) && dateTo === today.toISOString().slice(0, 10) })() ? "bg-[var(--ripnel-accent)] text-white" : "bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)] hover:bg-[var(--ops-border-soft)]"}`}
+                  >
+                    Esta semana
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const today = new Date()
+                      const first = new Date(today.getFullYear(), today.getMonth(), 1)
+                      setDateFrom(first.toISOString().slice(0, 10))
+                      setDateTo(today.toISOString().slice(0, 10))
+                      setCurrentPage(1)
+                    }}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${dateFrom && dateTo && (() => { const today = new Date(); const first = new Date(today.getFullYear(), today.getMonth(), 1); return dateFrom === first.toISOString().slice(0, 10) && dateTo === today.toISOString().slice(0, 10) })() ? "bg-[var(--ripnel-accent)] text-white" : "bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)] hover:bg-[var(--ops-border-soft)]"}`}
+                  >
+                    Este mes
+                  </button>
+                </div>
 
                 <DateFilterPicker
                   label="Fecha desde"
@@ -331,6 +386,10 @@ export default function TransactionHistoryPage() {
                                 {sale.status === "confirmed" ? (
                                   <Button asChild variant="accent" size="sm" className="rounded-lg px-3">
                                     <Link href={`/postventa/${sale.sale_id}`}>Postventa</Link>
+                                  </Button>
+                                ) : sale.status === "draft" ? (
+                                  <Button asChild variant="outline" size="sm" className="rounded-lg border-[color:color-mix(in_srgb,#f59e0b_40%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] px-3 text-[color:color-mix(in_srgb,#d97706_82%,var(--ops-text))] hover:bg-[color:color-mix(in_srgb,#f59e0b_18%,var(--ops-surface))]">
+                                    <Link href={`/ventas/${sale.sale_id}`}>CONTINUAR VENTA</Link>
                                   </Button>
                                 ) : (
                                   <span className="inline-block h-7 w-[5.25rem]" aria-hidden="true" />

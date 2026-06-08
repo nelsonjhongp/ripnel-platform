@@ -50,7 +50,7 @@ export interface CartItem {
 }
 
 export interface SaleDiscountState {
-  mode: string
+  mode: 'percent' | 'fixed' | 'none'
   value: string
   reason: string
 }

@@ -25,7 +25,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
+  SidebarRail,
+} from "@/components/ui/sidebar"
 import {
   Collapsible,
   CollapsibleContent,
@@ -461,6 +462,7 @@ export function AppSidebar({
     <div className="flex min-h-dvh w-full flex-1 bg-background">
       <Sidebar
         variant="sidebar"
+        collapsible="icon"
         className="border-sidebar-border bg-sidebar text-sidebar-foreground"
         style={
           {
@@ -482,12 +484,13 @@ export function AppSidebar({
               <Image
                 src="/ripnel-logo.svg"
                 alt="Ripnel"
-                width={1271}
-                height={898}
-                className="h-10 w-auto object-contain"
+                width={40}
+                height={40}
+                className="h-10 w-10 object-cover"
+                style={{ width: "auto", height: "auto" }}
               />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 group-data-[collapsible=icon]:hidden">
               <p className="truncate text-base font-semibold leading-5 text-sidebar-foreground">
                 Creaciones Ripnel
               </p>
@@ -495,33 +498,28 @@ export function AppSidebar({
             </div>
           </Link>
 
-          <div className="mt-3">
-            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/45 select-none">
-              Sede actual
-            </p>
-            <div className="rounded-xl bg-sidebar-accent/70 px-2.5 py-2">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-2">
-                  <Store className="h-4 w-4 shrink-0 text-sidebar-foreground/65" />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-sidebar-foreground">
-                      {locationsLoading
-                        ? "Cargando sede..."
-                        : locationsError
-                          ? "Sede no disponible"
-                          : defaultLocation?.name || "Sin sede asignada"}
-                    </p>
-            </div>
-          </div>
-                <button
-                  type="button"
-                  onClick={() => router.push(appRoutes.account)}
-                  className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-sidebar-foreground/65 transition-all duration-150 hover:bg-background/70 hover:text-sidebar-foreground"
-                  aria-label="Gestionar sede"
-                >
-                  <Settings className="h-4 w-4" />
-                </button>
+          <div className="mt-3 rounded-2xl bg-sidebar-accent/70 px-2.5 py-2 group-data-[collapsible=icon]:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <Store className="h-4 w-4 shrink-0 text-sidebar-foreground/65" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-sidebar-foreground">
+                    {locationsLoading
+                      ? "Cargando sede..."
+                      : locationsError
+                        ? "Sede no disponible"
+                        : defaultLocation?.name || "Sin sede asignada"}
+                  </p>
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => router.push(appRoutes.account)}
+                className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-sidebar-foreground/65 transition hover:bg-background/70 hover:text-sidebar-foreground"
+                aria-label="Gestionar sede"
+              >
+                <Settings className="h-4 w-4" />
+              </button>
             </div>
           </div>
         </SidebarHeader>
@@ -576,7 +574,7 @@ export function AppSidebar({
                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-foreground">
                     <CircleUserRound className="h-5 w-5" />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 group-data-[collapsible=icon]:hidden">
                     <p className="truncate text-sm font-semibold text-sidebar-foreground">
                       {user?.full_name || "Usuario"}
                     </p>
@@ -592,12 +590,12 @@ export function AppSidebar({
                 onClick={handleLogout}
                 className="h-10 gap-2.5 rounded-none px-3 text-sm font-medium text-sidebar-foreground/60 transition-all duration-150 ease-out cursor-pointer hover:bg-red-500/10 hover:text-red-500"
               >
-                <LogOut className="h-4 w-4" />
-                <span>Cerrar sesión</span>
+                <span className="group-data-[collapsible=icon]:hidden">Cerrar sesion</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>
+        <SidebarRail />
       </Sidebar>
 
       <SidebarInset>{children}</SidebarInset>

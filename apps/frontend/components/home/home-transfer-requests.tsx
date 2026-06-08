@@ -3,6 +3,7 @@ import Link from "next/link"
 import { ArrowUpRight, Package2 } from "lucide-react"
 
 import { OpsEmptyState } from "@/components/ui/ops-empty-state"
+import { HomeSectionCard } from "@/components/home/home-section-card"
 import type { HomeOverview } from "./home-types"
 
 function flowLabel(flow: string) {
@@ -22,32 +23,20 @@ function flowTone(flow: string) {
 export function HomeTransferRequests({
   section,
   formatDateTime,
+  infoTooltip,
 }: {
   section: NonNullable<HomeOverview["sections"]["transfer_requests"]>
   formatDateTime: (value: string | null | undefined) => string
+  infoTooltip?: string
 }) {
   return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ripnel-accent-hover)]">
-            Transferencias
-          </p>
-          <h2 className="mt-1 text-base font-semibold text-[var(--ops-text)] md:text-lg">Solicitudes entre tiendas</h2>
-        </div>
-
-        {section.primary_action ? (
-          <Link
-            href={section.primary_action.href}
-            className="sales-field sales-field-interactive inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium"
-          >
-            {section.primary_action.label}
-            <ArrowUpRight className="h-4 w-4" />
-          </Link>
-        ) : null}
-      </div>
-
-      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+    <HomeSectionCard
+      eyebrow="Transferencias"
+      title="Solicitudes entre tiendas"
+      action={section.primary_action}
+      infoTooltip={infoTooltip}
+    >
+      <div className="grid gap-2 md:grid-cols-3">
         <div className="sales-panel-muted rounded-xl p-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
             Abiertas por mi tienda
@@ -133,6 +122,6 @@ export function HomeTransferRequests({
           </p>
         </div>
       ) : null}
-    </section>
+    </HomeSectionCard>
   )
 }
