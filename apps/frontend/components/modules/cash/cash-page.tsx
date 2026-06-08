@@ -32,6 +32,7 @@ import {
   formatAmount,
   formatBusinessDate,
 } from "@/lib/cash";
+import { showSuccess, showError } from "@/lib/toast";
 
 const METHOD_CONFIG = [
   {
@@ -108,8 +109,9 @@ export default function CajaPage() {
         body: JSON.stringify({ location_id: locationId }),
       });
       refetch();
+      showSuccess("Caja abierta", "La sesión de caja está lista para operar.")
     } catch (err) {
-      setActionError(explainCashError(err, "Error al abrir caja"));
+      showError("Error al abrir caja", explainCashError(err, "No se pudo aperturar la caja."))
     } finally {
       setActionLoading(false);
     }
@@ -129,8 +131,9 @@ export default function CajaPage() {
       setShowCloseConfirm(false);
       setCloseNotes("");
       refetch();
+      showSuccess("Caja cerrada", "La jornada fue cerrada correctamente.")
     } catch (err) {
-      setActionError(explainCashError(err, "Error al cerrar caja"));
+      showError("Error al cerrar caja", explainCashError(err, "No se pudo cerrar la caja."))
     } finally {
       setActionLoading(false);
     }

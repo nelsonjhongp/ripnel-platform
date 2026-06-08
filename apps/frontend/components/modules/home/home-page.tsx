@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   ArrowLeftRight,
   BarChart3,
-  Boxes,
   CircleAlert,
   ClipboardList,
   Info,
@@ -24,7 +23,6 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { ErrorPage, LoadingPage } from "@/components/feedback/status-page";
 import { HomeHeader, type HomeHeaderAction } from "@/components/home/home-hero";
 import { HomeCriticalStockTable } from "@/components/home/home-critical-stock-table";
-import { HomeSectionCard } from "@/components/home/home-section-card";
 import { HomeTransferRequests } from "@/components/home/home-transfer-requests";
 import { OpsActionTile } from "@/components/ui/ops-action-tile";
 import { OpsEmptyState } from "@/components/ui/ops-empty-state";
@@ -281,7 +279,7 @@ export default function InicioPage() {
           </section>
         )}
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
           {personalSales?.visible && (
             <OpsMetricCard
               icon={<BarChart3 className="h-4 w-4" />}
@@ -352,7 +350,7 @@ export default function InicioPage() {
               </h2>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <div className="flex flex-wrap gap-2">
               {quickActions.map((item) => (
                 <OpsActionTile
                   key={item.key}
@@ -371,9 +369,9 @@ export default function InicioPage() {
         )}
 
         {personalSales?.visible || cashSection?.visible ? (
-          <div className="grid gap-6 xl:grid-cols-2">
+          <div className="flex flex-col gap-6 xl:flex-row">
             {personalSales?.visible ? (
-              <section className="space-y-3">
+              <section className="flex-1 min-w-0 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <ShoppingCart className="h-4 w-4 text-[var(--ripnel-accent)]" />
@@ -453,7 +451,7 @@ export default function InicioPage() {
             ) : null}
 
             {cashSection?.visible ? (
-              <section className="space-y-3">
+              <section className="flex-1 min-w-0 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <Wallet className="h-4 w-4 text-[var(--ripnel-accent)]" />
@@ -532,114 +530,55 @@ export default function InicioPage() {
           </div>
         ) : null}
 
-        {transferSection?.visible || inventorySection?.visible ? (
-          <div className="grid gap-6 xl:grid-cols-2">
-            {transferSection?.visible && (
-              <section className="space-y-3">
+        {(adminSection?.visible || inventorySection?.visible) && (
+          <div className="flex flex-col gap-6 xl:flex-row">
+            {adminSection?.visible && (
+              <section className="flex-1 min-w-0 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <ArrowLeftRight className="h-4 w-4 text-[var(--ripnel-accent)]" />
+                    <ShieldCheck className="h-4 w-4 text-[var(--ripnel-accent)]" />
                     <h2 className="text-base font-semibold text-[var(--ops-text)]">
-                      Transferencias entre tiendas
+                      Vision gerencial
                     </h2>
                   </div>
                   <Link
-                    href={buildTransferListRoute()}
+                    href={appRoutes.dashboard}
                     className="text-[13px] font-medium text-[var(--ripnel-accent)] transition hover:underline"
                   >
-                    Ver todas
+                    Ir al panel
                   </Link>
                 </div>
 
-                <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_30%,var(--ops-surface))] p-4">
-                  <div className="grid items-stretch gap-2 sm:grid-cols-3">
-                    <OpsMetricStripItem
-                      label="Abiertas por mi tienda"
-                      value={transferSection.counts.open_for_store_count}
-                      tone="accent"
-                      isNeutral={
-                        transferSection.counts.open_for_store_count === 0
-                      }
-                    />
-                    <OpsMetricStripItem
-                      label="Por despachar"
-                      value={transferSection.counts.pending_dispatch_count}
-                      tone="warning"
-                      isNeutral={
-                        transferSection.counts.pending_dispatch_count === 0
-                      }
-                    />
-                    <OpsMetricStripItem
-                      label="Por recibir"
-                      value={transferSection.counts.pending_receipts_count}
-                      tone="info"
-                      isNeutral={
-                        transferSection.counts.pending_receipts_count === 0
-                      }
-                    />
-                  </div>
-
-                  <div className="mt-3 space-y-6">
-                    {transferSection?.visible ? (
-                      <HomeTransferRequests
-                        section={transferSection}
-                        formatDateTime={formatDateTime}
-                        infoTooltip="Solicitudes de transferencia entre tiendas. Aquí ves las solicitudes abiertas, pendientes de despacho y recepciones pendientes para tu sede activa."
-                      />
-                    ) : null}
-
-                    {inventorySection?.visible && (
-                      <HomeSectionCard
-                        eyebrow="Inventario"
-                        title="Stock sensible"
-                        action={{ label: "Ver inventario", href: appRoutes.inventory }}
-                        infoTooltip="Variantes con stock crítico en tu sede activa. 'En cero' son unidades sin existencia; 'Bajo mínimo' están por debajo del umbral configurado."
-                      >
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          <div className="sales-panel-muted rounded-xl p-4">
-                            <p className="flex items-center gap-2 text-sm font-semibold text-[var(--ops-text)]">
-                              <Boxes className="h-4 w-4 text-rose-600" />
-                              En cero
-                            </p>
-                            <p className="mt-3 text-2xl font-bold text-[var(--ops-text)]">
-                              {inventorySection.zero_stock_count}
-                            </p>
-                          </div>
-                          <div className="sales-panel-muted rounded-xl p-4">
-                            <p className="text-sm font-semibold text-[var(--ops-text)]">Bajo mínimo</p>
-                            <p className="mt-3 text-2xl font-bold text-[var(--ops-text)]">
-                              {inventorySection.low_stock_count}
-                            </p>
-                            <p className="mt-1 text-sm text-[var(--ops-text-muted)]">
-                              Umbral {inventorySection.low_stock_threshold}
-                            </p>
-                          </div>
-                        </div>
-
-                        {transferSection.counts.open_for_store_count === 0 &&
-                          transferSection.counts.pending_dispatch_count === 0 &&
-                          transferSection.counts.pending_receipts_count === 0 && (
-                            <div className="mt-3 rounded-xl border border-dashed border-[var(--ops-border-soft)] px-4 py-4">
-                              <div className="flex items-center gap-2">
-                                <Inbox className="h-5 w-5 text-[var(--ops-text-muted)]" />
-                                <p className="text-sm font-semibold text-[var(--ops-text)]">
-                                  Sin movimientos entre tiendas
-                                </p>
-                              </div>
-                              <p className="mt-1 text-[13px] text-[var(--ops-text-muted)]">
-                                Todavía no hay solicitudes activas ni recepciones pendientes visibles para tu sede.
-                              </p>
-                            </div>
-                          )}
-                      </HomeSectionCard>
-                    )}
-                  </div>
-                </div>
+                <OpsSummaryBand
+                  items={[
+                    {
+                      icon: <Users className="h-4 w-4" />,
+                      label: "Usuarios activos",
+                      value: adminSection.active_user_count,
+                      meta: `${adminSection.active_location_count} sede(s)`,
+                      tone: "accent",
+                    },
+                    {
+                      icon: <Store className="h-4 w-4" />,
+                      label: "Sedes asignadas",
+                      value: adminSection.active_location_count,
+                      meta: "Activas",
+                      tone: "info",
+                    },
+                    {
+                      icon: <ClipboardList className="h-4 w-4" />,
+                      label: "Solicitudes abiertas",
+                      value: adminSection.pending_requests_count,
+                      meta: "Red asignada",
+                      tone: "success",
+                    },
+                  ]}
+                />
               </section>
             )}
 
             {inventorySection?.visible && (
-              <section className="space-y-3">
+              <section className="flex-1 min-w-0 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <PackageSearch className="h-4 w-4 text-[var(--ripnel-accent)]" />
@@ -663,53 +602,32 @@ export default function InicioPage() {
                 </div>
               </section>
             )}
-
-            {!transferSection?.visible && inventorySection?.visible && <div />}
           </div>
-        ) : null}
+        )}
 
-        {adminSection?.visible && (
+        {transferSection?.visible && (
           <section className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-[var(--ripnel-accent)]" />
+                <ArrowLeftRight className="h-4 w-4 text-[var(--ripnel-accent)]" />
                 <h2 className="text-base font-semibold text-[var(--ops-text)]">
-                  Vision gerencial
+                  Transferencias entre tiendas
                 </h2>
               </div>
               <Link
-                href={appRoutes.dashboard}
+                href={buildTransferListRoute()}
                 className="text-[13px] font-medium text-[var(--ripnel-accent)] transition hover:underline"
               >
-                Ir al panel
+                Ver todas
               </Link>
             </div>
 
-            <OpsSummaryBand
-              items={[
-                {
-                  icon: <Users className="h-4 w-4" />,
-                  label: "Usuarios activos",
-                  value: adminSection.active_user_count,
-                  meta: `${adminSection.active_location_count} sede(s)`,
-                  tone: "accent",
-                },
-                {
-                  icon: <Store className="h-4 w-4" />,
-                  label: "Sedes asignadas",
-                  value: adminSection.active_location_count,
-                  meta: "Activas",
-                  tone: "info",
-                },
-                {
-                  icon: <ClipboardList className="h-4 w-4" />,
-                  label: "Solicitudes abiertas",
-                  value: adminSection.pending_requests_count,
-                  meta: "Red asignada",
-                  tone: "success",
-                },
-              ]}
-            />
+            <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4">
+              <HomeTransferRequests
+                section={transferSection}
+                formatDateTime={formatDateTime}
+              />
+            </div>
           </section>
         )}
 

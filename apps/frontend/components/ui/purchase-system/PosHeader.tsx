@@ -38,9 +38,9 @@ type PosHeaderProgress = {
 
 type PosHeaderProps = {
   eyebrow?: string
-  title?: string
-  description?: string | null
-  subtitle?: string | null
+  title?: ReactNode
+  description?: ReactNode
+  subtitle?: ReactNode
   meta?: ReactNode
   actions?: ReactNode
   steps?: PosHeaderStep[]
