@@ -3,7 +3,7 @@ import { TransfersRequestPage } from "@/components/modules/transfers/transfers-r
 
 export default function TransferRequestRoutePage() {
   return (
-    <PermissionGuard permission="transfers.manage">
+    <PermissionGuard anyPermissions={["transfers.manage", "transfers.request.create"]}>
       <TransfersRequestPage />
     </PermissionGuard>
   )

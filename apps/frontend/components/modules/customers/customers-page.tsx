@@ -9,6 +9,7 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
+  Download,
 } from "lucide-react"
 
 import { AdminConfirmModal, AdminModalShell, AdminRowActionsMenu } from "@/components/admin/admin-ui"
@@ -40,7 +41,10 @@ import { Pagination } from "@/components/ui/pagination"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { apiFetchData } from "@/lib/api"
+import { showSuccess, showError } from "@/lib/toast"
+import { exportToCsv } from "@/lib/export-csv"
 import { useApiGet } from "@/hooks/use-api-get"
+import { useDebounce } from "@/hooks/use-debounce"
 import { activeBadgeLabel } from "@/lib/badge-utils"
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import { usePagination } from "@/hooks/use-pagination"
@@ -57,17 +61,18 @@ export default function CustomersPage() {
   const [activeChangeCustomer, setActiveChangeCustomer] = useState<CustomerRecord | null>(null)
   const [savingActiveChange, setSavingActiveChange] = useState(false)
 
-  // TODO: Add debounce to useApiGet or use a debounced query value
+  const debouncedQuery = useDebounce(query, 300)
+
   const { data: customersData, loading, error, refetch: refetchCustomers } = useApiGet(
     () => {
       const params = new URLSearchParams()
-      if (query.trim()) params.set("q", query.trim())
+      if (debouncedQuery.trim()) params.set("q", debouncedQuery.trim())
       if (docFilter !== "all") params.set("document_type", docFilter)
       params.set("sort", sort)
       const url = `/api/customers${params.toString() ? `?${params.toString()}` : ""}`
       return apiFetchData<CustomerRecord[]>(url, { cache: "no-store" })
     },
-    [query, docFilter, sort]
+    [debouncedQuery, docFilter, sort]
   )
   const customers = customersData ?? []
 
@@ -113,8 +118,9 @@ export default function CustomersPage() {
 
       refetchCustomers()
       closeEditModal()
+      showSuccess("Cliente actualizado", editingCustomer ? buildDisplayName(editingCustomer) : undefined)
     } catch (submitError: unknown) {
-      setSaveError(submitError instanceof Error ? submitError.message : "No se pudo guardar el cliente")
+      showError("Error al guardar", submitError instanceof Error ? submitError.message : "No se pudo guardar el cliente")
     } finally {
       setSaving(false)
     }
@@ -141,8 +147,12 @@ export default function CustomersPage() {
         setEditState(EMPTY_FORM)
       }
       setActiveChangeCustomer(null)
+      showSuccess(
+        activeChangeCustomer.active ? "Cliente desactivado" : "Cliente activado",
+        buildDisplayName(activeChangeCustomer)
+      )
     } catch (submitError: unknown) {
-      setSaveError(submitError instanceof Error ? submitError.message : "No se pudo actualizar el cliente")
+      showError("Error al actualizar", submitError instanceof Error ? submitError.message : "No se pudo actualizar el cliente")
     } finally {
       setSavingActiveChange(false)
     }
@@ -165,6 +175,23 @@ export default function CustomersPage() {
   const { paginatedItems: paginatedCustomers, totalPages, safePage, firstVisible, lastVisible, setPage } = usePagination(customers)
   const hasActiveFilters = query.trim().length > 0 || docFilter !== "all" || sort !== "desc"
 
+  function handleExport() {
+    const headers = ["Código", "Nombre", "Tipo Doc", "Nro Doc", "Razón Social", "Tipo", "Email", "Teléfono", "Activo", "Creado"]
+    const rows = (customersData || []).map((c) => [
+      c.internal_code || "-",
+      (c.full_name || c.business_name || c.commercial_name || "-"),
+      c.document_type,
+      c.document_number || "-",
+      c.business_name || "-",
+      CUSTOMER_TYPE_LABELS[c.customer_type] || c.customer_type,
+      c.email || "-",
+      c.phone || "-",
+      c.active ? "Sí" : "No",
+      formatCustomerDate(c.created_at),
+    ])
+    exportToCsv("clientes", headers, rows)
+  }
+
   return (
     <TooltipProvider delayDuration={120}>
       <OpsPageShell width="wide">
@@ -173,6 +200,24 @@ export default function CustomersPage() {
             title="Listado de clientes"
             actions={
               <>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      className="rounded-lg"
+                      onClick={handleExport}
+                      disabled={!customersData || customersData.length === 0}
+                      aria-label="Exportar CSV"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" sideOffset={8}>
+                    Exportar CSV
+                  </TooltipContent>
+                </Tooltip>
                 <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
                   <Link href={`${appRoutes.businessIntelligence}?view=clientes`}>Dashboards BI</Link>
                 </Button>

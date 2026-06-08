@@ -479,7 +479,7 @@ export function AppSidebar({
         {...props}
       >
         <SidebarHeader className="border-b border-sidebar-border px-3 pb-3 pt-4">
-          <Link href="/demo" className="flex items-center gap-2.5">
+          <Link href={appRoutes.home} className="flex items-center gap-2.5">
             <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full ring-1 ring-sidebar-border">
               <Image
                 src="/ripnel-logo.svg"
@@ -590,7 +590,7 @@ export function AppSidebar({
                 onClick={handleLogout}
                 className="h-10 gap-2.5 rounded-none px-3 text-sm font-medium text-sidebar-foreground/60 transition-all duration-150 ease-out cursor-pointer hover:bg-red-500/10 hover:text-red-500"
               >
-                <span className="group-data-[collapsible=icon]:hidden">Cerrar sesion</span>
+                <span className="group-data-[collapsible=icon]:hidden">Cerrar sesión</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>

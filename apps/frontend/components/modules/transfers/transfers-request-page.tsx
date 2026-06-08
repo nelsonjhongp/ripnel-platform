@@ -364,7 +364,9 @@ export function TransfersRequestPage() {
   const requestLocationOptions = useMemo<RequestLocationOption[]>(() => {
     const destinationLocationId = defaultLocation?.location_id;
     const activeLocations = (locations || []).filter(
-      (location) => location.location_id !== destinationLocationId
+      (location) =>
+        location.location_id !== destinationLocationId &&
+        location.type !== "workshop"
     );
 
     return [
@@ -532,7 +534,7 @@ export function TransfersRequestPage() {
                           }}
                           placeholder={
                             hasOriginSelected
-                              ? "Buscar producto por nombre, SKU o categoría..."
+                              ? "Buscar producto..."
                               : "Selecciona origen primero"
                           }
                           disabled={!hasOriginSelected || requestCompleted}

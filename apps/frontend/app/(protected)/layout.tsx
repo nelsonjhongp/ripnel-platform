@@ -4,6 +4,8 @@ import { ProtectedGuard } from "@/components/auth/ProtectedGuard"
 import { VisualPreferencesProvider } from "@/components/appearance/VisualPreferencesProvider"
 import { NotificationsProvider } from "@/components/notifications"
 import { ChatbotLazy } from "@/components/chatbot/ChatbotLazy"
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary"
+import { CommandPalette } from "@/components/ui/command-palette"
 
 export default function ProtectedLayout({
   children,
@@ -15,7 +17,10 @@ export default function ProtectedLayout({
       <VisualPreferencesProvider>
         <SidebarProvider>
           <NotificationsProvider>
-            <SidebarShell>{children}</SidebarShell>
+            <ErrorBoundary>
+              <SidebarShell>{children}</SidebarShell>
+              <CommandPalette />
+            </ErrorBoundary>
             <ChatbotLazy />
           </NotificationsProvider>
         </SidebarProvider>

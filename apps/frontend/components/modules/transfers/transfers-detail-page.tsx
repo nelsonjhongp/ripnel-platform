@@ -4,14 +4,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
-  ArrowRight,
   CheckCircle2,
-  CircleAlert,
   ClipboardList,
-  Clock3,
-  FileText,
+  Info,
   LoaderCircle,
-  MapPin,
   Package,
   RefreshCw,
   Truck,
@@ -36,8 +32,7 @@ import {
   OpsTableBlock,
   OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
-import { OpsInfoCard } from "@/components/ui/ops-info-card";
-import { OpsMetricStripItem } from "@/components/ui/ops-metric-strip-item";
+import { Pagination } from "@/components/ui/pagination";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ApiError, apiFetch, type ApiEnvelope, unwrapApiData } from "@/lib/api";
@@ -51,7 +46,6 @@ import {
   getTransferStatusClasses,
   TRANSFER_ACTION_CONFIG,
   type TransferActionKey,
-  type TransferAvailableActions,
   type TransferDetail,
   type TransferLineDetail,
   type TransferSummary,
@@ -69,198 +63,43 @@ const TRANSFER_STAGE_ORDER: TransferStatus[] = [
   "cancelled",
 ];
 
-function getTransferBannerCopy(transfer: TransferDetail) {
-  if (transfer.status === "requested") {
-    return {
-      title: "Solicitud pendiente de aprobación",
-      description: transfer.active_message,
-      tone:
-        "border-[color:color-mix(in_srgb,var(--ripnel-accent)_20%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_80%,var(--ops-surface))] text-[var(--ops-text)]",
-      iconClass: "text-[var(--ripnel-accent-hover)]",
-      Icon: CircleAlert,
-    };
-  }
-
-  if (transfer.status === "approved") {
-    return {
-      title: "Transferencia aprobada",
-      description: transfer.active_message,
-      tone:
-        "border-[color:color-mix(in_srgb,var(--ripnel-accent)_24%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_76%,var(--ops-surface))] text-[var(--ops-text)]",
-      iconClass: "text-[var(--ripnel-accent-hover)]",
-      Icon: ClipboardList,
-    };
-  }
-
-  if (transfer.status === "shipped") {
-    return {
-      title: "Transferencia despachada",
-      description: transfer.active_message,
-      tone:
-        "border-[color:color-mix(in_srgb,#f59e0b_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] text-[var(--ops-text)]",
-      iconClass: "text-[color:color-mix(in_srgb,#b45309_82%,var(--ops-text))]",
-      Icon: Truck,
-    };
-  }
-
-  if (transfer.status === "received") {
-    return {
-      title: "Transferencia recibida",
-      description: transfer.active_message,
-      tone:
-        "border-[color:color-mix(in_srgb,#10b981_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_10%,var(--ops-surface))] text-[var(--ops-text)]",
-      iconClass: "text-[color:color-mix(in_srgb,#059669_84%,var(--ops-text))]",
-      Icon: CheckCircle2,
-    };
-  }
-
-  return {
-    title: "Transferencia cancelada",
-    description: transfer.active_message,
-    tone:
-      "border-[color:color-mix(in_srgb,#e11d48_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#e11d48_8%,var(--ops-surface))] text-[var(--ops-text)]",
-    iconClass: "text-[color:color-mix(in_srgb,#be123c_84%,var(--ops-text))]",
-    Icon: XCircle,
-  };
-}
-
-function getTransferImpactCopy(status: TransferStatus) {
-  if (status === "requested" || status === "approved") {
-    return "Sin impacto en stock";
-  }
-
-  if (status === "shipped") {
-    return "Stock descontado en origen";
-  }
-
-  if (status === "received") {
-    return "Stock descontado en origen e ingresado en destino";
-  }
-
-  return "Sin impacto final / transferencia anulada";
-}
-
-function getPendingMetricLabel(status: TransferStatus) {
-  if (status === "requested" || status === "approved") {
-    return "Pendiente despacho";
-  }
-
-  if (status === "shipped") {
-    return "Pendiente recepción";
-  }
-
-  return "Pendiente";
-}
-
-function getPendingMetricTone(status: TransferStatus) {
-  if (status === "received" || status === "shipped" || status === "requested" || status === "approved") {
-    return "warning" as const;
-  }
-
-  return "accent" as const;
-}
-
-function getLinePendingValue(status: TransferStatus, line: TransferLineDetail) {
-  if (status === "requested" || status === "approved") {
-    return Math.max(0, Number(line.qty_requested || 0) - Number(line.qty_shipped || 0));
-  }
-
-  if (status === "shipped") {
-    return Math.max(0, Number(line.qty_shipped || 0) - Number(line.qty_received || 0));
-  }
-
-  if (status === "received") {
-    return 0;
-  }
-
-  return null;
-}
-
-function formatTraceStatus(name: string | null, date: string | null) {
-  if (!date) {
-    return "Pendiente";
-  }
-
-  return `${name || "Sin usuario"} · ${formatDateTime(date)}`;
-}
+const DETAIL_PAGE_SIZE = 4;
 
 function getTimelineState(
   transfer: TransferDetail,
   step: Exclude<TransferStatus, "cancelled">
 ): TimelineState {
   if (transfer.status === "cancelled") {
-    if (step === "requested") {
-      return "complete";
-    }
-
-    if (step === "approved" && transfer.approved_at) {
-      return "complete";
-    }
-
+    if (step === "requested") return "complete";
+    if (step === "approved" && transfer.approved_at) return "complete";
     return "pending";
   }
 
   const currentIndex = TRANSFER_STAGE_ORDER.indexOf(transfer.status);
   const stepIndex = TRANSFER_STAGE_ORDER.indexOf(step);
 
-  if (stepIndex < currentIndex) {
-    return "complete";
-  }
-
-  if (stepIndex === currentIndex) {
-    return "current";
-  }
-
+  if (stepIndex < currentIndex) return "complete";
+  if (stepIndex === currentIndex) return "current";
   return "pending";
 }
 
-function getTimelineStateClasses(state: TimelineState) {
-  if (state === "complete") {
-    return {
-      card: "border-[color:color-mix(in_srgb,#10b981_30%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_9%,var(--ops-surface))]",
-      icon: "border-[color:color-mix(in_srgb,#10b981_36%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_16%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_82%,var(--ops-text))]",
-      label: "text-[color:color-mix(in_srgb,#047857_88%,var(--ops-text))]",
-    };
-  }
-
-  if (state === "current") {
-    return {
-      card: "border-[color:color-mix(in_srgb,var(--ripnel-accent)_30%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_84%,var(--ops-surface))]",
-      icon: "border-[color:color-mix(in_srgb,var(--ripnel-accent)_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_90%,var(--ops-surface))] text-[var(--ripnel-accent-hover)]",
-      label: "text-[var(--ripnel-accent-hover)]",
-    };
-  }
-
-  if (state === "cancelled") {
-    return {
-      card: "border-[color:color-mix(in_srgb,#e11d48_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#e11d48_8%,var(--ops-surface))]",
-      icon: "border-[color:color-mix(in_srgb,#e11d48_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#e11d48_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#be123c_84%,var(--ops-text))]",
-      label: "text-[color:color-mix(in_srgb,#be123c_84%,var(--ops-text))]",
-    };
-  }
-
-  return {
-    card: "border-[var(--ops-border-strong)] bg-[var(--ops-surface)]",
-    icon: "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]",
-    label: "text-[var(--ops-text-muted)]",
-  };
+function getTimelineIconClasses(state: TimelineState) {
+  if (state === "complete")
+    return "border-[color:color-mix(in_srgb,#10b981_36%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_16%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_82%,var(--ops-text))]";
+  if (state === "current")
+    return "border-[color:color-mix(in_srgb,var(--ripnel-accent)_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_90%,var(--ops-surface))] text-[var(--ripnel-accent-hover)]";
+  if (state === "cancelled")
+    return "border-[color:color-mix(in_srgb,#e11d48_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#e11d48_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#be123c_84%,var(--ops-text))]";
+  return "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]";
 }
 
-function SummaryItem({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="space-y-1 border-b border-[var(--ops-border-soft)] pb-3 last:border-b-0 last:pb-0">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-        {label}
-      </p>
-      <p className="text-sm text-[var(--ops-text)]">{value}</p>
-    </div>
-  );
+function getLinePendingValue(status: TransferStatus, line: TransferLineDetail) {
+  if (status === "requested" || status === "approved")
+    return Math.max(0, Number(line.qty_requested || 0) - Number(line.qty_shipped || 0));
+  if (status === "shipped")
+    return Math.max(0, Number(line.qty_shipped || 0) - Number(line.qty_received || 0));
+  if (status === "received") return 0;
+  return null;
 }
 
 export function TransferDetailPage({
@@ -274,19 +113,14 @@ export function TransferDetailPage({
   const [notice, setNotice] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<TransferActionKey | null>(null);
   const [busyAction, setBusyAction] = useState<TransferActionKey | null>(null);
+  const [linesPage, setLinesPage] = useState(1);
 
   useEffect(() => {
     let active = true;
-
     params.then(({ transferId: resolvedTransferId }) => {
-      if (active) {
-        setTransferId(resolvedTransferId);
-      }
+      if (active) setTransferId(resolvedTransferId);
     });
-
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [params]);
 
   const {
@@ -326,10 +160,7 @@ export function TransferDetailPage({
   );
 
   async function handleTransferAction(action: TransferActionKey) {
-    if (!transferId) {
-      return;
-    }
-
+    if (!transferId) return;
     setBusyAction(action);
     setActionError(null);
     setNotice(null);
@@ -353,36 +184,21 @@ export function TransferDetailPage({
   }
 
   const totals = useMemo(() => {
-    if (!transfer) {
-      return null;
-    }
-
-    const baseTotals = transfer.lines.reduce(
-      (accumulator, line) => {
-        accumulator.lines += 1;
-        accumulator.requested += Number(line.qty_requested || 0);
-        accumulator.shipped += Number(line.qty_shipped || 0);
-        accumulator.received += Number(line.qty_received || 0);
-        return accumulator;
+    if (!transfer) return null;
+    const base = transfer.lines.reduce(
+      (acc, line) => {
+        acc.lines += 1;
+        acc.requested += Number(line.qty_requested || 0);
+        acc.shipped += Number(line.qty_shipped || 0);
+        acc.received += Number(line.qty_received || 0);
+        return acc;
       },
       { lines: 0, requested: 0, shipped: 0, received: 0 }
     );
-
-    const pendingToShip = Math.max(0, baseTotals.requested - baseTotals.shipped);
-    const pendingToReceive = Math.max(0, baseTotals.shipped - baseTotals.received);
-
     return {
-      ...baseTotals,
-      pendingToShip,
-      pendingToReceive,
-      pendingDisplay:
-        transfer.status === "requested" || transfer.status === "approved"
-          ? pendingToShip
-          : transfer.status === "shipped"
-            ? pendingToReceive
-            : transfer.status === "received"
-              ? 0
-              : "—",
+      ...base,
+      pendingToShip: Math.max(0, base.requested - base.shipped),
+      pendingToReceive: Math.max(0, base.shipped - base.received),
     };
   }, [transfer]);
 
@@ -391,23 +207,37 @@ export function TransferDetailPage({
     [transfer]
   );
 
-  const banner = transfer ? getTransferBannerCopy(transfer) : null;
   const movementsHref = transfer
     ? `${appRoutes.inventoryMovements}?query=${encodeURIComponent(transfer.transfer_id)}`
     : appRoutes.inventoryMovements;
   const movementsPending = transfer?.status === "requested" || transfer?.status === "approved";
+
   const visibleActions = transfer
     ? (Object.keys(transfer.available_actions) as TransferActionKey[]).filter(
         (action) => transfer.available_actions[action]
       )
     : [];
 
+  const primaryAction = visibleActions.find((a) => a !== "cancel") || null;
+  const secondaryActions = visibleActions.filter((a) => a !== primaryAction);
+
+  const totalLinesPages = Math.max(1, Math.ceil((transfer?.lines.length || 0) / DETAIL_PAGE_SIZE));
+  const safeLinesPage = Math.min(Math.max(linesPage, 1), totalLinesPages);
+  const paginatedLines = (transfer?.lines || []).slice(
+    (safeLinesPage - 1) * DETAIL_PAGE_SIZE,
+    safeLinesPage * DETAIL_PAGE_SIZE
+  );
+
+  useEffect(() => {
+    if (safeLinesPage > totalLinesPages) setLinesPage(totalLinesPages);
+  }, [safeLinesPage, totalLinesPages]);
+
   if (loading) {
     return (
       <LoadingPage
         variant="ops"
         title="Cargando detalle de transferencia"
-        description="Estamos recuperando la cabecera operativa y sus líneas asociadas."
+        description="Recuperando datos operativos de la transferencia."
       />
     );
   }
@@ -420,14 +250,12 @@ export function TransferDetailPage({
     return <ForbiddenPage variant="ops" />;
   }
 
-  if (pageError || !transfer || !totals || !banner) {
+  if (pageError || !transfer || !totals) {
     return (
       <ErrorPage
         variant="ops"
         title="No pudimos abrir el detalle de transferencia"
-        description={
-          pageError?.message || "La transferencia solicitada no está disponible para esta sede."
-        }
+        description={pageError?.message || "La transferencia solicitada no está disponible para esta sede."}
       />
     );
   }
@@ -480,32 +308,49 @@ export function TransferDetailPage({
   ];
 
   return (
-    <OpsPageShell width="wide">
-      <div className="space-y-3">
+    <OpsPageShell width="wide" className="pb-28">
+      <div className="space-y-1">
         <PosHeader
           eyebrow="Transferencias"
-          title={transfer.transfer_number || "Transferencia"}
-          description={`${transfer.from_location_name} ${String.fromCharCode(8594)} ${transfer.to_location_name}`}
+          title={
+            <span className="flex items-center gap-2.5">
+              {transfer.transfer_number || "Transferencia"}
+              <span
+                className={cn(
+                  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
+                  getTransferStatusClasses(transfer.status)
+                )}
+              >
+                {formatTransferStatus(transfer.status)}
+              </span>
+            </span>
+          }
+          description={
+            <span className="text-sm">
+              {transfer.from_location_name}
+              <span className="mx-1.5 text-[var(--ops-text-muted)]">&rarr;</span>
+              {transfer.to_location_name}
+            </span>
+          }
           meta={
-            <span
-              className={cn(
-                "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-                getTransferStatusClasses(transfer.status)
-              )}
-            >
-              {formatTransferStatus(transfer.status)}
+            <span className="text-xs text-[var(--ops-text-muted)]">
+              Creada por {transfer.created_by_name || "Sin usuario"} &middot;{" "}
+              {formatDateTime(transfer.created_at)} &middot;{" "}
+              {transfer.next_step
+                ? `Siguiente: ${formatTransferNextStep(transfer.next_step)}`
+                : "Flujo completado"}
             </span>
           }
           actions={
-            <div className="flex flex-wrap items-center gap-2">
-              <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
-                <Link href={appRoutes.transfers}>
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                  Volver a transferencias
-                </Link>
-              </Button>
+            <TooltipProvider>
+              <div className="flex items-center gap-2">
+                <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
+                  <Link href={appRoutes.transfers}>
+                    <ArrowLeft className="h-3.5 w-3.5" />
+                    Volver
+                  </Link>
+                </Button>
 
-              <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -521,280 +366,132 @@ export function TransferDetailPage({
                   </TooltipTrigger>
                   <TooltipContent>Actualizar detalle</TooltipContent>
                 </Tooltip>
-              </TooltipProvider>
 
-              {visibleActions.map((action) => (
-                <Button
-                  key={action}
-                  type="button"
-                  variant={action === "cancel" ? "destructive" : "accent"}
-                  size="sm"
-                  className="rounded-lg px-3"
-                  disabled={busyAction === action}
-                  onClick={() => setPendingAction(action)}
-                >
-                  {busyAction === action ? (
-                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    TRANSFER_ACTION_CONFIG[action].icon
-                  )}
-                  {formatTransferPrimaryAction(action)}
-                </Button>
-              ))}
+                {secondaryActions.map((action) => (
+                  <Button
+                    key={action}
+                    type="button"
+                    variant={action === "cancel" ? "destructive" : "outline"}
+                    size="sm"
+                    className="rounded-lg px-3"
+                    disabled={busyAction === action}
+                    onClick={() => setPendingAction(action)}
+                  >
+                    {busyAction === action ? (
+                      <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      TRANSFER_ACTION_CONFIG[action].icon
+                    )}
+                    {formatTransferPrimaryAction(action)}
+                  </Button>
+                ))}
 
-              {movementsPending ? (
-                <TooltipProvider>
+                {movementsPending ? (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className="inline-flex">
                         <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
                           <Link href={movementsHref}>
                             <Package className="h-3.5 w-3.5" />
-                            Ver movimientos de stock
+                            Movimientos
                           </Link>
                         </Button>
                       </span>
                     </TooltipTrigger>
                     <TooltipContent>Sin movimientos generados todavía.</TooltipContent>
                   </Tooltip>
-                </TooltipProvider>
-              ) : (
-                <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
-                  <Link href={movementsHref}>
-                    <Package className="h-3.5 w-3.5" />
-                    Ver movimientos de stock
-                  </Link>
-                </Button>
-              )}
-            </div>
+                ) : (
+                  <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
+                    <Link href={movementsHref}>
+                      <Package className="h-3.5 w-3.5" />
+                      Movimientos
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            </TooltipProvider>
           }
         />
 
-        <p className="text-sm text-[var(--ops-text-muted)]">
-          Creada por {transfer.created_by_name || "Sin usuario"} &middot;{" "}
-          {formatDateTime(transfer.created_at)}
-        </p>
+        {transfer.notes?.trim() ? (
+          <p className="flex items-center gap-1.5 text-[13px] italic text-[var(--ops-text-muted)]">
+            <Info className="h-3.5 w-3.5 shrink-0" />
+            {transfer.notes.trim()}
+          </p>
+        ) : null}
       </div>
 
       {notice ? <AdminInlineMessage tone="success">{notice}</AdminInlineMessage> : null}
       {actionError ? <AdminInlineMessage tone="danger">{actionError}</AdminInlineMessage> : null}
 
-      <section className={cn("rounded-xl border px-4 py-4 md:px-5", banner.tone)}>
-        <div className="flex items-start gap-3">
-          <div
-            className={cn(
-              "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-current/12 bg-white/60",
-              banner.iconClass
-            )}
-          >
-            <banner.Icon className="h-4 w-4" />
-          </div>
-          <div className="space-y-1">
-            <h2 className="text-sm font-semibold text-[var(--ops-text)]">{banner.title}</h2>
-            <p className="text-sm leading-5 text-[var(--ops-text-muted)]">{banner.description}</p>
-          </div>
-        </div>
-      </section>
-
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.3fr)]">
-        <section className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4">
-          <div className="flex items-center gap-2">
-            <Clock3 className="h-4 w-4 text-[var(--ops-text-muted)]" />
-            <h2 className="text-sm font-semibold text-[var(--ops-text)]">Siguiente etapa</h2>
-          </div>
-          <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center">
-            <div className="space-y-1">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                Paso
-              </p>
-              <p className="text-sm font-semibold text-[var(--ops-text)]">
-                {formatTransferNextStep(transfer.next_step)}
-              </p>
-            </div>
-            <div className="hidden justify-center md:flex">
-              <ArrowRight className="h-4 w-4 text-[var(--ops-text-muted)]" />
-            </div>
-            <div className="space-y-1">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                Responsable
-              </p>
-              <p className="text-sm font-semibold text-[var(--ops-text)]">
-                {transfer.next_owner?.location_name || "Sin siguiente responsable"}
-              </p>
-              {transfer.next_owner?.location_code ? (
-                <p className="text-[12px] text-[var(--ops-text-muted)]">
-                  {transfer.next_owner.location_code}
-                </p>
-              ) : null}
-            </div>
-          </div>
-        </section>
-
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-          <OpsMetricStripItem label="Líneas" value={totals.lines} isNeutral />
-          <OpsMetricStripItem label="Total solicitado" value={totals.requested} tone="accent" />
-          <OpsMetricStripItem label="Total despachado" value={totals.shipped} tone="warning" />
-          <OpsMetricStripItem
-            label="Total recibido"
-            value={totals.received}
-            tone="accent"
-          />
-          <OpsMetricStripItem
-            label={getPendingMetricLabel(transfer.status)}
-            value={totals.pendingDisplay}
-            tone={getPendingMetricTone(transfer.status)}
-          />
-        </div>
-      </div>
-
       <OpsSectionDivider className="space-y-5">
-        <OpsTableBlock>
-          <div className="flex items-center gap-2">
-            <Clock3 className="h-4 w-4 text-[var(--ops-text-muted)]" />
-            <h2 className="text-sm font-semibold text-[var(--ops-text)]">Timeline operativo</h2>
-          </div>
+        <div className="flex w-full items-center gap-0">
+          {timelineItems.map((item, index) => {
+            const iconStyles = getTimelineIconClasses(item.state);
+            const isCancelled = item.state === "cancelled";
 
-          <div className="grid gap-3 lg:grid-cols-[repeat(4,minmax(0,1fr))] xl:grid-cols-[repeat(5,minmax(0,1fr))]">
-            {timelineItems.map((item) => {
-              const styles = getTimelineStateClasses(item.state);
-
-              return (
-                <article key={item.key} className={cn("rounded-xl border px-4 py-4", styles.card)}>
-                  <div className="flex items-start gap-3">
-                    <div
-                      className={cn(
-                        "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border",
-                        styles.icon
-                      )}
-                    >
-                      <item.Icon className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0 space-y-1">
-                      <p className={cn("text-sm font-semibold", styles.label)}>{item.label}</p>
-                      {item.date ? (
-                        <>
-                          <p className="text-sm text-[var(--ops-text)]">{item.user || "Sin usuario"}</p>
-                          <p className="text-[12px] text-[var(--ops-text-muted)]">
-                            {formatDateTime(item.date)}
-                          </p>
-                        </>
-                      ) : (
-                        <p className="text-sm text-[var(--ops-text-muted)]">Pendiente</p>
-                      )}
-                    </div>
+            return (
+              <div key={item.key} className="flex flex-1 items-center last:flex-none">
+                <div className="flex flex-col items-center gap-1.5 min-w-0">
+                  <div
+                    className={cn(
+                      "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border",
+                      iconStyles
+                    )}
+                  >
+                    <item.Icon className="h-3.5 w-3.5" />
                   </div>
-                </article>
-              );
-            })}
-          </div>
-        </OpsTableBlock>
-
-        <div className="grid gap-4 xl:grid-cols-[1fr_1.15fr_0.9fr]">
-          <OpsInfoCard title="Ruta de transferencia" icon={MapPin}>
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center">
-              <div className="space-y-1.5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  Origen
-                </p>
-                <p className="text-sm font-semibold text-[var(--ops-text)]">
-                  {transfer.from_location_name}
-                </p>
-                <p className="text-[12px] text-[var(--ops-text-muted)]">
-                  {transfer.from_location_code}
-                </p>
-              </div>
-
-              <div className="hidden items-center justify-center sm:flex">
-                <ArrowRight className="h-4 w-4 text-[var(--ops-text-muted)]" />
-              </div>
-
-              <div className="space-y-1.5">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  Destino
-                </p>
-                <p className="text-sm font-semibold text-[var(--ops-text)]">
-                  {transfer.to_location_name}
-                </p>
-                <p className="text-[12px] text-[var(--ops-text-muted)]">
-                  {transfer.to_location_code}
-                </p>
-              </div>
-            </div>
-
-            <SummaryItem label="Impacto en stock" value={getTransferImpactCopy(transfer.status)} />
-          </OpsInfoCard>
-
-          <OpsInfoCard title="Trazabilidad" icon={ClipboardList}>
-            <div className="space-y-3">
-              <div className="grid gap-1.5 border-b border-[var(--ops-border-soft)] pb-3 md:grid-cols-[160px_minmax(0,1fr)]">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  Creada
-                </p>
-                <p className="text-sm text-[var(--ops-text)]">
-                  {formatTraceStatus(transfer.created_by_name, transfer.created_at)}
-                </p>
-              </div>
-
-              <div className="grid gap-1.5 border-b border-[var(--ops-border-soft)] pb-3 md:grid-cols-[160px_minmax(0,1fr)]">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  Aprobada
-                </p>
-                <p className="text-sm text-[var(--ops-text)]">
-                  {formatTraceStatus(transfer.approved_by_name, transfer.approved_at)}
-                </p>
-              </div>
-
-              <div className="grid gap-1.5 border-b border-[var(--ops-border-soft)] pb-3 md:grid-cols-[160px_minmax(0,1fr)]">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  Despachada
-                </p>
-                <p className="text-sm text-[var(--ops-text)]">
-                  {formatTraceStatus(transfer.shipped_by_name, transfer.shipped_at)}
-                </p>
-              </div>
-
-              <div
-                className={cn(
-                  "grid gap-1.5 md:grid-cols-[160px_minmax(0,1fr)]",
-                  transfer.cancelled_at ? "border-b border-[var(--ops-border-soft)] pb-3" : ""
-                )}
-              >
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  Recibida
-                </p>
-                <p className="text-sm text-[var(--ops-text)]">
-                  {formatTraceStatus(transfer.received_by_name, transfer.received_at)}
-                </p>
-              </div>
-
-              {transfer.cancelled_at ? (
-                <div className="grid gap-1.5 md:grid-cols-[160px_minmax(0,1fr)]">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                    Cancelada
-                  </p>
-                  <p className="text-sm text-[var(--ops-text)]">
-                    {formatTraceStatus(transfer.cancelled_by_name, transfer.cancelled_at)}
-                  </p>
+                  <span
+                    className={cn(
+                      "text-[11px] font-semibold whitespace-nowrap",
+                      item.state === "current"
+                        ? "text-[var(--ripnel-accent-hover)]"
+                        : isCancelled
+                          ? "text-[color:color-mix(in_srgb,#be123c_84%,var(--ops-text))]"
+                          : item.state === "complete"
+                            ? "text-[color:color-mix(in_srgb,#047857_88%,var(--ops-text))]"
+                            : "text-[var(--ops-text-muted)]"
+                    )}
+                  >
+                    {item.label}
+                  </span>
+                  {item.date ? (
+                    <span className="hidden text-[10px] text-[var(--ops-text-muted)] whitespace-nowrap text-center leading-tight sm:block">
+                      {item.user ? `${item.user.split(" ")[0]}\n` : ""}
+                      {formatDateTime(item.date)}
+                    </span>
+                  ) : (
+                    <span className="hidden text-[10px] text-[var(--ops-text-muted)] sm:block">
+                      Pendiente
+                    </span>
+                  )}
                 </div>
-              ) : null}
-            </div>
-          </OpsInfoCard>
+                {index < timelineItems.length - 1 ? (
+                  <div className="mx-2 h-px flex-1 bg-[var(--ops-border-strong)] last:flex-none" />
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
 
-          <OpsInfoCard title="Notas" icon={FileText}>
-            <p className="text-sm leading-6 text-[var(--ops-text)]">
-              {transfer.notes?.trim() || "Sin notas registradas."}
-            </p>
-          </OpsInfoCard>
+        <div>
+          <p className="text-xs text-[var(--ops-text-muted)]">
+            <span className="font-semibold text-[var(--ops-text)]">{totals.lines}</span>{" "}
+            {totals.lines === 1 ? "producto" : "productos"} solicitados &middot;{" "}
+            <span className="font-semibold text-[var(--ops-text)]">{totals.requested}</span>{" "}
+            {totals.requested === 1 ? "unidad" : "unidades"} &middot;{" "}
+            <span className="font-semibold text-[color:color-mix(in_srgb,#059669_82%,var(--ops-text))]">
+              {totals.received}
+            </span>{" "}
+            recibidas &middot;{" "}
+            <span className="font-semibold text-[color:color-mix(in_srgb,#d97706_82%,var(--ops-text))]">
+              {totals.shipped}
+            </span>{" "}
+            despachadas
+          </p>
         </div>
 
         <OpsTableBlock>
-          <div className="flex items-center gap-2">
-            <ClipboardList className="h-4 w-4 text-[var(--ops-text-muted)]" />
-            <h2 className="text-sm font-semibold text-[var(--ops-text)]">
-              Líneas de transferencia
-            </h2>
-          </div>
-
           <OpsTableWrap minWidth={hasLineNotes ? "1180px" : "1080px"}>
             <table className="w-full border-collapse">
               <thead className="bg-[var(--ops-surface-muted)]">
@@ -809,57 +506,65 @@ export function TransferDetailPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                {transfer.lines.map((line) => {
-                  const pendingValue = getLinePendingValue(transfer.status, line);
+                {paginatedLines.length === 0 ? (
+                  <tr>
+                    <td colSpan={hasLineNotes ? 7 : 6} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                      No hay productos en esta transferencia.
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedLines.map((line) => {
+                    const pendingValue = getLinePendingValue(transfer.status, line);
 
-                  return (
-                    <tr
-                      key={line.transfer_line_id}
-                      className="transition hover:bg-[var(--ops-surface-muted)]"
-                    >
-                      <td className="px-4 py-[var(--ops-row-py)] align-top">
-                        <div className="flex items-start gap-3">
-                          <div className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ripnel-accent-hover)]">
-                            <Package className="h-4 w-4" />
+                    return (
+                      <tr
+                        key={line.transfer_line_id}
+                        className="transition hover:bg-[var(--ops-surface-muted)]"
+                      >
+                        <td className="px-4 py-[var(--ops-row-py)] align-top">
+                          <div className="flex items-start gap-3">
+                            <div className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ripnel-accent-hover)]">
+                              <Package className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-[var(--ops-text)]">
+                                {line.style_name}
+                              </p>
+                              <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ripnel-accent-hover)]">
+                                {line.style_code || line.sku}
+                              </p>
+                            </div>
                           </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-[var(--ops-text)]">
-                              {line.style_name}
-                            </p>
-                            <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ripnel-accent-hover)]">
-                              {line.style_code || line.sku}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] align-top">
-                        <p className="text-sm text-[var(--ops-text)]">
-                          {line.color_name} / {line.size_code}
-                        </p>
-                        <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                          {line.sku}
-                        </p>
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] text-right text-sm font-semibold tabular-nums text-[var(--ops-text)]">
-                        {line.qty_requested}
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] text-right text-sm tabular-nums text-[var(--ops-text)]">
-                        {line.qty_shipped}
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] text-right text-sm tabular-nums text-[var(--ops-text)]">
-                        {line.qty_received}
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] text-right text-sm font-medium tabular-nums text-[var(--ops-text)]">
-                        {pendingValue === null ? "—" : pendingValue}
-                      </td>
-                      {hasLineNotes ? (
-                        <td className="px-4 py-[var(--ops-row-py)] align-top text-sm text-[var(--ops-text)]">
-                          {line.notes?.trim() || "—"}
                         </td>
-                      ) : null}
-                    </tr>
-                  );
-                })}
+                        <td className="px-4 py-[var(--ops-row-py)] align-top">
+                          <p className="text-sm text-[var(--ops-text)]">
+                            {line.color_name} / {line.size_code}
+                          </p>
+                          <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                            {line.sku}
+                          </p>
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] text-right text-sm font-semibold tabular-nums text-[var(--ops-text)]">
+                          {line.qty_requested}
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] text-right text-sm tabular-nums text-[var(--ops-text)]">
+                          {line.qty_shipped}
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] text-right text-sm tabular-nums text-[var(--ops-text)]">
+                          {line.qty_received}
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] text-right text-sm font-medium tabular-nums text-[var(--ops-text)]">
+                          {pendingValue === null ? "—" : pendingValue}
+                        </td>
+                        {hasLineNotes ? (
+                          <td className="px-4 py-[var(--ops-row-py)] align-top text-sm text-[var(--ops-text)]">
+                            {line.notes?.trim() || "—"}
+                          </td>
+                        ) : null}
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
               <tfoot className="bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))]">
                 <tr className="border-t border-[var(--ops-border-strong)] text-sm font-semibold text-[var(--ops-text)]">
@@ -869,36 +574,93 @@ export function TransferDetailPage({
                   <td className="px-4 py-3 text-right tabular-nums">{totals.requested}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{totals.shipped}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{totals.received}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{totals.pendingDisplay}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {transfer.status === "requested" || transfer.status === "approved"
+                      ? totals.pendingToShip
+                      : transfer.status === "shipped"
+                        ? totals.pendingToReceive
+                        : transfer.status === "received"
+                          ? 0
+                          : "—"}
+                  </td>
                   {hasLineNotes ? <td className="px-4 py-3" /> : null}
                 </tr>
               </tfoot>
             </table>
           </OpsTableWrap>
+
+          {transfer.lines.length > DETAIL_PAGE_SIZE ? (
+            <Pagination
+              page={safeLinesPage}
+              totalPages={totalLinesPages}
+              onPageChange={setLinesPage}
+              className="border-t border-[var(--ops-border-strong)] px-4 py-2"
+            />
+          ) : null}
         </OpsTableBlock>
       </OpsSectionDivider>
 
       <AdminConfirmModal
         open={Boolean(pendingAction)}
-        title={
-          pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction].confirmLabel : "Confirmar acción"
-        }
+        title={pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction].confirmLabel : "Confirmar acción"}
         description={pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction].description(transfer as unknown as TransferSummary) : ""}
-        confirmLabel={
-          pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction].confirmLabel : "Confirmar"
-        }
+        confirmLabel={pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction].confirmLabel : "Confirmar"}
         confirmTone={pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction].tone : "accent"}
         busy={Boolean(pendingAction && busyAction === pendingAction)}
         onCancel={() => setPendingAction(null)}
         onConfirm={() => {
-          if (!pendingAction) {
-            return;
-          }
-
+          if (!pendingAction) return;
           void handleTransferAction(pendingAction);
           setPendingAction(null);
         }}
       />
+
+      {primaryAction || visibleActions.includes("cancel") ? (
+        <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-4 py-3 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] md:left-[var(--sidebar-width)] md:pl-6 md:pr-8">
+          <div className="mx-auto flex max-w-[1380px] items-center justify-between">
+            <p className="hidden text-sm text-[var(--ops-text-muted)] md:block">
+              {transfer.transfer_number || "Transferencia"} &middot;{" "}
+              {transfer.from_location_name} &rarr; {transfer.to_location_name}
+            </p>
+            <div className="flex items-center gap-3">
+              {primaryAction ? (
+                <Button
+                  type="button"
+                  variant="accent"
+                  size="lg"
+                  className="gap-2.5 rounded-xl px-6 text-base font-semibold shadow-sm"
+                  disabled={busyAction === primaryAction}
+                  onClick={() => setPendingAction(primaryAction)}
+                >
+                  {busyAction === primaryAction ? (
+                    <LoaderCircle className="h-5 w-5 animate-spin" />
+                  ) : (
+                    TRANSFER_ACTION_CONFIG[primaryAction].icon
+                  )}
+                  {formatTransferPrimaryAction(primaryAction)}
+                </Button>
+              ) : null}
+              {visibleActions.includes("cancel") ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="lg"
+                  className="gap-2 rounded-xl px-5 text-sm font-semibold"
+                  disabled={busyAction === "cancel"}
+                  onClick={() => setPendingAction("cancel")}
+                >
+                  {busyAction === "cancel" ? (
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                  ) : (
+                    TRANSFER_ACTION_CONFIG.cancel.icon
+                  )}
+                  {formatTransferPrimaryAction("cancel")}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </OpsPageShell>
   );
 }

@@ -156,4 +156,6 @@ module.exports = {
   getSaleById,
   postSale,
   getSaleProformaPdfFile,
+  getSaleReceiptPdfFile,
+  sendSaleEmail,
 };
