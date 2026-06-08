@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ArrowLeftRight,
   BarChart3,
+  Boxes,
   CircleAlert,
   ClipboardList,
   Info,
@@ -18,14 +19,13 @@ import {
   Users,
   Wallet,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
-import { Boxes, Clock3, Info, ShieldCheck, Store, Wallet } from "lucide-react"
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ErrorPage, LoadingPage } from "@/components/feedback/status-page";
 import { HomeHeader, type HomeHeaderAction } from "@/components/home/home-hero";
 import { HomeCriticalStockTable } from "@/components/home/home-critical-stock-table";
+import { HomeSectionCard } from "@/components/home/home-section-card";
+import { HomeTransferRequests } from "@/components/home/home-transfer-requests";
 import { OpsActionTile } from "@/components/ui/ops-action-tile";
 import { OpsEmptyState } from "@/components/ui/ops-empty-state";
 import { OpsMetricCard } from "@/components/ui/ops-metric-card";
@@ -577,61 +577,63 @@ export default function InicioPage() {
                         transferSection.counts.pending_receipts_count === 0
                       }
                     />
-            <div className="space-y-6">
-              {transferRequests?.visible ? (
-                <HomeTransferRequests
-                  section={transferRequests}
-                  formatDateTime={formatDateTime}
-                  infoTooltip="Solicitudes de transferencia entre tiendas. Aquí ves las solicitudes abiertas, pendientes de despacho y recepciones pendientes para tu sede activa."
-                />
-              ) : null}
-            </div>
-
-            <div className="space-y-6">
-              {inventory?.visible ? (
-                <HomeSectionCard
-                  eyebrow="Inventario"
-                  title="Stock sensible"
-                  action={{ label: "Ver inventario", href: appRoutes.inventory }}
-                  infoTooltip="Variantes con stock crítico en tu sede activa. 'En cero' son unidades sin existencia; 'Bajo mínimo' están por debajo del umbral configurado."
-                >
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <div className="sales-panel-muted rounded-xl p-4">
-                      <p className="flex items-center gap-2 text-sm font-semibold text-[var(--ops-text)]">
-                        <Boxes className="h-4 w-4 text-rose-600" />
-                        En cero
-                      </p>
-                      <p className="mt-3 text-2xl font-bold text-[var(--ops-text)]">
-                        {inventory.zero_stock_count}
-                      </p>
-                    </div>
-                    <div className="sales-panel-muted rounded-xl p-4">
-                      <p className="text-sm font-semibold text-[var(--ops-text)]">Bajo mínimo</p>
-                      <p className="mt-3 text-2xl font-bold text-[var(--ops-text)]">
-                        {inventory.low_stock_count}
-                      </p>
-                      <p className="mt-1 text-sm text-[var(--ops-text-muted)]">
-                        Umbral {inventory.low_stock_threshold}
-                      </p>
-                    </div>
                   </div>
 
-                  {transferSection.counts.open_for_store_count === 0 &&
-                    transferSection.counts.pending_dispatch_count === 0 &&
-                    transferSection.counts.pending_receipts_count === 0 && (
-                      <div className="mt-3 rounded-xl border border-dashed border-[var(--ops-border-soft)] px-4 py-4">
-                        <div className="flex items-center gap-2">
-                          <Inbox className="h-5 w-5 text-[var(--ops-text-muted)]" />
-                          <p className="text-sm font-semibold text-[var(--ops-text)]">
-                            Sin movimientos entre tiendas
-                          </p>
+                  <div className="mt-3 space-y-6">
+                    {transferSection?.visible ? (
+                      <HomeTransferRequests
+                        section={transferSection}
+                        formatDateTime={formatDateTime}
+                        infoTooltip="Solicitudes de transferencia entre tiendas. Aquí ves las solicitudes abiertas, pendientes de despacho y recepciones pendientes para tu sede activa."
+                      />
+                    ) : null}
+
+                    {inventorySection?.visible && (
+                      <HomeSectionCard
+                        eyebrow="Inventario"
+                        title="Stock sensible"
+                        action={{ label: "Ver inventario", href: appRoutes.inventory }}
+                        infoTooltip="Variantes con stock crítico en tu sede activa. 'En cero' son unidades sin existencia; 'Bajo mínimo' están por debajo del umbral configurado."
+                      >
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <div className="sales-panel-muted rounded-xl p-4">
+                            <p className="flex items-center gap-2 text-sm font-semibold text-[var(--ops-text)]">
+                              <Boxes className="h-4 w-4 text-rose-600" />
+                              En cero
+                            </p>
+                            <p className="mt-3 text-2xl font-bold text-[var(--ops-text)]">
+                              {inventorySection.zero_stock_count}
+                            </p>
+                          </div>
+                          <div className="sales-panel-muted rounded-xl p-4">
+                            <p className="text-sm font-semibold text-[var(--ops-text)]">Bajo mínimo</p>
+                            <p className="mt-3 text-2xl font-bold text-[var(--ops-text)]">
+                              {inventorySection.low_stock_count}
+                            </p>
+                            <p className="mt-1 text-sm text-[var(--ops-text-muted)]">
+                              Umbral {inventorySection.low_stock_threshold}
+                            </p>
+                          </div>
                         </div>
-                        <p className="mt-1 text-[13px] text-[var(--ops-text-muted)]">
-                          Todavía no hay solicitudes activas ni recepciones
-                          pendientes visibles para tu sede.
-                        </p>
-                      </div>
+
+                        {transferSection.counts.open_for_store_count === 0 &&
+                          transferSection.counts.pending_dispatch_count === 0 &&
+                          transferSection.counts.pending_receipts_count === 0 && (
+                            <div className="mt-3 rounded-xl border border-dashed border-[var(--ops-border-soft)] px-4 py-4">
+                              <div className="flex items-center gap-2">
+                                <Inbox className="h-5 w-5 text-[var(--ops-text-muted)]" />
+                                <p className="text-sm font-semibold text-[var(--ops-text)]">
+                                  Sin movimientos entre tiendas
+                                </p>
+                              </div>
+                              <p className="mt-1 text-[13px] text-[var(--ops-text-muted)]">
+                                Todavía no hay solicitudes activas ni recepciones pendientes visibles para tu sede.
+                              </p>
+                            </div>
+                          )}
+                      </HomeSectionCard>
                     )}
+                  </div>
                 </div>
               </section>
             )}

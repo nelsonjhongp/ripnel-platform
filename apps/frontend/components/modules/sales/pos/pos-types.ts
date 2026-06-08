@@ -50,8 +50,9 @@ export interface CartItem {
 }
 
 export interface SaleDiscountState {
-  mode: 'percent' | 'fixed'
+  mode: 'percent' | 'fixed' | 'none'
   value: string
+  reason: string
 }
 
 export interface PaymentDraft {
