@@ -117,22 +117,18 @@ const transferenciasGroup: SidebarGroup = {
     {
       title: "Solicitar transferencia",
       url: appRoutes.transferRequest,
-      icon: ArrowRightLeft,
     },
     {
       title: "Transferencias",
       url: appRoutes.transfers,
-      icon: ArrowRightLeft,
     },
     {
       title: "Recepciones pendientes",
       url: appRoutes.transferPendingReceipts,
-      icon: ArrowRightLeft,
     },
     {
       title: "Historial de transferencias",
       url: appRoutes.transferHistory,
-      icon: ArrowRightLeft,
     },
   ],
 };

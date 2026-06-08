@@ -1,8 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
-import { RotateCcw, Search } from "lucide-react"
+import { useMemo, useState } from "react"
+import { RotateCcw, Search, Download } from "lucide-react"
 
 import { PermissionGuard } from "@/components/auth/PermissionGuard"
 import { InlineStatusCard } from "@/components/feedback/status-page"
@@ -22,8 +22,11 @@ import { OpsMetricPill } from "@/components/ui/ops-metric-pill"
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import { formatDateTime } from "@/lib/date-utils"
 import { formatCurrency } from "@/lib/format-utils"
-import { formatApiFetchError, apiFetch } from "@/lib/api"
+import { apiFetch } from "@/lib/api"
 import { buildSaleDetailRoute } from "@/lib/routes"
+import { useApiGet } from "@/hooks/use-api-get"
+import { useDebounce } from "@/hooks/use-debounce"
+import { exportToCsv } from "@/lib/export-csv"
 import { SALE_STATUS_META, SALE_STATUS_TONES, type SaleItem, type SalesPageResponse } from "@/types/sales"
 
 
@@ -38,70 +41,30 @@ const STATUS_LABELS: Record<string, string> = {
 const STATUS_TONES: Record<string, string> = SALE_STATUS_TONES
 
 export default function TransactionHistoryPage() {
-  const [sales, setSales] = useState<SaleItem[]>([])
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState("all")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
-  const [totalResults, setTotalResults] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const debouncedSearch = useDebounce(search, 300)
 
-  useEffect(() => {
-    let active = true
-    const controller = new AbortController()
+  const { data, loading, error, refetch } = useApiGet<SalesPageResponse>(
+    () => {
+      const params = new URLSearchParams()
+      if (status !== "all") params.set("status", status)
+      if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim())
+      if (dateFrom) params.set("date_from", dateFrom)
+      if (dateTo) params.set("date_to", dateTo)
+      params.set("limit", String(PAGE_SIZE))
+      params.set("offset", String((currentPage - 1) * PAGE_SIZE))
+      const path = `/api/sales?${params.toString()}`
+      return apiFetch<SalesPageResponse>(path, { cache: "no-store" })
+    },
+    [currentPage, dateFrom, dateTo, debouncedSearch, status]
+  )
 
-    const timeoutId = window.setTimeout(async () => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const params = new URLSearchParams()
-        if (status !== "all") params.set("status", status)
-        if (search.trim()) params.set("q", search.trim())
-        if (dateFrom) params.set("date_from", dateFrom)
-        if (dateTo) params.set("date_to", dateTo)
-        params.set("limit", String(PAGE_SIZE))
-        params.set("offset", String((currentPage - 1) * PAGE_SIZE))
-
-        const path = `/api/sales?${params.toString()}`
-        const data = await apiFetch<SalesPageResponse>(path, {
-          signal: controller.signal,
-          cache: "no-store",
-        })
-
-        if (active) {
-          setSales(Array.isArray(data?.items) ? data.items : [])
-          const nextTotal = Number(data?.total || 0)
-          const nextTotalPages = Math.max(1, Math.ceil(nextTotal / PAGE_SIZE))
-          setTotalResults(nextTotal)
-          if (currentPage > nextTotalPages) {
-            setCurrentPage(nextTotalPages)
-          }
-        }
-      } catch (loadError) {
-        if (!active || controller.signal.aborted) {
-          return
-        }
-
-        setSales([])
-        setTotalResults(0)
-        setError(formatApiFetchError(loadError, "No se pudieron cargar las ventas"))
-      } finally {
-        if (active) {
-          setLoading(false)
-        }
-      }
-    }, 250)
-
-    return () => {
-      active = false
-      controller.abort()
-      window.clearTimeout(timeoutId)
-    }
-  }, [currentPage, dateFrom, dateTo, search, status])
-
+  const sales = Array.isArray(data?.items) ? data.items : []
+  const totalResults = Number(data?.total || 0)
   const totalPages = Math.max(1, Math.ceil(totalResults / PAGE_SIZE))
   const safeCurrentPage = Math.min(currentPage, totalPages)
 
@@ -129,6 +92,23 @@ export default function TransactionHistoryPage() {
     setCurrentPage(1)
   }
 
+  function handleExport() {
+    const headers = ["Nro Venta", "Cliente", "Estado", "Tipo Doc", "Subtotal", "Descuento", "Total", "Vendedor", "Sede", "Fecha"]
+    const rows = sales.map((s) => [
+      s.sale_number || "-",
+      s.customer_name_text || "-",
+      STATUS_LABELS[s.status] || s.status,
+      s.document_type,
+      s.subtotal_amount.toFixed(2),
+      s.sale_discount_amount.toFixed(2),
+      s.total_amount.toFixed(2),
+      s.seller_name,
+      s.location_name,
+      s.confirmed_at ? formatDateTime(s.confirmed_at) : formatDateTime(s.created_at),
+    ])
+    exportToCsv("ventas", headers, rows)
+  }
+
   return (
     <PermissionGuard permission="sales.pos">
       <TooltipProvider delayDuration={120}>
@@ -138,9 +118,29 @@ export default function TransactionHistoryPage() {
               eyebrow="Operacion comercial"
               title="Historial de ventas"
               actions={
-                <Button asChild variant="accent" size="default" className="rounded-lg px-5 font-semibold shadow-sm">
-                  <Link href="/postventa">Postventa</Link>
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-sm"
+                        className="rounded-lg"
+                        onClick={handleExport}
+                        disabled={sales.length === 0}
+                        aria-label="Exportar CSV"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" sideOffset={8}>
+                      Exportar CSV
+                    </TooltipContent>
+                  </Tooltip>
+                  <Button asChild variant="accent" size="default" className="rounded-lg px-5 font-semibold shadow-sm">
+                    <Link href="/postventa">Postventa</Link>
+                  </Button>
+                </div>
               }
             />
 

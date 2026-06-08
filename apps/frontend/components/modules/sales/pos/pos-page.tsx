@@ -47,6 +47,8 @@ import {
 } from "@/components/ui/tooltip";
 import { apiFetch, unwrapApiData } from "@/lib/api";
 import { appRoutes, buildSaleDetailRoute } from "@/lib/routes";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcut";
+import { showSuccess, showError } from "@/lib/toast";
 
 import {
   DOC_TYPES,
@@ -220,6 +222,22 @@ export default function NuevaVentaPage() {
   useEffect(() => {
     void Promise.resolve().then(() => refreshGenericCustomer());
   }, [refreshGenericCustomer]);
+
+  useEffect(() => {
+    if (cart.length === 0) return
+    function warnBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault()
+    }
+    window.addEventListener("beforeunload", warnBeforeUnload)
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload)
+  }, [cart.length]);
+
+  useKeyboardShortcuts([
+    { key: "F2", handler: () => productSearchInputRef.current?.focus(), enabled: !submitting },
+    { key: "F4", handler: () => customerSearchInputRef.current?.focus(), enabled: !submitting },
+    { key: "F8", handler: () => { if (!submitDisabled) confirmSale() }, enabled: !submitting },
+    { key: "Escape", handler: () => { if (productPickerOpen) setProductPickerOpen(false); if (customerPickerOpen) setCustomerPickerOpen(false); }, enabled: true },
+  ]);
 
   useEffect(() => {
     if (!defaultLocation?.location_id) {
@@ -1247,8 +1265,10 @@ export default function NuevaVentaPage() {
       setDiscountModalOpen(false)
       closePriceSheet()
       await refreshPosContext()
+      showSuccess("Venta confirmada", sale.sale_number ? `#${sale.sale_number}` : "Exitosa")
     } catch (submitError) {
       setError(explainApiError(submitError, "No se pudo confirmar la venta."));
+      showError("Error al confirmar venta", explainApiError(submitError, "Revisa los datos e intenta de nuevo."))
       await refreshPosContext();
     } finally {
       setSubmitting(false);

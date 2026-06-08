@@ -9,6 +9,7 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
+  Download,
 } from "lucide-react";
 
 import {
@@ -24,6 +25,8 @@ import { useTransferCapabilities } from "@/hooks/use-transfer-capabilities";
 import { usePagination } from "@/hooks/use-pagination";
 import { appRoutes } from "@/lib/routes";
 import { formatDateTimeParts } from "@/lib/date-utils";
+import { showSuccess, showError } from "@/lib/toast";
+import { exportToCsv } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
 import { Pagination } from "@/components/ui/pagination";
@@ -322,13 +325,14 @@ export function TransfersListPage({
         body: JSON.stringify({}),
       });
       setNotice(TRANSFER_ACTION_CONFIG[action].successMessage);
+      showSuccess(TRANSFER_ACTION_CONFIG[action].label, TRANSFER_ACTION_CONFIG[action].successMessage)
       refetch();
     } catch (requestError) {
-      setActionError(
-        requestError instanceof Error
-          ? requestError.message
-          : `No se pudo ejecutar la acción ${TRANSFER_ACTION_CONFIG[action].label.toLowerCase()}`
-      );
+      const msg = requestError instanceof Error
+        ? requestError.message
+        : `No se pudo ejecutar la acción ${TRANSFER_ACTION_CONFIG[action].label.toLowerCase()}`
+      setActionError(msg);
+      showError(TRANSFER_ACTION_CONFIG[action].label, msg)
     } finally {
       setBusyAction(null);
     }
@@ -368,6 +372,23 @@ export function TransfersListPage({
     return <ForbiddenPage variant="ops" />;
   }
 
+  function handleExport() {
+    const allRows = queueRows
+    const headers = ["Nro", "Origen", "Destino", "Estado", "Flujo", "Solicitadas", "Enviadas", "Acción pendiente", "Última actualización"]
+    const rows = allRows.map((t) => [
+      t.transfer_number || "-",
+      `${t.from_location_name} (${t.from_location_code})`,
+      `${t.to_location_name} (${t.to_location_code})`,
+      t.status,
+      t.pending_stage,
+      String(t.qty_requested_total),
+      String(t.qty_shipped_total),
+      getVisibleStateCopy(t).title,
+      t.happened_at ? (() => { const p = formatDateTimeParts(t.happened_at); return `${p.date} ${p.time}` })() : t.updated_at ? (() => { const p = formatDateTimeParts(t.updated_at); return `${p.date} ${p.time}` })() : "-",
+    ])
+    exportToCsv("transferencias", headers, rows)
+  }
+
   return (
     <OpsPageShell width="wide" className="max-w-[1320px]">
       <PosHeader
@@ -375,6 +396,26 @@ export function TransfersListPage({
         title="Transferencias"
         actions={
           <>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    className="rounded-lg"
+                    onClick={handleExport}
+                    disabled={queueRows.length === 0}
+                    aria-label="Exportar CSV"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" sideOffset={8}>
+                  Exportar CSV
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
               <Link href={appRoutes.transferHistory}>Historial</Link>
             </Button>

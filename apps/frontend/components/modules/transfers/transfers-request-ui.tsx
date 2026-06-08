@@ -25,6 +25,7 @@ import { AdminTextarea } from "@/components/admin/admin-ui";
 import { cn } from "@/lib/utils";
 import { OpsSelectMenu, type OpsOption } from "@/components/ui/ops-selection";
 import { OpsTableWrap } from "@/components/ui/ops-page-shell";
+import { Pagination } from "@/components/ui/pagination";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -479,8 +480,14 @@ export function RequestProductComposer({
                         {selectedSource.qty_available} u.
                       </span>
                     </>
+                  ) : !resolvedColor ? (
+                    "Selecciona un color"
+                  ) : !resolvedSize ? (
+                    "Selecciona una talla"
+                  ) : !selectedVariant ? (
+                    "Variante no disponible"
                   ) : (
-                    "Selecciona una variante disponible."
+                    "Sin stock disponible en origen"
                   )}
                 </p>
 
@@ -507,6 +514,8 @@ export function RequestProductComposer({
   );
 }
 
+const DRAFT_TABLE_PAGE_SIZE = 5;
+
 export function RequestDraftTable({
   draftLines,
   onUpdateLineQty,
@@ -522,7 +531,21 @@ export function RequestDraftTable({
   highlightToken?: number;
   disabled?: boolean;
 }) {
+  const [draftPage, setDraftPage] = useState(1);
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+
+  const totalDraftPages = Math.max(1, Math.ceil(draftLines.length / DRAFT_TABLE_PAGE_SIZE));
+  const safeDraftPage = Math.min(Math.max(draftPage, 1), totalDraftPages);
+  const paginatedLines = draftLines.slice(
+    (safeDraftPage - 1) * DRAFT_TABLE_PAGE_SIZE,
+    safeDraftPage * DRAFT_TABLE_PAGE_SIZE
+  );
+
+  useEffect(() => {
+    if (safeDraftPage > totalDraftPages) {
+      setDraftPage(totalDraftPages);
+    }
+  }, [safeDraftPage, totalDraftPages]);
 
   useEffect(() => {
     if (!highlightedVariantId || !highlightToken) {
@@ -571,7 +594,7 @@ export function RequestDraftTable({
                   </td>
                 </tr>
               ) : (
-                draftLines.map((line) => (
+                paginatedLines.map((line) => (
                   <tr
                     key={`${line.variant_id}:${highlightedVariantId === line.variant_id ? highlightToken || 0 : 0}`}
                     ref={(node) => {
@@ -640,6 +663,14 @@ export function RequestDraftTable({
             </tbody>
           </table>
         </div>
+        {draftLines.length > DRAFT_TABLE_PAGE_SIZE ? (
+          <Pagination
+            page={safeDraftPage}
+            totalPages={totalDraftPages}
+            onPageChange={setDraftPage}
+            className="border-t border-[var(--ops-border-strong)] px-4 py-2"
+          />
+        ) : null}
       </OpsTableWrap>
     </section>
   );

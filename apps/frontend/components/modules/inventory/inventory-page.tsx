@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { LoaderCircle, RefreshCw, RotateCcw } from "lucide-react";
+import { LoaderCircle, RefreshCw, RotateCcw, Download } from "lucide-react";
 import { usePagination } from "@/hooks/use-pagination";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown, type FilterDropdownOption } from "@/components/ui/filter-dropdown";
@@ -30,6 +30,7 @@ import {
 import { apiFetch, unwrapApiData } from "@/lib/api";
 import { useApiGet } from "@/hooks/use-api-get";
 import { buildInventoryDetailRoute } from "@/lib/routes";
+import { exportToCsv } from "@/lib/export-csv";
 import { cn } from "@/lib/utils";
 import {
   formatInventoryVariantsSummary,
@@ -310,6 +311,34 @@ export default function InventoryPage() {
     setProductPage(1);
   }
 
+  function handleExport() {
+    if (view === "product") {
+      const headers = ["Código", "Producto", "Tipo", "Stock Total", "Tallas", "Colores", "Sedes", "Estado"]
+      const rows = (productSummary?.rows || []).map((r) => [
+        r.style_code,
+        r.style_name,
+        r.garment_type_name || "-",
+        String(r.stock_total),
+        String(r.sizes_count),
+        String(r.colors_count),
+        String(r.locations_count),
+        r.status_label,
+      ])
+      exportToCsv("stock-por-producto", headers, rows)
+    } else {
+      const headers = ["Sede", "Stock Total", "Productos", "Bajo Stock", "Sin Stock", "Estado"]
+      const rows = (locationSummary?.rows || []).map((r) => [
+        r.location_name,
+        String(r.stock_total),
+        String(r.products_count),
+        String(r.low_stock_count),
+        String(r.out_of_stock_count),
+        r.status_label,
+      ])
+      exportToCsv("stock-por-sede", headers, rows)
+    }
+  }
+
   return (
     <TooltipProvider delayDuration={120}>
       <OpsPageShell width="wide">
@@ -332,16 +361,42 @@ export default function InventoryPage() {
                 </TabsList>
               </Tabs>
 
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                className="rounded-lg"
-                onClick={() => setRefreshNonce((current) => current + 1)}
-                aria-label="Actualizar stock actual"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    className="rounded-lg"
+                    onClick={handleExport}
+                    disabled={view === "product" ? !productSummary?.rows?.length : !locationSummary?.rows?.length}
+                    aria-label="Exportar CSV"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={8}>
+                  Exportar CSV
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    className="rounded-lg"
+                    onClick={() => setRefreshNonce((current) => current + 1)}
+                    aria-label="Actualizar stock actual"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={8}>
+                  Actualizar
+                </TooltipContent>
+              </Tooltip>
             </div>
           }
         />

@@ -189,6 +189,70 @@ Ver `DESIGN.md` y `docs/` para guías detalladas. Principios clave:
 
 ## Changelog
 
+### 2026-06-08 — Auditoría completa, hardening UX, feedback unificado, CSV export
+
+#### Infraestructura nueva
+
+- **`lib/toast.ts`**: Wrapper unificado sobre `sonner` (`showSuccess`, `showError`, `showWarning`, `showInfo`) con duración y formato consistentes.
+- **`hooks/use-keyboard-shortcut.ts`**: `useKeyboardShortcut` (atajo individual) y `useKeyboardShortcuts` (múltiples atajos con soporte Ctrl/Alt/Shift, ignora inputs).
+- **`hooks/use-debounce.ts`**: `useDebounce<T>` genérico con delay configurable (default 300ms).
+- **`lib/export-csv.ts`**: `exportToCsv(filename, headers, rows)` — genera CSV con escaping de comillas/comas y descarga automática.
+- **`components/ui/export-csv-button.tsx`**: Botón reutilizable de exportación CSV con tooltip y estado disabled.
+- **`components/ui/command-palette.tsx`**: Buscador global de módulos con `Ctrl+K`. Navegación con flechas ↑↓ y Enter, filtrado por nombre y keywords, backdrop con blur.
+
+#### Global
+
+- **`app/layout.tsx`**: Agregado `<Toaster>` de sonner (`richColors`, `closeButton`, `position="top-right"`, tipografía Poppins).
+- **`app/(protected)/layout.tsx`**: `<ErrorBoundary>` global envolviendo todo el contenido protegido + `<CommandPalette>` para `Ctrl+K`.
+
+#### Sidebar
+
+- **Logo**: `href="/demo"` → `href={appRoutes.home}` (apunta a `/inicio`).
+- **Typo**: `Cerrar sesion` → `Cerrar sesión`.
+- **Íconos redundantes**: Eliminados 4 íconos `ArrowLeftRight` duplicados en los ítems del submenú Transferencias (`sidebar-config.ts`).
+
+#### POS (Ventas) — `pos-page.tsx`
+
+- **Protección anti-pérdida**: `beforeunload` se activa cuando `cart.length > 0`, previniendo cierre accidental de pestaña.
+- **Atajos de teclado**: `F2` → buscar producto, `F4` → buscar cliente, `F8` → confirmar venta, `Esc` → cerrar pickers abiertos.
+- **Toast**: éxito al confirmar venta (`showSuccess` con número de venta), error con mensaje del backend.
+
+#### Dashboard
+
+- KPIs (`DashboardKpiCard` → `OpsMetricCard`) ya eran cliqueables con `href`. Verificado que todos los KPIs y filas de atención navegan a sus páginas de detalle correspondientes.
+
+#### Unificación de feedback a toasts
+
+| Módulo | Antes | Ahora |
+|--------|-------|-------|
+| **Caja** (`cash-page.tsx`) | `setActionError` + inline `InlineStatusCard` | `showSuccess`/`showError` en abrir/cerrar caja |
+| **Clientes** (`customers-page.tsx`) | `setSaveError` + inline, sin debounce | `showSuccess`/`showError` + `useDebounce(300ms)` en búsqueda |
+| **Transferencias** (`transfers-list-page.tsx`) | `setActionError`/`setNotice` inline | `showSuccess`/`showError` en aprobar/despachar/recibir/cancelar |
+| **Catálogos** (`catalog-crud-page.tsx`) | `setMutationError`/`setEditError`/`setSuccessMessage` inline | `showSuccess`/`showError` en toggle y edición |
+
+#### Refactor de Historial de Ventas (`transaction-history-page.tsx`)
+
+- Migrado de `useEffect` + `AbortController` + `setTimeout` manual al hook estandarizado `useApiGet`.
+- Agregado `useDebounce` para búsqueda (300ms).
+- Eliminado import innecesario `formatApiFetchError`.
+- Reducción de ~45 líneas de boilerplate.
+
+#### CSV Export en tablas principales
+
+| Página | Archivo | Columnas |
+|--------|---------|----------|
+| `/ventas/historial` | `ventas.csv` | Nro, Cliente, Estado, Tipo Doc, Subtotal, Descuento, Total, Vendedor, Sede, Fecha |
+| `/inventario` | `stock-por-producto.csv` / `stock-por-sede.csv` | Según pestaña activa (producto/sede) |
+| `/transferencias` | `transferencias.csv` | Nro, Origen, Destino, Estado, Flujo, Solicitadas, Enviadas, Acción, Fecha |
+| `/clientes` | `clientes.csv` | Código, Nombre, Tipo Doc, Nro Doc, Razón Social, Tipo, Email, Teléfono, Activo, Creado |
+| `/inventario/movimientos` (Kardex) | `kardex.csv` | SKU, Producto, Sede, Tipo, Cantidad, Efecto, Saldo, Origen, Referencia, Usuario, Fecha |
+| `/catalogos/*` | `[tipo].csv` | Código, Nombre, campos dinámicos + Activo |
+
+#### Inicio (Home) — `home-page.tsx` + `home-transfer-requests.tsx`
+
+- **Transferencias entre tiendas**: Simplificado de ~70 líneas con doble jerarquía y métricas duplicadas a ~25 líneas limpias.
+- `HomeTransferRequests`: Eliminado wrapper `HomeSectionCard` (evitaba header anidado "Transferencias / Solicitudes entre tiendas"). Contadores grandes reemplazados por `OpsMetricStripItem` compactos. Lista de ítems como rows finas con chip de estado + ruta + fecha. Empty state simplificado.
+
 ### 2026-06-07 — Receipt buttons, descuento fijo, chatbot, sales history
 
 #### Backend — Nuevo
