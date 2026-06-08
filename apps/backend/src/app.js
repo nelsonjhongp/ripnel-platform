@@ -24,6 +24,7 @@ const dashboardRoutes = require('./modules/dashboard/dashboard.routes');
 const homeRoutes = require('./modules/home/home.routes');
 const productsRoutes = require('./modules/products/products.routes');
 const notificationsRoutes = require('./modules/notifications/notifications.routes');
+const chatbotRoutes = require('./modules/chatbot/chatbot.routes');
 const { AppError } = require('./shared/errors');
 const {
   errorHandler,
@@ -212,6 +213,7 @@ app.use('/api/cash', cashRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/home', homeRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/chatbot', chatbotRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

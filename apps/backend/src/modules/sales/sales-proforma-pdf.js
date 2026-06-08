@@ -138,7 +138,7 @@ function createProformaDocument(sale) {
       React.createElement(
         View,
         { style: styles.header },
-        React.createElement(Text, { style: styles.title }, 'PROFORMA'),
+        React.createElement(Text, { style: styles.title }, sale._label || 'PROFORMA'),
         React.createElement(Text, { style: styles.subtitle }, `Nro: ${text(sale.sale_number)}`)
       ),
       React.createElement(

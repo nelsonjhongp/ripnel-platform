@@ -7,7 +7,7 @@ function notFoundHandler(req, res) {
 
 function errorHandler(err, req, res, next) {
   const isCorsOriginError = err?.message === 'CORS origin not allowed';
-  const statusCode = err.statusCode || (isCorsOriginError ? 403 : 500);
+  const statusCode = err.statusCode || err.status || (isCorsOriginError ? 403 : 500);
   const code = err.code || (isCorsOriginError ? 'CORS_ORIGIN_DENIED' : null);
 
   if (statusCode >= 500) {

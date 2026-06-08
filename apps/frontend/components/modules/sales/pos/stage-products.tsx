@@ -221,7 +221,7 @@ export function ProductStage(props: ProductStageProps) {
                       undefined) ||
                   Number(selectedVariant.stock || 0) <= 0
                 }
-                className="h-10 rounded-lg px-4"
+                className="h-10 w-full rounded-lg px-4 shadow-sm"
               >
                 {!selectedVariant
                   ? "Agregar"
