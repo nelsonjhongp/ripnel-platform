@@ -9,6 +9,7 @@ import {
   Power,
   RefreshCw,
   RotateCcw,
+  Download,
 } from "lucide-react";
 import { AdminConfirmModal, AdminInlineMessage, AdminModalShell, AdminRowActionsMenu } from "@/components/admin/admin-ui";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
@@ -38,6 +39,8 @@ import type { CatalogListFieldConfig, CatalogFieldConfig } from "@/lib/product-m
 import { OpsEmptyState } from "@/components/ui/ops-empty-state";
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
 import { activeBadgeLabel } from "@/lib/badge-utils";
+import { showSuccess, showError } from "@/lib/toast";
+import { exportToCsv } from "@/lib/export-csv";
 import { CatalogItemForm, buildInitialState } from "./catalog-item-form";
 
 type CatalogCrudPageProps = {
@@ -145,6 +148,7 @@ export function CatalogCrudPage({
       setSuccessMessage(
         result.active ? "Registro activado correctamente." : "Registro inactivado correctamente."
       );
+      showSuccess(result.active ? "Registro activado" : "Registro inactivado")
       void refetch();
     } catch (requestError) {
       setMutationError(
@@ -152,6 +156,7 @@ export function CatalogCrudPage({
           ? requestError.message
           : "No se pudo actualizar el estado"
       );
+      showError("Error", requestError instanceof Error ? requestError.message : "No se pudo actualizar el estado")
     } finally {
       setToggling(false);
       setPendingToggleItem(null);
@@ -177,6 +182,7 @@ export function CatalogCrudPage({
     try {
       const result = await updateCatalogItem(endpoint, getItemId(editingItem, idKey), body);
       setSuccessMessage("Registro actualizado correctamente.");
+      showSuccess("Actualizado", "Registro actualizado correctamente.")
       setEditingItem(null);
       void refetch();
     } catch (requestError) {
@@ -185,6 +191,7 @@ export function CatalogCrudPage({
           ? requestError.message
           : "No se pudo actualizar el registro"
       );
+      showError("Error al guardar", requestError instanceof Error ? requestError.message : "No se pudo actualizar el registro")
     } finally {
       setEditSubmitting(false);
     }
@@ -194,6 +201,17 @@ export function CatalogCrudPage({
     .filter((field) => field.editableOnUpdate === false)
     .map((field) => field.key);
 
+  function handleExport() {
+    const csvHeaders = ["Código", "Nombre", ...listFields.map((f) => f.label), "Activo"]
+    const csvRows = items.map((item) => [
+      (item as Record<string, unknown>).code ? String((item as Record<string, unknown>).code) : "-",
+      String((item as Record<string, unknown>).name || "-"),
+      ...listFields.map((f) => formatValue((item as Record<string, unknown>)[f.key])),
+      item.active ? "Sí" : "No",
+    ])
+    exportToCsv(entityLabel.toLowerCase(), csvHeaders, csvRows)
+  }
+
   return (
     <TooltipProvider delayDuration={120}>
       <OpsPageShell width="wide">
@@ -202,6 +220,24 @@ export function CatalogCrudPage({
           title={title}
           actions={
             <>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    className="rounded-lg"
+                    onClick={handleExport}
+                    disabled={items.length === 0}
+                    aria-label="Exportar CSV"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={8}>
+                  Exportar CSV
+                </TooltipContent>
+              </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button

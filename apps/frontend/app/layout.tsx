@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Poppins, Geist } from "next/font/google";
 import "./globals.css";
+import { Toaster } from "sonner";
 import { cn } from "@/lib/utils";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/components/auth/AuthProvider";
@@ -38,7 +39,20 @@ export default function RootLayout({
     >
 <body suppressHydrationWarning>
         <AuthProvider>
-          <TooltipProvider>{children}</TooltipProvider>
+          <TooltipProvider>
+            {children}
+            <Toaster
+              richColors
+              closeButton
+              position="top-right"
+              toastOptions={{
+                style: {
+                  fontFamily: "var(--font-poppins)",
+                  fontSize: "14px",
+                },
+              }}
+            />
+          </TooltipProvider>
         </AuthProvider>
       </body>
     </html>

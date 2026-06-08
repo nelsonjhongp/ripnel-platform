@@ -233,17 +233,7 @@ function canAccessTransferHeader(transfer, actor) {
   const isDestination = locationIds.has(transfer.to_location_id);
   const isSource = locationIds.has(transfer.from_location_id);
 
-  const destinationVisible =
-    isDestination &&
-    (actor.capabilities.request_view_own ||
-      actor.capabilities.request_create ||
-      actor.capabilities.receive ||
-      actor.user_id === transfer.created_by);
-  const sourceVisible =
-    isSource &&
-    (actor.capabilities.approve || actor.capabilities.ship || actor.capabilities.cancel);
-
-  return destinationVisible || sourceVisible;
+  return isDestination || isSource;
 }
 
 function getTransferScopeRole(transfer, actor) {
@@ -299,9 +289,12 @@ function canActorApproveTransfer(transfer, actor) {
     return false;
   }
 
-  return (
-    actor.capabilities.approve && transfer.from_location_id === getActiveLocationId(actor)
-  );
+  if (!actor.capabilities.approve) {
+    return false;
+  }
+
+  const activeLocationId = getActiveLocationId(actor);
+  return transfer.from_location_id === activeLocationId;
 }
 
 function canActorShipTransfer(transfer, actor) {
@@ -334,7 +327,7 @@ function canActorCancelTransfer(transfer, actor) {
   const isSource = transfer.from_location_id === activeLocationId;
 
   if (transfer.status === 'requested') {
-    return actor.user_id === transfer.created_by;
+    return actor.user_id === transfer.created_by || (isSource && actor.capabilities.cancel);
   }
 
   return isSource && actor.capabilities.cancel;

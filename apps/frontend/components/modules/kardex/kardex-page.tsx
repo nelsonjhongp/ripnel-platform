@@ -9,6 +9,7 @@ import {
   LoaderCircle,
   RefreshCw,
   RotateCcw,
+  Download,
 } from "lucide-react";
 import { InlineStatusCard } from "@/components/feedback/status-page";
 import { apiFetchData } from "@/lib/api";
@@ -40,6 +41,7 @@ import {
 
 import type { KardexMovement, KardexResponse, MovementOperationFilter, MovementOriginFilter } from "@/lib/kardex-domain";
 import { resolveDocumentFamily, resolveMovementDirection, resolveSemanticOrigin, formatMovementOperationLabel, formatMovementOriginLabel, formatReference, resolveMovementTypeFromParams, resolveOriginFilterFromParams, resolveBackendReferenceType } from "@/lib/kardex-domain";
+import { exportToCsv } from "@/lib/export-csv";
 
 export default function KardexPage() {
   const searchParams = useSearchParams();
@@ -263,23 +265,61 @@ function KardexPageContent({
     dateTo !== "" ||
     hasSearchContext;
 
+  function handleExport() {
+    const headers = ["SKU", "Producto", "Sede", "Tipo", "Cantidad", "Efecto", "Saldo", "Origen", "Referencia", "Usuario", "Fecha"]
+    const rows = filteredMovements.map((m) => [
+      m.sku,
+      `${m.style_name} (${m.style_code})`,
+      m.location_name,
+      formatMovementOperationLabel(m),
+      String(m.quantity),
+      String(m.quantity_effect),
+      String(m.balance_qty),
+      formatMovementOriginLabel(m),
+      formatReference(m),
+      m.created_by_name || "-",
+      formatDateTime(m.created_at),
+    ])
+    exportToCsv("kardex", headers, rows)
+  }
+
   return (
     <OpsPageShell width="wide">
         <PosHeader
           eyebrow="Kardex"
           title="Movimientos de stock"
           actions={
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="rounded-lg"
-              onClick={() => refetch()}
-              disabled={loading}
-            >
-              <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
-              Actualizar
-            </Button>
+            <div className="flex items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    className="rounded-lg"
+                    onClick={handleExport}
+                    disabled={filteredMovements.length === 0}
+                    aria-label="Exportar CSV"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" sideOffset={8}>
+                  Exportar CSV
+                </TooltipContent>
+              </Tooltip>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-lg"
+                onClick={() => refetch()}
+                disabled={loading}
+              >
+                <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+                Actualizar
+              </Button>
+            </div>
           }
         />
 

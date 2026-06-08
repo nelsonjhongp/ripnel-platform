@@ -166,10 +166,11 @@ with seeded_role_permissions(role_name, permission_key) as (
     ('VENTAS', 'prices.manage'),
     ('VENTAS', 'transfers.request.create'),
     ('VENTAS', 'transfers.request.view_own'),
+    ('VENTAS', 'transfers.approve'),
+    ('VENTAS', 'transfers.cancel'),
     ('VENTAS', 'sales.pos'),
     ('VENTAS', 'sales.postsale.view'),
-    ('VENTAS', 'sales.postsale.exchange'),
-    ('VENTAS', 'dashboard.view')
+    ('VENTAS', 'sales.postsale.exchange')
 )
 insert into role_permissions (
   role_id,
