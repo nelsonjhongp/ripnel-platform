@@ -73,9 +73,10 @@ export function SalesWizardRail({
                   <button
                     type="button"
                     onClick={() => onSelect?.(item.id)}
-                    className="sales-wizard-step"
+                    className="sales-wizard-step focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ripnel-accent)]"
                     data-state={state}
                     aria-current={item.active ? "step" : undefined}
+                    aria-label={`${item.label} — ${metaLabel}`}
                   >
                     <span className="sales-wizard-node" data-state={state}>
                       {item.complete ? (

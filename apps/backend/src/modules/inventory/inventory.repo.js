@@ -40,8 +40,8 @@ function buildInventoryWhereClause(filters = {}) {
 }
 
 function buildKardexWhereClause(filters = {}) {
-  const conditions = [];
-  const values = [];
+  const conditions = [`location_id = any($1::uuid[])`];
+  const values = [filters.locationIds || []];
 
   if (filters.locationId) {
     values.push(filters.locationId);
@@ -56,6 +56,16 @@ function buildKardexWhereClause(filters = {}) {
   if (filters.movementType) {
     values.push(filters.movementType);
     conditions.push(`movement_type = $${values.length}`);
+  }
+
+  if (filters.referenceType) {
+    values.push(filters.referenceType);
+    conditions.push(`coalesce(reference_type, '') = $${values.length}`);
+  }
+
+  if (filters.referenceId) {
+    values.push(filters.referenceId);
+    conditions.push(`coalesce(reference_id::text, '') = $${values.length}`);
   }
 
   if (filters.dateFrom) {
@@ -78,6 +88,7 @@ function buildKardexWhereClause(filters = {}) {
         or style_name ilike $${index}
         or coalesce(reason, '') ilike $${index}
         or coalesce(reference_type, '') ilike $${index}
+        or coalesce(reference_id::text, '') ilike $${index}
         or location_name ilike $${index}
       )`
     );
@@ -117,6 +128,218 @@ async function findAllInventory(filters = {}) {
      inner join colors c on c.color_id = pv.color_id
      ${whereClause}
      order by l.name asc, ps.name asc, s.sort_order asc, c.name asc`,
+    values
+  );
+
+  return result.rows;
+}
+
+function buildScopedInventoryWhereClause(filters = {}, startIndex = 1) {
+  const conditions = [`i.location_id = any($${startIndex}::uuid[])`];
+  const values = [filters.locationIds || []];
+
+  if (filters.styleId) {
+    values.push(filters.styleId);
+    conditions.push(`ps.style_id = $${startIndex + values.length - 1}`);
+  }
+
+  if (filters.locationId) {
+    values.push(filters.locationId);
+    conditions.push(`l.location_id = $${startIndex + values.length - 1}`);
+  }
+
+  if (filters.query) {
+    values.push(`%${filters.query}%`);
+    const index = startIndex + values.length - 1;
+    conditions.push(
+      `(
+        ps.name ilike $${index}
+        or ps.style_code ilike $${index}
+        or gt.name ilike $${index}
+        or l.name ilike $${index}
+      )`
+    );
+  }
+
+  if (filters.garmentType) {
+    values.push(filters.garmentType);
+    conditions.push(`coalesce(gt.name, '') = $${startIndex + values.length - 1}`);
+  }
+
+  return {
+    whereClause: `where ${conditions.join(' and ')}`,
+    values,
+  };
+}
+
+async function findInventoryProductSummary(filters = {}) {
+  const lowStockThreshold = Number.isInteger(filters.lowStockThreshold)
+    ? filters.lowStockThreshold
+    : 3;
+  const { whereClause, values } = buildScopedInventoryWhereClause(filters);
+  values.push(lowStockThreshold);
+  const thresholdIndex = values.length;
+
+  const result = await query(
+    `with scoped_inventory as (
+       select
+         i.location_id,
+         l.name as location_name,
+         pv.variant_id,
+         ps.style_id,
+         ps.style_code,
+         ps.name as style_name,
+         gt.name as garment_type_name,
+         s.size_id,
+         c.color_id,
+         i.qty
+       from inventory i
+       inner join locations l on l.location_id = i.location_id
+       inner join product_variants pv on pv.variant_id = i.variant_id
+       inner join product_styles ps on ps.style_id = pv.style_id
+       left join garment_types gt on gt.garment_type_id = ps.garment_type_id
+       inner join sizes s on s.size_id = pv.size_id
+       inner join colors c on c.color_id = pv.color_id
+       ${whereClause}
+     ),
+     grouped as (
+       select
+         style_id,
+         max(style_code) as style_code,
+         max(style_name) as style_name,
+         max(garment_type_name) as garment_type_name,
+         sum(qty)::int as total_qty,
+         bool_or(qty = 0) as has_zero_variant,
+         count(distinct size_id)::int as sizes_count,
+         count(distinct color_id)::int as colors_count,
+         count(distinct case when qty > 0 then location_id end)::int as locations_with_stock
+       from scoped_inventory
+       group by style_id
+     )
+     select
+       style_id,
+       style_code,
+       style_name,
+       garment_type_name,
+       total_qty,
+       sizes_count,
+       colors_count,
+       locations_with_stock,
+       case
+         when total_qty = 0 then 'out'
+         when has_zero_variant then 'incomplete'
+         when total_qty <= $${thresholdIndex} then 'low'
+         else 'available'
+       end as status
+     from grouped
+     order by style_name asc, style_code asc`,
+    values
+  );
+
+  return result.rows;
+}
+
+async function findInventoryLocationSummary(filters = {}) {
+  const lowStockThreshold = Number.isInteger(filters.lowStockThreshold)
+    ? filters.lowStockThreshold
+    : 3;
+  const { whereClause, values } = buildScopedInventoryWhereClause(filters);
+  values.push(lowStockThreshold);
+  const thresholdIndex = values.length;
+
+  const result = await query(
+    `with scoped_inventory as (
+       select
+         i.location_id,
+         l.name as location_name,
+         pv.variant_id,
+         ps.style_id,
+         ps.style_code,
+         ps.name as style_name,
+         gt.name as garment_type_name,
+         i.qty
+       from inventory i
+       inner join locations l on l.location_id = i.location_id
+       inner join product_variants pv on pv.variant_id = i.variant_id
+       inner join product_styles ps on ps.style_id = pv.style_id
+       left join garment_types gt on gt.garment_type_id = ps.garment_type_id
+       ${whereClause}
+     ),
+     product_totals as (
+       select
+         location_id,
+         max(location_name) as location_name,
+         style_id,
+         sum(qty)::int as total_qty,
+         bool_or(qty = 0) as has_zero_variant
+       from scoped_inventory
+       group by location_id, style_id
+     ),
+     grouped as (
+       select
+         location_id,
+         max(location_name) as location_name,
+         sum(total_qty)::int as stock_total,
+         count(*) filter (where total_qty > 0)::int as products_count,
+         count(*) filter (
+           where total_qty > 0
+             and (
+               has_zero_variant = true
+               or total_qty <= $${thresholdIndex}
+             )
+         )::int as low_stock_count,
+         count(*) filter (where total_qty = 0)::int as out_of_stock_count
+       from product_totals
+       group by location_id
+     )
+     select
+       location_id,
+       location_name,
+       stock_total,
+       products_count,
+       low_stock_count,
+       out_of_stock_count,
+       case
+         when out_of_stock_count > 0 then 'critical'
+         when low_stock_count > 0 then 'attention'
+         else 'normal'
+       end as status
+     from grouped
+     order by location_name asc`,
+    values
+  );
+
+  return result.rows;
+}
+
+async function findInventoryStyleRows(filters = {}) {
+  const { whereClause, values } = buildScopedInventoryWhereClause(filters);
+  const result = await query(
+    `select
+       i.location_id,
+       l.name as location_name,
+       l.code as location_code,
+       pv.variant_id,
+       pv.sku,
+       ps.style_id,
+       ps.style_code,
+       ps.name as style_name,
+       gt.name as garment_type_name,
+       s.size_id,
+       s.code as size_code,
+       s.sort_order as size_sort_order,
+       c.color_id,
+       c.name as color_name,
+       i.qty
+     from inventory i
+     inner join locations l on l.location_id = i.location_id
+     inner join product_variants pv on pv.variant_id = i.variant_id
+     inner join product_styles ps on ps.style_id = pv.style_id
+     left join garment_types gt on gt.garment_type_id = ps.garment_type_id
+     inner join sizes s on s.size_id = pv.size_id
+     inner join colors c on c.color_id = pv.color_id
+     ${whereClause}
+     order by l.name asc, c.name asc, s.sort_order asc, pv.sku asc`,
     values
   );
 
@@ -216,7 +439,43 @@ async function findAllKardex(filters = {}) {
   return result.rows;
 }
 
-async function findAllAdjustments() {
+function buildAdjustmentsWhereClause(filters = {}) {
+  const conditions = [`ia.location_id = any($1::uuid[])`];
+  const values = [filters.locationIds || []];
+
+  if (filters.locationId) {
+    values.push(filters.locationId);
+    conditions.push(`ia.location_id = $${values.length}`);
+  }
+
+  if (filters.status) {
+    values.push(filters.status);
+    conditions.push(`ia.status = $${values.length}`);
+  }
+
+  if (filters.query) {
+    values.push(`%${filters.query}%`);
+    const index = values.length;
+    conditions.push(
+      `(
+        ia.adjustment_number ilike $${index}
+        or l.code ilike $${index}
+        or l.name ilike $${index}
+        or coalesce(ia.reason, '') ilike $${index}
+        or coalesce(created_user.full_name, '') ilike $${index}
+      )`
+    );
+  }
+
+  return {
+    whereClause: `where ${conditions.join(' and ')}`,
+    values,
+  };
+}
+
+async function findAllAdjustments(filters = {}) {
+  const { whereClause, values } = buildAdjustmentsWhereClause(filters);
+
   const result = await query(
     `select
        ia.adjustment_id,
@@ -244,6 +503,7 @@ async function findAllAdjustments() {
      left join users confirmed_user on confirmed_user.user_id = ia.confirmed_by
      left join users cancelled_user on cancelled_user.user_id = ia.cancelled_by
      left join inventory_adjustment_lines ial on ial.adjustment_id = ia.adjustment_id
+     ${whereClause}
      group by
        ia.adjustment_id,
        ia.adjustment_number,
@@ -264,7 +524,7 @@ async function findAllAdjustments() {
        ia.cancelled_at,
        ia.updated_at
      order by ia.created_at desc`,
-    []
+    values
   );
 
   return result.rows;
@@ -592,6 +852,9 @@ async function insertStockMovement(payload, executor = query) {
 
 module.exports = {
   findAllInventory,
+  findInventoryProductSummary,
+  findInventoryLocationSummary,
+  findInventoryStyleRows,
   findAllKardex,
   findAllAdjustments,
   findAdjustmentVariants,

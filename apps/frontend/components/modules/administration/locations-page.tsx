@@ -1,17 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import {
-  LoaderCircle,
   PencilLine,
   Plus,
   Power,
   RefreshCw,
   RotateCcw,
 } from "lucide-react";
-import { buildApiUrl } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import { apiFetchData } from "@/lib/api";
+import { useApiGet } from "@/hooks/use-api-get";
+import { activeBadgeLabel } from "@/lib/badge-utils";
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
+import { PAGE_SIZE } from "@/lib/constants";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
   AdminActionButton,
@@ -22,8 +24,8 @@ import {
   AdminInlineMessage,
   AdminModalShell,
   AdminRowActionsMenu,
-  AdminSelectMenu,
 } from "@/components/admin/admin-ui";
+import { OpsSelectMenu } from "@/components/ui/ops-selection";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
@@ -33,9 +35,8 @@ import {
   OpsSearchField,
   OpsSectionDivider,
   OpsTableBlock,
-  OpsTableFooter,
-  OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
+import { OpsDataTable } from "@/components/ui/ops-data-table";
 import { Pagination } from "@/components/ui/pagination";
 import {
   Tooltip,
@@ -43,6 +44,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { OpsEmptyState } from "@/components/ui/ops-empty-state";
 
 type LocationItem = {
   location_id: string;
@@ -83,11 +85,12 @@ const locationTypeLabels: Record<LocationItem["type"], string> = {
   third_party: "Tercero",
 };
 
-const PAGE_SIZE = 10;
-
 export default function LocationsPage() {
-  const [locations, setLocations] = useState<LocationItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: locationsData, loading, error: loadError, refetch } = useApiGet(
+    () => apiFetchData<LocationItem[]>("/api/locations", { cache: "no-store" }),
+    []
+  );
+  const locations = locationsData || [];
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -100,34 +103,6 @@ export default function LocationsPage() {
   const [formState, setFormState] = useState<FormState>(initialFormState);
   const [activeChangeLocation, setActiveChangeLocation] = useState<LocationItem | null>(null);
   const [savingActiveChange, setSavingActiveChange] = useState(false);
-
-  async function loadLocations() {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(buildApiUrl("/api/locations"), {
-        cache: "no-store",
-      });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo cargar ubicaciones");
-      }
-
-      setLocations(payload.data || []);
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error ? requestError.message : "No se pudo cargar ubicaciones"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void Promise.resolve().then(() => loadLocations());
-  }, []);
 
   const activeCount = locations.filter((location) => location.active).length;
   const storeCount = locations.filter((location) => location.type === "store").length;
@@ -172,14 +147,6 @@ export default function LocationsPage() {
     setFormState(initialFormState);
   }
 
-  function updateLocationInList(nextLocation: LocationItem) {
-    setLocations((current) =>
-      current.map((location) =>
-        location.location_id === nextLocation.location_id ? nextLocation : location
-      )
-    );
-  }
-
   function openEditModal(location: LocationItem) {
     setEditingLocationId(location.location_id);
     setFormState({
@@ -208,26 +175,20 @@ export default function LocationsPage() {
     setSavingActiveChange(true);
 
     try {
-      const response = await fetch(buildApiUrl(`/api/locations/${activeChangeLocation.location_id}`), {
+      const data = await apiFetchData<LocationItem>(`/api/locations/${activeChangeLocation.location_id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ active: !activeChangeLocation.active }),
       });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo actualizar la ubicación");
-      }
-
-      updateLocationInList(payload.data);
+      refetch();
 
       if (editingLocationId === activeChangeLocation.location_id) {
-        setFormState((current) => ({ ...current, active: payload.data.active }));
+        setFormState((current) => ({ ...current, active: data.active }));
       }
 
-      setSuccessMessage(payload.data.active ? "Ubicación activada." : "Ubicación inactivada.");
+      setSuccessMessage(data.active ? "Ubicación activada." : "Ubicación inactivada.");
       setActiveChangeLocation(null);
     } catch (requestError) {
       setError(
@@ -246,8 +207,8 @@ export default function LocationsPage() {
 
     try {
       const isEditing = Boolean(editingLocationId);
-      const response = await fetch(
-        buildApiUrl(isEditing ? `/api/locations/${editingLocationId}` : "/api/locations"),
+      const data = await apiFetchData<LocationItem>(
+        isEditing ? `/api/locations/${editingLocationId}` : "/api/locations",
         {
           method: isEditing ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
@@ -269,20 +230,11 @@ export default function LocationsPage() {
         }
       );
 
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          payload.message ||
-            (isEditing ? "No se pudo actualizar la ubicación" : "No se pudo crear la ubicación")
-        );
-      }
-
       if (isEditing) {
-        updateLocationInList(payload.data);
+        refetch();
         setSuccessMessage("Ubicación actualizada.");
       } else {
-        setLocations((current) => [payload.data, ...current]);
+        refetch();
         setSuccessMessage("Ubicación creada.");
       }
 
@@ -343,7 +295,7 @@ export default function LocationsPage() {
                       variant="outline"
                       size="icon-sm"
                       className="rounded-lg"
-                      onClick={loadLocations}
+                      onClick={refetch}
                       aria-label="Recargar"
                     >
                       <RefreshCw className="h-4 w-4" />
@@ -426,9 +378,9 @@ export default function LocationsPage() {
               </Tooltip>
             </OpsFiltersRow>
 
-            {error ? (
+            {loadError || error ? (
               <div role="alert" aria-live="polite" className="rounded-lg border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-4 py-2.5 text-sm text-[color:color-mix(in_srgb,#be123c_74%,var(--ops-text))]">
-                {error}
+                {loadError || error}
               </div>
             ) : null}
 
@@ -438,111 +390,94 @@ export default function LocationsPage() {
               </div>
             ) : null}
 
-            <OpsTableWrap minWidth="820px">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-[var(--ops-surface-muted)] text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                      <th className="px-4 py-3 text-left">Nombre</th>
-                      <th className="px-4 py-3 text-left">Código</th>
-                      <th className="px-4 py-3 text-left">Tipo</th>
-                      <th className="px-4 py-3 text-left">Dirección</th>
-                      <th className="px-4 py-3 text-left">Estado</th>
-                      <th className="w-[4.5rem] px-4 py-3 text-right">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                    {loading ? (
-                      <tr>
-                        <td colSpan={6} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                          <LoaderCircle className="mr-2 inline-block h-5 w-5 animate-spin" />
-                          Cargando ubicaciones…
-                        </td>
-                      </tr>
-                    ) : paginatedLocations.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                          {locations.length
-                            ? "No hay resultados para este filtro."
-                            : "Aún no hay ubicaciones registradas."}
-                        </td>
-                      </tr>
-                    ) : (
-                      paginatedLocations.map((location) => (
-                        <tr
-                          key={location.location_id}
-                          className="transition hover:bg-[var(--ops-surface-muted)]"
-                        >
-                          <td className="px-4 py-[var(--ops-row-py)]">
-                            <p className="text-sm font-semibold text-[var(--ops-text)]">
-                              {location.name}
-                            </p>
-                          </td>
-                          <td className="px-4 py-[var(--ops-row-py)]">
-                            <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--ops-text-muted)] tabular-nums">
-                              {location.code || "—"}
-                            </span>
-                          </td>
-                          <td className="px-4 py-[var(--ops-row-py)]">
-                            <span className="inline-block rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]">
-                              {locationTypeLabels[location.type]}
-                            </span>
-                          </td>
-                          <td className="px-4 py-[var(--ops-row-py)]">
-                            <span className="text-sm text-[var(--ops-text)]">
-                              {location.address || "—"}
-                            </span>
-                          </td>
-                          <td className="px-4 py-[var(--ops-row-py)]">
-                            <span
-                              className={cn(
-                                "inline-block rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-                                location.active
-                                  ? "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
-                                  : "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]"
-                              )}
-                            >
-                              {location.active ? "Activa" : "Inactiva"}
-                            </span>
-                          </td>
-                          <td className="w-[4.5rem] px-4 py-[var(--ops-row-py)]">
-                            <AdminRowActionsMenu
-                              ariaLabel={`Acciones para ${location.name}`}
-                              items={[
-                                {
-                                  label: "Editar",
-                                  icon: <PencilLine className="h-3.5 w-3.5" />,
-                                  onSelect: () => openEditModal(location),
-                                },
-                                {
-                                  label: location.active ? "Inactivar" : "Activar",
-                                  icon: <Power className="h-3.5 w-3.5" />,
-                                  tone: location.active ? "danger" : "neutral",
-                                  onSelect: () => setActiveChangeLocation(location),
-                                },
-                              ]}
-                            />
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-            </OpsTableWrap>
+            {!loading && !loadError && !error && locations.length === 0 ? (
+              <OpsEmptyState variant="compact" description="Aún no hay ubicaciones registradas." />
+            ) : (
+              <OpsDataTable
+                columns={[
+                  { key: "nombre", header: "Nombre" },
+                  { key: "codigo", header: "Código" },
+                  { key: "tipo", header: "Tipo" },
+                  { key: "direccion", header: "Dirección" },
+                  { key: "estado", header: "Estado" },
+                  { key: "acciones", header: "", className: "w-10" },
+                ]}
+                minWidth="820px"
+                loading={loading}
+                loadingMessage="Cargando ubicaciones..."
+                error={loadError || error}
+                errorTitle="Error al cargar ubicaciones"
+                isEmpty={locations.length > 0 && paginatedLocations.length === 0}
+                emptyMessage="No hay resultados para este filtro."
+                footer={
+                  <>
+                    <span className="text-sm tabular-nums text-[var(--ops-text-muted)]">
+                      {filteredLocations.length === 0
+                        ? "0 resultados"
+                        : `${firstVisible}-${lastVisible} de ${filteredLocations.length}`}
+                    </span>
 
-            <OpsTableFooter>
-              <span className="text-sm tabular-nums text-[var(--ops-text-muted)]">
-                {filteredLocations.length === 0
-                  ? "0 resultados"
-                  : `${firstVisible}-${lastVisible} de ${filteredLocations.length}`}
-              </span>
-
-              <Pagination
-                page={safePage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-                className="self-end md:self-auto"
-              />
-            </OpsTableFooter>
+                    <Pagination
+                      page={safePage}
+                      totalPages={totalPages}
+                      onPageChange={setCurrentPage}
+                      className="self-end md:self-auto"
+                    />
+                  </>
+                }
+              >
+                {paginatedLocations.map((location) => (
+                  <tr
+                    key={location.location_id}
+                    className="transition hover:bg-[var(--ops-surface-muted)]"
+                  >
+                    <td className="px-4 py-[var(--ops-row-py)]">
+                      <p className="text-sm font-semibold text-[var(--ops-text)]">
+                        {location.name}
+                      </p>
+                    </td>
+                    <td className="px-4 py-[var(--ops-row-py)]">
+                      <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--ops-text-muted)] tabular-nums">
+                        {location.code || "—"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-[var(--ops-row-py)]">
+                      <span className="inline-block rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]">
+                        {locationTypeLabels[location.type]}
+                      </span>
+                    </td>
+                    <td className="px-4 py-[var(--ops-row-py)]">
+                      <span className="text-sm text-[var(--ops-text)]">
+                        {location.address || "—"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-[var(--ops-row-py)]">
+                      <OpsStatusBadge tone={location.active ? "success" : "neutral"}>
+                        {activeBadgeLabel(location.active)}
+                      </OpsStatusBadge>
+                    </td>
+                    <td className="w-[4.5rem] px-4 py-[var(--ops-row-py)]">
+                      <AdminRowActionsMenu
+                        ariaLabel={`Acciones para ${location.name}`}
+                        items={[
+                          {
+                            label: "Editar",
+                            icon: <PencilLine className="h-3.5 w-3.5" />,
+                            onSelect: () => openEditModal(location),
+                          },
+                          {
+                            label: location.active ? "Inactivar" : "Activar",
+                            icon: <Power className="h-3.5 w-3.5" />,
+                            tone: location.active ? "danger" : "neutral",
+                            onSelect: () => setActiveChangeLocation(location),
+                          },
+                        ]}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </OpsDataTable>
+            )}
             </OpsTableBlock>
           </OpsSectionDivider>
 
@@ -592,7 +527,7 @@ export default function LocationsPage() {
                 </AdminField>
 
                 <AdminField label="Tipo">
-                  <AdminSelectMenu
+                  <OpsSelectMenu
                     value={formState.type}
                     onValueChange={(value) =>
                       setFormState((current) => ({

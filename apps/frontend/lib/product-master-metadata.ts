@@ -340,7 +340,7 @@ export const productMasterLinks: ProductMasterLink[] = [
 
 export function resolveProductMasterRouteTitle(pathname: string) {
   if (pathname === appRoutes.catalogs) {
-    return "Catalogos maestros"
+    return "Catálogos maestros"
   }
 
   if (pathname.startsWith(`${appRoutes.catalogs}/`)) {
@@ -376,6 +376,6 @@ export function getCatalogRoute(slug: string) {
 
 export const productMasterSummaryLink = {
   href: appRoutes.catalogs,
-  label: "Catalogos maestros",
+  label: "Catálogos maestros",
   icon: ReceiptText,
 }

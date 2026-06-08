@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { usePagination } from "@/hooks/use-pagination";
 import {
   Boxes,
   CircleAlert,
@@ -21,8 +22,10 @@ import {
 } from "@/components/admin/admin-ui";
 import { ApiEnvelope, apiFetch, unwrapApiData } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { formatDate } from "@/lib/date-utils";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsEmptyState } from "@/components/ui/ops-empty-state";
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
 import {
   OpsFiltersRow,
@@ -40,18 +43,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import type { ProductStatus, StatusFilter, StyleBase } from "@/types/products";
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
 
-type StyleItem = {
-  style_id: string;
-  style_code: string | null;
-  name: string;
-  description: string | null;
-  active: boolean;
-  created_at: string;
-  garment_type_name: string;
-  fabric_name: string | null;
-  fabric_detail_name: string | null;
-  target_name: string | null;
+type StyleItem = StyleBase & {
   configured_size_count: number;
   configured_color_count: number;
   expected_variant_count: number;
@@ -61,31 +56,12 @@ type StyleItem = {
   missing_retail_size_count: number;
   missing_wholesale_size_count: number;
   total_stock_qty: number;
-  status:
-    | "inactive"
-    | "draft"
-    | "pending_variants"
-    | "pending_prices"
-    | "ready_no_stock"
-    | "ready";
+  status: ProductStatus;
   next_step_label: string;
   warnings: {
     missing_wholesale_prices: boolean;
     stock_without_retail_price: boolean;
   };
-};
-
-type StyleBase = {
-  style_id: string;
-  style_code: string | null;
-  name: string;
-  description: string | null;
-  active: boolean;
-  created_at: string;
-  garment_type_name: string;
-  fabric_name: string | null;
-  fabric_detail_name: string | null;
-  target_name: string | null;
 };
 
 type SizeItem = {
@@ -160,8 +136,6 @@ type VariantFormState = {
   colorIds: string[];
 };
 
-type StatusFilter = "all" | "active" | "inactive";
-
 const STYLE_PAGE_SIZE = 10;
 const VARIANT_PAGE_SIZE = 10;
 
@@ -230,28 +204,13 @@ async function requestVariantsBaseData() {
   };
 }
 
-function getStatusBadgeClass(status: StyleItem["status"]) {
-  if (status === "ready") {
-    return "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]";
-  }
-
-  if (status === "ready_no_stock") {
-    return "border-[color:color-mix(in_srgb,#3b82f6_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#3b82f6_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#2563eb_74%,var(--ops-text))]";
-  }
-
-  if (status === "pending_prices") {
-    return "border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#e11d48_74%,var(--ops-text))]";
-  }
-
-  if (status === "pending_variants") {
-    return "border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#d97706_74%,var(--ops-text))]";
-  }
-
-  if (status === "draft") {
-    return "border-[color:color-mix(in_srgb,#334155_60%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#1e293b_90%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f1f5f9_94%,var(--ops-text))]";
-  }
-
-  return "border-[color:color-mix(in_srgb,#94a3b8_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#94a3b8_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#475569_74%,var(--ops-text))]";
+function variantStatusTone(status: StyleItem["status"]) {
+  if (status === "ready") return "success" as const
+  if (status === "ready_no_stock") return "accent" as const
+  if (status === "pending_prices") return "danger" as const
+  if (status === "pending_variants") return "warning" as const
+  if (status === "draft") return "warning" as const
+  return "neutral" as const
 }
 
 function getStatusLabel(status: StyleItem["status"]) {
@@ -287,16 +246,14 @@ export function VariantsPage({
   const [styles, setStyles] = useState<StyleItem[]>([]);
   const [sizes, setSizes] = useState<SizeItem[]>([]);
   const [colors, setColors] = useState<ColorItem[]>([]);
-  const [selectedStyleId, setSelectedStyleId] = useState<string>("");
+  const [selectedStyleId, setSelectedStyleId] = useState<string>(initialStyleId || "");
   const [selectedSnapshot, setSelectedSnapshot] = useState<VariantSnapshot | null>(null);
   const [selectedWorkspace, setSelectedWorkspace] = useState<ProductWorkspace | null>(null);
   const [formState, setFormState] = useState<VariantFormState>(initialFormState);
   const [styleSearch, setStyleSearch] = useState("");
   const [styleStatusFilter, setStyleStatusFilter] = useState<StatusFilter>("all");
-  const [stylePage, setStylePage] = useState(1);
   const [variantSearch, setVariantSearch] = useState("");
   const [variantStatusFilter, setVariantStatusFilter] = useState<StatusFilter>("all");
-  const [variantPage, setVariantPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingSelected, setLoadingSelected] = useState(false);
   const [savingConfig, setSavingConfig] = useState(false);
@@ -305,9 +262,13 @@ export function VariantsPage({
   const [pendingStatusVariant, setPendingStatusVariant] = useState<VariantItem | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const hasAppliedInitialSelection = useRef(false);
+  const selectedStyleExists = useMemo(
+    () => styles.some((style) => style.style_id === selectedStyleId),
+    [selectedStyleId, styles]
+  );
+  const resolvedSelectedStyleId = selectedStyleExists ? selectedStyleId : "";
 
-  async function loadBaseData() {
+  const loadBaseData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -318,12 +279,13 @@ export function VariantsPage({
       setSizes(sizesData);
       setColors(colorsData);
 
-      if (!selectedStyleId && initialStyleId && stylesData.length) {
-        const preferredStyle =
-          initialStyleId &&
-          stylesData.find((style) => style.style_id === initialStyleId)?.style_id;
-
-        setSelectedStyleId(preferredStyle || "");
+      if (selectedStyleId && !stylesData.some((style) => style.style_id === selectedStyleId)) {
+        setSelectedStyleId("");
+        setSelectedSnapshot(null);
+        setSelectedWorkspace(null);
+        setFormState(initialFormState);
+        setVariantSearch("");
+        setVariantStatusFilter("all");
       }
     } catch (requestError) {
       setError(
@@ -334,7 +296,7 @@ export function VariantsPage({
     } finally {
       setLoading(false);
     }
-  }
+  }, [selectedStyleId]);
 
   async function loadStyleSnapshot(styleId: string) {
     setLoadingSelected(true);
@@ -366,85 +328,16 @@ export function VariantsPage({
   }
 
   useEffect(() => {
-    let cancelled = false;
-
-    setLoading(true);
-    setError(null);
-
-    requestVariantsBaseData()
-      .then(({ stylesData, sizesData, colorsData }) => {
-        if (cancelled) {
-          return;
-        }
-
-        setStyles(stylesData);
-        setSizes(sizesData);
-        setColors(colorsData);
-
-        if (initialStyleId && stylesData.length) {
-          const preferredStyle =
-            initialStyleId &&
-            stylesData.find((style) => style.style_id === initialStyleId)?.style_id;
-
-          setSelectedStyleId((current) => current || preferredStyle || "");
-        }
-      })
-      .catch((requestError) => {
-        if (cancelled) {
-          return;
-        }
-
-        setError(
-          requestError instanceof Error
-            ? requestError.message
-            : "No se pudo cargar la base de Variantes"
-        );
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [initialStyleId]);
+    void Promise.resolve().then(loadBaseData);
+  }, [loadBaseData]);
 
   useEffect(() => {
-    if (
-      hasAppliedInitialSelection.current ||
-      !initialStyleId ||
-      !styles.some((style) => style.style_id === initialStyleId)
-    ) {
+    if (!resolvedSelectedStyleId) {
       return;
     }
 
-    hasAppliedInitialSelection.current = true;
-    setSelectedStyleId(initialStyleId);
-  }, [initialStyleId, styles]);
-
-  useEffect(() => {
-    if (!selectedStyleId) {
-      setSelectedSnapshot(null);
-      setSelectedWorkspace(null);
-      setFormState(initialFormState);
-      setVariantSearch("");
-      setVariantStatusFilter("all");
-      setVariantPage(1);
-      return;
-    }
-
-    loadStyleSnapshot(selectedStyleId);
-  }, [selectedStyleId]);
-
-  useEffect(() => {
-    setStylePage(1);
-  }, [styleSearch, styleStatusFilter]);
-
-  useEffect(() => {
-    setVariantPage(1);
-  }, [variantSearch, variantStatusFilter, selectedStyleId]);
+    void Promise.resolve().then(() => loadStyleSnapshot(resolvedSelectedStyleId));
+  }, [resolvedSelectedStyleId]);
 
   const filteredStyles = useMemo(() => {
     const term = normalizeText(styleSearch);
@@ -471,18 +364,6 @@ export function VariantsPage({
       return haystack.includes(term);
     });
   }, [styleSearch, styleStatusFilter, styles]);
-
-  useEffect(() => {
-    if (!selectedStyleId || !styles.length) {
-      return;
-    }
-
-    const stillExists = styles.some((style) => style.style_id === selectedStyleId);
-
-    if (!stillExists) {
-      setSelectedStyleId("");
-    }
-  }, [selectedStyleId, styles]);
 
   const visibleSizes = useMemo(() => {
     const selectedIds = new Set(formState.sizeIds);
@@ -544,49 +425,55 @@ export function VariantsPage({
     [styles]
   );
 
-  const styleTotalPages = Math.max(1, Math.ceil(filteredStyles.length / STYLE_PAGE_SIZE));
-  const safeStylePage = Math.min(stylePage, styleTotalPages);
+  const {
+    paginatedItems: paginatedStyles,
+    firstVisible: styleFirstVisible,
+    lastVisible: styleLastVisible,
+    totalPages: styleTotalPages,
+    safePage: safeStylePage,
+    setPage: setStylePage,
+  } = usePagination(filteredStyles, STYLE_PAGE_SIZE);
 
-  useEffect(() => {
-    if (stylePage !== safeStylePage) {
-      setStylePage(safeStylePage);
-    }
-  }, [safeStylePage, stylePage]);
+  const {
+    paginatedItems: paginatedVariants,
+    firstVisible: variantFirstVisible,
+    lastVisible: variantLastVisible,
+    totalPages: variantTotalPages,
+    safePage: safeVariantPage,
+    setPage: setVariantPage,
+  } = usePagination(filteredVariants, VARIANT_PAGE_SIZE);
 
-  const paginatedStyles = useMemo(() => {
-    const start = (safeStylePage - 1) * STYLE_PAGE_SIZE;
-    return filteredStyles.slice(start, start + STYLE_PAGE_SIZE);
-  }, [filteredStyles, safeStylePage]);
+  const resetVariantViewState = useCallback(() => {
+    setSelectedSnapshot(null);
+    setSelectedWorkspace(null);
+    setFormState(initialFormState);
+    setVariantSearch("");
+    setVariantStatusFilter("all");
+    setVariantPage(1);
+  }, [setVariantPage]);
 
-  const styleFirstVisible =
-    paginatedStyles.length === 0 ? 0 : (safeStylePage - 1) * STYLE_PAGE_SIZE + 1;
-  const styleLastVisible =
-    paginatedStyles.length === 0 ? 0 : styleFirstVisible + paginatedStyles.length - 1;
+  function handleSelectStyle(styleId: string) {
+    setSelectedStyleId(styleId);
+    setSuccessMessage(null);
+    setError(null);
+    setVariantSearch("");
+    setVariantStatusFilter("all");
+    setVariantPage(1);
+  }
 
-  const variantTotalPages = Math.max(1, Math.ceil(filteredVariants.length / VARIANT_PAGE_SIZE));
-  const safeVariantPage = Math.min(variantPage, variantTotalPages);
-
-  useEffect(() => {
-    if (variantPage !== safeVariantPage) {
-      setVariantPage(safeVariantPage);
-    }
-  }, [safeVariantPage, variantPage]);
-
-  const paginatedVariants = useMemo(() => {
-    const start = (safeVariantPage - 1) * VARIANT_PAGE_SIZE;
-    return filteredVariants.slice(start, start + VARIANT_PAGE_SIZE);
-  }, [filteredVariants, safeVariantPage]);
-
-  const variantFirstVisible =
-    paginatedVariants.length === 0 ? 0 : (safeVariantPage - 1) * VARIANT_PAGE_SIZE + 1;
-  const variantLastVisible =
-    paginatedVariants.length === 0 ? 0 : variantFirstVisible + paginatedVariants.length - 1;
+  function handleClearSelectedStyle() {
+    setSelectedStyleId("");
+    setSuccessMessage(null);
+    setError(null);
+    resetVariantViewState();
+    router.push("/productos/variantes");
+  }
 
   const selectedProduct = selectedWorkspace?.product || null;
 
   async function handleSaveConfig(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedStyleId) {
+    if (!resolvedSelectedStyleId) {
       return;
     }
 
@@ -595,7 +482,7 @@ export function VariantsPage({
     setSuccessMessage(null);
 
     try {
-      await requestApiData<VariantSnapshot>(`/api/variants/styles/${selectedStyleId}/config`, {
+      await requestApiData<VariantSnapshot>(`/api/variants/styles/${resolvedSelectedStyleId}/config`, {
         method: "PUT",
         body: JSON.stringify({
           size_ids: formState.sizeIds,
@@ -603,7 +490,7 @@ export function VariantsPage({
         }),
       });
 
-      await loadStyleSnapshot(selectedStyleId);
+      await loadStyleSnapshot(resolvedSelectedStyleId);
       setSuccessMessage("Configuracion guardada correctamente.");
       await loadBaseData();
     } catch (requestError) {
@@ -618,7 +505,7 @@ export function VariantsPage({
   }
 
   async function handleGenerateVariants() {
-    if (!selectedStyleId) {
+    if (!resolvedSelectedStyleId) {
       return;
     }
 
@@ -631,11 +518,11 @@ export function VariantsPage({
         created_count: number;
         existing_count: number;
         summary: VariantSnapshot["summary"];
-      }>(`/api/variants/styles/${selectedStyleId}/generate`, {
+      }>(`/api/variants/styles/${resolvedSelectedStyleId}/generate`, {
         method: "POST",
       });
 
-      await loadStyleSnapshot(selectedStyleId);
+      await loadStyleSnapshot(resolvedSelectedStyleId);
       await loadBaseData();
       setSuccessMessage(
         `Generacion completada. Se crearon ${result.created_count} variantes y ${result.existing_count} ya existian.`
@@ -664,8 +551,8 @@ export function VariantsPage({
         }),
       });
 
-      if (selectedStyleId) {
-        await loadStyleSnapshot(selectedStyleId);
+      if (resolvedSelectedStyleId) {
+        await loadStyleSnapshot(resolvedSelectedStyleId);
       }
 
       setSuccessMessage(
@@ -693,16 +580,13 @@ export function VariantsPage({
             title="Variantes de producto"
             actions={
               <>
-                {selectedStyleId ? (
+                {resolvedSelectedStyleId ? (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     className="rounded-lg"
-                    onClick={() => {
-                      setSelectedStyleId("");
-                      router.push("/productos/variantes");
-                    }}
+                    onClick={handleClearSelectedStyle}
                   >
                     Volver a variantes
                   </Button>
@@ -736,12 +620,15 @@ export function VariantsPage({
           </div>
 
           <div className="space-y-5">
-            {!selectedStyleId ? (
+            {!resolvedSelectedStyleId ? (
               <OpsSectionDivider className="space-y-4">
                 <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_auto]">
                   <OpsSearchField
                     value={styleSearch}
-                    onChange={setStyleSearch}
+                    onChange={(value) => {
+                      setStyleSearch(value);
+                      setStylePage(1);
+                    }}
                     placeholder="Buscar por código, nombre o tela"
                     ariaLabel="Buscar styles para variantes"
                   />
@@ -750,7 +637,10 @@ export function VariantsPage({
                     label="Estado"
                     value={styleStatusFilter}
                     options={STATUS_FILTER_OPTIONS}
-                    onChange={(v) => setStyleStatusFilter(v as StatusFilter)}
+                    onChange={(v) => {
+                      setStyleStatusFilter(v as StatusFilter);
+                      setStylePage(1);
+                    }}
                   />
 
                   <Tooltip>
@@ -801,8 +691,8 @@ export function VariantsPage({
                           </tr>
                         ) : paginatedStyles.length === 0 ? (
                           <tr>
-                            <td colSpan={8} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                              No hay styles para este filtro.
+                            <td colSpan={8} className="px-4 py-10">
+                              <OpsEmptyState variant="compact" description="No hay styles para este filtro." />
                             </td>
                           </tr>
                         ) : (
@@ -823,7 +713,7 @@ export function VariantsPage({
                                     {style.style_code || "Sin codigo"}
                                   </span>
                                   <span className="text-[11px] text-[var(--ops-text-muted)]">
-                                    {new Date(style.created_at).toLocaleDateString("es-PE")}
+                                    {formatDate(style.created_at)}
                                   </span>
                                 </div>
                               </td>
@@ -845,13 +735,9 @@ export function VariantsPage({
                                 </p>
                               </td>
                               <td className="px-4 py-[var(--ops-row-py)]">
-                                <span
-                                  className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${getStatusBadgeClass(
-                                    style.status
-                                  )}`}
-                                >
+                                <OpsStatusBadge tone={variantStatusTone(style.status)}>
                                   {getStatusLabel(style.status)}
-                                </span>
+                                </OpsStatusBadge>
                               </td>
                               <td className="px-4 py-[var(--ops-row-py)] text-right">
                                 <Button
@@ -860,9 +746,8 @@ export function VariantsPage({
                                   size="sm"
                                   className="rounded-lg px-3"
                                   onClick={() => {
-                                    setSelectedStyleId(style.style_id);
+                                    handleSelectStyle(style.style_id);
                                     router.push(`/productos/variantes?style_id=${encodeURIComponent(style.style_id)}`);
-                                    setSuccessMessage(null);
                                   }}
                                 >
                                   Configurar
@@ -893,7 +778,7 @@ export function VariantsPage({
               </OpsSectionDivider>
             ) : null}
 
-            {selectedStyleId ? (
+            {resolvedSelectedStyleId ? (
               <article className="ops-surface rounded-lg border p-4 md:p-5">
                 {loadingSelected ? (
                   <div className="ops-text-muted flex min-h-56 items-center justify-center">
@@ -919,23 +804,13 @@ export function VariantsPage({
                               </span>
                             ) : null}
                             {selectedProduct ? (
-                              <span
-                                className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getStatusBadgeClass(
-                                  selectedProduct.status
-                                )}`}
-                              >
+                              <OpsStatusBadge tone={variantStatusTone(selectedProduct.status)}>
                                 {getStatusLabel(selectedProduct.status)}
-                              </span>
+                              </OpsStatusBadge>
                             ) : null}
-                            <span
-                              className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${
-                                selectedSnapshot.style.active
-                                  ? "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
-                                  : "border-[color:color-mix(in_srgb,#94a3b8_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#94a3b8_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#475569_74%,var(--ops-text))]"
-                              }`}
-                            >
+                            <OpsStatusBadge tone={selectedSnapshot.style.active ? "success" : "neutral"}>
                               {selectedSnapshot.style.active ? "Activo" : "Inactivo"}
-                            </span>
+                            </OpsStatusBadge>
                           </div>
                           <div className="mt-3 grid gap-2 text-sm md:grid-cols-2 text-[var(--ops-text-muted)]">
                             <p>
@@ -1178,7 +1053,10 @@ export function VariantsPage({
                   <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_auto]">
                     <OpsSearchField
                       value={variantSearch}
-                      onChange={setVariantSearch}
+                      onChange={(value) => {
+                        setVariantSearch(value);
+                        setVariantPage(1);
+                      }}
                       placeholder="Buscar por SKU, talla o color"
                       ariaLabel="Buscar variantes"
                     />
@@ -1187,7 +1065,10 @@ export function VariantsPage({
                       label="Estado"
                       value={variantStatusFilter}
                       options={STATUS_FILTER_OPTIONS}
-                      onChange={(v) => setVariantStatusFilter(v as StatusFilter)}
+                      onChange={(v) => {
+                        setVariantStatusFilter(v as StatusFilter);
+                        setVariantPage(1);
+                      }}
                     />
 
                     <Tooltip>
@@ -1229,8 +1110,8 @@ export function VariantsPage({
                         <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
                           {paginatedVariants.length === 0 ? (
                             <tr>
-                              <td colSpan={6} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                                No hay variantes para este filtro.
+                              <td colSpan={6} className="px-4 py-10">
+                                <OpsEmptyState variant="compact" description="No hay variantes para este filtro." />
                               </td>
                             </tr>
                           ) : (
@@ -1259,16 +1140,9 @@ export function VariantsPage({
                                 <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{variant.sku}</td>
                                 <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{variant.barcode || "Pendiente"}</td>
                                 <td className="px-4 py-[var(--ops-row-py)]">
-                                  <span
-                                    className={cn(
-                                      "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-                                      variant.active
-                                        ? "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
-                                        : "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]"
-                                    )}
-                                  >
+                                  <OpsStatusBadge tone={variant.active ? "success" : "neutral"}>
                                     {variant.active ? "Activa" : "Inactiva"}
-                                  </span>
+                                  </OpsStatusBadge>
                                 </td>
                                 <td className="px-4 py-[var(--ops-row-py)] text-right">
                                   <AdminRowActionsMenu

@@ -14,9 +14,13 @@ export const appRoutes = {
   products: "/productos",
   prices: "/precios",
   inventory: "/inventario",
+  inventoryMovements: "/inventario/movimientos",
   inventoryAdjustments: "/inventario/ajustes",
-  kardex: "/kardex",
+  kardex: "/inventario/movimientos",
   transfers: "/transferencias",
+  transferRequest: "/transferencias/solicitar",
+  transferPendingReceipts: "/transferencias/recepciones",
+  transferHistory: "/transferencias/historial",
   purchaseSystem: "/ventas",
   transactionHistory: "/ventas/historial",
   postsales: "/postventa",
@@ -48,6 +52,18 @@ export function buildProductModuleRoute(slug: ProductRouteSlug) {
 
 export function buildTransferModuleRoute(slug: TransferRouteSlug) {
   return `${appRoutes.transfers}/${slug}`
+}
+
+export function buildInventoryDetailRoute(styleId: string, locationId?: string | null) {
+  const params = new URLSearchParams()
+
+  if (locationId) {
+    params.set("location_id", locationId)
+  }
+
+  return params.toString()
+    ? `${appRoutes.inventory}/${styleId}?${params.toString()}`
+    : `${appRoutes.inventory}/${styleId}`
 }
 
 export function buildSaleDetailRoute(saleId: string) {

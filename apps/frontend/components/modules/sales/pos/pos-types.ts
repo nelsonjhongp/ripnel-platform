@@ -149,7 +149,7 @@ export interface SalePreview {
 
 export interface MixedPayment {
   method: string
-  amount: number
+  amount: number | null
   reference: string | null
 }
 

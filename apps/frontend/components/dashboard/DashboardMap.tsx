@@ -35,7 +35,6 @@ export default function DashboardMap({ departments = [], locationName, height = 
   const [geoLoaded, setGeoLoaded] = useState(false)
   const [hoveredDept, setHoveredDept] = useState<{ name: string; saleCount: number; totalAmount: number } | null>(null)
 
-  const totalAmount = departments.reduce((s, d) => s + d.total_amount, 0)
   const maxAmount = Math.max(...departments.map((d) => d.total_amount), 0)
 
   const tooltipStyle: React.CSSProperties = {
@@ -169,7 +168,6 @@ export default function DashboardMap({ departments = [], locationName, height = 
 
   useEffect(() => {
     if (!geoLayer.current || !LeafletRef.current || !geoLoaded) return
-    const L = LeafletRef.current
     const deptEntries = departments.map((d) => [d.name, d] as const)
     geoLayer.current.eachLayer((layer) => {
       const feat = (layer as unknown as { feature?: { properties?: Record<string, string> } }).feature

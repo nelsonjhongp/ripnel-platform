@@ -91,6 +91,16 @@ const nextConfig: NextConfig = {
         permanent: false,
       },
       {
+        source: "/inventory/movements",
+        destination: "/inventario/movimientos",
+        permanent: false,
+      },
+      {
+        source: "/kardex",
+        destination: "/inventario/movimientos",
+        permanent: false,
+      },
+      {
         source: "/purchase-system",
         destination: "/ventas",
         permanent: false,
@@ -113,6 +123,21 @@ const nextConfig: NextConfig = {
       {
         source: "/transaction-history",
         destination: "/ventas/historial",
+        permanent: false,
+      },
+      {
+        source: "/transferencias/listado-de-transferencias",
+        destination: "/transferencias",
+        permanent: false,
+      },
+      {
+        source: "/transferencias/solicitar-productos",
+        destination: "/transferencias/solicitar",
+        permanent: false,
+      },
+      {
+        source: "/transferencias/recepciones-pendientes",
+        destination: "/transferencias/recepciones",
         permanent: false,
       },
     ];

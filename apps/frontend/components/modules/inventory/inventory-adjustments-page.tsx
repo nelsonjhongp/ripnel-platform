@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { usePagination } from "@/hooks/use-pagination";
 import Link from "next/link";
 import {
   Eye,
@@ -19,8 +20,11 @@ import {
   AdminRowActionsMenu,
 } from "@/components/admin/admin-ui";
 import { InlineStatusCard } from "@/components/feedback/status-page";
+import { ForbiddenPage } from "@/components/feedback/status-page";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsEmptyState } from "@/components/ui/ops-empty-state";
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
 import {
   OpsFiltersRow,
@@ -39,18 +43,23 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { apiFetchData } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useApiGet } from "@/hooks/use-api-get";
 import { appRoutes } from "@/lib/routes";
 import {
   type AdjustmentDetail,
+  type AdjustmentDetailData,
+  type AdjustmentListData,
   type AdjustmentStatus,
   type AdjustmentSummary,
+  formatAdjustmentIntent,
   formatAdjustmentDateTime,
   formatAdjustmentStatus,
   getAdjustmentDifferenceClasses,
   getAdjustmentStatusClasses,
-  requestAdjustmentJson,
   type Location,
+  resolveAdjustmentIntent,
 } from "./inventory-adjustments-shared";
 
 function AdjustmentStatusChip({ status }: { status: AdjustmentStatus }) {
@@ -66,17 +75,30 @@ function AdjustmentStatusChip({ status }: { status: AdjustmentStatus }) {
   );
 }
 
+function AdjustmentIntentChip({
+  adjustment,
+}: {
+  adjustment: { intent_type?: "opening" | "adjustment" | null; reason: string | null };
+}) {
+  const intent = resolveAdjustmentIntent(adjustment);
+  const classes =
+    intent === "opening"
+      ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_26%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))] text-[var(--ripnel-accent-hover)]"
+      : "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]";
+
+  return (
+    <span className={cn("inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold", classes)}>
+      {formatAdjustmentIntent(intent)}
+    </span>
+  );
+}
+
 export function InventoryAdjustmentsPage() {
-  const [adjustments, setAdjustments] = useState<AdjustmentSummary[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [loadingAdjustments, setLoadingAdjustments] = useState(true);
-  const [loadingLocations, setLoadingLocations] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuth();
   const [notice, setNotice] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | AdjustmentStatus>("all");
   const [locationFilter, setLocationFilter] = useState("all");
-  const [page, setPage] = useState(1);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -85,44 +107,21 @@ export function InventoryAdjustmentsPage() {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [confirmingAdjustment, setConfirmingAdjustment] = useState(false);
   const [cancellingAdjustment, setCancellingAdjustment] = useState(false);
+  const canManageAdjustments = ["ADMIN", "ALMACEN"].includes(
+    String(user?.role_name || "").toUpperCase()
+  );
 
-  async function loadAdjustments() {
-    setLoadingAdjustments(true);
-    setError(null);
+  const { data: adjustmentData, loading: loadingAdjustments, error, refetch: refreshAdjustments } = useApiGet(
+    () => apiFetchData<AdjustmentListData>("/api/inventory/adjustments", { cache: "no-store" }),
+    []
+  );
 
-    try {
-      const data = await requestAdjustmentJson<AdjustmentSummary[]>("/api/inventory/adjustments");
-      setAdjustments(data || []);
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error ? requestError.message : "No se pudo cargar ajustes"
-      );
-    } finally {
-      setLoadingAdjustments(false);
-    }
-  }
-
-  async function loadLocations() {
-    setLoadingLocations(true);
-
-    try {
-      const data = await requestAdjustmentJson<Location[]>("/api/locations");
-      setLocations((data || []).filter((location) => location.active));
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error ? requestError.message : "No se pudieron cargar sedes"
-      );
-    } finally {
-      setLoadingLocations(false);
-    }
-  }
-
-  useEffect(() => {
-    void Promise.resolve().then(() => {
-      void loadAdjustments();
-      void loadLocations();
-    });
-  }, []);
+  const adjustments = adjustmentData?.rows || [];
+  const locations = adjustmentData?.meta.available_locations || [];
+  const effectiveLocationFilter =
+    locationFilter === "all" || locations.some((location) => location.location_id === locationFilter)
+      ? locationFilter
+      : "all";
 
   const filteredAdjustments = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -130,7 +129,7 @@ export function InventoryAdjustmentsPage() {
     return adjustments.filter((adjustment) => {
       const matchesStatus = statusFilter === "all" || adjustment.status === statusFilter;
       const matchesLocation =
-        locationFilter === "all" || adjustment.location_id === locationFilter;
+        effectiveLocationFilter === "all" || adjustment.location_id === effectiveLocationFilter;
       const matchesQuery =
         !normalizedQuery ||
         adjustment.adjustment_number.toLowerCase().includes(normalizedQuery) ||
@@ -141,7 +140,7 @@ export function InventoryAdjustmentsPage() {
 
       return matchesStatus && matchesLocation && matchesQuery;
     });
-  }, [adjustments, locationFilter, query, statusFilter]);
+  }, [adjustments, effectiveLocationFilter, query, statusFilter]);
 
   const totals = useMemo(
     () => ({
@@ -152,16 +151,16 @@ export function InventoryAdjustmentsPage() {
     [adjustments]
   );
 
-  const totalPages = Math.max(1, Math.ceil(filteredAdjustments.length / 10));
-  const safePage = Math.min(page, totalPages);
-  const pageStart = (safePage - 1) * 10;
-  const paginatedAdjustments = filteredAdjustments.slice(pageStart, pageStart + 10);
-  const visibleFrom = filteredAdjustments.length ? pageStart + 1 : 0;
-  const visibleTo = filteredAdjustments.length
-    ? Math.min(pageStart + 10, filteredAdjustments.length)
-    : 0;
+  const {
+    paginatedItems: paginatedAdjustments,
+    firstVisible,
+    lastVisible,
+    totalPages,
+    safePage,
+    setPage,
+  } = usePagination(filteredAdjustments);
   const hasActiveFilters =
-    Boolean(query.trim()) || statusFilter !== "all" || locationFilter !== "all";
+    Boolean(query.trim()) || statusFilter !== "all" || effectiveLocationFilter !== "all";
 
   async function openDetail(adjustmentId: string) {
     setDetailOpen(true);
@@ -172,10 +171,11 @@ export function InventoryAdjustmentsPage() {
     setCancelModalOpen(false);
 
     try {
-      const data = await requestAdjustmentJson<AdjustmentDetail>(
-        `/api/inventory/adjustments/${adjustmentId}`
+      const data = await apiFetchData<AdjustmentDetailData>(
+        `/api/inventory/adjustments/${adjustmentId}`,
+        { cache: "no-store" }
       );
-      setDetail(data);
+      setDetail(data.adjustment);
     } catch (requestError) {
       setDetailError(
         requestError instanceof Error ? requestError.message : "No se pudo cargar el detalle"
@@ -200,19 +200,17 @@ export function InventoryAdjustmentsPage() {
 
     setConfirmingAdjustment(true);
     setDetailError(null);
-    setError(null);
-    setNotice(null);
 
     try {
-      await requestAdjustmentJson<AdjustmentDetail>(
+      await apiFetchData<AdjustmentDetailData>(
         `/api/inventory/adjustments/${detail.adjustment_id}/confirm`,
-        { method: "POST", body: JSON.stringify({}) }
+        { method: "POST", body: JSON.stringify({}), cache: "no-store" }
       );
 
       setConfirmModalOpen(false);
       closeDetail();
       setNotice("Ajuste confirmado y aplicado al inventario.");
-      await loadAdjustments();
+      void refreshAdjustments();
     } catch (requestError) {
       setDetailError(
         requestError instanceof Error ? requestError.message : "No se pudo confirmar el ajuste"
@@ -229,19 +227,17 @@ export function InventoryAdjustmentsPage() {
 
     setCancellingAdjustment(true);
     setDetailError(null);
-    setError(null);
-    setNotice(null);
 
     try {
-      await requestAdjustmentJson<AdjustmentDetail>(
+      await apiFetchData<AdjustmentDetailData>(
         `/api/inventory/adjustments/${detail.adjustment_id}/cancel`,
-        { method: "POST", body: JSON.stringify({}) }
+        { method: "POST", body: JSON.stringify({}), cache: "no-store" }
       );
 
       setCancelModalOpen(false);
       closeDetail();
       setNotice("Ajuste cancelado.");
-      await loadAdjustments();
+      void refreshAdjustments();
     } catch (requestError) {
       setDetailError(
         requestError instanceof Error ? requestError.message : "No se pudo cancelar el ajuste"
@@ -253,29 +249,31 @@ export function InventoryAdjustmentsPage() {
 
   return (
     <TooltipProvider delayDuration={120}>
+      {!canManageAdjustments ? (
+        <ForbiddenPage variant="ops" />
+      ) : (
       <OpsPageShell width="wide">
         <PosHeader
-          eyebrow="Apertura y regularizacion"
+          eyebrow="Inventario"
           title="Ajustes de inventario"
           actions={
             <div className="flex flex-wrap gap-2">
               <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="rounded-lg"
+              type="button"
+              variant="outline"
+              size="sm"
+              className="rounded-lg"
                 onClick={() => {
-                  void loadAdjustments();
-                  void loadLocations();
+                  void refreshAdjustments();
                 }}
-              >
+            >
                 <RefreshCw className="h-4 w-4" />
                 Actualizar
               </Button>
               <Button asChild variant="accent" size="sm" className="rounded-lg">
                 <Link href={`${appRoutes.inventoryAdjustments}/nuevo`}>
                   <PackagePlus className="h-4 w-4" />
-                  Nuevo ajuste
+                  Registrar ajuste de inventario
                 </Link>
               </Button>
             </div>
@@ -308,7 +306,7 @@ export function InventoryAdjustmentsPage() {
 
             <FilterDropdown
               label="Sede"
-              value={locationFilter}
+              value={effectiveLocationFilter}
               options={[
                 { value: "all", label: "Todas" },
                 ...locations.map((location) => ({
@@ -366,6 +364,7 @@ export function InventoryAdjustmentsPage() {
                   <th className="px-4 py-3">Numero</th>
                   <th className="px-4 py-3">Sede</th>
                   <th className="px-4 py-3">Estado</th>
+                  <th className="px-4 py-3">Intención</th>
                   <th className="px-4 py-3">Motivo</th>
                   <th className="px-4 py-3 text-right">Lineas</th>
                   <th className="px-4 py-3">Creado</th>
@@ -373,10 +372,10 @@ export function InventoryAdjustmentsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                {loadingAdjustments || loadingLocations ? (
+                {loadingAdjustments ? (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={8}
                       className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
                     >
                       <LoaderCircle className="mr-2 inline-block h-5 w-5 animate-spin align-middle" />
@@ -385,7 +384,7 @@ export function InventoryAdjustmentsPage() {
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-6">
+                    <td colSpan={8} className="px-4 py-6">
                       <InlineStatusCard
                         title="No pudimos cargar ajustes"
                         description={error}
@@ -420,6 +419,9 @@ export function InventoryAdjustmentsPage() {
                         <AdjustmentStatusChip status={adjustment.status} />
                       </td>
                       <td className="px-4 py-[var(--ops-row-py)] align-top">
+                        <AdjustmentIntentChip adjustment={adjustment} />
+                      </td>
+                      <td className="px-4 py-[var(--ops-row-py)] align-top">
                         <span className="block max-w-[180px] truncate text-sm text-[var(--ops-text)]">
                           {adjustment.reason || "Sin motivo"}
                         </span>
@@ -451,11 +453,8 @@ export function InventoryAdjustmentsPage() {
                   ))
                 ) : (
                   <tr>
-                    <td
-                      colSpan={7}
-                      className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
-                    >
-                      No hay ajustes para los filtros actuales.
+                    <td colSpan={8} className="px-4 py-10">
+                      <OpsEmptyState variant="compact" description="No hay ajustes para los filtros actuales." />
                     </td>
                   </tr>
                 )}
@@ -466,7 +465,7 @@ export function InventoryAdjustmentsPage() {
           <OpsTableFooter>
             <span className="text-sm text-[var(--ops-text-muted)]">
               {filteredAdjustments.length
-                ? `${visibleFrom}-${visibleTo} de ${filteredAdjustments.length}`
+                ? `${firstVisible}-${lastVisible} de ${filteredAdjustments.length}`
                 : "0 resultados"}
             </span>
             <Pagination
@@ -481,7 +480,7 @@ export function InventoryAdjustmentsPage() {
 
         {detailOpen ? (
           <AdminModalShell
-            title="Detalle de ajuste"
+            title="Detalle del ajuste"
             onClose={closeDetail}
             widthClass="max-w-5xl"
             footer={
@@ -523,9 +522,11 @@ export function InventoryAdjustmentsPage() {
                 ) : null}
                 {detail?.status === "confirmed" ? (
                   <Button asChild type="button" variant="outline" size="sm" className="rounded-lg">
-                    <Link href={`/kardex?query=${encodeURIComponent(detail.adjustment_id)}`}>
+                    <Link
+                      href={`${appRoutes.inventoryMovements}?query=${encodeURIComponent(detail.adjustment_id)}`}
+                    >
                       <Eye className="h-4 w-4" />
-                      Ver movimientos
+                      Ver movimientos de stock
                     </Link>
                   </Button>
                 ) : null}
@@ -553,15 +554,21 @@ export function InventoryAdjustmentsPage() {
                       {detail.location_name} · {detail.location_code}
                     </p>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                      Estado
-                    </p>
-                    <AdjustmentStatusChip status={detail.status} />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                      Lineas
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                        Estado
+                      </p>
+                      <AdjustmentStatusChip status={detail.status} />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                        Intención
+                      </p>
+                      <AdjustmentIntentChip adjustment={detail} />
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                        Lineas
                     </p>
                     <p className="text-lg font-semibold text-[var(--ops-text)]">
                       {detail.lines.length}
@@ -616,8 +623,9 @@ export function InventoryAdjustmentsPage() {
                   </dl>
 
                   <AdminInlineMessage tone="warning">
-                    Al confirmar, cada linea ajusta la cantidad final de la sede y registra un
-                    movimiento <code>ADJUST</code>.
+                    Al confirmar, cada linea actualiza la cantidad final de la sede y registra un
+                    movimiento <code>ADJUST</code> en movimientos de stock. No uses este flujo para
+                    mover mercaderia entre sedes.
                   </AdminInlineMessage>
                 </div>
 
@@ -715,6 +723,7 @@ export function InventoryAdjustmentsPage() {
           onConfirm={() => void cancelAdjustment()}
         />
       </OpsPageShell>
+      )}
     </TooltipProvider>
   );
 }

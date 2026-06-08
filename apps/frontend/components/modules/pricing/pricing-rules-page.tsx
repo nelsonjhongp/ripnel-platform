@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { LoaderCircle, RefreshCw, Save } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DateFilterPicker } from "@/components/ui/date-filter-picker"
@@ -8,54 +8,41 @@ import { OpsMetricPill } from "@/components/ui/ops-metric-pill"
 import { OpsSectionDivider, OpsTableBlock, OpsTableWrap } from "@/components/ui/ops-page-shell"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import {
   createPricingRule,
   fetchPricingRules,
   updatePricingRule,
 } from "@/lib/api-prices"
+import { formatDate } from "@/lib/date-utils";
 import type { PricingRuleRow } from "@/lib/prices-types"
+import { useApiGet } from "@/hooks/use-api-get"
 
-function formatDate(value: string | null) {
-  if (!value) return "-"
+function createRuleDraft(rule: PricingRuleRow | null) {
+  if (!rule) {
+    return {
+      minQty: "3",
+      active: true,
+      validFrom: "",
+      validTo: "",
+    }
+  }
 
-  return new Intl.DateTimeFormat("es-PE", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(value))
+  return {
+    minQty: String(rule.min_qty),
+    active: rule.active,
+    validFrom: rule.valid_from?.slice(0, 10) || "",
+    validTo: rule.valid_to?.slice(0, 10) || "",
+  }
 }
 
 export function PricingRulesPage() {
-  const [rules, setRules] = useState<PricingRuleRow[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { data: rulesData, loading, error, refetch } = useApiGet(() => fetchPricingRules(), [])
+  const rules = rulesData ?? []
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
-
-  const [minQty, setMinQty] = useState("3")
-  const [active, setActive] = useState(true)
-  const [validFrom, setValidFrom] = useState("")
-  const [validTo, setValidTo] = useState("")
-
-  const loadRules = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      const data = await fetchPricingRules()
-      setRules(data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudieron cargar las reglas")
-      setRules([])
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    void loadRules()
-  }, [loadRules])
+  const [draft, setDraft] = useState<ReturnType<typeof createRuleDraft> | null>(null)
 
   const wholesaleRule = useMemo(
     () =>
@@ -63,28 +50,37 @@ export function PricingRulesPage() {
     [rules]
   )
 
-  useEffect(() => {
-    if (!wholesaleRule) {
-      return
-    }
+  const formState = useMemo(
+    () => draft ?? createRuleDraft(wholesaleRule),
+    [draft, wholesaleRule]
+  )
 
-    setMinQty(String(wholesaleRule.min_qty))
-    setActive(wholesaleRule.active)
-    setValidFrom(wholesaleRule.valid_from?.slice(0, 10) || "")
-    setValidTo(wholesaleRule.valid_to?.slice(0, 10) || "")
-  }, [wholesaleRule])
+  const updateDraft = useCallback(
+    (updater: (current: ReturnType<typeof createRuleDraft>) => ReturnType<typeof createRuleDraft>) => {
+      setDraft((current) => updater(current ?? createRuleDraft(wholesaleRule)))
+      setSubmitError(null)
+      setMessage(null)
+    },
+    [wholesaleRule]
+  )
+
+  const handleRefresh = useCallback(() => {
+    setDraft(null)
+    setMessage(null)
+    refetch()
+  }, [refetch])
 
   async function handleSubmit() {
     setSubmitting(true)
-    setError(null)
+    setSubmitError(null)
     setMessage(null)
 
     try {
       const payload = {
-        min_qty: Number(minQty),
-        active,
-        valid_from: validFrom || null,
-        valid_to: validTo || null,
+        min_qty: Number(formState.minQty),
+        active: formState.active,
+        valid_from: formState.validFrom || null,
+        valid_to: formState.validTo || null,
       }
 
       if (wholesaleRule) {
@@ -96,10 +92,11 @@ export function PricingRulesPage() {
         })
       }
 
-      await loadRules()
+      refetch()
+      setDraft(null)
       setMessage("Regla mayorista guardada correctamente")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar la regla")
+      setSubmitError(err instanceof Error ? err.message : "No se pudo guardar la regla")
     } finally {
       setSubmitting(false)
     }
@@ -117,7 +114,7 @@ export function PricingRulesPage() {
                 type="button"
                 variant="outline"
                 size="icon-sm"
-                onClick={() => void loadRules()}
+                onClick={handleRefresh}
                 disabled={loading}
                 aria-label="Actualizar"
                 className="rounded-lg"
@@ -157,8 +154,8 @@ export function PricingRulesPage() {
                 <input
                   type="number"
                   min="1"
-                  value={minQty}
-                  onChange={(event) => setMinQty(event.target.value)}
+                  value={formState.minQty}
+                  onChange={(event) => updateDraft((current) => ({ ...current, minQty: event.target.value }))}
                   className="sales-field h-10 w-full rounded-lg px-3 text-sm text-[var(--ops-text)] outline-none"
                 />
               </div>
@@ -170,8 +167,8 @@ export function PricingRulesPage() {
                 <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-[var(--ops-text)]">
                   <input
                     type="checkbox"
-                    checked={active}
-                    onChange={(event) => setActive(event.target.checked)}
+                    checked={formState.active}
+                    onChange={(event) => updateDraft((current) => ({ ...current, active: event.target.checked }))}
                     className="h-4 w-4 rounded border-[var(--ops-border-strong)] accent-[var(--ripnel-accent)]"
                   />
                   Regla activa
@@ -180,17 +177,17 @@ export function PricingRulesPage() {
 
               <DateFilterPicker
                 label="Vigente desde"
-                value={validFrom}
-                onChange={setValidFrom}
+                value={formState.validFrom}
+                onChange={(value) => updateDraft((current) => ({ ...current, validFrom: value }))}
                 ariaLabel="Vigente desde"
               />
 
               <DateFilterPicker
                 label="Vigente hasta"
-                value={validTo}
-                onChange={setValidTo}
+                value={formState.validTo}
+                onChange={(value) => updateDraft((current) => ({ ...current, validTo: value }))}
                 ariaLabel="Vigente hasta"
-                min={validFrom || undefined}
+                min={formState.validFrom || undefined}
               />
             </div>
 
@@ -200,9 +197,9 @@ export function PricingRulesPage() {
               </div>
             ) : null}
 
-            {error ? (
+            {submitError ? (
               <div className="mt-4 rounded-lg border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-3 py-2 text-sm text-[color:color-mix(in_srgb,#be123c_74%,var(--ops-text))]">
-                {error}
+                {submitError}
               </div>
             ) : null}
 
@@ -213,7 +210,7 @@ export function PricingRulesPage() {
                 size="sm"
                 className="rounded-lg px-3"
                 onClick={() => void handleSubmit()}
-                disabled={submitting || Number.isNaN(Number(minQty)) || Number(minQty) <= 0}
+                disabled={submitting || Number.isNaN(Number(formState.minQty)) || Number(formState.minQty) <= 0}
               >
                 {submitting ? (
                   <>
@@ -277,13 +274,9 @@ export function PricingRulesPage() {
                           {rule.valid_to ? formatDate(rule.valid_to) : "Sin fin"}
                         </td>
                         <td className="px-4 py-[var(--ops-row-py)] align-top">
-                          <span
-                            className={rule.active
-                              ? "inline-flex rounded-full border border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]"
-                              : "inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]"}
-                          >
+                          <OpsStatusBadge tone={rule.active ? "success" : "neutral"}>
                             {rule.active ? "Activa" : "Inactiva"}
-                          </span>
+                          </OpsStatusBadge>
                         </td>
                       </tr>
                     ))

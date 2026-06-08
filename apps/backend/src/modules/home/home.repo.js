@@ -1,4 +1,9 @@
 const { query } = require('../../shared/db');
+const { findAllTransfers } = require('../transfers/transfers.repo');
+const {
+  buildTransferPendingCounts,
+  buildTransferPendingItems,
+} = require('../transfers/transfers-inbox');
 
 async function findPersonalSalesSummary(locationId, sellerUserId, businessDate, weekStartDate, executor = query) {
   const result = await executor(
@@ -84,7 +89,7 @@ async function findAssignedNetworkSummary(locationIds, businessDate, executor = 
        SELECT COUNT(*)::int AS pending_requests_count
        FROM stock_transfers st
        WHERE st.to_location_id IN (SELECT location_id FROM assigned_locations)
-         AND st.status = 'draft'
+         AND st.status IN ('requested', 'approved')
      )
      SELECT
        (SELECT COUNT(*)::int FROM active_users) AS active_user_count,
@@ -99,75 +104,13 @@ async function findAssignedNetworkSummary(locationIds, businessDate, executor = 
 }
 
 async function findTransferRequestCounts(locationId, executor = query) {
-  const result = await executor(
-    `SELECT
-       COUNT(*) FILTER (
-         WHERE st.to_location_id = $1
-           AND st.status = 'draft'
-       )::int AS drafts_for_store_count,
-       COUNT(*) FILTER (
-         WHERE st.from_location_id = $1
-           AND st.status = 'draft'
-       )::int AS drafts_to_ship_count,
-       COUNT(*) FILTER (
-         WHERE st.to_location_id = $1
-           AND st.status = 'shipped'
-       )::int AS pending_receive_count
-     FROM stock_transfers st`,
-    [locationId]
-  );
-
-  return result.rows[0] || null;
+  const rows = await findAllTransfers({ locationIds: [locationId] });
+  return buildTransferPendingCounts(rows, [locationId]);
 }
 
 async function findTransferRequestItems(locationId, limit = 5, executor = query) {
-  const result = await executor(
-    `SELECT
-       st.transfer_id,
-       st.transfer_number,
-       st.from_location_id,
-       lf.name AS from_location_name,
-       lf.code AS from_location_code,
-       st.to_location_id,
-       lt.name AS to_location_name,
-       lt.code AS to_location_code,
-       st.status,
-       st.created_at,
-       st.shipped_at,
-       st.updated_at,
-       COALESCE(SUM(stl.qty_requested), 0)::int AS qty_requested_total,
-       COALESCE(SUM(stl.qty_shipped), 0)::int AS qty_shipped_total
-     FROM stock_transfers st
-     INNER JOIN locations lf ON lf.location_id = st.from_location_id
-     INNER JOIN locations lt ON lt.location_id = st.to_location_id
-     LEFT JOIN stock_transfer_lines stl ON stl.transfer_id = st.transfer_id
-     WHERE (
-         st.to_location_id = $1
-         AND st.status IN ('draft', 'shipped')
-       )
-       OR (
-         st.from_location_id = $1
-         AND st.status = 'draft'
-       )
-     GROUP BY
-       st.transfer_id,
-       st.transfer_number,
-       st.from_location_id,
-       lf.name,
-       lf.code,
-       st.to_location_id,
-       lt.name,
-       lt.code,
-       st.status,
-       st.created_at,
-       st.shipped_at,
-       st.updated_at
-     ORDER BY COALESCE(st.shipped_at, st.updated_at, st.created_at) DESC
-     LIMIT $2`,
-    [locationId, limit]
-  );
-
-  return result.rows;
+  const rows = await findAllTransfers({ locationIds: [locationId] });
+  return buildTransferPendingItems(rows, [locationId], limit);
 }
 
 module.exports = {

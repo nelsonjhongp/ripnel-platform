@@ -10,6 +10,7 @@ const {
 	getSaleById,
 	postSale,
 	getSaleProformaPdfFile,
+	getSaleReceiptPdfFile,
 	sendSaleEmail,
 } = require('./sales.controller');
 
@@ -22,6 +23,7 @@ router.get('/sellable-variants', getSellableVariants);
 router.get('/analytics/customers', getCustomersAnalytics);
 router.get('/', getSales);
 router.get('/:saleId/proforma-pdf', getSaleProformaPdfFile);
+router.get('/:saleId/pdf', getSaleReceiptPdfFile);
 router.get('/:saleId/receipt-pdf', getSaleProformaPdfFile);
 router.post('/:saleId/send-email', sendSaleEmail);
 router.get('/:saleId', getSaleById);

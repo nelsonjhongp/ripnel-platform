@@ -39,6 +39,7 @@ type PosHeaderProgress = {
 type PosHeaderProps = {
   eyebrow?: string
   title?: string
+  description?: string | null
   subtitle?: string | null
   meta?: ReactNode
   actions?: ReactNode
@@ -52,6 +53,7 @@ type PosHeaderProps = {
 export function PosHeader({
   eyebrow = "Operacion comercial",
   title = "Nueva venta",
+  description = null,
   subtitle = "",
   meta = null,
   actions = null,
@@ -64,6 +66,7 @@ export function PosHeader({
   const showStepper = Array.isArray(steps) && typeof currentStep === "number"
   const progressItems = Array.isArray(progress?.items) ? progress.items : []
   const showProgress = progressItems.length > 0
+  const resolvedDescription = description ?? subtitle
 
   return (
     <section
@@ -82,8 +85,8 @@ export function PosHeader({
           <h1 className="text-2xl leading-8 font-semibold tracking-[-0.025em] text-[var(--ops-text)] md:text-[1.75rem]">
             {title}
           </h1>
-          {subtitle ? (
-            <p className="max-w-3xl text-sm leading-5 text-[var(--ops-text-muted)]">{subtitle}</p>
+          {resolvedDescription ? (
+            <p className="max-w-3xl text-sm leading-5 text-[var(--ops-text-muted)]">{resolvedDescription}</p>
           ) : null}
         </div>
 

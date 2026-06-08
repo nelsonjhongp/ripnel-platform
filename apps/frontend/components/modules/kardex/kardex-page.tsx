@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { usePagination } from "@/hooks/use-pagination";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowDownCircle,
   ArrowUpCircle,
@@ -9,11 +11,15 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { InlineStatusCard } from "@/components/feedback/status-page";
-import { buildApiUrl } from "@/lib/api";
+import { apiFetchData } from "@/lib/api";
+import { useApiGet } from "@/hooks/use-api-get";
 import { cn } from "@/lib/utils";
+import type { Location } from "@/types/shared";
+import { formatDateTime } from "@/lib/date-utils";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsEmptyState } from "@/components/ui/ops-empty-state";
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
 import { Pagination } from "@/components/ui/pagination";
 import {
@@ -32,145 +38,159 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-type MovementType = "IN" | "OUT" | "ADJUST";
-type MovementOperationFilter = "ALL" | "IN" | "OUT" | "ADJUST" | "TRANSFER";
-
-type KardexMovement = {
-  movement_id: string;
-  location_id: string;
-  location_code: string;
-  location_name: string;
-  variant_id: string;
-  sku: string;
-  style_code: string;
-  style_name: string;
-  movement_type: MovementType;
-  quantity: number;
-  quantity_effect: number;
-  balance_qty: number;
-  reason: string | null;
-  reference_type: string | null;
-  reference_id: string | null;
-  reference_line_id: string | null;
-  created_by: string | null;
-  created_by_name: string | null;
-  created_at: string;
-};
-
-function formatMovementTypeLabel(type: MovementType) {
-  if (type === "IN") return "Entrada";
-  if (type === "OUT") return "Salida";
-  return "Ajuste";
-}
-
-function formatMovementOperationLabel(movement: KardexMovement) {
-  if (movement.reference_type === "transfer") {
-    return movement.movement_type === "OUT" ? "Transferencia enviada" : "Transferencia recibida";
-  }
-
-  if (movement.reference_type === "adjustment" || movement.movement_type === "ADJUST") {
-    return "Ajuste";
-  }
-
-  return formatMovementTypeLabel(movement.movement_type);
-}
-
-function formatReference(movement: KardexMovement) {
-  if (movement.reference_type && movement.reference_id) {
-    const referenceLabel =
-      movement.reference_type === "transfer"
-        ? "Transferencia"
-        : movement.reference_type === "adjustment"
-          ? "Ajuste"
-          : movement.reference_type;
-    return `${referenceLabel} ${movement.reference_id.slice(0, 8)}`;
-  }
-  if (movement.reference_type) return movement.reference_type;
-  return movement.reason || "Sin referencia";
-}
-
-function formatDateTime(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("es-PE", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(date);
-}
+import type { KardexMovement, KardexResponse, MovementOperationFilter, MovementOriginFilter } from "@/lib/kardex-domain";
+import { resolveDocumentFamily, resolveMovementDirection, resolveSemanticOrigin, formatMovementOperationLabel, formatMovementOriginLabel, formatReference, resolveMovementTypeFromParams, resolveOriginFilterFromParams, resolveBackendReferenceType } from "@/lib/kardex-domain";
 
 export default function KardexPage() {
-  const [movements, setMovements] = useState<KardexMovement[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [locationFilter, setLocationFilter] = useState("ALL");
-  const [movementType, setMovementType] = useState<MovementOperationFilter>("ALL");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  const searchParams = useSearchParams();
+  const searchParamsKey = searchParams.toString();
+  const initialQuery = searchParams.get("query") ?? searchParams.get("reference_id") ?? "";
+  const initialLocation = searchParams.get("location_id") ?? searchParams.get("location") ?? "ALL";
+  const initialMovementType = resolveMovementTypeFromParams(
+    searchParams.get("movement_type"),
+    searchParams.get("reference_type")
+  );
+  const initialOriginFilter = resolveOriginFilterFromParams(searchParams.get("reference_type"));
+  const initialDateFrom = searchParams.get("date_from") ?? "";
+  const initialDateTo = searchParams.get("date_to") ?? "";
 
-  async function loadKardex() {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(buildApiUrl("/api/inventory/kardex"), {
+  return (
+    <KardexPageContent
+      key={searchParamsKey}
+      initialQuery={initialQuery}
+      initialLocation={initialLocation}
+      initialMovementType={initialMovementType}
+      initialOriginFilter={initialOriginFilter}
+      initialDateFrom={initialDateFrom}
+      initialDateTo={initialDateTo}
+      referenceTypeParam={searchParams.get("reference_type")}
+      referenceIdParam={searchParams.get("reference_id")}
+      hasSearchContext={Boolean(searchParamsKey)}
+    />
+  );
+}
+
+function KardexPageContent({
+  initialQuery,
+  initialLocation,
+  initialMovementType,
+  initialOriginFilter,
+  initialDateFrom,
+  initialDateTo,
+  referenceTypeParam,
+  referenceIdParam,
+  hasSearchContext,
+}: {
+  initialQuery: string;
+  initialLocation: string;
+  initialMovementType: MovementOperationFilter;
+  initialOriginFilter: MovementOriginFilter;
+  initialDateFrom: string;
+  initialDateTo: string;
+  referenceTypeParam: string | null;
+  referenceIdParam: string | null;
+  hasSearchContext: boolean;
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [query, setQuery] = useState(initialQuery);
+  const [locationFilter, setLocationFilter] = useState(initialLocation);
+  const [movementType, setMovementType] = useState<MovementOperationFilter>(initialMovementType);
+  const [originFilter, setOriginFilter] = useState<MovementOriginFilter>(initialOriginFilter);
+  const [dateFrom, setDateFrom] = useState(initialDateFrom);
+  const [dateTo, setDateTo] = useState(initialDateTo);
+
+  const { data: kardexResponse, loading, error, refetch } = useApiGet<KardexResponse>(
+    () => {
+      const params = new URLSearchParams();
+      const normalizedQuery = query.trim();
+      const backendReferenceType = resolveBackendReferenceType(
+        movementType,
+        originFilter,
+        referenceTypeParam
+      );
+      const combinedQuery = [normalizedQuery, referenceIdParam || ""]
+        .map((value) => value.trim())
+        .filter((value, index, values) => value && values.indexOf(value) === index)
+        .join(" ");
+
+      if (movementType !== "ALL" && movementType !== "TRANSFER") {
+        params.set("movement_type", movementType);
+      }
+
+      if (backendReferenceType) {
+        params.set("reference_type", backendReferenceType);
+      }
+
+      if (referenceIdParam) {
+        params.set("reference_id", referenceIdParam);
+      }
+
+      if (normalizedQuery) {
+        params.set("query", combinedQuery);
+      }
+
+      if (locationFilter !== "ALL") {
+        params.set("location_id", locationFilter);
+      }
+
+      if (dateFrom) {
+        params.set("date_from", `${dateFrom}T00:00:00`);
+      }
+
+      if (dateTo) {
+        params.set("date_to", `${dateTo}T23:59:59`);
+      }
+
+      return apiFetchData<KardexResponse>(`/api/inventory/kardex?${params.toString()}`, {
         cache: "no-store",
       });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.message || "No se pudo cargar movimientos de stock");
-      }
-      setMovements(payload.data || []);
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "No se pudo cargar movimientos de stock"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
+    },
+    [query, locationFilter, movementType, originFilter, referenceTypeParam, referenceIdParam, dateFrom, dateTo]
+  );
 
-  useEffect(() => {
-    void Promise.resolve().then(() => loadKardex());
-  }, []);
+  const movements = useMemo(() => kardexResponse?.rows || [], [kardexResponse]);
+  const availableLocations = useMemo(() => kardexResponse?.meta?.available_locations || [], [kardexResponse]);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const initialQuery = params.get("query");
-    const initialLocation = params.get("location");
-
-    if (initialQuery) {
-      setQuery(initialQuery);
-    }
-
-    if (initialLocation) {
-      setLocationFilter(initialLocation);
-    }
-  }, []);
+  const effectiveLocationFilter =
+    locationFilter === "ALL" ||
+    availableLocations.some((location) => location.location_id === locationFilter)
+      ? locationFilter
+      : "ALL";
 
   const locationOptions = useMemo(() => {
-    const map = new Map<string, string>();
-
-    for (const movement of movements) {
-      map.set(movement.location_code, movement.location_name);
-    }
-
-    return Array.from(map.entries()).map(([code, name]) => ({ code, name }));
-  }, [movements]);
+    return availableLocations.map((location) => ({
+      location_id: location.location_id,
+      code: location.code,
+      name: location.name,
+    }));
+  }, [availableLocations]);
 
   const filteredMovements = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return movements.filter((movement) => {
       const movementDate = new Date(movement.created_at);
+      const movementDirection = resolveMovementDirection(movement);
+      const documentFamily = resolveDocumentFamily(movement);
+      const semanticOrigin = resolveSemanticOrigin(movement);
       const matchesType =
         movementType === "ALL" ||
         (movementType === "TRANSFER"
-          ? movement.reference_type === "transfer"
-          : movement.movement_type === movementType && movement.reference_type !== "transfer");
+          ? documentFamily === "transfer"
+          : movementType === "IN"
+            ? movementDirection === "entry" && documentFamily !== "transfer"
+            : movementType === "OUT"
+              ? movementDirection === "exit" && documentFamily !== "transfer"
+              : movementDirection === "adjustment");
+      const matchesOrigin =
+        originFilter === "ALL" ||
+        (originFilter === "opening"
+          ? semanticOrigin === "opening_confirmed"
+          : originFilter === "adjustment"
+            ? semanticOrigin === "adjustment_confirmed"
+            : documentFamily === originFilter);
       const matchesLocation =
-        locationFilter === "ALL" || movement.location_code === locationFilter;
+        effectiveLocationFilter === "ALL" || movement.location_id === effectiveLocationFilter;
       const matchesDateFrom =
         !dateFrom ||
         (!Number.isNaN(movementDate.getTime()) &&
@@ -188,9 +208,16 @@ export default function KardexPage() {
         movement.location_name.toLowerCase().includes(normalizedQuery) ||
         (movement.reference_id || "").toLowerCase().includes(normalizedQuery) ||
         reference.includes(normalizedQuery);
-      return matchesType && matchesLocation && matchesDateFrom && matchesDateTo && matchesQuery;
+      return (
+        matchesType &&
+        matchesOrigin &&
+        matchesLocation &&
+        matchesDateFrom &&
+        matchesDateTo &&
+        matchesQuery
+      );
     });
-  }, [dateFrom, dateTo, locationFilter, movements, query, movementType]);
+  }, [dateFrom, dateTo, effectiveLocationFilter, movements, originFilter, query, movementType]);
 
   const totals = useMemo(() => {
     return filteredMovements.reduce(
@@ -201,10 +228,10 @@ export default function KardexPage() {
         if (movement.quantity_effect < 0) {
           acc.exits += Math.abs(movement.quantity_effect);
         }
-        if (movement.movement_type === "ADJUST") {
+        if (resolveMovementDirection(movement) === "adjustment") {
           acc.adjustments += 1;
         }
-        if (movement.reference_type === "transfer") {
+        if (resolveDocumentFamily(movement) === "transfer") {
           acc.transfers += 1;
         }
         return acc;
@@ -213,32 +240,33 @@ export default function KardexPage() {
     );
   }, [filteredMovements]);
 
-  const pageSize = 10;
-  const totalPages = Math.max(1, Math.ceil(filteredMovements.length / pageSize));
-  const safePage = Math.min(currentPage, totalPages);
-  const paginatedMovements = filteredMovements.slice(
-    (safePage - 1) * pageSize,
-    safePage * pageSize
-  );
-  const firstVisible = filteredMovements.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
-  const lastVisible = Math.min(safePage * pageSize, filteredMovements.length);
+  const {
+    paginatedItems: paginatedMovements,
+    firstVisible,
+    lastVisible,
+    totalPages,
+    safePage,
+    setPage,
+  } = usePagination(filteredMovements);
 
   function handleFilterChange(fn: () => void) {
     fn();
-    setCurrentPage(1);
+    setPage(1);
   }
 
   const hasActiveFilters =
     query !== "" ||
-    locationFilter !== "ALL" ||
+    effectiveLocationFilter !== "ALL" ||
     movementType !== "ALL" ||
+    originFilter !== "ALL" ||
     dateFrom !== "" ||
-    dateTo !== "";
+    dateTo !== "" ||
+    hasSearchContext;
 
   return (
     <OpsPageShell width="wide">
         <PosHeader
-          eyebrow="Trazabilidad"
+          eyebrow="Kardex"
           title="Movimientos de stock"
           actions={
             <Button
@@ -246,7 +274,7 @@ export default function KardexPage() {
               variant="outline"
               size="sm"
               className="rounded-lg"
-              onClick={() => loadKardex()}
+              onClick={() => refetch()}
               disabled={loading}
             >
               <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
@@ -264,21 +292,21 @@ export default function KardexPage() {
 
         <OpsSectionDivider>
           <OpsTableBlock>
-          <OpsFiltersRow className="lg:grid-cols-[minmax(0,1.45fr)_0.78fr_0.78fr_0.72fr_0.72fr_auto]">
+          <OpsFiltersRow className="lg:grid-cols-[minmax(0,1.45fr)_0.75fr_0.75fr_0.75fr_0.72fr_0.72fr_auto]">
             <OpsSearchField
               value={query}
               onChange={(value) => handleFilterChange(() => setQuery(value))}
-              placeholder="Buscar por SKU, producto, ubicación o referencia"
+              placeholder="Buscar por SKU, producto, sede, origen o referencia"
               ariaLabel="Buscar movimientos de stock"
             />
 
             <FilterDropdown
               label="Sede"
-              value={locationFilter}
+              value={effectiveLocationFilter}
               options={[
                 { value: "ALL", label: "Todas" },
                 ...locationOptions.map((location) => ({
-                  value: location.code,
+                  value: location.location_id,
                   label: `${location.code} - ${location.name}`,
                 })),
               ]}
@@ -286,16 +314,30 @@ export default function KardexPage() {
             />
 
             <FilterDropdown
-              label="Tipo"
+              label="Operación"
               value={movementType}
               options={[
                 { value: "ALL", label: "Todos" },
                 { value: "IN", label: "Entradas" },
                 { value: "OUT", label: "Salidas" },
                 { value: "ADJUST", label: "Ajustes" },
-                { value: "TRANSFER", label: "Transferencias" },
+                { value: "TRANSFER", label: "Por transferencia" },
               ]}
               onChange={(v) => handleFilterChange(() => setMovementType(v as MovementOperationFilter))}
+            />
+
+            <FilterDropdown
+              label="Origen"
+              value={originFilter}
+              options={[
+                { value: "ALL", label: "Todos" },
+                { value: "sale", label: "Venta" },
+                { value: "transfer", label: "Transferencia" },
+                { value: "exchange", label: "Cambio" },
+                { value: "adjustment", label: "Ajuste" },
+                { value: "opening", label: "Apertura" },
+              ]}
+              onChange={(v) => handleFilterChange(() => setOriginFilter(v as MovementOriginFilter))}
             />
 
             <div>
@@ -332,8 +374,12 @@ export default function KardexPage() {
                       setQuery("");
                       setLocationFilter("ALL");
                       setMovementType("ALL");
+                      setOriginFilter("ALL");
                       setDateFrom("");
                       setDateTo("");
+                      if (hasSearchContext) {
+                        router.replace(pathname);
+                      }
                     })}
                     disabled={!hasActiveFilters}
                     className="rounded-lg"
@@ -354,7 +400,8 @@ export default function KardexPage() {
                     <th className="px-4 py-3">Fecha</th>
                     <th className="px-4 py-3">SKU</th>
                     <th className="px-4 py-3">Producto</th>
-                    <th className="px-4 py-3 hidden sm:table-cell">Ref.</th>
+                    <th className="px-4 py-3 hidden sm:table-cell">Origen</th>
+                    <th className="px-4 py-3 hidden xl:table-cell">Ref.</th>
                     <th className="px-4 py-3">Tipo</th>
                     <th className="px-4 py-3 text-right">Cantidad</th>
                     <th className="px-4 py-3">Ubicación</th>
@@ -364,14 +411,14 @@ export default function KardexPage() {
                 <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
                   {loading ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                      <td colSpan={9} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
                         <LoaderCircle className="mr-2 inline-block h-4 w-4 animate-spin" />
                         Cargando movimientos...
                       </td>
                     </tr>
                    ) : error ? (
                      <tr>
-                       <td colSpan={8} className="px-4 py-6">
+                       <td colSpan={9} className="px-4 py-6">
                          <InlineStatusCard
                            title="No pudimos cargar movimientos"
                            description={error}
@@ -382,10 +429,12 @@ export default function KardexPage() {
                      </tr>
                    ) : filteredMovements.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                        {movements.length === 0
-                          ? "No hay movimientos de stock registrados."
-                          : "No se encontraron movimientos con los filtros actuales."}
+                      <td colSpan={9} className="px-4 py-10">
+                        <OpsEmptyState variant="compact" description={
+                          movements.length === 0
+                            ? "No hay movimientos de stock registrados."
+                            : "No se encontraron movimientos con los filtros actuales."
+                        } />
                       </td>
                     </tr>
                   ) : (
@@ -404,24 +453,27 @@ export default function KardexPage() {
                           {movement.style_name}
                         </td>
                         <td className="px-4 py-[var(--ops-row-py)] text-xs text-[var(--ops-text-muted)] hidden sm:table-cell">
+                            {formatMovementOriginLabel(movement)}
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] text-xs text-[var(--ops-text-muted)] hidden xl:table-cell">
                             {formatReference(movement)}
                         </td>
                         <td className="px-4 py-[var(--ops-row-py)]">
                           <span
                             className={cn(
                               "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
-                              movement.movement_type === "IN" &&
+                              resolveMovementDirection(movement) === "entry" &&
                                 "border-[color:color-mix(in_srgb,#10b981_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_82%,var(--ops-text))]",
-                              movement.movement_type === "OUT" &&
+                              resolveMovementDirection(movement) === "exit" &&
                                 "border-[color:color-mix(in_srgb,#f59e0b_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] text-[color:color-mix(in_srgb,#d97706_72%,var(--ops-text))]",
-                              movement.movement_type === "ADJUST" &&
+                              resolveMovementDirection(movement) === "adjustment" &&
                                 "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text-muted)]"
                             )}
                           >
-                            {movement.movement_type === "IN" && (
+                            {resolveMovementDirection(movement) === "entry" && (
                               <ArrowUpCircle className="h-3 w-3" />
                             )}
-                            {movement.movement_type === "OUT" && (
+                            {resolveMovementDirection(movement) === "exit" && (
                               <ArrowDownCircle className="h-3 w-3" />
                             )}
                             {formatMovementOperationLabel(movement)}
@@ -460,7 +512,7 @@ export default function KardexPage() {
             <Pagination
               page={safePage}
               totalPages={totalPages}
-              onPageChange={setCurrentPage}
+              onPageChange={setPage}
               className="self-end md:self-auto"
             />
           </OpsTableFooter>

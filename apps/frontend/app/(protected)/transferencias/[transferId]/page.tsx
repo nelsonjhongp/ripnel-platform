@@ -1,10 +1,6 @@
-import { notFound } from "next/navigation"
-import { TransfersManagePage } from "@/components/modules/transfers/transfers-manage-page"
-import { TransfersRequestPage } from "@/components/modules/transfers/transfers-request-page"
+import { notFound, redirect } from "next/navigation"
 import { TransferDetailPage } from "@/components/modules/transfers/transfers-detail-page"
-import { TransfersListPage } from "@/components/modules/transfers/transfers-list-page"
-import { TransfersPendingPage } from "@/components/modules/transfers/transfers-pending-page"
-import { transferRouteSlugs } from "@/lib/routes"
+import { appRoutes, transferRouteSlugs } from "@/lib/routes"
 
 export default async function TransferPage({
   params,
@@ -14,19 +10,19 @@ export default async function TransferPage({
   const { transferId } = await params
 
   if (transferId === transferRouteSlugs.list) {
-    return <TransfersListPage />
+    redirect(appRoutes.transfers)
   }
 
   if (transferId === transferRouteSlugs.create) {
-    return <TransfersManagePage />
+    notFound()
   }
 
   if (transferId === transferRouteSlugs.requestProducts) {
-    return <TransfersRequestPage />
+    redirect(appRoutes.transferRequest)
   }
 
   if (transferId === transferRouteSlugs.pendingReceipts) {
-    return <TransfersPendingPage />
+    redirect(appRoutes.transferPendingReceipts)
   }
 
   if (transferId) {

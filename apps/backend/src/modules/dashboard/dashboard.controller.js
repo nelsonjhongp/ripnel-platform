@@ -13,6 +13,8 @@ async function getOverview(req, res, next) {
       role_name: req.auth?.role_name,
       date_from: req.query.date_from || undefined,
       date_to: req.query.date_to || undefined,
+      location_scope: req.query.location_scope || undefined,
+      location_id: req.query.location_id || undefined,
     });
 
     return res.json(overview);
@@ -43,6 +45,8 @@ async function getDepartmentSales(req, res, next) {
       role_name: req.auth?.role_name,
       date_from: req.query.date_from || undefined,
       date_to: req.query.date_to || undefined,
+      location_scope: req.query.location_scope || undefined,
+      location_id: req.query.location_id || undefined,
     });
 
     return res.json(result);
@@ -60,6 +64,8 @@ async function getCommercialActivityController(req, res, next) {
       date_from: req.query.date_from || undefined,
       date_to: req.query.date_to || undefined,
       group: req.query.group || undefined,
+      location_scope: req.query.location_scope || undefined,
+      location_id: req.query.location_id || undefined,
     });
 
     return res.json(result);
