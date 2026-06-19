@@ -1,9 +1,8 @@
 "use client"
 
-import { LoaderCircle } from "lucide-react"
+import { AlertTriangle, LoaderCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { OpsTableWrap, OpsTableFooter } from "@/components/ui/ops-page-shell"
-import { InlineStatusCard } from "@/components/feedback/status-page"
 
 export type OpsDataTableColumn = {
   key: string
@@ -44,7 +43,7 @@ export function OpsDataTable({
         <thead className="bg-[var(--ops-surface-muted)]">
           <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
             {columns.map((col) => (
-              <th key={col.key} className={cn("px-4 py-3", col.className)}>
+              <th key={col.key} scope="col" className={cn("px-4 py-3", col.className)}>
                 {col.header}
               </th>
             ))}
@@ -63,13 +62,17 @@ export function OpsDataTable({
             </tr>
           ) : error ? (
             <tr>
-              <td colSpan={colCount} className="px-4 py-6">
-                <InlineStatusCard
-                  title={errorTitle}
-                  description={error}
-                  tone="danger"
-                  variant="ops"
-                />
+              <td
+                colSpan={colCount}
+                className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
+              >
+                <div role="alert" className="inline-flex max-w-xl items-start gap-2 text-left">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[var(--ops-tone-danger-text)]" />
+                  <span>
+                    <span className="block font-semibold text-[var(--ops-text)]">{errorTitle}</span>
+                    <span className="mt-0.5 block">{error}</span>
+                  </span>
+                </div>
               </td>
             </tr>
           ) : isEmpty ? (

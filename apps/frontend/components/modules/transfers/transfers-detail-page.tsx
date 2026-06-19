@@ -228,10 +228,6 @@ export function TransferDetailPage({
     safeLinesPage * DETAIL_PAGE_SIZE
   );
 
-  useEffect(() => {
-    if (safeLinesPage > totalLinesPages) setLinesPage(totalLinesPages);
-  }, [safeLinesPage, totalLinesPages]);
-
   if (loading) {
     return (
       <LoadingPage
