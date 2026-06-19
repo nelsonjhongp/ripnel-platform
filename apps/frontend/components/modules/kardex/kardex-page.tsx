@@ -1,27 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { usePagination } from "@/hooks/use-pagination";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowDownCircle,
   ArrowUpCircle,
-  LoaderCircle,
   RefreshCw,
   RotateCcw,
   Download,
 } from "lucide-react";
-import { InlineStatusCard } from "@/components/feedback/status-page";
 import { apiFetchData } from "@/lib/api";
 import { useApiGet } from "@/hooks/use-api-get";
 import { cn } from "@/lib/utils";
-import type { Location } from "@/types/shared";
 import { formatDateTime } from "@/lib/date-utils";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
-import { OpsEmptyState } from "@/components/ui/ops-empty-state";
-import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import { OpsDataTable } from "@/components/ui/ops-data-table";
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import { Pagination } from "@/components/ui/pagination";
 import {
   OpsFiltersRow,
@@ -29,8 +26,6 @@ import {
   OpsSearchField,
   OpsSectionDivider,
   OpsTableBlock,
-  OpsTableFooter,
-  OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
 import {
   Tooltip,
@@ -39,7 +34,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-import type { KardexMovement, KardexResponse, MovementOperationFilter, MovementOriginFilter } from "@/lib/kardex-domain";
+import type { KardexResponse, MovementOperationFilter, MovementOriginFilter } from "@/lib/kardex-domain";
 import { resolveDocumentFamily, resolveMovementDirection, resolveSemanticOrigin, formatMovementOperationLabel, formatMovementOriginLabel, formatReference, resolveMovementTypeFromParams, resolveOriginFilterFromParams, resolveBackendReferenceType } from "@/lib/kardex-domain";
 import { exportToCsv } from "@/lib/export-csv";
 
@@ -323,12 +318,14 @@ function KardexPageContent({
           }
         />
 
-        <div className="flex flex-wrap items-center gap-2">
-          <OpsMetricPill label="Entradas" value={totals.entries} tone="accent" />
-          <OpsMetricPill label="Salidas" value={totals.exits} tone="warning" />
-          <OpsMetricPill label="Ajustes" value={totals.adjustments} />
-          <OpsMetricPill label="Transferencias" value={totals.transfers} />
-        </div>
+        <OpsMetricInlineGroup
+          items={[
+            { label: "Entradas", value: totals.entries, tone: "accent" },
+            { label: "Salidas", value: totals.exits, tone: "warning" },
+            { label: "Ajustes", value: totals.adjustments, tone: "default" },
+            { label: "Transferencias", value: totals.transfers, tone: "default" },
+          ]}
+        />
 
         <OpsSectionDivider>
           <OpsTableBlock>
@@ -433,52 +430,46 @@ function KardexPageContent({
             </TooltipProvider>
           </OpsFiltersRow>
 
-          <OpsTableWrap minWidth="1080px">
-              <table className="w-full border-collapse">
-                <thead className="bg-[var(--ops-surface-muted)]">
-                  <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                    <th className="px-4 py-3">Fecha</th>
-                    <th className="px-4 py-3">SKU</th>
-                    <th className="px-4 py-3">Producto</th>
-                    <th className="px-4 py-3 hidden sm:table-cell">Origen</th>
-                    <th className="px-4 py-3 hidden xl:table-cell">Ref.</th>
-                    <th className="px-4 py-3">Tipo</th>
-                    <th className="px-4 py-3 text-right">Cantidad</th>
-                    <th className="px-4 py-3">Ubicación</th>
-                    <th className="px-4 py-3">Usuario</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={9} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                        <LoaderCircle className="mr-2 inline-block h-4 w-4 animate-spin" />
-                        Cargando movimientos...
-                      </td>
-                    </tr>
-                   ) : error ? (
-                     <tr>
-                       <td colSpan={9} className="px-4 py-6">
-                         <InlineStatusCard
-                           title="No pudimos cargar movimientos"
-                           description={error}
-                           tone="danger"
-                           variant="ops"
-                         />
-                       </td>
-                     </tr>
-                   ) : filteredMovements.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="px-4 py-10">
-                        <OpsEmptyState variant="compact" description={
-                          movements.length === 0
-                            ? "No hay movimientos de stock registrados."
-                            : "No se encontraron movimientos con los filtros actuales."
-                        } />
-                      </td>
-                    </tr>
-                  ) : (
-                    paginatedMovements.map((movement) => (
+          <OpsDataTable
+            columns={[
+              { key: "fecha", header: "Fecha" },
+              { key: "sku", header: "SKU" },
+              { key: "producto", header: "Producto" },
+              { key: "origen", header: "Origen", className: "hidden sm:table-cell" },
+              { key: "ref", header: "Ref.", className: "hidden xl:table-cell" },
+              { key: "tipo", header: "Tipo" },
+              { key: "cantidad", header: "Cantidad", className: "text-right" },
+              { key: "ubicacion", header: "Ubicación" },
+              { key: "usuario", header: "Usuario" },
+            ]}
+            minWidth="1080px"
+            loading={loading}
+            loadingMessage="Cargando movimientos..."
+            error={error}
+            errorTitle="No pudimos cargar movimientos"
+            isEmpty={filteredMovements.length === 0}
+            emptyMessage={
+              movements.length === 0
+                ? "No hay movimientos de stock registrados."
+                : "No se encontraron movimientos con los filtros actuales."
+            }
+            footer={
+              <>
+                <span className="text-[var(--ops-text-muted)]">
+                  {filteredMovements.length === 0
+                    ? "0 resultados"
+                    : `${firstVisible}-${lastVisible} de ${filteredMovements.length}`}
+                </span>
+                <Pagination
+                  page={safePage}
+                  totalPages={totalPages}
+                  onPageChange={setPage}
+                  className="self-end md:self-auto"
+                />
+              </>
+            }
+          >
+            {paginatedMovements.map((movement) => (
                       <tr
                         key={movement.movement_id}
                         className="transition hover:bg-[var(--ops-surface-muted)]"
@@ -537,25 +528,8 @@ function KardexPageContent({
                           {movement.created_by_name || "Sistema"}
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-          </OpsTableWrap>
-
-          <OpsTableFooter>
-            <span className="text-[var(--ops-text-muted)]">
-              {filteredMovements.length === 0
-                ? "0 resultados"
-                : `${firstVisible}-${lastVisible} de ${filteredMovements.length}`}
-            </span>
-            <Pagination
-              page={safePage}
-              totalPages={totalPages}
-              onPageChange={setPage}
-              className="self-end md:self-auto"
-            />
-          </OpsTableFooter>
+            ))}
+          </OpsDataTable>
           </OpsTableBlock>
         </OpsSectionDivider>
     </OpsPageShell>

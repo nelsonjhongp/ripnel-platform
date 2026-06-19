@@ -2,20 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { LoaderCircle, RefreshCw, RotateCcw, Download } from "lucide-react";
+import { RefreshCw, RotateCcw, Download } from "lucide-react";
 import { usePagination } from "@/hooks/use-pagination";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown, type FilterDropdownOption } from "@/components/ui/filter-dropdown";
-import { OpsEmptyState } from "@/components/ui/ops-empty-state";
-import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import { OpsDataTable } from "@/components/ui/ops-data-table";
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import {
   OpsFiltersRow,
   OpsPageShell,
   OpsSearchField,
   OpsSectionDivider,
   OpsTableBlock,
-  OpsTableFooter,
-  OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
 import { Pagination } from "@/components/ui/pagination";
@@ -264,8 +262,6 @@ export default function InventoryPage() {
 
   const {
     paginatedItems: paginatedProducts,
-    firstVisible: productsFirstVisible,
-    lastVisible: productsLastVisible,
     totalPages: productsTotalPages,
     safePage: productsSafePage,
     setPage: setProductPage,
@@ -273,8 +269,6 @@ export default function InventoryPage() {
 
   const {
     paginatedItems: paginatedLocations,
-    firstVisible: locationsFirstVisible,
-    lastVisible: locationsLastVisible,
     totalPages: locationsTotalPages,
     safePage: locationsSafePage,
     setPage: setLocationPage,
@@ -345,7 +339,6 @@ export default function InventoryPage() {
         <PosHeader
           eyebrow="INVENTARIO"
           title="Stock actual"
-          description="Consulta el stock disponible por producto, sede, talla y color."
           actions={
             <div className="flex flex-wrap items-center justify-end gap-2">
               <Tabs
@@ -401,23 +394,21 @@ export default function InventoryPage() {
           }
         />
 
-        <div className="flex flex-wrap items-center gap-2">
-          {view === "product" ? (
-            <>
-              <OpsMetricPill label="Stock total" value={productTotals.stockTotal} tone="accent" />
-              <OpsMetricPill label="Productos con stock" value={productTotals.productsWithStock} />
-              <OpsMetricPill label="Bajo stock" value={productTotals.lowStock} tone="warning" />
-              <OpsMetricPill label="Sin stock" value={productTotals.outOfStock} tone="warning" />
-            </>
-          ) : (
-            <>
-              <OpsMetricPill label="Stock total" value={locationTotals.stockTotal} tone="accent" />
-              <OpsMetricPill label="Productos" value={locationTotals.products} />
-              <OpsMetricPill label="Bajo stock" value={locationTotals.lowStock} tone="warning" />
-              <OpsMetricPill label="Sin stock" value={locationTotals.outOfStock} tone="warning" />
-            </>
-          )}
-        </div>
+        {view === "product" ? (
+          <OpsMetricInlineGroup items={[
+            { label: "Stock total", value: productTotals.stockTotal, tone: "accent" },
+            { label: "Productos con stock", value: productTotals.productsWithStock },
+            { label: "Bajo stock", value: productTotals.lowStock, tone: "warning" },
+            { label: "Sin stock", value: productTotals.outOfStock, tone: "warning" },
+          ]} />
+        ) : (
+          <OpsMetricInlineGroup items={[
+            { label: "Stock total", value: locationTotals.stockTotal, tone: "accent" },
+            { label: "Productos", value: locationTotals.products },
+            { label: "Bajo stock", value: locationTotals.lowStock, tone: "warning" },
+            { label: "Sin stock", value: locationTotals.outOfStock, tone: "warning" },
+          ]} />
+        )}
 
         <OpsSectionDivider>
           {view === "product" ? (
@@ -489,47 +480,39 @@ export default function InventoryPage() {
                 </Tooltip>
               </OpsFiltersRow>
 
-              <OpsTableWrap minWidth={showLocationsColumn ? "1020px" : "920px"}>
-                <table className="w-full border-collapse">
-                  <thead className="bg-[var(--ops-surface-muted)]">
-                    <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                      <th className="px-4 py-3">Producto</th>
-                      <th className="px-4 py-3">Tipo</th>
-                      <th className="px-4 py-3">Stock</th>
-                      <th className="px-4 py-3">Variantes</th>
-                      {showLocationsColumn ? <th className="px-4 py-3">Sedes</th> : null}
-                      <th className="px-4 py-3">Estado</th>
-                      <th className="px-4 py-3 text-right">Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                    {loading ? (
-                      <tr>
-                        <td
-                          colSpan={showLocationsColumn ? 7 : 6}
-                          className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
-                        >
-                          <LoaderCircle className="mr-2 inline-block h-5 w-5 animate-spin" />
-                          Cargando stock actual...
-                        </td>
-                      </tr>
-                    ) : error ? (
-                      <tr>
-                        <td
-                          colSpan={showLocationsColumn ? 7 : 6}
-                          className="px-4 py-8 text-center text-sm text-[var(--ops-text-muted)]"
-                        >
-                          {error}
-                        </td>
-                      </tr>
-                    ) : paginatedProducts.length === 0 ? (
-                      <tr>
-                        <td colSpan={showLocationsColumn ? 7 : 6} className="px-4 py-10">
-                          <OpsEmptyState variant="compact" description="No encontramos productos para los filtros actuales." />
-                        </td>
-                      </tr>
-                    ) : (
-                      paginatedProducts.map((row) => (
+              <OpsDataTable
+                columns={[
+                  { key: "producto", header: "Producto" },
+                  { key: "tipo", header: "Tipo" },
+                  { key: "stock", header: "Stock" },
+                  { key: "variantes", header: "Variantes" },
+                  ...(showLocationsColumn ? [{ key: "sedes", header: "Sedes" }] : []),
+                  { key: "estado", header: "Estado" },
+                  { key: "accion", header: "Acción", className: "text-right" },
+                ]}
+                minWidth={showLocationsColumn ? "1020px" : "920px"}
+                loading={loading}
+                loadingMessage="Cargando stock actual..."
+                error={error}
+                errorTitle="No pudimos cargar stock actual"
+                isEmpty={paginatedProducts.length === 0}
+                emptyMessage="No encontramos productos para los filtros actuales."
+                footer={
+                  <>
+                    <p className="text-[13px] text-[var(--ops-text-muted)]">
+                      {selectedLocation
+                        ? `Stock en sede: ${selectedLocation.name}`
+                        : productSummary?.meta.scope_label || "Todas las sedes"}
+                    </p>
+                    <Pagination
+                      page={productsSafePage}
+                      totalPages={productsTotalPages}
+                      onPageChange={setProductPage}
+                    />
+                  </>
+                }
+              >
+                {paginatedProducts.map((row) => (
                         <tr key={row.style_id} className="transition hover:bg-[var(--ops-surface-muted)]">
                           <td className="px-4 py-[var(--ops-row-py)]">
                             <div className="space-y-1">
@@ -570,24 +553,8 @@ export default function InventoryPage() {
                             </Button>
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </OpsTableWrap>
-
-              <OpsTableFooter>
-                <p className="text-[13px] text-[var(--ops-text-muted)]">
-                  {selectedLocation
-                    ? `Stock en sede: ${selectedLocation.name}`
-                    : productSummary?.meta.scope_label || "Todas las sedes"}
-                </p>
-                <Pagination
-                  page={productsSafePage}
-                  totalPages={productsTotalPages}
-                  onPageChange={setProductPage}
-                />
-              </OpsTableFooter>
+                ))}
+              </OpsDataTable>
             </OpsTableBlock>
           ) : (
             <OpsTableBlock>
@@ -629,41 +596,37 @@ export default function InventoryPage() {
                 </Tooltip>
               </OpsFiltersRow>
 
-              <OpsTableWrap minWidth="960px">
-                <table className="w-full border-collapse">
-                  <thead className="bg-[var(--ops-surface-muted)]">
-                    <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                      <th className="px-4 py-3">Sede</th>
-                      <th className="px-4 py-3">Stock total</th>
-                      <th className="px-4 py-3">Productos</th>
-                      <th className="px-4 py-3">Bajo stock</th>
-                      <th className="px-4 py-3">Sin stock</th>
-                      <th className="px-4 py-3">Estado</th>
-                      <th className="px-4 py-3 text-right">Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                    {loading ? (
-                      <tr>
-                        <td colSpan={7} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                          <LoaderCircle className="mr-2 inline-block h-5 w-5 animate-spin" />
-                          Cargando sedes...
-                        </td>
-                      </tr>
-                    ) : error ? (
-                      <tr>
-                        <td colSpan={7} className="px-4 py-8 text-center text-sm text-[var(--ops-text-muted)]">
-                          {error}
-                        </td>
-                      </tr>
-                    ) : paginatedLocations.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="px-4 py-10">
-                          <OpsEmptyState variant="compact" description="No encontramos sedes para los filtros actuales." />
-                        </td>
-                      </tr>
-                    ) : (
-                      paginatedLocations.map((row) => (
+              <OpsDataTable
+                columns={[
+                  { key: "sede", header: "Sede" },
+                  { key: "stock", header: "Stock total" },
+                  { key: "productos", header: "Productos" },
+                  { key: "bajo", header: "Bajo stock" },
+                  { key: "sin-stock", header: "Sin stock" },
+                  { key: "estado", header: "Estado" },
+                  { key: "accion", header: "Acción", className: "text-right" },
+                ]}
+                minWidth="960px"
+                loading={loading}
+                loadingMessage="Cargando sedes..."
+                error={error}
+                errorTitle="No pudimos cargar sedes"
+                isEmpty={paginatedLocations.length === 0}
+                emptyMessage="No encontramos sedes para los filtros actuales."
+                footer={
+                  <>
+                    <p className="text-[13px] text-[var(--ops-text-muted)]">
+                      Vista consolidada por ubicación visible.
+                    </p>
+                    <Pagination
+                      page={locationsSafePage}
+                      totalPages={locationsTotalPages}
+                      onPageChange={setLocationPage}
+                    />
+                  </>
+                }
+              >
+                {paginatedLocations.map((row) => (
                         <tr key={row.location_id} className="transition hover:bg-[var(--ops-surface-muted)]">
                           <td className="px-4 py-[var(--ops-row-py)]">
                             <div className="space-y-1">
@@ -699,22 +662,8 @@ export default function InventoryPage() {
                             </Button>
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </OpsTableWrap>
-
-              <OpsTableFooter>
-                <p className="text-[13px] text-[var(--ops-text-muted)]">
-                  Vista consolidada por ubicación visible.
-                </p>
-                <Pagination
-                  page={locationsSafePage}
-                  totalPages={locationsTotalPages}
-                  onPageChange={setLocationPage}
-                />
-              </OpsTableFooter>
+                ))}
+              </OpsDataTable>
             </OpsTableBlock>
           )}
         </OpsSectionDivider>
