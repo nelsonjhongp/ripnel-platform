@@ -110,7 +110,7 @@ export default function CustomersPage() {
     setSaveError(null)
 
     try {
-      const data = await apiFetchData<CustomerRecord>(`/api/customers/${editingCustomer.customer_id}`, {
+      await apiFetchData<CustomerRecord>(`/api/customers/${editingCustomer.customer_id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildCustomerPayload(editState)),
