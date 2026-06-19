@@ -66,6 +66,9 @@ export function CommandPalette() {
     function onKeyDown(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
         e.preventDefault()
+        if (!open) {
+          setActiveIndex(0)
+        }
         setOpen((prev) => !prev)
       }
       if (e.key === "Escape" && open) {
@@ -80,13 +83,8 @@ export function CommandPalette() {
   useEffect(() => {
     if (open) {
       inputRef.current?.focus()
-      setActiveIndex(0)
     }
   }, [open])
-
-  useEffect(() => {
-    setActiveIndex(0)
-  }, [query])
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "ArrowDown") {
@@ -116,7 +114,10 @@ export function CommandPalette() {
             <input
               ref={inputRef}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value)
+                setActiveIndex(0)
+              }}
               onKeyDown={handleKeyDown}
               placeholder="Buscar módulo o página..."
               className="flex-1 bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
