@@ -14,13 +14,13 @@ import {
 
 import { useAuth } from "@/components/auth/AuthProvider"
 import { PermissionGuard } from "@/components/auth/PermissionGuard"
-import { InlineStatusCard } from "@/components/feedback/status-page"
+
 import { Button } from "@/components/ui/button"
 import { DateFilterPicker } from "@/components/ui/date-filter-picker"
 import { FilterDropdown } from "@/components/ui/filter-dropdown"
 import { OpsSearchField } from "@/components/ui/ops-page-shell"
 import { Pagination } from "@/components/ui/pagination"
-import { OpsEmptyState } from "@/components/ui/ops-empty-state"
+import { OpsDataTable } from "@/components/ui/ops-data-table"
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill"
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
@@ -313,154 +313,130 @@ export default function PostsalePage() {
                 </Tooltip>
               </div>
 
-              <div className="overflow-x-auto">
-                <div className="min-w-[1080px] border-y border-[var(--ops-border-strong)]">
-                  <table className="w-full border-collapse">
-                    <thead className="bg-[var(--ops-surface-muted)]">
-                      <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                        <th className="px-4 py-3">Venta</th>
-                        <th className="px-4 py-3">Fecha</th>
-                        <th className="px-4 py-3">Cliente</th>
-                        <th className="px-4 py-3">Sede</th>
-                        <th className="px-4 py-3">Estado</th>
-                        <th className="px-4 py-3">Total</th>
-                        <th className="px-4 py-3">Postventa</th>
-                        <th className="px-4 py-3 text-right">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                      {loading ? (
-                        <tr>
-                          <td colSpan={8} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                            Cargando ventas elegibles...
-                          </td>
-                        </tr>
-                      ) : error ? (
-                        <tr>
-                          <td colSpan={8} className="px-4 py-6">
-                            <InlineStatusCard
-                              title="No pudimos cargar la cola de postventa"
-                              description={error}
-                              tone="danger"
-                            />
-                          </td>
-                        </tr>
-                      ) : paginatedSales.length === 0 ? (
-                        <tr>
-                          <td colSpan={8} className="px-4 py-10">
-                            <OpsEmptyState variant="compact" description="No se encontraron ventas para los filtros aplicados." />
-                          </td>
-                        </tr>
-                      ) : (
-                        paginatedSales.map((sale) => (
-                          <tr key={sale.sale_id} className="transition hover:bg-[var(--ops-surface-muted)]">
-                            <td className="px-4 py-[var(--ops-row-py)]">
-                              <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                                {sale.sale_number || "Sin correlativo"}
-                              </p>
-                              <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                                {sale.document_type}
-                              </p>
-                            </td>
+              <OpsDataTable
+                columns={[
+                  { key: "venta", header: "Venta" },
+                  { key: "fecha", header: "Fecha" },
+                  { key: "cliente", header: "Cliente" },
+                  { key: "sede", header: "Sede" },
+                  { key: "estado", header: "Estado" },
+                  { key: "total", header: "Total" },
+                  { key: "postventa", header: "Postventa" },
+                  { key: "acciones", header: "Acciones", className: "text-right" },
+                ]}
+                minWidth="1080px"
+                loading={loading}
+                loadingMessage="Cargando ventas elegibles..."
+                error={error}
+                errorTitle="No pudimos cargar la cola de postventa"
+                emptyMessage="No se encontraron ventas para los filtros aplicados."
+                isEmpty={!loading && !error && paginatedSales.length === 0}
+                footer={
+                  <>
+                    <span className="text-sm text-[var(--ops-text-muted)]">
+                      {sales.length === 0 ? "0 resultados" : `${firstVisible}-${lastVisible} de ${sales.length}`}
+                    </span>
+                    <Pagination
+                      page={safePage}
+                      totalPages={totalPages}
+                      onPageChange={setPage}
+                      className="self-end md:self-auto"
+                    />
+                  </>
+                }
+              >
+                {paginatedSales.map((sale) => (
+                  <tr key={sale.sale_id} className="transition hover:bg-[var(--ops-surface-muted)]">
+                    <td className="px-4 py-[var(--ops-row-py)]">
+                      <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
+                        {sale.sale_number || "Sin correlativo"}
+                      </p>
+                      <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                        {sale.document_type}
+                      </p>
+                    </td>
 
-                            <td className="px-4 py-[var(--ops-row-py)] text-xs leading-5 text-[var(--ops-text-muted)]">
-                              <p>{formatDateLabel(sale.confirmed_at, sale.created_at)}</p>
-                              <p className="mt-1 uppercase tracking-[0.12em]">{sale.business_date}</p>
-                            </td>
+                    <td className="px-4 py-[var(--ops-row-py)] text-xs leading-5 text-[var(--ops-text-muted)]">
+                      <p>{formatDateLabel(sale.confirmed_at, sale.created_at)}</p>
+                      <p className="mt-1 uppercase tracking-[0.12em]">{sale.business_date}</p>
+                    </td>
 
-                            <td className="px-4 py-[var(--ops-row-py)]">
-                              <p className="text-sm font-medium leading-5 text-[var(--ops-text)]">
-                                {sale.customer_name_text || "Cliente general"}
-                              </p>
-                              <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
-                                {sale.seller_name}
-                              </p>
-                            </td>
+                    <td className="px-4 py-[var(--ops-row-py)]">
+                      <p className="text-sm font-medium leading-5 text-[var(--ops-text)]">
+                        {sale.customer_name_text || "Cliente general"}
+                      </p>
+                      <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
+                        {sale.seller_name}
+                      </p>
+                    </td>
 
-                            <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
-                              {sale.location_name}
-                            </td>
+                    <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                      {sale.location_name}
+                    </td>
 
-                            <td className="px-4 py-[var(--ops-row-py)]">
-                              <div className="flex flex-wrap gap-1.5">
-                                <OpsStatusBadge
-                                  tone={STATUS_TONES[sale.status] || "neutral"}
-                                  icon={
-                                    sale.status === "confirmed" ? (
-                                      <CheckCircle2 className="h-3.5 w-3.5" />
-                                    ) : sale.status === "cancelled" ? (
-                                      <XCircle className="h-3.5 w-3.5" />
-                                    ) : (
-                                      <CircleAlert className="h-3.5 w-3.5" />
-                                    )
-                                  }
-                                >
-                                  {STATUS_LABELS[sale.status] || sale.status}
-                                </OpsStatusBadge>
-                                <OpsStatusBadge
-                                  tone={CASH_TONES[sale.cash_status] || "neutral"}
-                                  icon={<Wallet className="h-3.5 w-3.5" />}
-                                >
-                                  {CASH_LABELS[sale.cash_status] || CASH_LABELS.missing}
-                                </OpsStatusBadge>
-                              </div>
-                            </td>
+                    <td className="px-4 py-[var(--ops-row-py)]">
+                      <div className="flex flex-wrap gap-1.5">
+                        <OpsStatusBadge
+                          tone={STATUS_TONES[sale.status] || "neutral"}
+                          icon={
+                            sale.status === "confirmed" ? (
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            ) : sale.status === "cancelled" ? (
+                              <XCircle className="h-3.5 w-3.5" />
+                            ) : (
+                              <CircleAlert className="h-3.5 w-3.5" />
+                            )
+                          }
+                        >
+                          {STATUS_LABELS[sale.status] || sale.status}
+                        </OpsStatusBadge>
+                        <OpsStatusBadge
+                          tone={CASH_TONES[sale.cash_status] || "neutral"}
+                          icon={<Wallet className="h-3.5 w-3.5" />}
+                        >
+                          {CASH_LABELS[sale.cash_status] || CASH_LABELS.missing}
+                        </OpsStatusBadge>
+                      </div>
+                    </td>
 
-                            <td className="px-4 py-[var(--ops-row-py)]">
-                              <p className="text-sm font-semibold text-[var(--ops-text)]">
-                                S/. {Number(sale.total_amount || 0).toFixed(2)}
-                              </p>
-                              <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
-                                {sale.currency}
-                              </p>
-                            </td>
+                    <td className="px-4 py-[var(--ops-row-py)]">
+                      <p className="text-sm font-semibold text-[var(--ops-text)]">
+                        S/. {Number(sale.total_amount || 0).toFixed(2)}
+                      </p>
+                      <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
+                        {sale.currency}
+                      </p>
+                    </td>
 
-                            <td className="px-4 py-[var(--ops-row-py)]">
-                              <div className="flex flex-wrap gap-1.5">
-                                <OpsStatusBadge
-                                  tone={
-                                    sale.availability.exchange.allowed
-                                      ? "success"
-                                      : "neutral"
-                                  }
-                                >
-                                  {sale.availability.exchange.allowed ? "Cambio ok" : "Cambio bloqueado"}
-                                </OpsStatusBadge>
-                                <OpsStatusBadge
-                                  tone={
-                                    sale.availability.cancel.allowed
-                                      ? "warning"
-                                      : "neutral"
-                                  }
-                                >
-                                  {sale.availability.cancel.allowed ? "Anulación ok" : "Anulación bloqueada"}
-                                </OpsStatusBadge>
-                              </div>
-                            </td>
+                    <td className="px-4 py-[var(--ops-row-py)]">
+                      <div className="flex flex-wrap gap-1.5">
+                        <OpsStatusBadge
+                          tone={
+                            sale.availability.exchange.allowed
+                              ? "success"
+                              : "neutral"
+                          }
+                        >
+                          {sale.availability.exchange.allowed ? "Cambio ok" : "Cambio bloqueado"}
+                        </OpsStatusBadge>
+                        <OpsStatusBadge
+                          tone={
+                            sale.availability.cancel.allowed
+                              ? "warning"
+                              : "neutral"
+                          }
+                        >
+                          {sale.availability.cancel.allowed ? "Anulación ok" : "Anulación bloqueada"}
+                        </OpsStatusBadge>
+                      </div>
+                    </td>
 
-                            <td className="px-4 py-[var(--ops-row-py)]">
-                              <SaleActions saleId={sale.sale_id} canOpenSale={has("sales.pos")} />
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between">
-                <span className="text-sm text-[var(--ops-text-muted)]">
-                  {sales.length === 0 ? "0 resultados" : `${firstVisible}-${lastVisible} de ${sales.length}`}
-                </span>
-
-                <Pagination
-                  page={safePage}
-                  totalPages={totalPages}
-                  onPageChange={setPage}
-                  className="self-end md:self-auto"
-                />
-              </div>
+                    <td className="px-4 py-[var(--ops-row-py)]">
+                      <SaleActions saleId={sale.sale_id} canOpenSale={has("sales.pos")} />
+                    </td>
+                  </tr>
+                ))}
+              </OpsDataTable>
             </div>
           </div>
         </section>

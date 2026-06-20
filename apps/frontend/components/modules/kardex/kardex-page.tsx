@@ -6,12 +6,10 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowDownCircle,
   ArrowUpCircle,
-  LoaderCircle,
   RefreshCw,
   RotateCcw,
   Download,
 } from "lucide-react";
-import { InlineStatusCard } from "@/components/feedback/status-page";
 import { apiFetchData } from "@/lib/api";
 import { useApiGet } from "@/hooks/use-api-get";
 import { cn } from "@/lib/utils";
@@ -20,7 +18,6 @@ import { formatDateTime } from "@/lib/date-utils";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { Button } from "@/components/ui/button";
 import { FilterDropdown } from "@/components/ui/filter-dropdown";
-import { OpsEmptyState } from "@/components/ui/ops-empty-state";
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
 import { Pagination } from "@/components/ui/pagination";
 import {
@@ -29,9 +26,8 @@ import {
   OpsSearchField,
   OpsSectionDivider,
   OpsTableBlock,
-  OpsTableFooter,
-  OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
+import { OpsDataTable } from "@/components/ui/ops-data-table";
 import {
   Tooltip,
   TooltipContent,
@@ -433,129 +429,102 @@ function KardexPageContent({
             </TooltipProvider>
           </OpsFiltersRow>
 
-          <OpsTableWrap minWidth="1080px">
-              <table className="w-full border-collapse">
-                <thead className="bg-[var(--ops-surface-muted)]">
-                  <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                    <th className="px-4 py-3">Fecha</th>
-                    <th className="px-4 py-3">SKU</th>
-                    <th className="px-4 py-3">Producto</th>
-                    <th className="px-4 py-3 hidden sm:table-cell">Origen</th>
-                    <th className="px-4 py-3 hidden xl:table-cell">Ref.</th>
-                    <th className="px-4 py-3">Tipo</th>
-                    <th className="px-4 py-3 text-right">Cantidad</th>
-                    <th className="px-4 py-3">Ubicación</th>
-                    <th className="px-4 py-3">Usuario</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={9} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                        <LoaderCircle className="mr-2 inline-block h-4 w-4 animate-spin" />
-                        Cargando movimientos...
-                      </td>
-                    </tr>
-                   ) : error ? (
-                     <tr>
-                       <td colSpan={9} className="px-4 py-6">
-                         <InlineStatusCard
-                           title="No pudimos cargar movimientos"
-                           description={error}
-                           tone="danger"
-                           variant="ops"
-                         />
-                       </td>
-                     </tr>
-                   ) : filteredMovements.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="px-4 py-10">
-                        <OpsEmptyState variant="compact" description={
-                          movements.length === 0
-                            ? "No hay movimientos de stock registrados."
-                            : "No se encontraron movimientos con los filtros actuales."
-                        } />
-                      </td>
-                    </tr>
-                  ) : (
-                    paginatedMovements.map((movement) => (
-                      <tr
-                        key={movement.movement_id}
-                        className="transition hover:bg-[var(--ops-surface-muted)]"
-                      >
-                        <td className="px-4 py-[var(--ops-row-py)] text-xs text-[var(--ops-text-muted)]">
-                          {formatDateTime(movement.created_at)}
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                          {movement.sku}
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] text-sm font-semibold text-[var(--ops-text)]">
-                          {movement.style_name}
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] text-xs text-[var(--ops-text-muted)] hidden sm:table-cell">
-                            {formatMovementOriginLabel(movement)}
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] text-xs text-[var(--ops-text-muted)] hidden xl:table-cell">
-                            {formatReference(movement)}
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)]">
-                          <span
-                            className={cn(
-                              "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
-                              resolveMovementDirection(movement) === "entry" &&
-                                "border-[color:color-mix(in_srgb,#10b981_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_82%,var(--ops-text))]",
-                              resolveMovementDirection(movement) === "exit" &&
-                                "border-[color:color-mix(in_srgb,#f59e0b_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] text-[color:color-mix(in_srgb,#d97706_72%,var(--ops-text))]",
-                              resolveMovementDirection(movement) === "adjustment" &&
-                                "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text-muted)]"
-                            )}
-                          >
-                            {resolveMovementDirection(movement) === "entry" && (
-                              <ArrowUpCircle className="h-3 w-3" />
-                            )}
-                            {resolveMovementDirection(movement) === "exit" && (
-                              <ArrowDownCircle className="h-3 w-3" />
-                            )}
-                            {formatMovementOperationLabel(movement)}
-                          </span>
-                        </td>
-                        <td
-                          className={cn(
-                            "px-4 py-[var(--ops-row-py)] text-right text-sm font-semibold tabular-nums",
-                            movement.quantity_effect >= 0
-                              ? "text-[color:color-mix(in_srgb,#059669_88%,var(--ops-text))]"
-                              : "text-[color:color-mix(in_srgb,#e11d48_88%,var(--ops-text))]"
-                          )}
-                        >
-                          {movement.quantity_effect >= 0 ? "+" : ""}
-                          {movement.quantity_effect}
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
-                          {movement.location_name}
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] text-xs text-[var(--ops-text-muted)]">
-                          {movement.created_by_name || "Sistema"}
-                        </td>
-                      </tr>
-                    ))
+          <OpsDataTable
+            columns={[
+              { key: "fecha", header: "Fecha" },
+              { key: "sku", header: "SKU" },
+              { key: "producto", header: "Producto" },
+              { key: "origen", header: "Origen", className: "hidden sm:table-cell" },
+              { key: "ref", header: "Ref.", className: "hidden xl:table-cell" },
+              { key: "tipo", header: "Tipo" },
+              { key: "cantidad", header: "Cantidad", className: "text-right" },
+              { key: "ubicacion", header: "Ubicación" },
+              { key: "usuario", header: "Usuario" },
+            ]}
+            minWidth="1080px"
+            loading={loading}
+            loadingMessage="Cargando movimientos..."
+            error={error}
+            errorTitle="No pudimos cargar movimientos"
+            emptyMessage={movements.length === 0 ? "No hay movimientos de stock registrados." : "No se encontraron movimientos con los filtros actuales."}
+            isEmpty={!loading && !error && filteredMovements.length === 0}
+            footer={
+              <>
+                <span className="text-[var(--ops-text-muted)]">
+                  {filteredMovements.length === 0
+                    ? "0 resultados"
+                    : `${firstVisible}-${lastVisible} de ${filteredMovements.length}`}
+                </span>
+                <Pagination
+                  page={safePage}
+                  totalPages={totalPages}
+                  onPageChange={setPage}
+                  className="self-end md:self-auto"
+                />
+              </>
+            }
+          >
+            {paginatedMovements.map((movement) => (
+              <tr
+                key={movement.movement_id}
+                className="transition hover:bg-[var(--ops-surface-muted)]"
+              >
+                <td className="px-4 py-[var(--ops-row-py)] text-xs text-[var(--ops-text-muted)]">
+                  {formatDateTime(movement.created_at)}
+                </td>
+                <td className="px-4 py-[var(--ops-row-py)] text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                  {movement.sku}
+                </td>
+                <td className="px-4 py-[var(--ops-row-py)] text-sm font-semibold text-[var(--ops-text)]">
+                  {movement.style_name}
+                </td>
+                <td className="px-4 py-[var(--ops-row-py)] text-xs text-[var(--ops-text-muted)] hidden sm:table-cell">
+                    {formatMovementOriginLabel(movement)}
+                </td>
+                <td className="px-4 py-[var(--ops-row-py)] text-xs text-[var(--ops-text-muted)] hidden xl:table-cell">
+                    {formatReference(movement)}
+                </td>
+                <td className="px-4 py-[var(--ops-row-py)]">
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                      resolveMovementDirection(movement) === "entry" &&
+                        "border-[color:color-mix(in_srgb,#10b981_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_82%,var(--ops-text))]",
+                      resolveMovementDirection(movement) === "exit" &&
+                        "border-[color:color-mix(in_srgb,#f59e0b_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] text-[color:color-mix(in_srgb,#d97706_72%,var(--ops-text))]",
+                      resolveMovementDirection(movement) === "adjustment" &&
+                        "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text-muted)]"
+                    )}
+                  >
+                    {resolveMovementDirection(movement) === "entry" && (
+                      <ArrowUpCircle className="h-3 w-3" />
+                    )}
+                    {resolveMovementDirection(movement) === "exit" && (
+                      <ArrowDownCircle className="h-3 w-3" />
+                    )}
+                    {formatMovementOperationLabel(movement)}
+                  </span>
+                </td>
+                <td
+                  className={cn(
+                    "px-4 py-[var(--ops-row-py)] text-right text-sm font-semibold tabular-nums",
+                    movement.quantity_effect >= 0
+                      ? "text-[color:color-mix(in_srgb,#059669_88%,var(--ops-text))]"
+                      : "text-[color:color-mix(in_srgb,#e11d48_88%,var(--ops-text))]"
                   )}
-                </tbody>
-              </table>
-          </OpsTableWrap>
-
-          <OpsTableFooter>
-            <span className="text-[var(--ops-text-muted)]">
-              {filteredMovements.length === 0
-                ? "0 resultados"
-                : `${firstVisible}-${lastVisible} de ${filteredMovements.length}`}
-            </span>
-            <Pagination
-              page={safePage}
-              totalPages={totalPages}
-              onPageChange={setPage}
-              className="self-end md:self-auto"
-            />
-          </OpsTableFooter>
+                >
+                  {movement.quantity_effect >= 0 ? "+" : ""}
+                  {movement.quantity_effect}
+                </td>
+                <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                  {movement.location_name}
+                </td>
+                <td className="px-4 py-[var(--ops-row-py)] text-xs text-[var(--ops-text-muted)]">
+                  {movement.created_by_name || "Sistema"}
+                </td>
+              </tr>
+            ))}
+          </OpsDataTable>
           </OpsTableBlock>
         </OpsSectionDivider>
     </OpsPageShell>

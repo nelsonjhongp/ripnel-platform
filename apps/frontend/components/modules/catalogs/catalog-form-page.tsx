@@ -85,7 +85,7 @@ export function CatalogFormPage({
         <CatalogItemForm
           catalogItems={catalogItems}
           fields={fields}
-          idKey=""
+          idKey="id"
           duplicateStrategy={duplicateStrategy}
           mode="create"
           initialValues={buildInitialState(fields)}

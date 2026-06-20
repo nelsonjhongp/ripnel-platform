@@ -6,9 +6,9 @@ type StatusTone = "neutral" | "warning" | "danger";
 type StatusVariant = "default" | "ops";
 
 const defaultToneClasses: Record<StatusTone, string> = {
-  neutral: "border-slate-200 bg-white text-slate-900",
-  warning: "border-amber-200 bg-amber-50 text-amber-900",
-  danger: "border-rose-200 bg-rose-50 text-rose-900",
+  neutral: "border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100",
+  warning: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200",
+  danger: "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200",
 };
 
 const opsToneClasses: Record<StatusTone, string> = {
@@ -50,7 +50,7 @@ export function StatusPage({
       className={
         isOps
           ? "ops-page flex min-h-[calc(100dvh-3.5rem)] w-full items-center px-4 py-8 md:px-6"
-          : "flex min-h-[calc(100dvh-3.5rem)] w-full items-center bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_30%,#f8fafc_65%,#eef2ff_100%)] px-4 py-10 md:px-8"
+          : "flex min-h-[calc(100dvh-3.5rem)] w-full items-center bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_30%,#f8fafc_65%,#eef2ff_100%)] px-4 py-10 dark:bg-[radial-gradient(circle_at_top,rgba(126,80,220,0.15)_0%,rgba(30,30,30,0.9)_40%,var(--ops-surface)_100%)] md:px-8"
       }
     >
       <div className={isOps ? "mx-auto w-full max-w-4xl" : "mx-auto w-full max-w-5xl"}>
@@ -62,7 +62,7 @@ export function StatusPage({
               className={
                 isOps
                   ? "rounded-xl bg-[var(--ops-surface-muted)] p-2.5 text-current"
-                  : "rounded-2xl bg-slate-900/5 p-3 text-current"
+                  : "rounded-2xl bg-slate-900/5 p-3 text-current dark:bg-slate-100/10"
               }
             >
               {icon}
@@ -99,7 +99,7 @@ export function StatusPage({
                       className={
                         isOps
                           ? "inline-flex items-center gap-2 rounded-xl border border-[color:color-mix(in_srgb,var(--ripnel-accent)_30%,transparent)] bg-[var(--ripnel-accent)] px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)]"
-                          : "inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+                          : "inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
                       }
                     >
                       <Home className="h-4 w-4" />
@@ -111,7 +111,7 @@ export function StatusPage({
                       className={
                         isOps
                           ? "inline-flex items-center gap-2 rounded-xl border border-[color:color-mix(in_srgb,var(--ripnel-accent)_30%,transparent)] bg-[var(--ripnel-accent)] px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] cursor-pointer"
-                          : "inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 cursor-pointer"
+                          : "inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 cursor-pointer"
                       }
                     >
                       <Home className="h-4 w-4" />
@@ -126,7 +126,7 @@ export function StatusPage({
                       className={
                         isOps
                           ? "inline-flex items-center gap-2 rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3.5 py-2 text-sm font-semibold text-[var(--ops-text-muted)] transition hover:text-[var(--ops-text)]"
-                          : "inline-flex items-center gap-2 rounded-2xl border border-current/15 px-4 py-2.5 text-sm font-semibold text-current/80 transition hover:bg-white/60"
+                          : "inline-flex items-center gap-2 rounded-2xl border border-current/15 px-4 py-2.5 text-sm font-semibold text-current/80 transition hover:bg-white/60 dark:hover:bg-white/10"
                       }
                     >
                       <RefreshCcw className="h-4 w-4" />
@@ -138,7 +138,7 @@ export function StatusPage({
                       className={
                         isOps
                           ? "inline-flex items-center gap-2 rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3.5 py-2 text-sm font-semibold text-[var(--ops-text-muted)] transition hover:text-[var(--ops-text)] cursor-pointer"
-                          : "inline-flex items-center gap-2 rounded-2xl border border-current/15 px-4 py-2.5 text-sm font-semibold text-current/80 transition hover:bg-white/60 cursor-pointer"
+                          : "inline-flex items-center gap-2 rounded-2xl border border-current/15 px-4 py-2.5 text-sm font-semibold text-current/80 transition hover:bg-white/60 dark:hover:bg-white/10 cursor-pointer"
                       }
                     >
                       <RefreshCcw className="h-4 w-4" />
@@ -278,7 +278,7 @@ export function InlineStatusCard({
             className={
               variant === "ops"
                 ? "rounded-xl bg-[var(--ops-surface-muted)] p-2 text-current"
-                : "rounded-2xl bg-slate-900/5 p-2.5 text-current"
+                : "rounded-2xl bg-slate-900/5 p-2.5 text-current dark:bg-slate-100/10"
             }
           >
             {icon}

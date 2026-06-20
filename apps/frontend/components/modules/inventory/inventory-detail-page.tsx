@@ -16,9 +16,9 @@ import {
   OpsPageShell,
   OpsSectionDivider,
   OpsTableBlock,
-  OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
+import { OpsDataTable } from "@/components/ui/ops-data-table";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { useSidebarTopbarBreadcrumbs } from "@/components/sidebar/SidebarShell";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -272,38 +272,34 @@ export default function InventoryDetailPage() {
 
         {tab === "locations" ? (
           <OpsTableBlock>
-            <OpsTableWrap minWidth="880px">
-              <table className="w-full border-collapse">
-                <thead className="bg-[var(--ops-surface-muted)]">
-                  <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                    <th className="px-4 py-3">Sede</th>
-                    <th className="px-4 py-3">Stock total</th>
-                    <th className="px-4 py-3">Variantes con stock</th>
-                    <th className="px-4 py-3">Estado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                  {detail.locations.map((location) => (
-                    <tr key={location.location_id} className="transition hover:bg-[var(--ops-surface-muted)]">
-                      <td className="px-4 py-[var(--ops-row-py)] text-sm font-semibold text-[var(--ops-text)]">
-                        {location.location_name}
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
-                        {location.stock_total}
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
-                        {location.variants_with_stock}
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)]">
-                        <OpsStatusBadge tone={getProductStatusTone(location.status)} size="xs">
-                          {location.status_label}
-                        </OpsStatusBadge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </OpsTableWrap>
+            <OpsDataTable
+              columns={[
+                { key: "sede", header: "Sede" },
+                { key: "stock_total", header: "Stock total" },
+                { key: "variantes_stock", header: "Variantes con stock" },
+                { key: "estado", header: "Estado" },
+              ]}
+              minWidth="880px"
+            >
+              {detail.locations.map((location) => (
+                <tr key={location.location_id} className="transition hover:bg-[var(--ops-surface-muted)]">
+                  <td className="px-4 py-[var(--ops-row-py)] text-sm font-semibold text-[var(--ops-text)]">
+                    {location.location_name}
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                    {location.stock_total}
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                    {location.variants_with_stock}
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)]">
+                    <OpsStatusBadge tone={getProductStatusTone(location.status)} size="xs">
+                      {location.status_label}
+                    </OpsStatusBadge>
+                  </td>
+                </tr>
+              ))}
+            </OpsDataTable>
           </OpsTableBlock>
         ) : null}
 
@@ -315,60 +311,43 @@ export default function InventoryDetailPage() {
               </div>
             </div>
 
-            <OpsTableWrap minWidth="920px">
-              <table className="w-full border-collapse">
-                <thead className="bg-[var(--ops-surface-muted)]">
-                  <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                    <th className="px-4 py-3">Color / Talla</th>
-                    {detail.matrix.sizes.map((size) => (
-                      <th key={size.size_id} className="px-4 py-3">
-                        {size.size_code}
-                      </th>
-                    ))}
-                    <th className="px-4 py-3">Total</th>
-                    <th className="px-4 py-3">Estado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                  {detail.matrix.rows.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={detail.matrix.sizes.length + 3}
-                        className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
-                      >
-                        No hay matriz disponible para la sede seleccionada.
-                      </td>
-                    </tr>
-                  ) : (
-                    detail.matrix.rows.map((row) => (
-                      <tr key={row.color_id} className="transition hover:bg-[var(--ops-surface-muted)]">
-                        <td className="px-4 py-[var(--ops-row-py)] text-sm font-semibold text-[var(--ops-text)]">
-                          {row.color_name}
-                        </td>
-                        {row.cells.map((cell) => (
-                          <td
-                            key={`${row.color_id}-${cell.size_id}`}
-                            className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]"
-                          >
-                            <span className={cell.qty === 0 ? "text-[var(--ops-text-muted)]" : ""}>
-                              {cell.qty}
-                            </span>
-                          </td>
-                        ))}
-                        <td className="px-4 py-[var(--ops-row-py)] text-sm font-semibold text-[var(--ops-text)]">
-                          {row.total_qty}
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)]">
-                          <OpsStatusBadge tone={getProductStatusTone(row.status)} size="xs">
-                            {row.status_label}
-                          </OpsStatusBadge>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </OpsTableWrap>
+            <OpsDataTable
+              columns={[
+                { key: "color", header: "Color / Talla" },
+                ...detail.matrix.sizes.map((size) => ({ key: `size_${size.size_id}`, header: size.size_code })),
+                { key: "total", header: "Total" },
+                { key: "estado", header: "Estado" },
+              ]}
+              minWidth="920px"
+              emptyMessage="No hay matriz disponible para la sede seleccionada."
+              isEmpty={detail.matrix.rows.length === 0}
+            >
+              {detail.matrix.rows.map((row) => (
+                <tr key={row.color_id} className="transition hover:bg-[var(--ops-surface-muted)]">
+                  <td className="px-4 py-[var(--ops-row-py)] text-sm font-semibold text-[var(--ops-text)]">
+                    {row.color_name}
+                  </td>
+                  {row.cells.map((cell) => (
+                    <td
+                      key={`${row.color_id}-${cell.size_id}`}
+                      className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]"
+                    >
+                      <span className={cell.qty === 0 ? "text-[var(--ops-text-muted)]" : ""}>
+                        {cell.qty}
+                      </span>
+                    </td>
+                  ))}
+                  <td className="px-4 py-[var(--ops-row-py)] text-sm font-semibold text-[var(--ops-text)]">
+                    {row.total_qty}
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)]">
+                    <OpsStatusBadge tone={getProductStatusTone(row.status)} size="xs">
+                      {row.status_label}
+                    </OpsStatusBadge>
+                  </td>
+                </tr>
+              ))}
+            </OpsDataTable>
           </OpsTableBlock>
         ) : null}
 

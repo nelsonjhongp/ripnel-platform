@@ -15,6 +15,7 @@ import {
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { InlineStatusCard } from "@/components/feedback/status-page";
+import { OpsPageShell } from "@/components/ui/ops-page-shell";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   Collapsible,
@@ -143,16 +144,14 @@ export default function CajaPage() {
     return (
       <ErrorBoundary>
         <PermissionGuard anyPermissions={["cash.view", "cash.operate"]}>
-          <section className="sales-page min-h-dvh px-4 py-[var(--ops-page-py)] md:px-8">
-            <div className="mx-auto max-w-4xl">
+          <OpsPageShell>
               <InlineStatusCard
                 title="Sin sede asignada"
                 description="Tu usuario no tiene una sede default configurada. Contacta a un administrador antes de aperturar caja."
                 tone="warning"
                 variant="ops"
               />
-            </div>
-          </section>
+          </OpsPageShell>
         </PermissionGuard>
       </ErrorBoundary>
     );
@@ -169,8 +168,7 @@ export default function CajaPage() {
     <ErrorBoundary>
       <PermissionGuard anyPermissions={["cash.view", "cash.operate"]}>
         <TooltipProvider delayDuration={120}>
-          <section className="sales-page min-h-dvh px-4 py-[var(--ops-page-py)] md:px-8">
-            <div className="mx-auto max-w-5xl space-y-5">
+          <OpsPageShell width="wide" className="!max-w-5xl">
               <header className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
                 <p className="text-xs uppercase tracking-wide text-[var(--ripnel-accent-hover)]">
                   Operaciones de caja
@@ -228,30 +226,30 @@ export default function CajaPage() {
                   <article
                     className={`sales-panel rounded-lg p-5 shadow-sm md:p-6 ${
                       isOpen
-                        ? "border-emerald-300/70 bg-[color:color-mix(in_srgb,#22c55e_12%,var(--ops-surface))]"
+                        ? "border-[var(--ops-tone-success-border)] bg-[var(--ops-tone-success-bg)]"
                         : isClosed
                           ? "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)]"
-                          : "border-amber-300/70 bg-[color:color-mix(in_srgb,#f59e0b_13%,var(--ops-surface))]"
+                          : "border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)]"
                     }`}
                   >
                     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                       <div className="flex items-center gap-3">
                         {isOpen ? (
-                          <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+                          <CheckCircle2 className="h-6 w-6 text-[var(--ops-tone-success-text)]" />
                         ) : isClosed ? (
                           <X className="h-6 w-6 text-slate-500" />
                         ) : (
-                          <Clock3 className="h-6 w-6 text-amber-600" />
+                          <Clock3 className="h-6 w-6 text-[var(--ops-tone-warning-text)]" />
                         )}
 
                         <div>
                           <p
                             className={`text-lg font-semibold ${
                               isOpen
-                                ? "text-emerald-700"
-                                : isClosed
+? "text-[var(--ops-tone-success-text)]"
+                              : isClosed
                                   ? "text-[var(--ops-text)]"
-                                  : "text-amber-700"
+                                  : "text-[var(--ops-tone-warning-text)]"
                             }`}
                           >
                             {isOpen
@@ -262,7 +260,7 @@ export default function CajaPage() {
                           </p>
 
                           {isOpen && current?.closing?.opened_by_name ? (
-                            <p className="text-sm text-emerald-700/90">
+                            <p className="text-sm text-[var(--ops-tone-success-text)]">
                               Aperturada por{" "}
                               <span className="font-medium">
                                 {current.closing.opened_by_name}
@@ -280,7 +278,7 @@ export default function CajaPage() {
                           ) : null}
 
                           {hasNoClosing ? (
-                            <p className="text-sm text-amber-700/90">
+                            <p className="text-sm text-[var(--ops-tone-warning-text)]">
                               Abre caja para habilitar ventas en esta sede.
                             </p>
                           ) : null}
@@ -292,7 +290,7 @@ export default function CajaPage() {
                           <button
                             onClick={handleOpen}
                             disabled={actionLoading || !canOperateCash}
-                            className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60"
+                            className="rounded-xl bg-[var(--ops-tone-success-text)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60"
                           >
                             {actionLoading ? "Abriendo..." : "Abrir caja"}
                           </button>
@@ -403,8 +401,8 @@ export default function CajaPage() {
                     <article
                       className={`sales-panel rounded-lg p-4 shadow-sm md:px-5 md:py-4 ${
                         consistencyOk
-                          ? "border-emerald-300/70 bg-[color:color-mix(in_srgb,#22c55e_12%,var(--ops-surface))]"
-                          : "border-amber-300/70 bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))]"
+? "border-[var(--ops-tone-success-border)] bg-[var(--ops-tone-success-bg)]"
+                           : "border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)]"
                       }`}
                     >
                       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -413,8 +411,8 @@ export default function CajaPage() {
                             <p
                               className={`text-xs uppercase tracking-wide ${
                                 consistencyOk
-                                  ? "text-emerald-700"
-                                  : "text-amber-700"
+                                  ? "text-[var(--ops-tone-success-text)]"
+                                  : "text-[var(--ops-tone-warning-text)]"
                               }`}
                             >
                               {consistencyOk
@@ -449,8 +447,8 @@ export default function CajaPage() {
                             <p
                               className={`mt-1 text-lg font-semibold ${
                                 consistencyOk
-                                  ? "text-emerald-800"
-                                  : "text-amber-800"
+                                  ? "text-[var(--ops-tone-success-text)]"
+                                  : "text-[var(--ops-tone-warning-text)]"
                               }`}
                             >
                               {formatAmount(summary.consistency.difference)}
@@ -530,8 +528,7 @@ export default function CajaPage() {
                   </div>
                 </div>
               ) : null}
-            </div>
-          </section>
+          </OpsPageShell>
         </TooltipProvider>
       </PermissionGuard>
     </ErrorBoundary>

@@ -102,11 +102,11 @@ export function ChatbotWidget() {
 
       {isOpen && (
         <div
-          className={`fixed z-50 flex flex-col bg-white shadow-2xl dark:bg-zinc-900 ${
-            isMaximized
-              ? "inset-0 m-4 rounded-xl border border-zinc-200 dark:border-zinc-700"
-              : "bottom-6 right-6 h-[520px] w-[380px] rounded-xl border border-zinc-200 dark:border-zinc-700"
-          }`}
+className={`fixed z-50 flex flex-col bg-white shadow-2xl dark:bg-zinc-900 ${
+             isMaximized
+               ? "inset-0 m-4 rounded-xl border border-zinc-200 dark:border-zinc-700"
+               : "bottom-6 right-6 h-[520px] w-[380px] rounded-xl border border-zinc-200 dark:border-zinc-700"
+           }`}
         >
           <div className="flex items-center justify-between rounded-t-xl border-b border-zinc-200 bg-zinc-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800">
             <div className="flex items-center gap-2">
@@ -118,14 +118,14 @@ export function ChatbotWidget() {
             <div className="flex items-center gap-1">
               <button
                 onClick={handleNewChat}
-                className="cursor-pointer rounded-md p-1.5 text-zinc-500 transition hover:bg-zinc-200 hover:text-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+                className="cursor-pointer rounded-md p-1.5 text-zinc-500 dark:text-zinc-400 transition hover:bg-zinc-200 hover:text-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
                 aria-label="Nueva conversacion"
               >
                 <Plus className="h-4 w-4" />
               </button>
               <button
                 onClick={toggleMaximize}
-                className="cursor-pointer rounded-md p-1.5 text-zinc-500 transition hover:bg-zinc-200 hover:text-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+                className="cursor-pointer rounded-md p-1.5 text-zinc-500 dark:text-zinc-400 transition hover:bg-zinc-200 hover:text-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
                 aria-label={isMaximized ? "Minimizar" : "Maximizar"}
               >
                 {isMaximized ? (
@@ -136,7 +136,7 @@ export function ChatbotWidget() {
               </button>
               <button
                 onClick={handleClose}
-                className="cursor-pointer rounded-md p-1.5 text-zinc-500 transition hover:bg-zinc-200 hover:text-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+                className="cursor-pointer rounded-md p-1.5 text-zinc-500 dark:text-zinc-400 transition hover:bg-zinc-200 hover:text-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
                 aria-label="Cerrar"
               >
                 <X className="h-4 w-4" />
@@ -151,7 +151,7 @@ export function ChatbotWidget() {
           >
             {isMaximized && conversations.length > 0 && (
               <div className="w-56 shrink-0 overflow-y-auto border-r border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50">
-                <div className="p-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                <div className="p-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                   Conversaciones
                 </div>
                 {conversations.map((conv) => (
@@ -208,7 +208,7 @@ export function ChatbotWidget() {
                   ) : (
                     <>
                       {activeConv && (
-                        <div className="mb-2 truncate text-xs font-medium text-zinc-400">
+                        <div className="mb-2 truncate text-xs font-medium text-zinc-400 dark:text-zinc-500">
                           {activeConv.title || "Conversacion"}
                         </div>
                       )}
@@ -234,11 +234,11 @@ export function ChatbotWidget() {
                       ))}
                       {isSending && (
                         <div className="mb-2 flex justify-start">
-                          <div className="max-w-[85%] rounded-xl bg-zinc-100 px-3 py-2 text-sm text-zinc-500 dark:bg-zinc-800">
+                          <div className="max-w-[85%] rounded-xl bg-zinc-100 px-3 py-2 text-sm text-zinc-500 dark:bg-zinc-800 dark:text-zinc-300">
                             <span className="inline-flex gap-1">
-                              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400" />
-                              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400 [animation-delay:0.1s]" />
-                              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400 [animation-delay:0.2s]" />
+                              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400 dark:bg-zinc-500" />
+                              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400 dark:bg-zinc-500 [animation-delay:0.1s]" />
+                              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-zinc-400 dark:bg-zinc-500 [animation-delay:0.2s]" />
                             </span>
                           </div>
                         </div>

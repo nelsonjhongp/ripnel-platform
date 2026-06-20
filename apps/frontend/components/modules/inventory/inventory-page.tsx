@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LoaderCircle, RefreshCw, RotateCcw, Download } from "lucide-react";
-import { usePagination } from "@/hooks/use-pagination";
 import { Button } from "@/components/ui/button";
+import { PAGE_SIZE } from "@/lib/constants";
 import { FilterDropdown, type FilterDropdownOption } from "@/components/ui/filter-dropdown";
 import { OpsEmptyState } from "@/components/ui/ops-empty-state";
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
@@ -80,6 +80,8 @@ function buildProductSummaryParams(input: {
   locationId: string;
   status: ProductStatusFilter;
   garmentType: string;
+  page: number;
+  pageSize: number;
 }) {
   const params = new URLSearchParams();
 
@@ -99,12 +101,17 @@ function buildProductSummaryParams(input: {
     params.set("garment_type", input.garmentType);
   }
 
+  params.set("page", String(input.page));
+  params.set("page_size", String(input.pageSize));
+
   return params;
 }
 
 function buildLocationSummaryParams(input: {
   query: string;
   status: LocationStatusFilter;
+  page: number;
+  pageSize: number;
 }) {
   const params = new URLSearchParams();
 
@@ -115,6 +122,9 @@ function buildLocationSummaryParams(input: {
   if (input.status !== "all") {
     params.set("status", input.status);
   }
+
+  params.set("page", String(input.page));
+  params.set("page_size", String(input.pageSize));
 
   return params;
 }
@@ -135,6 +145,8 @@ export default function InventoryPage() {
   const [locationStatus, setLocationStatus] = useState<LocationStatusFilter>(
     normalizeLocationStatusFilter(searchParams.get("location_health"))
   );
+  const [productPage, setProductPage] = useState(Number(searchParams.get("page")) || 1);
+  const [locationPage, setLocationPage] = useState(Number(searchParams.get("location_page")) || 1);
   const [refreshNonce, setRefreshNonce] = useState(0);
 
   const productParams = useMemo(
@@ -144,8 +156,10 @@ export default function InventoryPage() {
         locationId: locationFilter,
         status: productStatus,
         garmentType,
+        page: productPage,
+        pageSize: PAGE_SIZE,
       }),
-    [garmentType, locationFilter, productStatus, query]
+    [garmentType, locationFilter, productPage, productStatus, query]
   );
 
   const locationParams = useMemo(
@@ -153,8 +167,10 @@ export default function InventoryPage() {
       buildLocationSummaryParams({
         query: locationQuery,
         status: locationStatus,
+        page: locationPage,
+        pageSize: PAGE_SIZE,
       }),
-    [locationQuery, locationStatus]
+    [locationPage, locationQuery, locationStatus]
   );
 
   const { data: productData, loading: loadingProducts, error: productError } = useApiGet(
@@ -211,14 +227,24 @@ export default function InventoryPage() {
       params.set("location_health", locationStatus);
     }
 
+    if (productPage > 1) {
+      params.set("page", String(productPage));
+    }
+
+    if (locationPage > 1) {
+      params.set("location_page", String(locationPage));
+    }
+
     const nextUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
     router.replace(nextUrl, { scroll: false });
   }, [
     garmentType,
     locationFilter,
+    locationPage,
     locationQuery,
     locationStatus,
     pathname,
+    productPage,
     productStatus,
     query,
     router,
@@ -262,23 +288,8 @@ export default function InventoryPage() {
     };
   }, [locationRows]);
 
-  const {
-    paginatedItems: paginatedProducts,
-    firstVisible: productsFirstVisible,
-    lastVisible: productsLastVisible,
-    totalPages: productsTotalPages,
-    safePage: productsSafePage,
-    setPage: setProductPage,
-  } = usePagination(productRows);
-
-  const {
-    paginatedItems: paginatedLocations,
-    firstVisible: locationsFirstVisible,
-    lastVisible: locationsLastVisible,
-    totalPages: locationsTotalPages,
-    safePage: locationsSafePage,
-    setPage: setLocationPage,
-  } = usePagination(locationRows);
+  const productsTotalPages = productSummary?.meta.total_pages || 1;
+  const locationsTotalPages = locationSummary?.meta.total_pages || 1;
 
   const hasProductFilters =
     Boolean(query.trim()) ||
@@ -522,14 +533,14 @@ export default function InventoryPage() {
                           {error}
                         </td>
                       </tr>
-                    ) : paginatedProducts.length === 0 ? (
+                    ) : productRows.length === 0 ? (
                       <tr>
                         <td colSpan={showLocationsColumn ? 7 : 6} className="px-4 py-10">
                           <OpsEmptyState variant="compact" description="No encontramos productos para los filtros actuales." />
                         </td>
                       </tr>
                     ) : (
-                      paginatedProducts.map((row) => (
+                      productRows.map((row) => (
                         <tr key={row.style_id} className="transition hover:bg-[var(--ops-surface-muted)]">
                           <td className="px-4 py-[var(--ops-row-py)]">
                             <div className="space-y-1">
@@ -583,7 +594,7 @@ export default function InventoryPage() {
                     : productSummary?.meta.scope_label || "Todas las sedes"}
                 </p>
                 <Pagination
-                  page={productsSafePage}
+                  page={productPage}
                   totalPages={productsTotalPages}
                   onPageChange={setProductPage}
                 />
@@ -656,14 +667,14 @@ export default function InventoryPage() {
                           {error}
                         </td>
                       </tr>
-                    ) : paginatedLocations.length === 0 ? (
+                    ) : locationRows.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="px-4 py-10">
                           <OpsEmptyState variant="compact" description="No encontramos sedes para los filtros actuales." />
                         </td>
                       </tr>
                     ) : (
-                      paginatedLocations.map((row) => (
+                      locationRows.map((row) => (
                         <tr key={row.location_id} className="transition hover:bg-[var(--ops-surface-muted)]">
                           <td className="px-4 py-[var(--ops-row-py)]">
                             <div className="space-y-1">
@@ -710,7 +721,7 @@ export default function InventoryPage() {
                   Vista consolidada por ubicación visible.
                 </p>
                 <Pagination
-                  page={locationsSafePage}
+                  page={locationPage}
                   totalPages={locationsTotalPages}
                   onPageChange={setLocationPage}
                 />

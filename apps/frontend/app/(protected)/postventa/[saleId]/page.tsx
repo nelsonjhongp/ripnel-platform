@@ -1,3 +1,4 @@
+import { PermissionGuard } from "@/components/auth/PermissionGuard"
 import PostsaleDetailPage from "@/components/modules/postsales/postsale-detail-page"
 
 type PostsaleDetailRouteProps = {
@@ -5,5 +6,9 @@ type PostsaleDetailRouteProps = {
 }
 
 export default function Page(props: PostsaleDetailRouteProps) {
-  return <PostsaleDetailPage {...props} />
+  return (
+    <PermissionGuard permission="sales.postsale.view">
+      <PostsaleDetailPage {...props} />
+    </PermissionGuard>
+  )
 }
