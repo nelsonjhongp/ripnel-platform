@@ -18,6 +18,7 @@ import {
 import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
+import { OpsPageShell } from "@/components/ui/ops-page-shell";
 import { apiFetch } from "@/lib/api";
 import {
   CashClosingDetail,
@@ -65,10 +66,10 @@ export default function CashHistoryDetailPage({
 
   const consistencyTone = useMemo(() => {
     if (!closing?.sales_summary.consistency.is_consistent) {
-      return "border-amber-300/70 bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))]";
+      return "border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)]";
     }
 
-    return "border-emerald-300/70 bg-[color:color-mix(in_srgb,#22c55e_12%,var(--ops-surface))]";
+    return "border-[var(--ops-tone-success-border)] bg-[var(--ops-tone-success-bg)]";
   }, [closing]);
 
   if (loading) {
@@ -97,8 +98,7 @@ export default function CashHistoryDetailPage({
   return (
     <PermissionGuard anyPermissions={["cash.view", "cash.operate"]}>
       <TooltipProvider delayDuration={120}>
-        <section className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
-          <div className="mx-auto max-w-6xl space-y-5">
+        <OpsPageShell width="wide" className="space-y-5">
             <Link
               href="/caja/historial"
               className="sales-field sales-field-interactive inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--ops-text)] shadow-sm"
@@ -287,8 +287,7 @@ export default function CashHistoryDetailPage({
                 </div>
               </div>
             </article>
-          </div>
-        </section>
+        </OpsPageShell>
       </TooltipProvider>
     </PermissionGuard>
   );

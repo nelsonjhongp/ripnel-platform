@@ -1,6 +1,7 @@
 "use client"
 
 import { CircleAlert, Minus, PencilLine, Plus, ShoppingBasket, Trash2 } from "lucide-react"
+import { OpsDataTable } from "@/components/ui/ops-data-table"
 import { Button } from "@/components/ui/button"
 import { SearchablePicker } from "@/components/ui/searchable-picker"
 import { OpsSelectMenu } from "@/components/ui/ops-selection"
@@ -276,171 +277,153 @@ export function ProductStage(props: ProductStageProps) {
           </Tooltip>
         </div>
 
-        {cart.length === 0 ? (
-          <div className="mt-4 rounded-lg border border-dashed border-[var(--ops-border-soft)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-4 py-8 text-center text-sm text-[var(--ops-text-muted)]">
-            Aun no hay productos agregados a la venta.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <div className="min-w-[980px] border-y border-[var(--ops-border-strong)]">
-              <table className="w-full border-collapse">
-                <thead className="bg-[var(--ops-surface-muted)]">
-                  <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                    <th className="px-4 py-3">Producto</th>
-                    <th className="px-4 py-3">Talla</th>
-                    <th className="px-4 py-3">Color</th>
-                    <th className="px-4 py-3 text-center">
-                      Cantidad
-                    </th>
-                    <th className="px-4 py-3 text-right">
-                      Precio aplicado
-                    </th>
-                    <th className="px-4 py-3 text-right">
-                      Subtotal
-                    </th>
-                    <th className="px-4 py-3 text-right">
-                      Acciones
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                  {totals.items.map((item) => (
-                    <tr
-                      key={item.variant_id}
-                      className="transition hover:bg-[var(--ops-surface-muted)]"
+        <OpsDataTable
+          columns={[
+            { key: "producto", header: "Producto" },
+            { key: "talla", header: "Talla" },
+            { key: "color", header: "Color" },
+            { key: "cantidad", header: "Cantidad", className: "text-center" },
+            { key: "precio", header: "Precio aplicado", className: "text-right" },
+            { key: "subtotal", header: "Subtotal", className: "text-right" },
+            { key: "acciones", header: "Acciones", className: "text-right" },
+          ]}
+          minWidth="980px"
+          isEmpty={cart.length === 0}
+          emptyMessage="Aun no hay productos agregados a la venta."
+        >
+          {totals.items.map((item) => (
+            <tr
+              key={item.variant_id}
+              className="transition hover:bg-[var(--ops-surface-muted)]"
+            >
+              <td className="px-4 py-[var(--ops-row-py)] align-top">
+                <p className="text-sm font-semibold text-[var(--ops-text)]">
+                  {item.style_name}
+                </p>
+                {item.price_override?.reason ? (
+                  <p className="mt-1 text-[11px] text-[var(--ripnel-accent-hover)]">
+                    Ajuste manual:{" "}
+                    {item.price_override.reason}
+                  </p>
+                ) : null}
+              </td>
+              <td className="px-4 py-[var(--ops-row-py)] align-top text-sm text-[var(--ops-text)]">
+                {item.size_name || item.size_code}
+              </td>
+              <td className="px-4 py-[var(--ops-row-py)] align-top text-sm text-[var(--ops-text)]">
+                {item.color_name || item.color_code}
+              </td>
+              <td className="px-4 py-[var(--ops-row-py)] align-top">
+                <div className="flex justify-center">
+                  <div className="sales-field flex items-center gap-1 rounded-lg px-1.5 py-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateQty(item.variant_id, -1)
+                      }
+                      className="sales-field-interactive rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1 text-[var(--ops-text-muted)]"
                     >
-                      <td className="px-4 py-[var(--ops-row-py)] align-top">
-                        <p className="text-sm font-semibold text-[var(--ops-text)]">
-                          {item.style_name}
-                        </p>
-                        {item.price_override?.reason ? (
-                          <p className="mt-1 text-[11px] text-[var(--ripnel-accent-hover)]">
-                            Ajuste manual:{" "}
-                            {item.price_override.reason}
-                          </p>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] align-top text-sm text-[var(--ops-text)]">
-                        {item.size_name || item.size_code}
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] align-top text-sm text-[var(--ops-text)]">
-                        {item.color_name || item.color_code}
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] align-top">
-                        <div className="flex justify-center">
-                          <div className="sales-field flex items-center gap-1 rounded-lg px-1.5 py-1">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                updateQty(item.variant_id, -1)
-                              }
-                              className="sales-field-interactive rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1 text-[var(--ops-text-muted)]"
-                            >
-                              <Minus className="h-3 w-3" />
-                            </button>
-                            <span className="min-w-8 text-center text-sm font-semibold text-[var(--ops-text)]">
-                              {item.quantity}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                updateQty(item.variant_id, 1)
-                              }
-                              disabled={
-                                item.quantity >= item.stock
-                              }
-                              className="sales-field-interactive rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1 text-[var(--ops-text-muted)] disabled:opacity-40"
-                            >
-                              <Plus className="h-3 w-3" />
-                            </button>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
-                        <div className="space-y-1">
-                          <p className="text-sm font-semibold text-[var(--ops-text)]">
-                            S/.{" "}
-                            {formatMoney(
-                              item.unit_price_before_discount,
-                            )}
-                          </p>
-                          <p className="text-[11px] text-[var(--ops-text-muted)]">
-                            {item.price_type_applied ===
-                            "wholesale"
-                              ? "Mayorista"
-                              : "Retail"}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
-                        <p className="text-sm font-semibold text-[var(--ops-text)]">
-                          S/.{" "}
-                          {formatMoney(
-                            item.line_subtotal_before_discount,
-                          )}
-                        </p>
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] align-top">
-                        <div className="flex items-center justify-end gap-1">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  openPriceSheet(item)
-                                }
-                                className="sales-field-interactive rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1.5 text-[var(--ops-text-muted)] transition"
-                                aria-label={
-                                  item.price_override
-                                    ? "Editar precio"
-                                    : "Ajustar precio"
-                                }
-                              >
-                                <PencilLine className="h-4 w-4" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent
-                              side="bottom"
-                              sideOffset={8}
-                            >
-                              {item.price_override
-                                ? "Editar precio"
-                                : "Ajustar precio"}
-                            </TooltipContent>
-                          </Tooltip>
-                          {item.price_override ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                clearPriceAdjustment(
-                                  item.variant_id,
-                                )
-                              }
-                              className="rounded-lg p-1 text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface)] hover:text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]"
-                              aria-label="Quitar ajuste"
-                            >
-                              <CircleAlert className="h-4 w-4" />
-                            </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              removeFromCart(item.variant_id)
-                            }
-                            className={`rounded-lg border p-1.5 transition hover:bg-[var(--ops-surface-muted)] ${buildSemanticChipClass("danger")}`}
-                            aria-label="Quitar producto"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+                      <Minus className="h-3 w-3" />
+                    </button>
+                    <span className="min-w-8 text-center text-sm font-semibold text-[var(--ops-text)]">
+                      {item.quantity}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateQty(item.variant_id, 1)
+                      }
+                      disabled={
+                        item.quantity >= item.stock
+                      }
+                      className="sales-field-interactive rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1 text-[var(--ops-text-muted)] disabled:opacity-40"
+                    >
+                      <Plus className="h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+              </td>
+              <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-[var(--ops-text)]">
+                    S/.{" "}
+                    {formatMoney(
+                      item.unit_price_before_discount,
+                    )}
+                  </p>
+                  <p className="text-[11px] text-[var(--ops-text-muted)]">
+                    {item.price_type_applied ===
+                    "wholesale"
+                      ? "Mayorista"
+                      : "Retail"}
+                  </p>
+                </div>
+              </td>
+              <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
+                <p className="text-sm font-semibold text-[var(--ops-text)]">
+                  S/.{" "}
+                  {formatMoney(
+                    item.line_subtotal_before_discount,
+                  )}
+                </p>
+              </td>
+              <td className="px-4 py-[var(--ops-row-py)] align-top">
+                <div className="flex items-center justify-end gap-1">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openPriceSheet(item)
+                        }
+                        className="sales-field-interactive rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1.5 text-[var(--ops-text-muted)] transition"
+                        aria-label={
+                          item.price_override
+                            ? "Editar precio"
+                            : "Ajustar precio"
+                        }
+                      >
+                        <PencilLine className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent
+                      side="bottom"
+                      sideOffset={8}
+                    >
+                      {item.price_override
+                        ? "Editar precio"
+                        : "Ajustar precio"}
+                    </TooltipContent>
+                  </Tooltip>
+                  {item.price_override ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        clearPriceAdjustment(
+                          item.variant_id,
+                        )
+                      }
+                      className="rounded-lg p-1 text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface)] hover:text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]"
+                      aria-label="Quitar ajuste"
+                    >
+                      <CircleAlert className="h-4 w-4" />
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      removeFromCart(item.variant_id)
+                    }
+                    className={`rounded-lg border p-1.5 transition hover:bg-[var(--ops-surface-muted)] ${buildSemanticChipClass("danger")}`}
+                    aria-label="Quitar producto"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </OpsDataTable>
       </section>
     </div>
   )

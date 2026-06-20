@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import dynamic from "next/dynamic"
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary"
 import Link from "next/link"
 import { Dialog as DialogPrimitive } from "radix-ui"
@@ -19,10 +20,36 @@ import {
   X,
 } from "lucide-react";
 
-import { ProductStage } from "./stage-products"
-import { CustomerStage } from "./stage-customer"
-import { PaymentStage } from "./stage-payment"
-import { SummaryStage } from "./stage-summary"
+import { Skeleton } from "@/components/ui/skeleton"
+import { OpsPageShell } from "@/components/ui/ops-page-shell"
+
+const ProductStage = dynamic(() => import("./stage-products").then((m) => m.ProductStage), {
+  ssr: false,
+  loading: () => <StageSkeleton />,
+})
+const CustomerStage = dynamic(() => import("./stage-customer").then((m) => m.CustomerStage), {
+  ssr: false,
+  loading: () => <StageSkeleton />,
+})
+const PaymentStage = dynamic(() => import("./stage-payment").then((m) => m.PaymentStage), {
+  ssr: false,
+  loading: () => <StageSkeleton />,
+})
+const SummaryStage = dynamic(() => import("./stage-summary").then((m) => m.SummaryStage), {
+  ssr: false,
+  loading: () => <StageSkeleton />,
+})
+
+function StageSkeleton() {
+  return (
+    <div className="space-y-4 rounded-2xl border border-[var(--ops-border-strong)] p-4">
+      <Skeleton className="h-6 w-48" />
+      <Skeleton className="h-10 w-full" />
+      <Skeleton className="h-10 w-full" />
+      <Skeleton className="h-24 w-full" />
+    </div>
+  )
+}
 
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { InlineStatusCard } from "@/components/feedback/status-page";
@@ -1280,8 +1307,7 @@ export default function NuevaVentaPage() {
       <PermissionGuard permission="sales.pos">
         <Sheet open={customerSheetOpen} onOpenChange={setCustomerSheetOpen}>
           <TooltipProvider delayDuration={120}>
-            <div className="sales-page min-h-dvh px-4 py-[var(--ops-page-py)] md:px-8">
-              <div className="mx-auto max-w-[1180px] space-y-4">
+            <OpsPageShell width="wide">
                 <PosHeader
                   eyebrow="Punto de venta"
                   title="Nueva venta"
@@ -1469,7 +1495,7 @@ export default function NuevaVentaPage() {
                     <div className="ops-overlay-backdrop absolute inset-0 z-20 flex items-center justify-center rounded-[28px] p-4">
                       <div className="ops-overlay-panel w-full max-w-md rounded-2xl p-6">
                         <div className="flex items-start gap-3">
-                          <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+                          <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-[var(--ops-tone-warning-text)]" />
                           <div className="space-y-2">
                             <p className="text-lg font-semibold">
                               Venta bloqueada por caja
@@ -1619,8 +1645,7 @@ export default function NuevaVentaPage() {
                     />
                   </section>
                 </div>
-              </div>
-            </div>
+            </OpsPageShell>
           </TooltipProvider>
 
           <DialogPrimitive.Root open={discountModalOpen} onOpenChange={setDiscountModalOpen}>
@@ -2050,7 +2075,7 @@ export default function NuevaVentaPage() {
                 )}
 
                 {customerFormError ? (
-                  <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                  <div className="rounded-xl border border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] px-3 py-2 text-sm text-[var(--ops-tone-danger-text)]">
                     {customerFormError}
                   </div>
                 ) : null}
@@ -2189,7 +2214,7 @@ export default function NuevaVentaPage() {
                   </div>
 
                   {priceFormError ? (
-                    <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                    <div className="rounded-xl border border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] px-3 py-2 text-sm text-[var(--ops-tone-danger-text)]">
                       {priceFormError}
                     </div>
                   ) : null}

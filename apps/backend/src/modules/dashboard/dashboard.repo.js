@@ -318,6 +318,15 @@ async function findPendingTransfersItems(locationId, limit = 5, executor = query
   return buildTransferPendingItems(rows, locationIds, limit);
 }
 
+async function findTransferPendingData(locationId, limit = 5) {
+  const locationIds = normalizeLocationIds(locationId);
+  const rows = await findAllTransfers({ locationIds });
+  return {
+    counts: buildTransferPendingCounts(rows, locationIds),
+    items: buildTransferPendingItems(rows, locationIds, limit),
+  };
+}
+
 async function findCriticalInventoryCounts(locationId, lowStockThreshold = 3, executor = query) {
   const locationIds = normalizeLocationIds(locationId);
   const result = await executor(
@@ -543,6 +552,7 @@ module.exports = {
   findPostsalesWindowItems,
   findPendingTransfersCounts,
   findPendingTransfersItems,
+  findTransferPendingData,
   findCriticalInventoryCounts,
   findCriticalInventoryItems,
   findRecentSalesEvents,

@@ -189,6 +189,82 @@ Ver `DESIGN.md` y `docs/` para guías detalladas. Principios clave:
 
 ## Changelog
 
+### 2026-06-20 — Auditoría P0/P1, dark mode, PermissionGuard, consistencia UI
+
+#### Seguridad — PermissionGuard en 27 rutas
+
+Se agregó `PermissionGuard` en todas las rutas de página Next.js que carecían de protección client-side. El backend ya validaba permisos, pero ahora el frontend también bloquea acceso visual:
+
+| Permiso | Rutas protegidas |
+|---------|-----------------|
+| `sales.pos` | `/ventas`, `/ventas/[saleId]`, `/ventas/historial` |
+| `sales.postsale.view` | `/postventa`, `/postventa/[saleId]` |
+| `cash.view` / `cash.operate` | `/caja` (`anyPermissions`), `/caja/historial`, `/caja/historial/[id]` |
+| `cash.admin.view` | `/caja/control` |
+| `customers.manage` | `/clientes` |
+| `inventory.view` | `/inventario`, `/inventario/[styleId]`, `/inventario/movimientos`, `/inventario/ajustes` |
+| `transfers.manage` / `transfers.request.view_own` | `/transferencias`, `/transferencias/[transferId]`, `/transferencias/historial` (`anyPermissions`) |
+| `transfers.manage` / `transfers.receive` | `/transferencias/recepciones` (`anyPermissions`) |
+| `catalogs.manage` | `/catalogos`, `/catalogos/[catalogId]`, `/catalogos/[catalogId]/nuevo` |
+| `products.manage` | `/productos`, `/productos/[productId]`, `/productos/nuevo` |
+| `prices.manage` | `/precios`, `/precios/reglas`, `/precios/crear` |
+
+#### Dark mode — migración a tokens ops-tone
+
+Archivos que usaban colores Tailwind hardcoded (`text-amber-*`, `bg-emerald-*`, `border-rose-*`, etc.) sin variantes `dark:` fueron migrados a variables CSS `var(--ops-tone-*)`:
+
+| Archivo | Cambio |
+|---------|--------|
+| `cash/cash-page.tsx` | `border-emerald-*` → `var(--ops-tone-success-border)`, `text-amber-*` → `var(--ops-tone-warning-text)` |
+| `cash/cash-control-page.tsx` | `text-amber-700/800`, `text-emerald-700` → tokens correspondientes |
+| `cash/cash-history-detail-page.tsx` | `border-amber-*`/`border-emerald-*` → tokens de warning/success |
+| `shared/module-placeholder.tsx` | Reescrito completamente: `slate-*`, `violet-*` → `var(--ops-*)` y `var(--ripnel-accent)` |
+| `customers/customers-powerbi-dashboard-page.tsx` | Reescrito: `gray-*`, `blue-*`, `amber-*` → tokens ops + OpsPageShell + PosHeader |
+| `feedback/status-page.tsx` | `defaultToneClasses` con `dark:` variants; fondo del section con `dark:` gradient; botones con `dark:` |
+| `sales/pos/pos-page.tsx` | `text-amber-500` → `var(--ops-tone-warning-text)`; `border-rose-*`/`bg-rose-*` → `var(--ops-tone-danger-*)` |
+| `chatbot/ChatbotWidget.tsx` | Agregadas variantes `dark:` faltantes en botones, labels, loading dots, conversation title |
+
+#### Consistencia UI — OpsPageShell
+
+| Página | Antes | Después |
+|--------|-------|---------|
+| `prices-workspace-page.tsx` | Wrapper manual | `<OpsPageShell width="wide">` |
+| `pricing-rules-page.tsx` | Wrapper manual | `<OpsPageShell width="wide">` |
+| `transaction-history-page.tsx` | `ops-page min-h-screen` + `max-w-[1180px]` manual | `<OpsPageShell width="wide">` |
+| `customers-powerbi-dashboard-page.tsx` | Sección sin shell | `<OpsPageShell width="wide">` + `PosHeader` |
+
+#### Consistencia UI — TooltipProvider
+
+| Página | Cambio |
+|--------|--------|
+| `transfers-manage-page.tsx` | Agregado `<TooltipProvider delayDuration={120}>` wrapper |
+
+#### TypeScript — corrección de errores
+
+| Archivo | Issue | Fix |
+|---------|-------|-----|
+| `inventory-adjustments-create-page.tsx` | Acceso a `detail.status`, `detail.location_id` etc. sobre tipo `AdjustmentDetailData` (que envuelve `{ adjustment, meta }`) | Desestructurar: `const { adjustment } = ...`; acceder vía `adjustment.status`, `adjustment.location_id` |
+| `inventory-adjustments-create-page.tsx` | `tone="info"` no es valor válido de `StatusTone` | Cambiado a `tone="neutral"` |
+| `administration/users-page.tsx` | `useMemo` usaba `userForm` y `selectedLocationIds` antes de su declaración | Movidos `useState` antes de los `useMemo` dependientes |
+
+#### window.confirm → AdminConfirmModal
+
+- `postsale-detail-page.tsx`: Reemplazado `window.confirm` por `<AdminConfirmModal>`. El botón de cancelación ahora abre el modal; el modal confirma la acción asíncrona.
+
+#### Seguridad — backend routes
+
+- `catalogs.routes.js`, `styles.routes.js`, `variants.routes.js`: Agregado `requireAuth` + `requirePermission` en todas las rutas.
+- `users.routes.js`: Validación Zod (`userAssignments` schema) en `PUT /:userId/locations`.
+- Rate limiter global: 200 req/min configurado en `app.js`.
+
+#### Performance — backend
+
+- `sales.service.js`: `createSale` refactorizado de N+1 queries a batch queries (6-7N → 6 queries totales).
+- `dashboard.service.js`: Overview + activity secuenciales → `Promise.all`.
+- `dashboard.repo.js`: `findTransferPendingData` combinado de 2 llamadas a 1.
+- `inventory.service.js`/`repo.js`: Paginación server-side (`LIMIT`/`OFFSET` + `COUNT`), backward-compatible.
+- Frontend: Dynamic imports para recharts y POS stages.
+
 ### 2026-06-08 — Auditoría completa, hardening UX, feedback unificado, CSV export
 
 #### Infraestructura nueva

@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import Link from "next/link";
 import { FormEvent, useEffect, useId, useMemo, useState } from "react";
 import {
@@ -21,6 +22,7 @@ import {
 import { FieldLabel } from "@/components/ui/ops-field-label";
 import { MultiSelectCatalog } from "@/components/ui/ops-multi-select-catalog";
 import { AdminConfirmModal } from "@/components/admin/admin-ui";
+import { OpsPageShell } from "@/components/ui/ops-page-shell";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
   Sheet,
@@ -259,7 +261,7 @@ export function ProductCreatePage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [catalogSubmitting, setCatalogSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<React.ReactNode | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [createdStyle, setCreatedStyle] = useState<CreatedStyle | null>(null);
   const [catalogPanel, setCatalogPanel] = useState<CatalogPanelState>(null);
@@ -425,8 +427,10 @@ export function ProductCreatePage() {
     setError(null);
     setCreatedStyle(null);
 
+    let style: CreatedStyle | null = null;
+
     try {
-      const style = await requestData<CreatedStyle>("/api/styles", {
+      style = await requestData<CreatedStyle>("/api/styles", {
         method: "POST",
         body: JSON.stringify({
           name: resolvedName.trim(),
@@ -439,17 +443,49 @@ export function ProductCreatePage() {
         }),
       });
 
-      await requestData(`/api/variants/styles/${style.style_id}/config`, {
-        method: "PUT",
-        body: JSON.stringify({
-          size_ids: formState.size_ids,
-          color_ids: formState.color_ids,
-        }),
-      });
+      try {
+        await requestData(`/api/variants/styles/${style.style_id}/config`, {
+          method: "PUT",
+          body: JSON.stringify({
+            size_ids: formState.size_ids,
+            color_ids: formState.color_ids,
+          }),
+        });
+      } catch (configError) {
+        const detailsUrl = `/productos/variantes?style_id=${encodeURIComponent(style.style_id!)}`;
+        setError(
+          <>
+            El producto &quot;{style.name}&quot; se creo pero fallo la configuracion de tallas y colores.{' '}
+            <Link href={detailsUrl} className="underline font-semibold">
+              Ir a Variantes
+            </Link>
+            {' '}para completarlo.
+          </>
+        );
+        setCreatedStyle(style);
+        setConfirmationOpen(false);
+        return;
+      }
 
-      await requestData(`/api/variants/styles/${style.style_id}/generate`, {
-        method: "POST",
-      });
+      try {
+        await requestData(`/api/variants/styles/${style.style_id}/generate`, {
+          method: "POST",
+        });
+      } catch (generateError) {
+        const detailsUrl = `/productos/variantes?style_id=${encodeURIComponent(style.style_id!)}`;
+        setError(
+          <>
+            El producto &quot;{style.name}&quot; se creo pero las variantes no se generaron.{' '}
+            <Link href={detailsUrl} className="underline font-semibold">
+              Ir a Variantes
+            </Link>
+            {' '}para generarlas manualmente.
+          </>
+        );
+        setCreatedStyle(style);
+        setConfirmationOpen(false);
+        return;
+      }
 
       setCreatedStyle(style);
       setFormState((current) => ({
@@ -644,7 +680,7 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
 
   return (
     <>
-      <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
+      <OpsPageShell width="wide">
         <div className="mx-auto flex max-w-5xl flex-col gap-4">
           <PosHeader
             eyebrow="Productos"
@@ -870,7 +906,7 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
             <AdminInlineMessage tone="warning">Carga tallas en catalogos antes de crear productos.</AdminInlineMessage>
           ) : null}
         </div>
-      </section>
+      </OpsPageShell>
 
       <Sheet
         open={Boolean(catalogPanel)}

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { LoaderCircle, Plus, RefreshCw, RotateCcw } from "lucide-react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
-import { ForbiddenPage, InlineStatusCard, LoadingPage } from "@/components/feedback/status-page";
+import { ForbiddenPage, LoadingPage } from "@/components/feedback/status-page";
 import { apiFetch, type ApiEnvelope, unwrapApiData } from "@/lib/api";
 import { useApiGet } from "@/hooks/use-api-get";
 import { useTransferCapabilities } from "@/hooks/use-transfer-capabilities";
@@ -22,9 +22,8 @@ import {
   OpsSearchField,
   OpsSectionDivider,
   OpsTableBlock,
-  OpsTableFooter,
-  OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
+import { OpsDataTable } from "@/components/ui/ops-data-table";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
   Tooltip,
@@ -288,133 +287,111 @@ export function TransfersHistoryPage() {
             </TooltipProvider>
           </OpsFiltersRow>
 
-          <OpsTableWrap minWidth="1120px">
-            <table className="w-full border-collapse">
-              <thead className="bg-[var(--ops-surface-muted)]">
-                <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  <th className="px-4 py-3">Documento</th>
-                  <th className="px-4 py-3">Ruta</th>
-                  <th className="px-4 py-3">Estado</th>
-                  <th className="px-4 py-3">Cierre</th>
-                  <th className="px-4 py-3 text-right">Unidades</th>
-                  <th className="px-4 py-3">Última actividad</th>
-                  <th className="px-4 py-3 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                      Cargando historial...
-                    </td>
-                  </tr>
-                ) : error ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-6">
-                      <InlineStatusCard
-                        title="No pudimos cargar el historial"
-                        description={error}
-                        tone="danger"
-                        variant="ops"
-                      />
-                    </td>
-                  </tr>
-                ) : paginatedItems.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                      No encontramos transferencias cerradas con ese criterio.
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedItems.map((transfer) => {
-                    const happenedAt =
-                      transfer.received_at ||
-                      transfer.cancelled_at ||
-                      transfer.shipped_at ||
-                      transfer.approved_at ||
-                      transfer.updated_at ||
-                      transfer.created_at;
+          <OpsDataTable
+            columns={[
+              { key: "documento", header: "Documento" },
+              { key: "ruta", header: "Ruta" },
+              { key: "estado", header: "Estado" },
+              { key: "cierre", header: "Cierre" },
+              { key: "unidades", header: "Unidades", className: "text-right" },
+              { key: "actividad", header: "Última actividad" },
+              { key: "acciones", header: "Acciones", className: "text-right" },
+            ]}
+            minWidth="1120px"
+            loading={loading}
+            loadingMessage="Cargando historial..."
+            error={error}
+            errorTitle="No pudimos cargar el historial"
+            emptyMessage="No encontramos transferencias cerradas con ese criterio."
+            isEmpty={!loading && !error && paginatedItems.length === 0}
+            footer={
+              <>
+                <span className="text-sm text-[var(--ops-text-muted)]">
+                  {items.length === 0 ? "0 resultados" : `${firstVisible}-${lastVisible} de ${items.length}`}
+                </span>
+                <Pagination
+                  page={safePage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  className="self-end md:self-auto"
+                />
+              </>
+            }
+          >
+            {paginatedItems.map((transfer) => {
+              const happenedAt =
+                transfer.received_at ||
+                transfer.cancelled_at ||
+                transfer.shipped_at ||
+                transfer.approved_at ||
+                transfer.updated_at ||
+                transfer.created_at;
 
-                    return (
-                      <tr
-                        key={transfer.transfer_id}
-                        className="transition hover:bg-[var(--ops-surface-muted)]"
+              return (
+                <tr
+                  key={transfer.transfer_id}
+                  className="transition hover:bg-[var(--ops-surface-muted)]"
+                >
+                  <td className="px-4 py-[var(--ops-row-py)] align-top">
+                    <div className="space-y-1.5">
+                      <Link
+                        href={`/transferencias/${transfer.transfer_id}`}
+                        className="inline-flex rounded-md text-sm font-semibold text-[var(--ops-text)] transition hover:text-[var(--ripnel-accent-hover)]"
                       >
-                        <td className="px-4 py-[var(--ops-row-py)] align-top">
-                          <div className="space-y-1.5">
-                            <Link
-                              href={`/transferencias/${transfer.transfer_id}`}
-                              className="inline-flex rounded-md text-sm font-semibold text-[var(--ops-text)] transition hover:text-[var(--ripnel-accent-hover)]"
-                            >
-                              {transfer.transfer_number || "Sin número"}
-                            </Link>
-                            <p className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                              {formatTransferScopeRole(transfer.scope_role)}
-                            </p>
-                          </div>
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top">
-                          <p className="text-sm text-[var(--ops-text)]">
-                            {transfer.from_location_name}{" "}
-                            <span className="text-[var(--ops-text-muted)]">&rarr;</span>{" "}
-                            {transfer.to_location_name}
-                          </p>
-                          <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                            {transfer.from_location_code} / {transfer.to_location_code}
-                          </p>
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top">
-                          <span
-                            className={cn(
-                              "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-                              getTransferStatusClasses(transfer.status)
-                            )}
-                          >
-                            {formatTransferStatus(transfer.status)}
-                          </span>
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top">
-                          <p className="text-sm text-[var(--ops-text)]">{transfer.active_message}</p>
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
-                          <p className="text-sm font-semibold tabular-nums text-[var(--ops-text)]">
-                            {transfer.status === "received"
-                              ? transfer.qty_received_total
-                              : transfer.qty_requested_total}
-                          </p>
-                          <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                            {transfer.status === "received" ? "Recibidas" : "Solicitadas"}
-                          </p>
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top">
-                          <p className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                            {formatDateTime(happenedAt)}
-                          </p>
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
-                          <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
-                            <Link href={`/transferencias/${transfer.transfer_id}`}>Ver detalle</Link>
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </OpsTableWrap>
-
-          <OpsTableFooter>
-            <span className="text-sm text-[var(--ops-text-muted)]">
-              {items.length === 0 ? "0 resultados" : `${firstVisible}-${lastVisible} de ${items.length}`}
-            </span>
-            <Pagination
-              page={safePage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-              className="self-end md:self-auto"
-            />
-          </OpsTableFooter>
+                        {transfer.transfer_number || "Sin número"}
+                      </Link>
+                      <p className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                        {formatTransferScopeRole(transfer.scope_role)}
+                      </p>
+                    </div>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] align-top">
+                    <p className="text-sm text-[var(--ops-text)]">
+                      {transfer.from_location_name}{" "}
+                      <span className="text-[var(--ops-text-muted)]">&rarr;</span>{" "}
+                      {transfer.to_location_name}
+                    </p>
+                    <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                      {transfer.from_location_code} / {transfer.to_location_code}
+                    </p>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] align-top">
+                    <span
+                      className={cn(
+                        "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                        getTransferStatusClasses(transfer.status)
+                      )}
+                    >
+                      {formatTransferStatus(transfer.status)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] align-top">
+                    <p className="text-sm text-[var(--ops-text)]">{transfer.active_message}</p>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
+                    <p className="text-sm font-semibold tabular-nums text-[var(--ops-text)]">
+                      {transfer.status === "received"
+                        ? transfer.qty_received_total
+                        : transfer.qty_requested_total}
+                    </p>
+                    <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                      {transfer.status === "received" ? "Recibidas" : "Solicitadas"}
+                    </p>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] align-top">
+                    <p className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                      {formatDateTime(happenedAt)}
+                    </p>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
+                    <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
+                      <Link href={`/transferencias/${transfer.transfer_id}`}>Ver detalle</Link>
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
+          </OpsDataTable>
         </OpsTableBlock>
       </OpsSectionDivider>
     </OpsPageShell>

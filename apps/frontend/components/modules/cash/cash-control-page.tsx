@@ -32,6 +32,8 @@ import {
 import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
+import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsPageShell } from "@/components/ui/ops-page-shell";
 import { ApiError, apiFetch } from "@/lib/api";
 import {
   CashAdminSessionsResponse,
@@ -234,8 +236,7 @@ export default function CashControlPage() {
   return (
     <PermissionGuard permission="cash.admin.view">
       <TooltipProvider delayDuration={120}>
-        <section className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
-          <div className="mx-auto max-w-7xl space-y-5">
+        <OpsPageShell width="wide" className="!max-w-7xl space-y-5">
             <header className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div>
@@ -323,21 +324,19 @@ export default function CashControlPage() {
                   ))}
                 </div>
 
-                <select
+                <FilterDropdown
+                  label="Sede"
                   value={locationId}
-                  onChange={(event) => setLocationId(event.target.value)}
-                  className="sales-field rounded-xl px-3 py-2 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_72%,transparent)]"
-                >
-                  <option value="all">Todas las sedes</option>
-                  {locations.map((location) => (
-                    <option
-                      key={location.location_id}
-                      value={location.location_id}
-                    >
-                      {location.name}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: "all", label: "Todas las sedes" },
+                    ...locations.map((loc) => ({
+                      value: loc.location_id,
+                      label: loc.name,
+                    })),
+                  ]}
+                  onChange={(value) => setLocationId(value)}
+                  triggerClassName="h-10 rounded-xl"
+                />
               </div>
             </div>
 
@@ -351,10 +350,10 @@ export default function CashControlPage() {
                 </p>
               </article>
               <article className="sales-chip sales-chip-warning rounded-xl p-4 shadow-sm">
-                <p className="text-[11px] uppercase tracking-wide text-amber-700">
+                <p className="text-[11px] uppercase tracking-wide text-[var(--ops-tone-warning-text)]">
                   Pendientes de cierre
                 </p>
-                <p className="mt-2 text-2xl font-bold text-amber-800">
+                <p className="mt-2 text-2xl font-bold text-[var(--ops-tone-warning-text)]">
                   {stats?.open_count || 0}
                 </p>
               </article>
@@ -568,11 +567,11 @@ export default function CashControlPage() {
                               {formatAmount(closing.total_all)}
                             </p>
                             {closing.is_consistent === false ? (
-                              <p className="text-xs text-amber-700">
+                              <p className="text-xs text-[var(--ops-tone-warning-text)]">
                                 Dif. {formatAmount(closing.difference)}
                               </p>
                             ) : (
-                              <p className="text-xs text-emerald-700">
+                              <p className="text-xs text-[var(--ops-tone-success-text)]">
                                 Consistencia OK
                               </p>
                             )}
@@ -628,7 +627,7 @@ export default function CashControlPage() {
 
               <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
+                  <AlertTriangle className="h-4 w-4 text-[var(--ops-tone-warning-text)]" />
                   <h2 className="text-sm font-semibold text-[var(--ops-text)]">
                     Alertas operativas
                   </h2>
@@ -649,7 +648,7 @@ export default function CashControlPage() {
                             <span className="text-sm text-[var(--ops-text)]">
                               {location.location_name}
                             </span>
-                            <span className="text-sm font-semibold text-amber-700">
+                            <span className="text-sm font-semibold text-[var(--ops-tone-warning-text)]">
                               {location.open_count}
                             </span>
                           </div>
@@ -682,7 +681,7 @@ export default function CashControlPage() {
                                 {formatBusinessDate(session.business_date)}
                               </p>
                             </div>
-                            <span className="text-sm font-semibold text-amber-700">
+                            <span className="text-sm font-semibold text-[var(--ops-tone-warning-text)]">
                               {formatAmount(session.difference)}
                             </span>
                           </Link>
@@ -697,8 +696,7 @@ export default function CashControlPage() {
                 </div>
               </article>
             </div>
-          </div>
-        </section>
+        </OpsPageShell>
       </TooltipProvider>
     </PermissionGuard>
   );

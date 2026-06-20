@@ -13,16 +13,15 @@ const {
   findSalePaymentsBySaleId,
   findCustomerById,
   findCustomerByInternalCode,
-  findVariantById,
-  getCurrentRetailPriceInTx,
-  getCurrentWholesalePriceInTx,
-  getInventoryQtyInTx,
+  findVariantsByIds,
+  getCurrentPricesInTx,
+  getInventoryQtysInTx,
   nextSaleNumberInTx,
   insertSale,
-  insertSaleDetail,
+  insertSaleDetails,
   insertSalePayment,
-  decrementInventoryInTx,
-  insertStockMovementInTx,
+  decrementInventoryBatch,
+  insertStockMovements,
 } = require('./sales.repo');
 const { findCashClosingByLocationAndDate } = require('../cash/cash.repo');
 const { findActiveUserById } = require('../auth/auth.repo');
@@ -733,24 +732,32 @@ async function createSale(input = {}) {
       throw new AppError('Duplicate variant_id in items is not allowed', 400);
     }
 
-    const variant = await findVariantById(variantId);
-    if (!variant) {
-      throw new AppError(`Variant ${variantId} not found`, 404);
-    }
-
-    if (!variant.active) {
-      throw new AppError(`Variant ${variant.sku} is inactive`, 400);
-    }
-
     seenVariantIds.add(variantId);
     normalizedItems.push({
-      variant_id: variant.variant_id,
-      sku: variant.sku,
-      style_id: variant.style_id,
-      size_id: variant.size_id,
+      variant_id: variantId,
+      sku: null,
+      style_id: null,
+      size_id: null,
       quantity: qty,
       price_override: normalizePriceOverride(item && item.price_override),
     });
+  }
+
+  const allVariantIds = normalizedItems.map(item => item.variant_id);
+  const variantRows = await findVariantsByIds(allVariantIds);
+  const variantMap = new Map(variantRows.map(v => [v.variant_id, v]));
+
+  for (const item of normalizedItems) {
+    const variant = variantMap.get(item.variant_id);
+    if (!variant) {
+      throw new AppError(`Variant ${item.variant_id} not found`, 404);
+    }
+    if (!variant.active) {
+      throw new AppError(`Variant ${variant.sku} is inactive`, 400);
+    }
+    item.sku = variant.sku;
+    item.style_id = variant.style_id;
+    item.size_id = variant.size_id;
   }
 
   const client = await pool.connect();
@@ -767,12 +774,11 @@ async function createSale(input = {}) {
     const computedItems = [];
     let baseSubtotalAmount = 0;
 
+    const qtysMap = await getInventoryQtysInTx(clientQuery, location.location_id, allVariantIds);
+    const pricesMap = await getCurrentPricesInTx(clientQuery, normalizedItems);
+
     for (const item of normalizedItems) {
-      const availableQty = await getInventoryQtyInTx(
-        clientQuery,
-        location.location_id,
-        item.variant_id
-      );
+      const availableQty = qtysMap[item.variant_id] || 0;
 
       if (availableQty < item.quantity) {
         throw new AppError(
@@ -781,18 +787,15 @@ async function createSale(input = {}) {
         );
       }
 
-      const resolvedRetailPrice = normalizeAmount(
-        await getCurrentRetailPriceInTx(clientQuery, item.style_id, item.size_id)
-      );
+      const itemPrices = pricesMap[item.variant_id] || {};
+      const resolvedRetailPrice = normalizeAmount(itemPrices.retail_price);
 
       if (resolvedRetailPrice === null) {
         throw new AppError(`No current retail price found for ${item.sku}`, 409);
       }
 
       const resolvedWholesalePrice = wholesaleApplies
-        ? normalizeAmount(
-            await getCurrentWholesalePriceInTx(clientQuery, item.style_id, item.size_id)
-          )
+        ? normalizeAmount(itemPrices.wholesale_price)
         : null;
       const autoUnitPrice =
         wholesaleApplies && resolvedWholesalePrice !== null
@@ -868,37 +871,40 @@ async function createSale(input = {}) {
 
     const saleId = saleRow.sale_id;
 
-    for (const item of pricedSale.items) {
-      await insertSaleDetail(clientQuery, {
-        sale_id: saleId,
+    await insertSaleDetails(clientQuery, pricedSale.items.map(item => ({
+      sale_id: saleId,
+      variant_id: item.variant_id,
+      quantity: item.quantity,
+      unit_price_list: item.unit_price_list,
+      unit_price_final: item.unit_price_final,
+      price_type_applied: item.price_type_applied,
+      pricing_basis: item.pricing_basis,
+      pricing_rule_applied: item.pricing_rule_applied || null,
+      override_reason: item.override_reason,
+      overridden_by: item.overridden_by,
+      overridden_at: item.overridden_at,
+      line_subtotal: item.line_subtotal,
+      line_tax: item.line_tax,
+      line_total: item.line_total,
+    })));
+
+    await decrementInventoryBatch(clientQuery, location.location_id,
+      pricedSale.items.map(item => ({
         variant_id: item.variant_id,
         quantity: item.quantity,
-        unit_price_list: item.unit_price_list,
-        unit_price_final: item.unit_price_final,
-        price_type_applied: item.price_type_applied,
-        pricing_basis: item.pricing_basis,
-        pricing_rule_applied: item.pricing_rule_applied || null,
-        override_reason: item.override_reason,
-        overridden_by: item.overridden_by,
-        overridden_at: item.overridden_at,
-        line_subtotal: item.line_subtotal,
-        line_tax: item.line_tax,
-        line_total: item.line_total,
-      });
+      }))
+    );
 
-      await decrementInventoryInTx(clientQuery, location.location_id, item.variant_id, item.quantity);
-
-      await insertStockMovementInTx(clientQuery, {
-        location_id: location.location_id,
-        variant_id: item.variant_id,
-        movement_type: 'OUT',
-        quantity: item.quantity,
-        reason: `Venta ${saleNumber}`,
-        reference_type: 'sale',
-        reference_id: saleId,
-        created_by: user.user_id,
-      });
-    }
+    await insertStockMovements(clientQuery, pricedSale.items.map(item => ({
+      location_id: location.location_id,
+      variant_id: item.variant_id,
+      movement_type: 'OUT',
+      quantity: item.quantity,
+      reason: `Venta ${saleNumber}`,
+      reference_type: 'sale',
+      reference_id: saleId,
+      created_by: user.user_id,
+    })));
 
     for (const payment of payments) {
       await insertSalePayment(clientQuery, {

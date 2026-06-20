@@ -15,6 +15,7 @@ import {
 import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
+import { OpsPageShell } from "@/components/ui/ops-page-shell";
 import { ApiError, apiFetch } from "@/lib/api";
 import { useApiGet } from "@/hooks/use-api-get";
 import { usePagination } from "@/hooks/use-pagination";
@@ -119,8 +120,7 @@ export default function CashHistoryPage() {
   return (
     <PermissionGuard anyPermissions={["cash.view", "cash.operate"]}>
       <TooltipProvider delayDuration={120}>
-        <section className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
-          <div className="mx-auto max-w-6xl space-y-5">
+        <OpsPageShell width="wide" className="space-y-5">
             <header className="px-1 space-y-4">
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
@@ -310,8 +310,7 @@ export default function CashHistoryPage() {
                 </>
               )}
             </article>
-          </div>
-        </section>
+        </OpsPageShell>
       </TooltipProvider>
     </PermissionGuard>
   );
