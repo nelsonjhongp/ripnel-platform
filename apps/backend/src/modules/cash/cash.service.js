@@ -1,12 +1,16 @@
 const { AppError } = require("../../shared/errors");
+const { round2 } = require("../../shared/numbers");
+const { normalizeUuid } = require("../../shared/uuid");
 const {
   findCashClosingByLocationAndDate,
   findCashClosingById,
   findAllCashClosings,
   insertCashClosing,
   updateCashClosingClose,
+  updateCashClosingReopen,
   sumSalesPaymentsByLocationAndDate,
   countSalesByLocationAndDate,
+  countUnconfirmedSalesByLocationAndDate,
   getAdminCashSummary,
   findAdminCashSessions,
 } = require("./cash.repo");
@@ -39,23 +43,8 @@ function normalizeBusinessDateValue(value) {
   return normalized;
 }
 
-function round2(value) {
-  return Math.round(Number(value || 0) * 100) / 100;
-}
-
 function toNumber(value) {
   return round2(value || 0);
-}
-
-function normalizeUuid(value) {
-  const normalized = String(value || "").trim();
-  if (!normalized) return null;
-
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    normalized,
-  )
-    ? normalized
-    : null;
 }
 
 function normalizeDate(value) {
@@ -74,7 +63,13 @@ function addDays(dateString, days) {
 function normalizeRange(value) {
   const normalized = String(value || "").trim();
   if (!normalized) return "7d";
-  return ["7d", "30d"].includes(normalized) ? normalized : null;
+  return ["7d", "30d", "60d"].includes(normalized) ? normalized : null;
+}
+
+function normalizeCashStatus(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized || normalized === "all") return null;
+  return ["open", "closed"].includes(normalized) ? normalized : null;
 }
 
 function buildRangeFilter(range) {
@@ -85,7 +80,11 @@ function buildRangeFilter(range) {
 
   const endDate = todayPeruDate();
   const startDate =
-    normalizedRange === "30d" ? addDays(endDate, -29) : addDays(endDate, -6);
+    normalizedRange === "30d"
+      ? addDays(endDate, -29)
+      : normalizedRange === "60d"
+        ? addDays(endDate, -59)
+        : addDays(endDate, -6);
 
   return {
     range: normalizedRange,
@@ -317,6 +316,41 @@ async function resolveCashAdminContext(userId, permissions) {
   return { user, capabilities };
 }
 
+async function reopenCash(input) {
+  const normalizedId = normalizeUuid(input.cash_closing_id);
+  if (!normalizedId)
+    throw new AppError("cash_closing_id is required", 400, {
+      code: "INVALID_CASH_CLOSING_ID",
+    });
+
+  const { user, capabilities } = await resolveCashAdminContext(
+    input.user_id,
+    input.permissions,
+  );
+  if (!capabilities.reopen) {
+    throw new AppError("Forbidden", 403, { code: "FORBIDDEN" });
+  }
+
+  const closing = await findCashClosingById(normalizedId);
+  if (!closing)
+    throw new AppError("Caja no encontrada", 404, {
+      code: "CASH_CLOSING_NOT_FOUND",
+    });
+  if (closing.status !== "closed")
+    throw new AppError("La caja no esta cerrada.", 409, {
+      code: "CASH_NOT_CLOSED",
+    });
+
+  const reopenNotes = input.reopen_notes ? String(input.reopen_notes).trim() : null;
+
+  await updateCashClosingReopen(normalizedId, {
+    reopened_by: user.user_id,
+    reopen_notes: reopenNotes,
+  });
+
+  return serializeCashClosing(await findCashClosingById(normalizedId));
+}
+
 async function closeCash(input) {
   const normalizedId = normalizeUuid(input.cash_closing_id);
   if (!normalizedId)
@@ -345,6 +379,17 @@ async function closeCash(input) {
     throw new AppError("La caja operativa de la sede ya fue cerrada.", 409, {
       code: "CASH_ALREADY_CLOSED",
     });
+
+  const unconfirmedCount = await countUnconfirmedSalesByLocationAndDate(
+    closing.location_id,
+    closing.business_date,
+  );
+  if (unconfirmedCount > 0) {
+    throw new AppError("No se puede cerrar caja: existen ventas sin confirmar.", 409, {
+      code: "UNCONFIRMED_SALES_EXIST",
+      count: unconfirmedCount,
+    });
+  }
 
   const paymentRows = await sumSalesPaymentsByLocationAndDate(
     closing.location_id,
@@ -400,25 +445,49 @@ async function getCurrentCash(input) {
 
 async function listCashClosings(input = {}) {
   const requestedLocationId = normalizeUuid(input.location_id);
-  const status = input.status ? String(input.status).trim() : null;
-  const rangeFilter = buildRangeFilter(input.range);
+  const rawStatus = input.status;
+  const status = normalizeCashStatus(rawStatus);
+
+  const dateFrom = normalizeDate(input.date_from);
+  const dateTo = normalizeDate(input.date_to);
+  const rangeFilter = dateFrom && dateTo
+    ? { startDate: dateFrom, endDate: dateTo, range: "custom" }
+    : buildRangeFilter(input.range || "30d");
+
   const { locationId } = await resolveCashContext(
     input.user_id,
     input.permissions,
     requestedLocationId,
   );
 
-  if (status && !["open", "closed"].includes(status)) {
+  if (rawStatus != null && rawStatus !== "" && status === null && String(rawStatus).trim().toLowerCase() !== "all") {
     throw new AppError("Invalid status value", 400, { code: "INVALID_STATUS" });
   }
 
-  const closings = await findAllCashClosings({
+  const page = Math.max(Number(input.page) || 1, 1);
+  const pageSize = Math.min(Math.max(Number(input.pageSize) || 10, 1), 50);
+  const offset = (page - 1) * pageSize;
+
+  const { rows, totalItems } = await findAllCashClosings({
     locationId,
     status,
     startDate: rangeFilter.startDate,
     endDate: rangeFilter.endDate,
+    limit: pageSize,
+    offset,
   });
-  return closings.map(serializeCashClosing);
+
+  const totalPages = totalItems > 0 ? Math.ceil(totalItems / pageSize) : 0;
+
+  return {
+    items: rows.map(serializeCashClosing),
+    pagination: {
+      page,
+      page_size: pageSize,
+      total_items: totalItems,
+      total_pages: totalPages,
+    },
+  };
 }
 
 async function getCashClosing(input = {}) {
@@ -460,12 +529,18 @@ async function getCashClosing(input = {}) {
 
 async function getCashAdminSummary(input = {}) {
   const requestedLocationId = normalizeUuid(input.location_id);
-  const status = input.status ? String(input.status).trim() : null;
-  const rangeFilter = buildRangeFilter(input.range);
+  const rawStatus = input.status;
+  const status = normalizeCashStatus(rawStatus);
+
+  const dateFrom = normalizeDate(input.date_from);
+  const dateTo = normalizeDate(input.date_to);
+  const rangeFilter = dateFrom && dateTo
+    ? { startDate: dateFrom, endDate: dateTo, range: "custom" }
+    : buildRangeFilter(input.range);
 
   await resolveCashAdminContext(input.user_id, input.permissions);
 
-  if (status && !["open", "closed"].includes(status)) {
+  if (rawStatus != null && rawStatus !== "" && status === null && String(rawStatus).trim().toLowerCase() !== "all") {
     throw new AppError("Invalid status value", 400, { code: "INVALID_STATUS" });
   }
 
@@ -504,14 +579,21 @@ async function getCashAdminSummary(input = {}) {
 
 async function listCashAdminSessions(input = {}) {
   const requestedLocationId = normalizeUuid(input.location_id);
-  const status = input.status ? String(input.status).trim() : null;
-  const rangeFilter = buildRangeFilter(input.range);
+  const rawStatus = input.status;
+  const status = normalizeCashStatus(rawStatus);
+
+  const dateFrom = normalizeDate(input.date_from);
+  const dateTo = normalizeDate(input.date_to);
+  const rangeFilter = dateFrom && dateTo
+    ? { startDate: dateFrom, endDate: dateTo, range: "custom" }
+    : buildRangeFilter(input.range);
+
   const page = Number(input.page || 1);
   const pageSize = Number(input.page_size || input.pageSize || 20);
 
   await resolveCashAdminContext(input.user_id, input.permissions);
 
-  if (status && !["open", "closed"].includes(status)) {
+  if (rawStatus != null && rawStatus !== "" && status === null && String(rawStatus).trim().toLowerCase() !== "all") {
     throw new AppError("Invalid status value", 400, { code: "INVALID_STATUS" });
   }
 
@@ -554,6 +636,7 @@ async function listCashAdminSessions(input = {}) {
 
 module.exports = {
   openCash,
+  reopenCash,
   closeCash,
   getCurrentCash,
   listCashClosings,

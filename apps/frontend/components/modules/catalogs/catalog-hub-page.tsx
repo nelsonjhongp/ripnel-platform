@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/tooltip"
 import { OpsPageShell } from "@/components/ui/ops-page-shell"
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
-import { OpsMetricPill } from "@/components/ui/ops-metric-pill"
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group"
 import { useApiGet } from "@/hooks/use-api-get"
 import { fetchCatalogHubState } from "@/lib/api-catalogs"
 import {
@@ -91,7 +91,7 @@ export function CatalogHubPage() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <h2 className="truncate text-base font-semibold text-[var(--ops-text)]">{definition.shortLabel}</h2>
-                        <OpsMetricPill label="" value={count.total} tone="accent" />
+                        <OpsMetricInlineGroup items={[{ label: "", value: count.total, tone: "accent" }]} />
                       </div>
                       <p className="mt-1 text-sm text-[var(--ops-text-muted)]">{definition.shortDescription}</p>
                     </div>

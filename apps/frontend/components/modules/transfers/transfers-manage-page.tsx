@@ -17,14 +17,14 @@ import {
   AdminInlineMessage,
   AdminTextarea,
 } from "@/components/admin/admin-ui";
-import { OpsSelectMenu } from "@/components/ui/ops-selection";
+import { OpsSelect } from "@/components/ui/ops-selection";
 import {
   OpsPageShell,
   OpsSectionDivider,
   OpsTableBlock,
   OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
-import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import { useTransferDraft } from "./use-transfer-draft";
 
 type Location = {
@@ -166,15 +166,13 @@ export function TransfersManagePage() {
         title="Registrar transferencia"
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <OpsMetricPill label="Lineas" value={totals.lines} tone="accent" />
-        <OpsMetricPill label="Unidades" value={totals.units} />
-        <OpsMetricPill
-          label="Disponibles"
-          value={totals.availableVariants}
-          tone="warning"
-        />
-      </div>
+      <OpsMetricInlineGroup
+        items={[
+          { label: "Lineas", value: totals.lines, tone: "accent" },
+          { label: "Unidades", value: totals.units, tone: "default" },
+          { label: "Disponibles", value: totals.availableVariants, tone: "warning" },
+        ]}
+      />
 
       <OpsSectionDivider>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -189,7 +187,7 @@ export function TransfersManagePage() {
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                   Origen
                 </label>
-                <OpsSelectMenu
+                <OpsSelect
                   value={originId}
                   onValueChange={setOriginId}
                   placeholder="Selecciona una sede"
@@ -202,7 +200,7 @@ export function TransfersManagePage() {
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                   Destino
                 </label>
-                <OpsSelectMenu
+                <OpsSelect
                   value={destinationId}
                   onValueChange={setDestinationId}
                   placeholder="Selecciona una sede"

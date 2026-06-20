@@ -1,6 +1,7 @@
 export const appRoutes = {
   login: "/",
   forbidden: "/forbidden",
+  demo: "/demo",
   home: "/inicio",
   dashboard: "/panel",
   businessIntelligence: "/panel",

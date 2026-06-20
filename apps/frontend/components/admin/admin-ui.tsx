@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactNode } from "react"
-import { AlertTriangle, EllipsisVertical, X } from "lucide-react"
+import { AlertTriangle, CheckCircle2, EllipsisVertical, Info, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -8,27 +8,48 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { OpsDialogPanel } from "@/components/ui/ops-dialog"
 import { Input } from "@/components/ui/input"
+import { opsControlClassName } from "@/components/ui/ops-control-styles"
 import { cn } from "@/lib/utils"
 
-const adminControlClass =
-  "w-full rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] text-sm text-[var(--ops-text)] outline-none transition hover:border-[var(--ops-border-soft)] focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[var(--ripnel-accent-soft)] disabled:cursor-not-allowed disabled:opacity-60"
+const adminControlClass = `${opsControlClassName} focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[var(--ripnel-accent-soft)]`
 
 export function AdminInlineMessage({
   tone,
+  icon,
+  title,
   children,
 }: {
   tone: "danger" | "warning" | "success"
+  icon?: ReactNode
+  title?: string
   children: ReactNode
 }) {
   const toneClass =
     tone === "danger"
-      ? "border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] text-[var(--ops-tone-danger-text)]"
+      ? "text-[var(--ops-tone-danger-text)]"
       : tone === "warning"
-        ? "border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)] text-[var(--ops-tone-warning-text)]"
-        : "border-[var(--ops-tone-success-border)] bg-[var(--ops-tone-success-bg)] text-[var(--ops-tone-success-text)]"
+        ? "text-[var(--ops-tone-warning-text)]"
+        : "text-[var(--ops-tone-success-text)]"
+  const DefaultIcon =
+    tone === "success" ? CheckCircle2 : tone === "warning" ? Info : AlertTriangle
+  const resolvedIcon = icon === undefined ? <DefaultIcon className="h-4 w-4" /> : icon
 
-  return <div className={cn("rounded-xl border px-4 py-3 text-sm", toneClass)}>{children}</div>
+  return (
+    <div
+      role={tone === "danger" ? "alert" : "status"}
+      className="flex items-start gap-2.5 rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2.5 text-sm text-[var(--ops-text-muted)] shadow-sm"
+    >
+      {resolvedIcon ? (
+        <span className={cn("mt-0.5 shrink-0", toneClass)}>{resolvedIcon}</span>
+      ) : null}
+      <div className="min-w-0 leading-5">
+        {title ? <p className={cn("font-semibold", toneClass)}>{title}</p> : null}
+        <div className={title ? "mt-0.5" : undefined}>{children}</div>
+      </div>
+    </div>
+  )
 }
 
 export function AdminSection({
@@ -88,7 +109,7 @@ export function AdminField({
 }
 
 export function AdminInput(props: ComponentProps<typeof Input>) {
-  return <Input {...props} className={cn(adminControlClass, "h-10 px-3.5 py-2.5", props.className)} />
+  return <Input {...props} className={cn(adminControlClass, "h-9 px-3.5 py-2", props.className)} />
 }
 
 export function AdminTextarea(props: ComponentProps<"textarea">) {
@@ -96,15 +117,6 @@ export function AdminTextarea(props: ComponentProps<"textarea">) {
     <textarea
       {...props}
       className={cn(adminControlClass, "min-h-28 resize-y px-3.5 py-2.5", props.className)}
-    />
-  )
-}
-
-export function AdminSelect(props: ComponentProps<"select">) {
-  return (
-    <select
-      {...props}
-      className={cn(adminControlClass, "h-10 cursor-pointer px-3.5 py-2.5", props.className)}
     />
   )
 }
@@ -227,6 +239,7 @@ export function AdminActionButton({
   const variant =
     tone === "accent" ? "accent" : tone === "danger" ? "destructive" : "outline"
 
+  // Semantic admin wrapper over the shared Button primitive.
   return <Button {...props} variant={variant} size={props.size ?? "sm"} className={cn("rounded-lg px-3", className)} />
 }
 
@@ -240,6 +253,7 @@ export function AdminRowActionButton({
   icon?: ReactNode
   tone?: "neutral" | "accent" | "danger"
 }) {
+  // Semantic row-action wrapper kept for dense tables and action clusters.
   return (
     <AdminActionButton
       {...props}
@@ -305,6 +319,7 @@ export function AdminConfirmModal({
   confirmLabel,
   confirmTone = "danger",
   busy = false,
+  closeVariant = "default",
   onCancel,
   onConfirm,
 }: {
@@ -314,6 +329,7 @@ export function AdminConfirmModal({
   confirmLabel: string
   confirmTone?: "accent" | "danger" | "neutral"
   busy?: boolean
+  closeVariant?: "default" | "icon"
   onCancel: () => void
   onConfirm: () => void
 }) {
@@ -326,6 +342,7 @@ export function AdminConfirmModal({
       title={title}
       onClose={onCancel}
       widthClass="max-w-md"
+      closeVariant={closeVariant}
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <AdminActionButton type="button" onClick={onCancel} disabled={busy}>
@@ -347,6 +364,7 @@ export function AdminConfirmModal({
   )
 }
 
+/** @deprecated Prefer `OpsDialog` from `@/components/ui/ops-dialog` for new dialogs. Kept as a compatibility wrapper for legacy admin flows. */
 export function AdminModalShell({
   title,
   description,
@@ -354,6 +372,7 @@ export function AdminModalShell({
   children,
   footer,
   widthClass = "max-w-2xl",
+  closeVariant = "default",
 }: {
   title: string
   description?: string
@@ -361,27 +380,22 @@ export function AdminModalShell({
   children: ReactNode
   footer?: ReactNode
   widthClass?: string
+  closeVariant?: "default" | "icon"
 }) {
   return (
     <div className="ops-overlay-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className={cn("ops-overlay-panel w-full overflow-hidden rounded-2xl", widthClass)}>
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--ops-border-strong)] px-5 py-4 md:px-6">
-          <div>
-            <h3 className="text-lg font-semibold text-[var(--ops-text)] md:text-xl">{title}</h3>
-            {description ? (
-              <p className="mt-1 text-sm text-[var(--ops-text-muted)]">{description}</p>
-            ) : null}
-          </div>
-          <AdminActionButton type="button" tone="neutral" onClick={onClose}>
-            <X className="h-4 w-4" />
-            Cerrar
-          </AdminActionButton>
-        </div>
-
-        <div className="max-h-[80vh] overflow-y-auto px-5 py-5 md:px-6">{children}</div>
-
-        {footer ? <div className="border-t border-[var(--ops-border-strong)] px-5 py-4 md:px-6">{footer}</div> : null}
-      </div>
+      <OpsDialogPanel
+        title={title}
+        description={description}
+        onClose={onClose}
+        size={widthClass === "max-w-md" ? "sm" : "md"}
+        panelClassName={widthClass}
+        closeVariant={closeVariant === "icon" ? "icon" : "button"}
+        bodyClassName="max-h-[80vh] px-5 py-5 md:px-6"
+        footer={footer}
+      >
+        {children}
+      </OpsDialogPanel>
     </div>
   )
 }

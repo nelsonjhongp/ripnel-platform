@@ -27,9 +27,9 @@ import {
   type RolePermission,
 } from "@/components/admin/role-permission-picker";
 import { Button } from "@/components/ui/button";
-import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsSelect } from "@/components/ui/ops-selection";
 import { OpsEmptyState } from "@/components/ui/ops-empty-state";
-import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import {
   OpsFiltersRow,
   OpsPageShell,
@@ -273,12 +273,14 @@ export default function RolesPage() {
           }
         />
 
-        <div className="flex flex-wrap items-center gap-2">
-          <OpsMetricPill label="Total roles" value={roles.length} />
-          <OpsMetricPill label="Activos" value={activeRoles} tone="accent" />
-          <OpsMetricPill label="Inactivos" value={inactiveRoles} />
-          <OpsMetricPill label="Permisos" value={availablePermissions.length} />
-        </div>
+        <OpsMetricInlineGroup
+          items={[
+            { label: "Total roles", value: roles.length },
+            { label: "Activos", value: activeRoles, tone: "accent" },
+            { label: "Inactivos", value: inactiveRoles },
+            { label: "Permisos", value: availablePermissions.length },
+          ]}
+        />
 
         <OpsSectionDivider>
           <OpsTableBlock>
@@ -292,7 +294,7 @@ export default function RolesPage() {
                 placeholder="Buscar por nombre o descripción"
                 ariaLabel="Buscar roles"
               />
-            <FilterDropdown label="Orden" value={sortOrder} options={[{ value: "desc", label: "Más reciente" }, { value: "asc", label: "Más antiguo" }]} onChange={(v) => { setSortOrder(v as "desc" | "asc"); setPage(1); }} />
+            <OpsSelect label="Orden" value={sortOrder} options={[{ value: "desc", label: "Más reciente" }, { value: "asc", label: "Más antiguo" }]} onChange={(v) => { setSortOrder(v as "desc" | "asc"); setPage(1); }} />
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button onClick={clearFilters} disabled={!hasActiveFilters} variant="outline" size="icon-sm" className="mt-auto h-10 w-10 rounded-lg" aria-label="Limpiar filtros">

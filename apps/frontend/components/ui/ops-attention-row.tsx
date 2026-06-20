@@ -11,7 +11,7 @@ export interface OpsAttentionRowProps {
   description: string
   ctaLabel: string
   href: string
-  highlightValue: string
+  highlightValue?: string
   badge?: string | null
   tone?: "neutral" | "success" | "warning" | "danger" | "accent"
   embedded?: boolean
@@ -19,23 +19,23 @@ export interface OpsAttentionRowProps {
 
 const iconToneClasses: Record<NonNullable<OpsAttentionRowProps["tone"]>, string> = {
   neutral:
-    "bg-[color:color-mix(in_srgb,#4f46e5_8%,var(--ops-surface))] text-[#4f46e5]",
+    "bg-[var(--ops-tone-neutral-bg)] text-[var(--ops-tone-neutral-text)]",
   success:
-    "bg-[var(--ops-tone-success-bg)] text-emerald-600",
+    "bg-[var(--ops-tone-success-bg)] text-[var(--ops-tone-success-text)]",
   warning:
-    "bg-[var(--ops-tone-warning-bg)] text-amber-600",
+    "bg-[var(--ops-tone-warning-bg)] text-[var(--ops-tone-warning-text)]",
   danger:
-    "bg-[var(--ops-tone-danger-bg)] text-rose-600",
+    "bg-[var(--ops-tone-danger-bg)] text-[var(--ops-tone-danger-text)]",
   accent:
     "bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_84%,var(--ops-surface))] text-[var(--ripnel-accent-hover)]",
 }
 
 const borderToneClasses: Record<NonNullable<OpsAttentionRowProps["tone"]>, string> = {
-  neutral: "border-l-[var(--ops-border-soft)]",
-  success: "border-l-emerald-500/80",
-  warning: "border-l-amber-500/85",
-  danger: "border-l-rose-500/85",
-  accent: "border-l-[var(--ripnel-accent)]/80",
+  neutral: "border-l-[var(--ops-tone-neutral-border)]",
+  success: "border-l-[var(--ops-tone-success-border)]",
+  warning: "border-l-[var(--ops-tone-warning-border)]",
+  danger: "border-l-[var(--ops-tone-danger-border)]",
+  accent: "border-l-[color:color-mix(in_srgb,var(--ripnel-accent)_38%,var(--ops-border-strong))]",
 }
 
 const badgeToneMap: Record<
@@ -51,10 +51,10 @@ const badgeToneMap: Record<
 
 const highlightToneClasses: Record<NonNullable<OpsAttentionRowProps["tone"]>, string> = {
   neutral: "text-[var(--ops-text)]",
-  success: "text-emerald-600",
-  warning: "text-amber-600",
-  danger: "text-rose-600",
-  accent: "text-[var(--ripnel-accent)]",
+  success: "text-[var(--ops-tone-success-text)]",
+  warning: "text-[var(--ops-tone-warning-text)]",
+  danger: "text-[var(--ops-tone-danger-text)]",
+  accent: "text-[var(--ripnel-accent-hover)]",
 }
 
 export function OpsAttentionRow({
@@ -106,16 +106,20 @@ export function OpsAttentionRow({
             {ctaLabel}
           </Link>
         </div>
-        <div className="flex min-w-[72px] flex-col items-end justify-start gap-1">
-          <p className={cn("text-right text-[15px] font-semibold tracking-[-0.02em]", highlightToneClasses[tone])}>
-            {highlightValue}
-          </p>
-          {badge ? (
-            <OpsStatusBadge tone={badgeToneMap[tone]} size="xs">
-              {badge}
-            </OpsStatusBadge>
-          ) : null}
-        </div>
+        {highlightValue || badge ? (
+          <div className="flex min-w-[72px] flex-col items-end justify-start gap-1">
+            {highlightValue ? (
+              <p className={cn("text-right text-[15px] font-semibold tracking-[-0.02em]", highlightToneClasses[tone])}>
+                {highlightValue}
+              </p>
+            ) : null}
+            {badge ? (
+              <OpsStatusBadge tone={badgeToneMap[tone]} size="xs">
+                {badge}
+              </OpsStatusBadge>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </div>
   )

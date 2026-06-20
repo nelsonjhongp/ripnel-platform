@@ -6,12 +6,12 @@ import { cn } from "@/lib/utils"
 
 export interface OpsMetricCardProps {
   icon: React.ReactNode
-  label: string
+  label: React.ReactNode
   value: string | number
   detail?: string
   state?: string
   footer?: React.ReactNode
-  tone?: "default" | "accent" | "success" | "warning" | "danger" | "neutral"
+  tone?: "default" | "accent" | "info" | "success" | "warning" | "danger" | "neutral"
   href?: string
   className?: string
   valueClassName?: string
@@ -29,11 +29,11 @@ const toneClasses: Record<
     badgeText: "text-[var(--ripnel-accent-hover)]",
   },
   success: {
-    bg: "bg-[color:color-mix(in_srgb,#14b8a6_12%,var(--ops-surface))]",
-    text: "text-teal-700 dark:text-teal-400",
+    bg: "bg-[var(--ops-tone-success-bg)]",
+    text: "text-[var(--ops-tone-success-text)]",
     badge:
-      "border-[color:color-mix(in_srgb,#14b8a6_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#14b8a6_12%,var(--ops-surface))]",
-    badgeText: "text-teal-700 dark:text-teal-400",
+      "border-[var(--ops-tone-success-border)] bg-[var(--ops-tone-success-bg)]",
+    badgeText: "text-[var(--ops-tone-success-text)]",
   },
   warning: {
     bg: "bg-[var(--ops-tone-warning-bg)]",
@@ -49,12 +49,19 @@ const toneClasses: Record<
       "border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)]",
     badgeText: "text-rose-700 dark:text-rose-400",
   },
-  neutral: {
-    bg: "bg-[color:color-mix(in_srgb,#38bdf8_10%,var(--ops-surface))]",
-    text: "text-sky-700 dark:text-sky-400",
+  info: {
+    bg: "bg-[var(--ops-tone-info-bg)]",
+    text: "text-[var(--ops-tone-info-text)]",
     badge:
-      "border-[color:color-mix(in_srgb,#38bdf8_22%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#38bdf8_10%,var(--ops-surface))]",
-    badgeText: "text-sky-700 dark:text-sky-400",
+      "border-[var(--ops-tone-info-border)] bg-[var(--ops-tone-info-bg)]",
+    badgeText: "text-[var(--ops-tone-info-text)]",
+  },
+  neutral: {
+    bg: "bg-[var(--ops-tone-neutral-bg)]",
+    text: "text-[var(--ops-tone-neutral-text)]",
+    badge:
+      "border-[var(--ops-tone-neutral-border)] bg-[var(--ops-tone-neutral-bg)]",
+    badgeText: "text-[var(--ops-tone-neutral-text)]",
   },
   default: {
     bg: "bg-[var(--ops-surface-muted)]",
@@ -90,9 +97,9 @@ export function OpsMetricCard({
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
           {label}
-        </p>
+        </div>
         <p className={cn("mt-1 text-2xl font-bold leading-none text-[var(--ops-text)]", valueClassName)}>
           {value}
         </p>

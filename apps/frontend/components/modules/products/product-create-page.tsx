@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   OpsReadonlyFieldState,
-  OpsSelectMenu,
+  OpsSelect,
 } from "@/components/ui/ops-selection";
 import { FieldLabel } from "@/components/ui/ops-field-label";
 import { MultiSelectCatalog } from "@/components/ui/ops-multi-select-catalog";
@@ -727,7 +727,7 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
 
                 <div className="space-y-1.5">
                   <FieldLabel actionLabel="Crear nuevo" onAction={() => openCatalogPanel("garmentTypes")}>Tipo de prenda</FieldLabel>
-                  <OpsSelectMenu
+                  <OpsSelect
                     value={formState.garment_type_id}
                     onValueChange={(value) =>
                       setFormState((current) => ({
@@ -745,7 +745,7 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
 
                 <div className="space-y-1.5">
                   <FieldLabel actionLabel="Crear nuevo" onAction={() => openCatalogPanel("fabrics")}>Tela</FieldLabel>
-                  <OpsSelectMenu
+                  <OpsSelect
                     value={formState.fabric_id}
                     onValueChange={(value) =>
                       setFormState((current) => ({ ...current, fabric_id: value }))
@@ -760,7 +760,7 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
 
                 <div className="space-y-1.5">
                   <FieldLabel actionLabel="Crear nuevo" onAction={() => openCatalogPanel("fabricDetails")}>Detalle</FieldLabel>
-                  <OpsSelectMenu
+                  <OpsSelect
                     value={formState.fabric_detail_id}
                     onValueChange={(value) =>
                       setFormState((current) => ({
@@ -778,7 +778,7 @@ async function handleCatalogCreate(event: FormEvent<HTMLFormElement>) {
 
                 <div className="space-y-1.5">
                   <FieldLabel actionLabel="Crear nuevo" onAction={() => openCatalogPanel("targets")}>Target</FieldLabel>
-                  <OpsSelectMenu
+                  <OpsSelect
                     value={formState.target_id}
                     onValueChange={(value) =>
                       setFormState((current) => ({ ...current, target_id: value }))

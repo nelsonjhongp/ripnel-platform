@@ -24,9 +24,9 @@ import { ApiEnvelope, apiFetch, unwrapApiData } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/date-utils";
 import { Button } from "@/components/ui/button";
-import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsSelect } from "@/components/ui/ops-selection";
 import { OpsEmptyState } from "@/components/ui/ops-empty-state";
-import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import {
   OpsFiltersRow,
   OpsPageShell,
@@ -613,11 +613,11 @@ export function VariantsPage({
             }
           />
 
-          <div className="flex flex-wrap items-center gap-2">
-            <OpsMetricPill label="Styles base" value={styles.length} />
-            <OpsMetricPill label="Listos" value={readyStylesCount} tone="accent" />
-            <OpsMetricPill label="Por completar" value={pendingStylesCount} tone="warning" />
-          </div>
+          <OpsMetricInlineGroup items={[
+            { label: "Styles base", value: styles.length },
+            { label: "Listos", value: readyStylesCount, tone: "accent" },
+            { label: "Por completar", value: pendingStylesCount, tone: "warning" },
+          ]} />
 
           <div className="space-y-5">
             {!resolvedSelectedStyleId ? (
@@ -633,7 +633,7 @@ export function VariantsPage({
                     ariaLabel="Buscar styles para variantes"
                   />
 
-                  <FilterDropdown
+                  <OpsSelect
                     label="Estado"
                     value={styleStatusFilter}
                     options={STATUS_FILTER_OPTIONS}
@@ -854,23 +854,20 @@ export function VariantsPage({
                       <div>
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                           <div className="space-y-3">
-                            <div className="flex flex-wrap gap-2">
-                              <OpsMetricPill
-                                label="Retail"
-                                value={`${selectedProduct.retail_sizes_covered_count}/${selectedProduct.configured_size_count}`}
-                                tone="success"
-                              />
-                              <OpsMetricPill
-                                label="Mayorista"
-                                value={`${selectedProduct.wholesale_sizes_covered_count}/${selectedProduct.configured_size_count}`}
-                                tone="accent"
-                              />
-                              <OpsMetricPill label="Stock" value={selectedProduct.total_stock_qty} />
-                              <OpsMetricPill
-                                label="Siguiente paso"
-                                value={selectedProduct.next_step_label}
-                              />
-                            </div>
+                            <OpsMetricInlineGroup items={[
+                              {
+                                label: "Retail",
+                                value: `${selectedProduct.retail_sizes_covered_count}/${selectedProduct.configured_size_count}`,
+                                tone: "success",
+                              },
+                              {
+                                label: "Mayorista",
+                                value: `${selectedProduct.wholesale_sizes_covered_count}/${selectedProduct.configured_size_count}`,
+                                tone: "accent",
+                              },
+                              { label: "Stock", value: selectedProduct.total_stock_qty },
+                              { label: "Siguiente paso", value: selectedProduct.next_step_label },
+                            ]} />
 
                             <div className="flex flex-wrap gap-2">
                               {selectedProduct.missing_retail_size_count > 0 ? (
@@ -1061,7 +1058,7 @@ export function VariantsPage({
                       ariaLabel="Buscar variantes"
                     />
 
-                    <FilterDropdown
+                    <OpsSelect
                       label="Estado"
                       value={variantStatusFilter}
                       options={STATUS_FILTER_OPTIONS}

@@ -13,8 +13,8 @@ import { usePagination } from "@/hooks/use-pagination";
 import { appRoutes } from "@/lib/routes";
 import { Button } from "@/components/ui/button";
 import { DateFilterPicker } from "@/components/ui/date-filter-picker";
-import { FilterDropdown } from "@/components/ui/filter-dropdown";
-import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import { OpsSelect } from "@/components/ui/ops-selection";
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import { Pagination } from "@/components/ui/pagination";
 import {
   OpsFiltersRow,
@@ -200,11 +200,13 @@ export function TransfersHistoryPage() {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <OpsMetricPill label="Recibidas" value={receivedCount} tone="accent" />
-        <OpsMetricPill label="Canceladas" value={cancelledCount} />
-        <OpsMetricPill label="Consulta actual" value={items.length} tone="warning" />
-      </div>
+      <OpsMetricInlineGroup
+        items={[
+          { label: "Recibidas", value: receivedCount, tone: "accent" },
+          { label: "Canceladas", value: cancelledCount, tone: "default" },
+          { label: "Consulta actual", value: items.length, tone: "warning" },
+        ]}
+      />
 
       <OpsSectionDivider>
         <OpsTableBlock>
@@ -219,7 +221,7 @@ export function TransfersHistoryPage() {
               ariaLabel="Buscar transferencias cerradas"
             />
 
-            <FilterDropdown
+            <OpsSelect
               label="Estado"
               value={status}
               options={HISTORY_STATUS_OPTIONS}
@@ -230,7 +232,7 @@ export function TransfersHistoryPage() {
             />
 
             {transferCapabilities.manage ? (
-              <FilterDropdown
+              <OpsSelect
                 label="Alcance"
                 value={scope}
                 options={TRANSFER_SCOPE_OPTIONS}

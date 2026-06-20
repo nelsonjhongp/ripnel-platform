@@ -10,8 +10,8 @@ import {
   NotFoundPage,
 } from "@/components/feedback/status-page";
 import { Button } from "@/components/ui/button";
-import { FilterDropdown } from "@/components/ui/filter-dropdown";
-import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import { OpsSelect } from "@/components/ui/ops-selection";
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import {
   OpsPageShell,
   OpsSectionDivider,
@@ -184,11 +184,11 @@ export default function InventoryDetailPage() {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <OpsMetricPill label="Stock total" value={detail.summary.stock_total} tone="accent" />
-        <OpsMetricPill label="Tallas disponibles" value={detail.summary.sizes_available} />
-        <OpsMetricPill label="Colores disponibles" value={detail.summary.colors_available} />
-      </div>
+      <OpsMetricInlineGroup items={[
+        { label: "Stock total", value: detail.summary.stock_total, tone: "accent" },
+        { label: "Tallas disponibles", value: detail.summary.sizes_available },
+        { label: "Colores disponibles", value: detail.summary.colors_available },
+      ]} />
 
       <OpsSectionDivider className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -202,7 +202,7 @@ export default function InventoryDetailPage() {
           </Tabs>
 
           <div className="w-full sm:w-[260px]">
-            <FilterDropdown
+            <OpsSelect
               label="Sede"
               value={selectedLocationId}
               options={locationOptions}

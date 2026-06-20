@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from "react"
 import { LoaderCircle, RefreshCw, Save } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DateFilterPicker } from "@/components/ui/date-filter-picker"
-import { OpsMetricPill } from "@/components/ui/ops-metric-pill"
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group"
 import { OpsSectionDivider, OpsTableBlock, OpsTableWrap } from "@/components/ui/ops-page-shell"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -129,19 +129,13 @@ export function PricingRulesPage() {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <OpsMetricPill label="Reglas" value={rules.length} />
-        <OpsMetricPill
-          label="Minimo mayorista"
-          value={wholesaleRule?.min_qty ?? 0}
-          tone="accent"
-        />
-        <OpsMetricPill
-          label="Activa"
-          value={wholesaleRule?.active ? "Si" : "No"}
-          tone={wholesaleRule?.active ? "success" : "default"}
-        />
-      </div>
+      <OpsMetricInlineGroup
+        items={[
+          { label: "Reglas", value: rules.length },
+          { label: "Minimo mayorista", value: wholesaleRule?.min_qty ?? 0, tone: "accent" },
+          { label: "Activa", value: wholesaleRule?.active ? "Si" : "No", tone: wholesaleRule?.active ? "success" : "default" },
+        ]}
+      />
 
       <OpsSectionDivider>
         <div className="mx-auto max-w-4xl space-y-6">

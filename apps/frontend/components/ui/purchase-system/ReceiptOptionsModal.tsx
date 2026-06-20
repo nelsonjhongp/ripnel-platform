@@ -1,8 +1,9 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { Clock, Download, Eye, FileText, Printer, ReceiptText, Smartphone } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Clock, Eye, FileText, Printer, ReceiptText, Smartphone } from "lucide-react"
+import { OpsDialog } from "@/components/ui/ops-dialog"
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import { cn } from "@/lib/utils"
 
 type ReceiptFormat = "ticket-80mm" | "ticket-58mm" | "pdf-a4" | "pdf-ticket" | "preview"
@@ -59,30 +60,24 @@ export function ReceiptOptionsModal({
   saleId?: string
   onOpenPreview: () => void
 }) {
-  if (!open) return null
-
   return (
-    <div className="ops-overlay-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="ops-overlay-panel w-full max-w-md overflow-hidden rounded-2xl">
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--ops-border-strong)] px-5 py-4">
-          <div>
-            <h3 className="text-lg font-semibold text-[var(--ops-text)]">Descargar comprobante</h3>
-            <p className="mt-1 text-sm text-[var(--ops-text-muted)]">
-              Selecciona el formato de salida del documento.
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon-sm"
-            onClick={onClose}
-            className="rounded-lg shrink-0"
-          >
-            &times;
-          </Button>
-        </div>
-
-        <div className="max-h-[70vh] overflow-y-auto px-5 py-4 space-y-2">
+    <OpsDialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          onClose()
+        }
+      }}
+      title="Descargar comprobante"
+      description="Selecciona el formato de salida del documento."
+      size="sm"
+      bodyClassName="max-h-[70vh] space-y-4"
+      footer={
+        <p className="text-xs text-[var(--ops-text-muted)]">
+          Los formatos de ticket estarán disponibles próximamente. El PDF A4 ya se encuentra operativo.
+        </p>
+      }
+    >
           {RECEIPT_OPTIONS.map((option) => (
             <button
               key={option.id}
@@ -91,14 +86,14 @@ export function ReceiptOptionsModal({
               onClick={() => {
                 if (!option.available) return
                 if (option.id === "pdf-a4" && saleId) {
-                  window.open(`/api/sales/${saleId}/pdf`, "_blank")
+                  window.open(`/api/sales/${saleId}/receipt-pdf`, "_blank")
                 }
                 onClose()
               }}
               className={cn(
                 "flex w-full items-start gap-3 rounded-xl border px-4 py-3 text-left transition",
                 option.available
-                  ? "cursor-pointer border-[var(--ops-border-soft)] bg-[var(--ops-surface)] hover:bg-[var(--ops-surface-muted)] hover:border-[var(--ripsel-accent)]"
+                  ? "cursor-pointer border-[var(--ops-border-soft)] bg-[var(--ops-surface)] hover:bg-[var(--ops-surface-muted)] hover:border-[var(--ripnel-accent)]"
                   : "cursor-not-allowed border-[var(--ops-border-soft)] bg-[var(--ops-surface)] opacity-60"
               )}
             >
@@ -109,10 +104,10 @@ export function ReceiptOptionsModal({
                 <span className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-[var(--ops-text)]">{option.label}</span>
                   {!option.available ? (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ops-tone-warning-text)]">
+                    <OpsStatusBadge tone="warning" size="xs">
                       <Clock className="h-2.5 w-2.5" />
                       Próximamente
-                    </span>
+                    </OpsStatusBadge>
                   ) : null}
                 </span>
                 <span className="mt-0.5 block text-xs text-[var(--ops-text-muted)]">{option.description}</span>
@@ -140,14 +135,6 @@ export function ReceiptOptionsModal({
               </span>
             </button>
           </div>
-        </div>
-
-        <div className="border-t border-[var(--ops-border-strong)] px-5 py-3">
-          <p className="text-xs text-[var(--ops-text-muted)]">
-            Los formatos de ticket estarán disponibles próximamente. El PDF A4 ya se encuentra operativo.
-          </p>
-        </div>
-      </div>
-    </div>
+    </OpsDialog>
   )
 }

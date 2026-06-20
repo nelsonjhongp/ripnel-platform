@@ -25,10 +25,9 @@ import {
   AdminModalShell,
   AdminRowActionsMenu,
 } from "@/components/admin/admin-ui";
-import { OpsSelectMenu } from "@/components/ui/ops-selection";
+import { OpsSelect } from "@/components/ui/ops-selection";
 import { Button } from "@/components/ui/button";
-import { FilterDropdown } from "@/components/ui/filter-dropdown";
-import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import {
   OpsFiltersRow,
   OpsPageShell,
@@ -264,16 +263,6 @@ export default function LocationsPage() {
     setCurrentPage(1);
   }
 
-  function handleTypeFilterChange(value: LocationItem["type"] | "all") {
-    setTypeFilter(typeFilter === value ? "all" : value);
-    setCurrentPage(1);
-  }
-
-  function handleStatusFilterChange(value: "active" | "all") {
-    setStatusFilter(statusFilter === value ? "all" : value);
-    setCurrentPage(1);
-  }
-
   return (
     <TooltipProvider delayDuration={120}>
       <OpsPageShell width="wide">
@@ -309,35 +298,14 @@ export default function LocationsPage() {
             }
           />
 
-          <div className="flex flex-wrap items-center gap-2">
-            <OpsMetricPill
-              label="Total sedes"
-              value={locations.length}
-              active={statusFilter === "all" && typeFilter === "all"}
-              onClick={() => { setStatusFilter("all"); setTypeFilter("all"); setCurrentPage(1); }}
-            />
-            <OpsMetricPill
-              label="Tiendas"
-              value={storeCount}
-              tone="accent"
-              active={typeFilter === "store"}
-              onClick={() => { handleTypeFilterChange("store"); }}
-            />
-            <OpsMetricPill
-              label="Almacenes"
-              value={warehouseCount}
-              tone="accent"
-              active={typeFilter === "warehouse"}
-              onClick={() => { handleTypeFilterChange("warehouse"); }}
-            />
-            <OpsMetricPill
-              label="Activas"
-              value={activeCount}
-              tone="success"
-              active={statusFilter === "active"}
-              onClick={() => { handleStatusFilterChange("active"); }}
-            />
-          </div>
+          <OpsMetricInlineGroup
+            items={[
+              { label: "Total sedes", value: locations.length },
+              { label: "Tiendas", value: storeCount, tone: "accent" },
+              { label: "Almacenes", value: warehouseCount, tone: "accent" },
+              { label: "Activas", value: activeCount, tone: "success" },
+            ]}
+          />
 
           <OpsSectionDivider>
             <OpsTableBlock>
@@ -349,7 +317,7 @@ export default function LocationsPage() {
                 ariaLabel="Buscar ubicaciones"
               />
 
-              <FilterDropdown
+              <OpsSelect
                 label="Tipo"
                 value={typeFilter}
                 options={[
@@ -527,7 +495,7 @@ export default function LocationsPage() {
                 </AdminField>
 
                 <AdminField label="Tipo">
-                  <OpsSelectMenu
+                  <OpsSelect
                     value={formState.type}
                     onValueChange={(value) =>
                       setFormState((current) => ({

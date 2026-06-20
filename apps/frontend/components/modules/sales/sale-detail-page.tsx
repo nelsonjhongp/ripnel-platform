@@ -29,9 +29,10 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { ReceiptOptionsModal } from "@/components/ui/purchase-system/ReceiptOptionsModal"
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
+import { OpsMetricRow } from "@/components/ui/ops-metric-row"
+import { OpsPageShell } from "@/components/ui/ops-page-shell"
 import { ApiError, apiFetch } from "@/lib/api"
 import { appRoutes } from "@/lib/routes"
-import { cn } from "@/lib/utils"
 import { PAYMENT_METHOD_LABELS, SALE_STATUS_META, SALE_STATUS_TONES, type SaleStatus } from "@/types/sales"
 import { formatCurrency, round2 } from "@/lib/format-utils"
 import { formatDateTime } from "@/lib/date-utils"
@@ -100,25 +101,6 @@ function formatPaymentMethod(value: string) {
 function customerDocument(sale: SaleDetail) {
   if (!sale.customer_doc_type && !sale.customer_doc_number) return null
   return `${sale.customer_doc_type || ""} ${sale.customer_doc_number || ""}`.trim()
-}
-
-function SummaryRow({
-  label,
-  value,
-  muted = false,
-  strong = false,
-}: {
-  label: string
-  value: string
-  muted?: boolean
-  strong?: boolean
-}) {
-  return (
-    <div className={cn("flex items-center justify-between gap-3 text-sm", strong && "font-semibold text-[var(--ops-text)]", muted && "text-[var(--ops-text-muted)]", !strong && !muted && "text-[var(--ops-text)]")}>
-      <span className="text-[var(--ops-text-muted)]">{label}</span>
-      <span className="tabular-nums">{value}</span>
-    </div>
-  )
 }
 
 export default function SaleDetailPage({ params }: { params: Promise<{ saleId: string }> }) {
@@ -194,8 +176,7 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
 
   return (
     <PermissionGuard permission="sales.pos">
-      <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
-        <div className="mx-auto max-w-[1280px] space-y-5">
+      <OpsPageShell width="wide" className="max-w-[1280px] space-y-5">
 
           {/* ── Top bar ── */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -281,11 +262,11 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
                   <table className="w-full border-collapse text-sm">
                     <thead className="bg-[var(--ops-surface-muted)]">
                       <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                        <th className="px-4 py-3">Producto</th>
-                        <th className="px-4 py-3">Variante</th>
-                        <th className="px-4 py-3 text-right">Cant.</th>
-                        <th className="px-4 py-3 text-right">P. Unit.</th>
-                        <th className="px-4 py-3 text-right">Total</th>
+                        <th scope="col" className="px-4 py-3">Producto</th>
+                        <th scope="col" className="px-4 py-3">Variante</th>
+                        <th scope="col" className="px-4 py-3 text-right">Cant.</th>
+                        <th scope="col" className="px-4 py-3 text-right">P. Unit.</th>
+                        <th scope="col" className="px-4 py-3 text-right">Total</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
@@ -317,7 +298,7 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
                                   <p className="mt-0.5 text-[11px] text-[var(--ops-text-muted)]">Lista {formatCurrency(listPrice)}</p>
                                 ) : null}
                                 {lineDiscount > 0 ? (
-                                  <p className="text-[11px] text-[color:color-mix(in_srgb,#dc2626_76%,var(--ops-text))]">-{formatCurrency(lineDiscount)}</p>
+                                  <p className="text-[11px] text-[var(--ops-tone-danger-text)]">-{formatCurrency(lineDiscount)}</p>
                                 ) : null}
                               </td>
                               <td className="px-4 py-[var(--ops-row-py)] text-right font-semibold text-[var(--ops-text)]">{formatCurrency(Number(line.line_total))}</td>
@@ -338,15 +319,15 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
                   <ReceiptText className="h-4 w-4 text-[var(--ripnel-accent)]" />Totales
                 </h2>
                 <article className="sales-panel rounded-lg p-5 shadow-sm space-y-2">
-                  <SummaryRow label="Subtotal" value={formatCurrency(Number(sale.subtotal_amount))} muted />
-                  {discountAmount > 0 ? <SummaryRow label="Descuento" value={`-${formatCurrency(discountAmount)}`} muted /> : null}
-                  <SummaryRow label="IGV" value={formatCurrency(Number(sale.tax_amount))} muted />
+                  <OpsMetricRow label="Subtotal" value={formatCurrency(Number(sale.subtotal_amount))} />
+                  {discountAmount > 0 ? <OpsMetricRow label="Descuento" value={`-${formatCurrency(discountAmount)}`} tone="warning" /> : null}
+                  <OpsMetricRow label="IGV" value={formatCurrency(Number(sale.tax_amount))} />
                   <div className="border-t border-[var(--ops-border-strong)] pt-2">
-                    <SummaryRow label="Total" value={formatCurrency(Number(sale.total_amount))} strong />
+                    <OpsMetricRow label="Total" value={formatCurrency(Number(sale.total_amount))} />
                   </div>
                   <div className="border-t border-[var(--ops-border-soft)] pt-2">
-                    <SummaryRow label="Unidades" value={String(consistency.unitCount)} muted />
-                    <SummaryRow label="Líneas" value={String(sale.details.length)} muted />
+                    <OpsMetricRow label="Unidades" value={String(consistency.unitCount)} />
+                    <OpsMetricRow label="Líneas" value={String(sale.details.length)} />
                   </div>
                 </article>
               </section>
@@ -386,8 +367,7 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
             saleId={sale.sale_id}
             onOpenPreview={() => setReceiptModalOpen(false)}
           />
-        </div>
-      </section>
+      </OpsPageShell>
     </PermissionGuard>
   )
 }

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react"
+import type { InputHTMLAttributes, ReactNode } from "react"
 import { Search } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -103,6 +103,9 @@ export function OpsTableFooter({
 
 export function OpsSearchField({
   label = "Buscar",
+  name = "ops_search",
+  autoComplete = "off",
+  inputMode = "search",
   value,
   onChange,
   placeholder,
@@ -110,6 +113,9 @@ export function OpsSearchField({
   onFocus,
 }: {
   label?: string
+  name?: string
+  autoComplete?: string
+  inputMode?: InputHTMLAttributes<HTMLInputElement>["inputMode"]
   value: string
   onChange: (value: string) => void
   placeholder: string
@@ -121,10 +127,13 @@ export function OpsSearchField({
       <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
         {label}
       </label>
-      <div className="sales-field flex h-10 items-center gap-2 rounded-lg px-3 transition hover:bg-[var(--ops-surface-muted)]">
+      <div className="sales-field flex h-10 items-center gap-2 rounded-lg px-3 transition hover:bg-[var(--ops-surface-muted)] focus-within:border-[var(--ripnel-accent)] focus-within:ring-2 focus-within:ring-[var(--ripnel-accent-soft)]">
         <Search className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
         <input
           type="text"
+          name={name}
+          autoComplete={autoComplete}
+          inputMode={inputMode}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onFocus={onFocus}

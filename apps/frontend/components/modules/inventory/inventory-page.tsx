@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { RefreshCw, RotateCcw, Download } from "lucide-react";
 import { usePagination } from "@/hooks/use-pagination";
 import { Button } from "@/components/ui/button";
-import { FilterDropdown, type FilterDropdownOption } from "@/components/ui/filter-dropdown";
+import { OpsSelect, type OpsOption } from "@/components/ui/ops-selection";
 import { OpsDataTable } from "@/components/ui/ops-data-table";
 import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import {
@@ -44,7 +44,7 @@ import {
   type ProductStatusFilter,
 } from "./inventory-summary-shared";
 
-const PRODUCT_STATUS_OPTIONS: FilterDropdownOption[] = [
+const PRODUCT_STATUS_OPTIONS: OpsOption[] = [
   { value: "all", label: "Todos" },
   { value: "available", label: "Disponible" },
   { value: "incomplete", label: "Stock incompleto" },
@@ -52,7 +52,7 @@ const PRODUCT_STATUS_OPTIONS: FilterDropdownOption[] = [
   { value: "out", label: "Sin stock" },
 ];
 
-const LOCATION_STATUS_OPTIONS: FilterDropdownOption[] = [
+const LOCATION_STATUS_OPTIONS: OpsOption[] = [
   { value: "all", label: "Todos" },
   { value: "normal", label: "Normal" },
   { value: "attention", label: "Revisar" },
@@ -61,7 +61,7 @@ const LOCATION_STATUS_OPTIONS: FilterDropdownOption[] = [
 
 function buildLocationOptions(
   availableLocations: InventoryProductSummaryResponse["meta"]["available_locations"]
-): FilterDropdownOption[] {
+): OpsOption[] {
   return [
     { value: "all", label: "Todas las sedes" },
     ...availableLocations.map((location) => ({
@@ -231,7 +231,7 @@ export default function InventoryPage() {
   );
   const locationOptions = useMemo(() => buildLocationOptions(availableLocations), [availableLocations]);
   const showLocationsColumn = locationFilter === "all" && availableLocations.length > 1;
-  const garmentTypeOptions = useMemo<FilterDropdownOption[]>(() => {
+  const garmentTypeOptions = useMemo<OpsOption[]>(() => {
     const values = Array.from(
       new Set(productRows.map((row) => row.garment_type_name).filter(Boolean))
     ).sort((left, right) => String(left).localeCompare(String(right), "es"));
@@ -431,7 +431,7 @@ export default function InventoryPage() {
                   ariaLabel="Buscar producto"
                 />
 
-                <FilterDropdown
+                <OpsSelect
                   label="Sede"
                   value={locationFilter}
                   options={locationOptions}
@@ -441,7 +441,7 @@ export default function InventoryPage() {
                   }}
                 />
 
-                <FilterDropdown
+                <OpsSelect
                   label="Estado"
                   value={productStatus}
                   options={PRODUCT_STATUS_OPTIONS}
@@ -452,7 +452,7 @@ export default function InventoryPage() {
                 />
 
                 {garmentTypeOptions.length > 1 ? (
-                  <FilterDropdown
+                  <OpsSelect
                     label="Tipo de prenda"
                     value={garmentType}
                     options={garmentTypeOptions}
@@ -569,7 +569,7 @@ export default function InventoryPage() {
                   ariaLabel="Buscar sede"
                 />
 
-                <FilterDropdown
+                <OpsSelect
                   label="Estado"
                   value={locationStatus}
                   options={LOCATION_STATUS_OPTIONS}

@@ -31,6 +31,11 @@ const sizeClasses: Record<NonNullable<OpsStatusBadgeProps["size"]>, string> = {
   sm: "gap-1.5 px-2.5 py-1 text-[11px]",
 }
 
+const iconSizeClasses: Record<NonNullable<OpsStatusBadgeProps["size"]>, string> = {
+  xs: "[&_svg]:h-3 [&_svg]:w-3",
+  sm: "[&_svg]:h-3.5 [&_svg]:w-3.5",
+}
+
 export function OpsStatusBadge({
   children,
   tone = "neutral",
@@ -47,7 +52,7 @@ export function OpsStatusBadge({
         className
       )}
     >
-      {icon ? <span className="[&_svg]:h-3 [&_svg]:w-3">{icon}</span> : null}
+      {icon ? <span className={iconSizeClasses[size]}>{icon}</span> : null}
       <span>{children}</span>
     </span>
   )

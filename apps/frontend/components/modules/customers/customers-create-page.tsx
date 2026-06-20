@@ -12,11 +12,16 @@ import {
   EMPTY_FORM,
   validateCustomerInput,
 } from "./customer-form"
+import {
+  findDuplicateCustomerByDocument,
+  mapCustomerSaveError,
+} from "./customer-document-guard"
 
 export default function CustomersCreatePage() {
   const router = useRouter()
   const [state, setState] = useState<CustomerFormState>(EMPTY_FORM)
   const [submitting, setSubmitting] = useState(false)
+  const [submissionState, setSubmissionState] = useState<"idle" | "validating" | "saving">("idle")
   const [error, setError] = useState<string | null>(null)
 
   async function createCustomer() {
@@ -29,8 +34,20 @@ export default function CustomersCreatePage() {
     }
 
     setSubmitting(true)
+    setSubmissionState("validating")
 
     try {
+      const duplicateCustomer = await findDuplicateCustomerByDocument({
+        documentType: state.document_type,
+        documentNumber: state.document_number,
+      })
+
+      if (duplicateCustomer) {
+        setError("Ya existe un cliente con este documento.")
+        return
+      }
+
+      setSubmissionState("saving")
       await apiFetchData("/api/customers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -39,9 +56,10 @@ export default function CustomersCreatePage() {
 
       router.push("/clientes")
     } catch (submitError: unknown) {
-      setError(submitError instanceof Error ? submitError.message : "No se pudo crear el cliente")
+      setError(mapCustomerSaveError(submitError))
     } finally {
       setSubmitting(false)
+      setSubmissionState("idle")
     }
   }
 
@@ -55,6 +73,7 @@ export default function CustomersCreatePage() {
         onCancel={() => router.push("/clientes")}
         submitLabel="Crear cliente"
         submitting={submitting}
+        submissionState={submissionState}
         error={error}
       />
     </AdminFormPageShell>

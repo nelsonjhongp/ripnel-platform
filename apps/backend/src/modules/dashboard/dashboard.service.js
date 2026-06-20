@@ -1,4 +1,5 @@
 const { pool } = require("../../shared/db");
+const { round2 } = require("../../shared/numbers");
 const { findCashClosingByLocationAndDate } = require("../cash/cash.repo");
 const { resolveCashCapabilities } = require("../cash/cash-access");
 const {
@@ -38,10 +39,6 @@ const TODAY_SLOT_COLUMNS = Array.from({ length: 12 }, (_, index) => {
 });
 function todayPeruDate() {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/Lima" });
-}
-
-function round2(value) {
-  return Math.round(Number(value || 0) * 100) / 100;
 }
 
 function shiftIsoDate(dateString, deltaDays) {

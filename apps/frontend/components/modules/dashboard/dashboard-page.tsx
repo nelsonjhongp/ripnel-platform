@@ -5,6 +5,7 @@ import type { ReactNode } from "react"
 import { useEffect, useMemo, useState } from "react"
 import type { LucideIcon } from "lucide-react"
 import {
+  ArrowRight,
   CircleDollarSign,
   ClipboardList,
   CreditCard,
@@ -45,10 +46,10 @@ import { useApiGet } from "@/hooks/use-api-get"
 import { ErrorPage, ProtectedLoadingPage } from "@/components/feedback/status-page"
 import { useSidebarTopbarActions } from "@/components/sidebar"
 import { Button } from "@/components/ui/button"
-import { FilterDropdown } from "@/components/ui/filter-dropdown"
-import { OpsCardActionLink } from "@/components/ui/ops-card-action-link"
-import { OpsInlineBadge } from "@/components/ui/ops-inline-badge"
+import { OpsSelect } from "@/components/ui/ops-selection"
+import { OpsActionLink } from "@/components/ui/ops-action-link"
 import { OpsMetricRow } from "@/components/ui/ops-metric-row"
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { fetchCommercialActivity, fetchCustomerAnalytics, fetchDashboardOverview } from "@/lib/api-dashboard"
@@ -491,7 +492,7 @@ export default function DashboardPage() {
             Cobertura
           </span>
           <div className="min-w-[180px] max-w-[220px]">
-            <FilterDropdown
+            <OpsSelect
               label=""
               value={selectedLocation}
               options={locationOptions}
@@ -776,6 +777,34 @@ function DashboardInfoCard({
   )
 }
 
+function DashboardActionLink({ href, label }: { href: string; label: string }) {
+  return (
+    <OpsActionLink
+      href={href}
+      tone="accent"
+      size="sm"
+      className="gap-1.5 border-transparent bg-transparent px-0 hover:bg-transparent"
+    >
+      {label}
+      <ArrowRight className="h-3.5 w-3.5" />
+    </OpsActionLink>
+  )
+}
+
+function DashboardInlineBadge({
+  children,
+  tone,
+}: {
+  children: ReactNode
+  tone: "neutral" | "accent" | "success" | "warning" | "danger"
+}) {
+  return (
+    <OpsStatusBadge tone={tone} size="xs" className="uppercase tracking-[0.12em]">
+      {children}
+    </OpsStatusBadge>
+  )
+}
+
 
 function SalesPerformanceCard({ section }: { section: SalesToday | null }) {
   const saleCount = Number(section?.sale_count || 0)
@@ -854,7 +883,7 @@ function SalesPerformanceCard({ section }: { section: SalesToday | null }) {
             ))}
           </div>
 
-          <OpsCardActionLink href={appRoutes.transactionHistory} label="Ver ventas" />
+          <DashboardActionLink href={appRoutes.transactionHistory} label="Ver ventas" />
         </div>
       )}
     </DashboardInfoCard>
@@ -916,7 +945,7 @@ function InventoryCard({ section }: { section: InventorySection | null }) {
             <OpsEmptyState variant="compact" description="No hay variantes criticas en el alcance seleccionado." />
           )}
 
-          <OpsCardActionLink href={`${appRoutes.inventory}?status=con-alertas`} label="Ver stock" />
+          <DashboardActionLink href={`${appRoutes.inventory}?status=con-alertas`} label="Ver stock" />
         </div>
       )}
     </DashboardInfoCard>
@@ -954,16 +983,17 @@ function OperationsCard({
                     : "Resumen consolidado del alcance seleccionado."}
               </p>
             </div>
-            <OpsInlineBadge
-              label={
+            <DashboardInlineBadge
+              tone={!cash?.closing ? "neutral" : cash.closing.status === "open" ? "success" : "neutral"}
+            >
+              {
                 cash?.closing
                   ? formatCashStatus(cash.closing.status)
                   : isSingleLocationScope
                     ? "Sin datos"
                     : "Consolidado"
               }
-              tone={!cash?.closing ? "neutral" : cash.closing.status === "open" ? "success" : "neutral"}
-            />
+            </DashboardInlineBadge>
           </div>
           <div className="space-y-1.5">
             <OpsMetricRow label="Ventas" value={formatCurrencyPEN(cash?.sales_summary?.consistency?.sales_total)} />
@@ -975,7 +1005,7 @@ function OperationsCard({
             />
           </div>
           <div>
-            <OpsCardActionLink href={appRoutes.cash} label="Ver caja" />
+            <DashboardActionLink href={appRoutes.cash} label="Ver caja" />
           </div>
         </div>
 
@@ -987,10 +1017,11 @@ function OperationsCard({
                 Casos disponibles segun reglas activas.
               </p>
             </div>
-            <OpsInlineBadge
-              label={`${formatNumber(Number(postsales?.eligible_exchange_count || 0))} casos`}
+            <DashboardInlineBadge
               tone={Number(postsales?.eligible_exchange_count || 0) > 0 ? "warning" : "neutral"}
-            />
+            >
+              {`${formatNumber(Number(postsales?.eligible_exchange_count || 0))} casos`}
+            </DashboardInlineBadge>
           </div>
           <div className="space-y-1.5">
             <OpsMetricRow label="Elegibles" value={formatNumber(Number(postsales?.eligible_exchange_count || 0))} />
@@ -998,7 +1029,7 @@ function OperationsCard({
             <OpsMetricRow label="Bloqueadas" value={formatNumber(Number(postsales?.blocked_cancel_count || 0))} />
           </div>
           <div>
-            <OpsCardActionLink href={appRoutes.postsales} label="Revisar postventa" />
+            <DashboardActionLink href={appRoutes.postsales} label="Revisar postventa" />
           </div>
         </div>
 
@@ -1010,12 +1041,7 @@ function OperationsCard({
                 Flujo de aprobación, despacho y recepción entre sedes.
               </p>
             </div>
-            <OpsInlineBadge
-              label={`${formatNumber(
-                Number(transfers?.pending_receipts_count || 0) +
-                  Number(transfers?.pending_approval_count || 0) +
-                  Number(transfers?.pending_dispatch_count || 0)
-              )} pendientes`}
+            <DashboardInlineBadge
               tone={
                 Number(transfers?.pending_receipts_count || 0) +
                   Number(transfers?.pending_approval_count || 0) +
@@ -1024,7 +1050,13 @@ function OperationsCard({
                   ? "warning"
                   : "neutral"
               }
-            />
+            >
+              {`${formatNumber(
+                Number(transfers?.pending_receipts_count || 0) +
+                  Number(transfers?.pending_approval_count || 0) +
+                  Number(transfers?.pending_dispatch_count || 0)
+              )} pendientes`}
+            </DashboardInlineBadge>
           </div>
           <div className="space-y-1.5">
             <OpsMetricRow label="Por recibir" value={formatNumber(Number(transfers?.pending_receipts_count || 0))} />
@@ -1032,7 +1064,7 @@ function OperationsCard({
             <OpsMetricRow label="Por despachar" value={formatNumber(Number(transfers?.pending_dispatch_count || 0))} />
           </div>
           <div>
-            <OpsCardActionLink
+            <DashboardActionLink
               href={appRoutes.transfers}
               label="Ver transferencias"
             />

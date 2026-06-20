@@ -1,22 +1,39 @@
 import Link from "next/link";
-import { AlertTriangle, Ban, Home, LoaderCircle, RefreshCcw, SearchX } from "lucide-react";
+import { AlertTriangle, Ban, Home, Info, LoaderCircle, RefreshCcw, SearchX } from "lucide-react";
 import { appRoutes } from "@/lib/routes";
 
 type StatusTone = "neutral" | "warning" | "danger";
 type StatusVariant = "default" | "ops";
 
-const defaultToneClasses: Record<StatusTone, string> = {
-  neutral: "border-slate-200 bg-white text-slate-900",
-  warning: "border-amber-200 bg-amber-50 text-amber-900",
-  danger: "border-rose-200 bg-rose-50 text-rose-900",
+const panelClasses: Record<StatusVariant, string> = {
+  default: "border-slate-200 bg-white text-slate-900",
+  ops: "border-[var(--ops-border-strong)] bg-[var(--ops-surface)] text-[var(--ops-text)]",
 };
 
-const opsToneClasses: Record<StatusTone, string> = {
-  neutral: "border-[var(--ops-border-strong)] bg-[var(--ops-surface)] text-[var(--ops-text)]",
-  warning:
-    "border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)] text-[var(--ops-text)]",
-  danger:
-    "border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] text-[var(--ops-text)]",
+const iconToneClasses: Record<StatusVariant, Record<StatusTone, string>> = {
+  default: {
+    neutral: "text-slate-500",
+    warning: "text-amber-600",
+    danger: "text-rose-600",
+  },
+  ops: {
+    neutral: "text-[var(--ops-text-muted)]",
+    warning: "text-[var(--ops-tone-warning-text)]",
+    danger: "text-[var(--ops-tone-danger-text)]",
+  },
+};
+
+const titleToneClasses: Record<StatusVariant, Record<StatusTone, string>> = {
+  default: {
+    neutral: "text-slate-900",
+    warning: "text-slate-900",
+    danger: "text-slate-900",
+  },
+  ops: {
+    neutral: "text-[var(--ops-text)]",
+    warning: "text-[var(--ops-text)]",
+    danger: "text-[var(--ops-text)]",
+  },
 };
 
 export type StatusAction =
@@ -42,8 +59,9 @@ export function StatusPage({
   primaryAction?: StatusAction;
   secondaryAction?: StatusAction;
 }) {
-  const toneClasses = variant === "ops" ? opsToneClasses : defaultToneClasses;
   const isOps = variant === "ops";
+  const iconToneClass = iconToneClasses[variant][tone];
+  const titleToneClass = titleToneClasses[variant][tone];
 
   return (
     <section
@@ -55,16 +73,10 @@ export function StatusPage({
     >
       <div className={isOps ? "mx-auto w-full max-w-4xl" : "mx-auto w-full max-w-5xl"}>
         <div
-          className={`border ${isOps ? "rounded-2xl p-5 shadow-sm md:p-6" : "min-h-[60vh] rounded-[28px] p-6 shadow-lg md:p-10"} ${toneClasses[tone]}`}
+          className={`border ${isOps ? "rounded-2xl p-5 shadow-sm md:p-6" : "min-h-[60vh] rounded-[28px] p-6 shadow-lg md:p-10"} ${panelClasses[variant]}`}
         >
           <div className={`flex h-full items-start ${isOps ? "gap-3.5 md:gap-4" : "gap-4 md:gap-5"}`}>
-            <div
-              className={
-                isOps
-                  ? "rounded-xl bg-[var(--ops-surface-muted)] p-2.5 text-current"
-                  : "rounded-2xl bg-slate-900/5 p-3 text-current"
-              }
-            >
+            <div className={`shrink-0 pt-0.5 ${iconToneClass}`}>
               {icon}
             </div>
             <div className={`flex min-h-full flex-1 flex-col justify-center ${isOps ? "space-y-2.5" : "space-y-3"}`}>
@@ -78,7 +90,7 @@ export function StatusPage({
                 {eyebrow}
               </p>
               <div>
-                <h1 className={isOps ? "text-2xl font-semibold md:text-[1.75rem]" : "text-3xl font-bold md:text-5xl"}>
+                <h1 className={`${isOps ? "text-2xl font-semibold md:text-[1.75rem]" : "text-3xl font-bold md:text-5xl"} ${titleToneClass}`}>
                   {title}
                 </h1>
                 <p
@@ -269,26 +281,24 @@ export function InlineStatusCard({
   icon?: React.ReactNode;
   variant?: StatusVariant;
 }) {
-  const toneClass = variant === "ops" ? opsToneClasses[tone] : defaultToneClasses[tone];
+  const isOps = variant === "ops";
+  const iconToneClass = iconToneClasses[variant][tone];
+  const titleToneClass = titleToneClasses[variant][tone];
+  const fallbackIcon =
+    tone === "neutral" ? <Info className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />;
+  const resolvedIcon = icon === undefined ? fallbackIcon : icon;
+
   return (
-    <div className={`border p-5 shadow-sm ${variant === "ops" ? "rounded-2xl" : "rounded-3xl"} ${toneClass}`}>
+    <div className={`border p-4 shadow-sm ${isOps ? "rounded-xl" : "rounded-2xl"} ${panelClasses[variant]}`}>
       <div className="flex items-start gap-3">
-        {icon ? (
-          <div
-            className={
-              variant === "ops"
-                ? "rounded-xl bg-[var(--ops-surface-muted)] p-2 text-current"
-                : "rounded-2xl bg-slate-900/5 p-2.5 text-current"
-            }
-          >
-            {icon}
-          </div>
+        {resolvedIcon ? (
+          <div className={`mt-0.5 shrink-0 ${iconToneClass}`}>{resolvedIcon}</div>
         ) : null}
         <div>
-          <p className={variant === "ops" ? "text-sm font-semibold" : "text-base font-semibold"}>{title}</p>
+          <p className={`${isOps ? "text-sm font-semibold" : "text-base font-semibold"} ${titleToneClass}`}>{title}</p>
           <p
             className={
-              variant === "ops"
+              isOps
                 ? "mt-1 text-sm leading-6 text-[var(--ops-text-muted)]"
                 : "mt-1 text-sm leading-6 text-current/75"
             }

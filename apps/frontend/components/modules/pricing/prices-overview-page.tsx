@@ -6,7 +6,7 @@ import { CoverageBar } from "./coverage-bar"
 import { PencilLine, RefreshCw, RotateCcw, Settings2 } from "lucide-react"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Button } from "@/components/ui/button"
-import { FilterDropdown } from "@/components/ui/filter-dropdown"
+import { OpsSelect } from "@/components/ui/ops-selection"
 import {
   OpsFiltersRow,
   OpsSearchField,
@@ -14,7 +14,7 @@ import {
   OpsTableBlock,
 } from "@/components/ui/ops-page-shell"
 import { OpsDataTable } from "@/components/ui/ops-data-table"
-import { OpsMetricPill } from "@/components/ui/ops-metric-pill"
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group"
 import { Pagination } from "@/components/ui/pagination"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { fetchPriceCatalog } from "@/lib/api-prices"
@@ -71,7 +71,7 @@ export function PricesOverviewPage() {
     () => fetchPriceCatalog({ q: search.trim() || undefined, coverage, status }),
     [coverage, search, status]
   )
-  const items = catalog ?? []
+  const items = useMemo(() => catalog ?? [], [catalog])
 
   const { paginatedItems: visibleItems, totalPages, safePage, firstVisible, lastVisible, setPage } = usePagination(items)
 
@@ -137,13 +137,15 @@ export function PricesOverviewPage() {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <OpsMetricPill label="Estilos" value={metrics.totalStyles} />
-        <OpsMetricPill label="Con retail" value={metrics.retailComplete} tone="success" />
-        <OpsMetricPill label="Con mayorista" value={metrics.wholesaleComplete} tone="success" />
-        <OpsMetricPill label="Faltan precios" value={metrics.missingPrices} tone="warning" />
-        <OpsMetricPill label="Sin precios" value={metrics.withoutPrices} />
-      </div>
+      <OpsMetricInlineGroup
+        items={[
+          { label: "Estilos", value: metrics.totalStyles },
+          { label: "Con retail", value: metrics.retailComplete, tone: "success" },
+          { label: "Con mayorista", value: metrics.wholesaleComplete, tone: "success" },
+          { label: "Faltan precios", value: metrics.missingPrices, tone: "warning" },
+          { label: "Sin precios", value: metrics.withoutPrices },
+        ]}
+      />
 
       <OpsSectionDivider>
         <OpsTableBlock>
@@ -158,7 +160,7 @@ export function PricesOverviewPage() {
               ariaLabel="Buscar estilos de precios"
             />
 
-            <FilterDropdown
+            <OpsSelect
               label="Cobertura"
               value={coverage}
               options={COVERAGE_OPTIONS}
@@ -168,7 +170,7 @@ export function PricesOverviewPage() {
               }}
             />
 
-            <FilterDropdown
+            <OpsSelect
               label="Estado"
               value={status}
               options={STATUS_OPTIONS}
@@ -241,9 +243,12 @@ export function PricesOverviewPage() {
                   </td>
 
                   <td className="px-4 py-[var(--ops-row-py)]">
-                    <OpsStatusBadge tone={statusMeta.tone}>
-                      {statusMeta.label}
-                    </OpsStatusBadge>
+                    <p className="text-sm font-semibold text-[var(--ops-text)]">
+                      {item.configured_size_count} talla{item.configured_size_count === 1 ? "" : "s"}
+                    </p>
+                    <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                      R {item.retail_sizes_covered_count}/{item.configured_size_count} · M {item.wholesale_sizes_covered_count}/{item.configured_size_count}
+                    </p>
                   </td>
 
                   <td className="px-4 py-[var(--ops-row-py)]">

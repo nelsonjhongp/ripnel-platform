@@ -139,6 +139,43 @@ Base unit: 4px
 
 ## Components
 
+### Shared Catalog Taxonomy
+
+- **`components/ui`**: primitives and shared operational patterns. This is the canonical layer for new work.
+- **`components/admin`**: semantic wrappers over shared UI primitives for CRUD/admin flows; not a separate visual system.
+- **`components/feedback`**: loading, empty, forbidden, error, and generic inline system status.
+- **`components/ui/purchase-system`**: POS-specific compositions. Reuse them for POS flows, not as global defaults for unrelated modules.
+
+### Canonical Families
+
+- **Status**: `OpsStatusBadge` is canonical. `OpsInlineBadge` remains as a compact deprecated alias.
+- **Metrics**: prefer `OpsMetricInlineGroup` / `OpsMetricInline` para métricas planas, `OpsMetricCard` para KPIs con contexto y `OpsMetricRow` para desglose. `OpsMetricPill`, `OpsMetricStripItem` y `OpsSummaryBand` son legacy.
+- **Actions**: prefer shared `Button` / `AdminActionButton` for direct actions and `OpsActionLink` for lightweight CTAs. `OpsCardActionLink` is a compatibility wrapper for existing card footers.
+- **Attention**: prefer `OpsAttentionRow` inline and `OpsActionBanner` for higher-importance module alerts. `OpsPendingRow` is a compact deprecated wrapper.
+- **Selection**: prefer `OpsSelectMenu`, `OpsMultiSelectMenu`, and `SearchablePicker`. `FilterDropdown` and `AdminSelect` should visually converge to the same shared control base.
+- **Progress**: prefer `SalesWizardRail` for multistep operational flows. `Stepper` remains for compact form progress. `PosHeader` should not be treated as the canonical progress component.
+
+### Usage Matrix
+
+| Need | Use | Do not use in new code | Replacement | Notes |
+|------|-----|------------------------|-------------|-------|
+| Simple table/list filter | `FilterDropdown` | Manual selects or `AdminSelect` for filters | `FilterDropdown` | Valid semantic wrapper over the shared control base |
+| Operational form select | `OpsSelectMenu` | `FilterDropdown` outside filtering contexts | `OpsSelectMenu` | For forms and simple operational choices |
+| Typeahead/search picker | `SearchablePicker` | `CompactPicker*` directly in modules | `SearchablePicker` | `CompactPicker*` is an internal UI primitive |
+| POS selector without search | POS wrapper + `OpsSelectMenu` | `CompactPicker*` directly | Domain wrapper or `OpsSelectMenu` | Use for document type and similar POS-specific choices |
+| Visual status badge | `OpsStatusBadge` | `OpsInlineBadge` | `OpsStatusBadge` | Future business states should prefer domain badge wrappers |
+| Lightweight CTA | `OpsActionLink` | `OpsCardActionLink` | `OpsActionLink` | Keep legacy wrapper only for temporary compatibility |
+| Inline text metric | `OpsMetricInlineGroup` / `OpsMetricInline` | Hand-made inline rows | `OpsMetricInlineGroup` | Minimal icon + label: value, sin contenedor. Usar como métrica canónica |
+| Compact metric (legacy) | — | `OpsMetricPill` / `OpsMetricStripItem` | `OpsMetricInline` | Migrar a OpsMetricInline |
+| KPI with context | `OpsMetricCard` | `OpsSummaryBand` as a new pattern | `OpsMetricCard` | Compose several cards when multiple KPIs are needed |
+| Numeric breakdown | `OpsMetricRow` | Repeated hand-made rows | `OpsMetricRow` | Totals, subtotals, payment methods |
+| Inline system feedback | `InlineStatusCard` | Actionable banners for simple errors | `InlineStatusCard` | Errors, warnings, and info inside an existing screen |
+| Actionable module alert | `OpsActionBanner` | `InlineStatusCard` with improvised CTA | `OpsActionBanner` | Strong operational state for a module |
+| Pending/attention list item | `OpsAttentionRow` | `OpsPendingRow` | `OpsAttentionRow` | `OpsPendingRow` is legacy compatibility |
+| Full-page status | `StatusPage` wrappers | Hand-made 403/404/500 pages | `LoadingPage`, `ForbiddenPage`, `ErrorPage`, etc. | Do not create `OpsStatusPage` unless the existing base stops fitting |
+| Sales wizard | `SalesWizardRail` | Progress UI inside `PosHeader` | `SalesWizardRail` | Keep sales-specific until there is real usage outside POS |
+| CRUD form shell | `AdminFormPageShell` | Hand-made CRUD page layouts | `AdminFormPageShell` | Valid wrapper built from `OpsPageShell` + `PosHeader` |
+
 ### Buttons
 
 #### `button-primary`

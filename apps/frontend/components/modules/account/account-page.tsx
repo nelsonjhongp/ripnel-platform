@@ -5,7 +5,7 @@ import Link from "next/link"
 import { CheckCircle2, KeyRound, ChevronRight } from "lucide-react"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { useVisualPreferences } from "@/components/appearance/VisualPreferencesProvider"
-import { FilterDropdown } from "@/components/ui/filter-dropdown"
+import { OpsSelect } from "@/components/ui/ops-selection"
 import { appRoutes } from "@/lib/routes"
 import {
   AccountPageFrame,
@@ -68,7 +68,7 @@ export default function AccountPage() {
         {locationOptions.length > 0 && (
           <div className="grid gap-3 border-t border-[var(--ops-border-strong)] px-4 py-[var(--ops-row-py)] md:grid-cols-[200px_minmax(0,1fr)] md:items-center">
             <span className="text-sm font-medium text-[var(--ops-text)]">Sede operativa</span>
-            <FilterDropdown
+            <OpsSelect
               label=""
               value={currentLocationId}
               options={[{ value: "", label: "Sin sede default" }, ...locationOptions]}
@@ -78,7 +78,7 @@ export default function AccountPage() {
         )}
         <div className="grid gap-3 border-t border-[var(--ops-border-strong)] px-4 py-[var(--ops-row-py)] md:grid-cols-[200px_minmax(0,1fr)] md:items-center">
           <span className="text-sm font-medium text-[var(--ops-text)]">Apariencia</span>
-          <FilterDropdown
+          <OpsSelect
             label=""
             value={currentThemeChoice}
             options={themeOptions}

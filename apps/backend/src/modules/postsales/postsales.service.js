@@ -1,5 +1,7 @@
 const { pool } = require('../../shared/db');
 const { AppError } = require('../../shared/errors');
+const { round2 } = require('../../shared/numbers');
+const { normalizeUuid } = require('../../shared/uuid');
 const { findActiveUserById } = require('../auth/auth.repo');
 const { findDefaultLocationByUserId } = require('../users/users.repo');
 const {
@@ -27,17 +29,6 @@ const {
 
 const ALLOWED_SALE_STATUSES = ['confirmed', 'draft', 'cancelled'];
 
-function normalizeUuid(value) {
-  const normalized = String(value || '').trim();
-  if (!normalized) return null;
-
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    normalized
-  )
-    ? normalized
-    : null;
-}
-
 function normalizeText(value) {
   if (value === undefined || value === null) return null;
   const normalized = String(value).trim();
@@ -57,10 +48,6 @@ function normalizePositiveInteger(value, fallback = null) {
   }
 
   return parsed;
-}
-
-function round2(value) {
-  return Math.round(Number(value || 0) * 100) / 100;
 }
 
 function isCloseEnough(left, right) {

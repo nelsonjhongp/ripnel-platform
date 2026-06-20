@@ -12,12 +12,14 @@ export function resolveCashCapabilities({
   const view = hasPermission(permissions, "cash.view");
   const operate = hasPermission(permissions, "cash.operate");
   const admin = hasPermission(permissions, "cash.admin.view");
+  const reopen = hasPermission(permissions, "cash.admin.reopen");
 
   return {
     view,
     operate,
     admin,
-    visible: view || operate || admin,
+    reopen,
+    visible: view || operate || admin || reopen,
   };
 }
 

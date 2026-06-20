@@ -1,5 +1,6 @@
 const { AppError } = require('../../shared/errors');
 const { pool } = require('../../shared/db');
+const { normalizeUuid } = require('../../shared/uuid');
 const { findActiveUserById } = require('../auth/auth.repo');
 const { findUserByEmail } = require('../users/users.repo');
 const { findDefaultLocationByUserId, findUserLocationsByUserId } = require('../users/users.repo');
@@ -29,19 +30,6 @@ const {
 const ALLOWED_MOVEMENT_TYPES = ['IN', 'OUT', 'ADJUST'];
 const DEVELOPMENT_ACTOR_EMAIL = 'nelson@ripnel.com';
 const LOW_STOCK_THRESHOLD = 3;
-
-function normalizeUuid(value) {
-  const normalized = String(value || '').trim();
-  if (!normalized) {
-    return null;
-  }
-
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    normalized
-  )
-    ? normalized
-    : null;
-}
 
 function normalizeText(value) {
   if (value === undefined || value === null) {

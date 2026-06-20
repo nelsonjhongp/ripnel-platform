@@ -14,7 +14,7 @@ import {
 import { AdminConfirmModal, AdminInlineMessage, AdminModalShell, AdminRowActionsMenu } from "@/components/admin/admin-ui";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { Button } from "@/components/ui/button";
-import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsSelect } from "@/components/ui/ops-selection";
 import {
   OpsFiltersRow,
   OpsPageShell,
@@ -279,7 +279,7 @@ export function CatalogCrudPage({
                 ariaLabel="Buscar registros"
               />
 
-              <FilterDropdown
+              <OpsSelect
                 label="Estado"
                 value={statusFilter}
                 options={[

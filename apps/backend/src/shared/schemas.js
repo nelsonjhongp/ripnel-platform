@@ -96,6 +96,33 @@ const createSale = z.object({
   sale_discount: saleDiscount.optional().nullable(),
 });
 
+// Postsales schemas
+const createExchange = z.object({
+  sale_detail_id: z.string().uuid(),
+  replacement_variant_id: z.string().uuid(),
+  reason: z.string().min(1, 'El motivo es requerido'),
+  notes: z.string().optional(),
+});
+
+const cancelSale = z.object({
+  reason: z.string().min(1, 'El motivo es requerido'),
+  notes: z.string().optional(),
+});
+
+// Cash schemas
+const openCash = z.object({
+  location_id: z.string().uuid().optional(),
+  notes: z.string().optional(),
+});
+
+const closeCash = z.object({
+  notes: z.string().optional(),
+});
+
+const reopenCash = z.object({
+  reopen_notes: z.string().min(1, 'El motivo de reapertura es requerido'),
+});
+
 module.exports = {
   login,
   changePassword,
@@ -104,4 +131,9 @@ module.exports = {
   createCustomer,
   patchCustomer,
   createSale,
+  createExchange,
+  cancelSale,
+  openCash,
+  closeCash,
+  reopenCash,
 };

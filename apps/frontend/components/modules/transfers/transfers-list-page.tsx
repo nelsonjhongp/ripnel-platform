@@ -28,7 +28,7 @@ import { formatDateTimeParts } from "@/lib/date-utils";
 import { showSuccess, showError } from "@/lib/toast";
 import { exportToCsv } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
-import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsSelect } from "@/components/ui/ops-selection";
 import { Pagination } from "@/components/ui/pagination";
 import {
   OpsFiltersRow,
@@ -465,7 +465,7 @@ export function TransfersListPage({
               ariaLabel="Buscar transferencias"
             />
 
-            <FilterDropdown
+            <OpsSelect
               label="Vista"
               value={selectedQueue}
               options={TRANSFER_QUEUE_OPTIONS}
@@ -477,7 +477,7 @@ export function TransfersListPage({
             />
 
             {transferCapabilities.manage ? (
-              <FilterDropdown
+              <OpsSelect
                 label="Alcance"
                 value={scope}
                 options={TRANSFER_SCOPE_OPTIONS}
@@ -486,7 +486,6 @@ export function TransfersListPage({
                   setScope(value as TransferScope);
                   setCurrentPage(1);
                 }}
-                showSelectedHelper={false}
               />
             ) : (
               <div className="flex items-end">

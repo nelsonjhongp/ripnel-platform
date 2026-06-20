@@ -1,18 +1,20 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import {
-  AlertTriangle, ArrowRight, Ban, Box, Building2, Check, CheckCircle2,
-  ChevronDown, Clock, Eye, FileText, Info, LoaderCircle, MapPin,
-  Package, PackageSearch, PencilLine, Plus, Power, RefreshCw, RotateCw,
-  Search, Settings, Smartphone, Store, Ticket, User, Warehouse, XCircle
+  AlertTriangle, ArrowRight, Ban, BarChart3, Box, Building2, Check, CheckCircle2,
+  ChevronDown, Clock, Eye, FileText, Info, MapPin,
+  Package, PackageSearch, PencilLine, Plus, Power, RefreshCw,
+  Search, Settings, Smartphone, Ticket, User, XCircle
 } from "lucide-react"
 import { OpsPageShell, OpsSectionDivider, OpsTableBlock, OpsFiltersRow, OpsSearchField } from "@/components/ui/ops-page-shell"
 import { OpsDataTable, type OpsDataTableColumn } from "@/components/ui/ops-data-table"
 import { OpsEmptyState } from "@/components/ui/ops-empty-state"
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import { OpsMetricPill } from "@/components/ui/ops-metric-pill"
+import { OpsMetricInline, type OpsMetricInlineTone } from "@/components/ui/ops-metric-inline"
+import { OpsMetricInlineGroup, type OpsMetricInlineGroupItem } from "@/components/ui/ops-metric-inline-group"
 import { OpsMetricCard } from "@/components/ui/ops-metric-card"
 import { OpsMetricStripItem } from "@/components/ui/ops-metric-strip-item"
 import { OpsMetricRow } from "@/components/ui/ops-metric-row"
@@ -21,7 +23,6 @@ import { OpsCardActionLink } from "@/components/ui/ops-card-action-link"
 import { OpsSectionHeader } from "@/components/ui/ops-section-header"
 import { OpsQuantityStepper } from "@/components/ui/ops-quantity-stepper"
 import { OpsLocationIcon } from "@/components/ui/ops-location-icon"
-import { FilterDropdown, type FilterDropdownOption } from "@/components/ui/filter-dropdown"
 import { DateFilterPicker } from "@/components/ui/date-filter-picker"
 import { Pagination } from "@/components/ui/pagination"
 import { CompactPickerPopover, CompactPickerList, CompactPickerOption, CompactPickerEmpty } from "@/components/ui/compact-picker"
@@ -33,16 +34,19 @@ import { AdminFormPageShell } from "@/components/admin/admin-form-page-shell"
 import { InlineStatusCard, LoadingPage, NotFoundPage, ForbiddenPage, ErrorPage } from "@/components/feedback/status-page"
 import { OpsAttentionRow } from "@/components/ui/ops-attention-row"
 import { OpsPendingRow } from "@/components/ui/ops-pending-row"
+import { OpsActionBanner } from "@/components/ui/ops-action-banner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { appRoutes } from "@/lib/routes"
 import { OpsSummaryBand, type OpsSummaryBandItem } from "@/components/ui/ops-summary-band"
 import { OpsActionLink } from "@/components/ui/ops-action-link"
 import { OpsActionTile } from "@/components/ui/ops-action-tile"
 import { OpsInfoCard } from "@/components/ui/ops-info-card"
-import { OpsSelectMenu, OpsMultiSelectMenu, OpsSelectionChip, OpsReadonlyFieldState, type OpsOption } from "@/components/ui/ops-selection"
+import { OpsPanel, OpsPanelMuted } from "@/components/ui/ops-panel"
+import { OpsSelect, OpsMultiSelectMenu, OpsSelectionChip, OpsReadonlyFieldState, type OpsOption } from "@/components/ui/ops-selection"
 import { FieldLabel } from "@/components/ui/ops-field-label"
 import { MultiSelectCatalog } from "@/components/ui/ops-multi-select-catalog"
 import { SearchablePicker } from "@/components/ui/searchable-picker"
+import { OpsSegmentedControl } from "@/components/ui/ops-segmented-control"
 import { Stepper } from "@/components/ui/stepper"
 import { InputGroup, InputGroupInput, InputGroupAddon, InputGroupButton } from "@/components/ui/input-group"
 import { AdminSection, AdminCheckboxOption, AdminCheckboxRow } from "@/components/admin/admin-ui"
@@ -67,7 +71,7 @@ const tableColumns: OpsDataTableColumn[] = [
   { key: "precio", header: "Precio" },
 ]
 
-const filterStatusOptions: FilterDropdownOption[] = [
+const filterStatusOptions: OpsOption[] = [
   { value: "all", label: "Todos" },
   { value: "active", label: "Activo", badge: "OK", tone: "success" },
   { value: "inactive", label: "Inactivo", badge: "OFF", tone: "neutral" },
@@ -114,6 +118,41 @@ const attentionItems = [
   { key: "price", label: "Precios vencidos", value: "12 productos", highlightValue: "12", badge: "Pendiente", cta: "Actualizar", href: "/precios", icon: Clock, tone: "warning" as const, numericValue: 12 },
 ]
 
+const metricInlineItems: OpsMetricInlineGroupItem[] = [
+  {
+    label: "Ventas visibles",
+    value: "128",
+    tone: "default",
+    icon: <Ticket className="h-3.5 w-3.5" />,
+  },
+  {
+    label: "Ingreso visible",
+    value: "S/. 12,840",
+    tone: "accent",
+    icon: <BarChart3 className="h-3.5 w-3.5" />,
+  },
+  {
+    label: "Borradores",
+    value: "6",
+    tone: "warning",
+    icon: <Clock className="h-3.5 w-3.5" />,
+  },
+  {
+    label: "Confirmadas",
+    value: "122",
+    tone: "success",
+    icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+  },
+]
+
+function DemoNote({ children }: { children: ReactNode }) {
+  return (
+    <p className="max-w-3xl text-[12px] leading-5 text-[var(--ops-text-muted)]">
+      {children}
+    </p>
+  )
+}
+
 export default function DemoPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
@@ -135,10 +174,46 @@ export default function DemoPage() {
   const [passValue, setPassValue] = useState("")
   const [showPass, setShowPass] = useState(false)
   const [receiptDemoOpen, setReceiptDemoOpen] = useState(false)
+  const [segmentedValue, setSegmentedValue] = useState<string>("7d")
+  const [segmentedAccentValue, setSegmentedAccentValue] = useState<string>("all")
+  const [switchSegmentedValue, setSwitchSegmentedValue] = useState<"single" | "mixed">("single")
+  const [statusPagePreview, setStatusPagePreview] = useState<
+    "loading" | "not-found" | "forbidden" | "error"
+  >("loading")
 
   const filteredPickerItems = pickerItems.filter((item) =>
     item.toLowerCase().includes(pickerQuery.toLowerCase())
   )
+
+  const statusPagePresets = [
+    {
+      key: "loading" as const,
+      label: "LoadingPage",
+      helper: "Carga operativa",
+      preview: <LoadingPage variant="ops" />,
+    },
+    {
+      key: "not-found" as const,
+      label: "NotFoundPage",
+      helper: "Ruta o modulo ausente",
+      preview: <NotFoundPage variant="ops" />,
+    },
+    {
+      key: "forbidden" as const,
+      label: "ForbiddenPage",
+      helper: "Permisos insuficientes",
+      preview: <ForbiddenPage variant="ops" />,
+    },
+    {
+      key: "error" as const,
+      label: "ErrorPage",
+      helper: "Fallo inesperado",
+      preview: <ErrorPage variant="ops" />,
+    },
+  ]
+
+  const activeStatusPage =
+    statusPagePresets.find((item) => item.key === statusPagePreview) ?? statusPagePresets[0]
 
   return (
     <TooltipProvider delayDuration={120}>
@@ -157,10 +232,35 @@ export default function DemoPage() {
           }
         />
 
+        <OpsSectionDivider>
+          <OpsSectionHeader icon={<Info className="h-4 w-4" />} title="0. Taxonomía" />
+          <OpsPanel className="p-4">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <DemoNote>
+                <strong className="text-[var(--ops-text)]">UI compartida</strong>: primitives y patrones canónicos para módulos nuevos.
+              </DemoNote>
+              <DemoNote>
+                <strong className="text-[var(--ops-text)]">Wrappers semánticos</strong>: `admin-*` y composiciones de dominio sobre la base compartida.
+              </DemoNote>
+              <DemoNote>
+                <strong className="text-[var(--ops-text)]">Feedback</strong>: carga, vacío, error y estados de sistema fuera de alertas operativas.
+              </DemoNote>
+              <DemoNote>
+                <strong className="text-[var(--ops-text)]">Legacy / derivados</strong>: aliases y variantes heredadas que siguen activas por compatibilidad.
+              </DemoNote>
+            </div>
+          </OpsPanel>
+        </OpsSectionDivider>
+
         {/* ──────────── 1. LAYOUT ──────────── */}
         <OpsSectionDivider>
           <OpsSectionHeader icon={<Building2 className="h-4 w-4" />} title="1. Layout" />
           <div className="mt-3 space-y-3">
+            <DemoNote>
+              Canonico para nuevas paginas: <strong className="text-[var(--ops-text)]">OpsPageShell</strong> +{" "}
+              <strong className="text-[var(--ops-text)]">PosHeader</strong>. El formulario admin queda como shell
+              derivado para flujos CRUD.
+            </DemoNote>
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">OpsPageShell</span>
               <span className="text-[11px] text-[var(--ops-text-muted)]">(envolviendo esta pagina, width=&quot;wide&quot;)</span>
@@ -197,7 +297,7 @@ export default function DemoPage() {
                 placeholder="Buscar producto..."
                 ariaLabel="Buscar producto"
               />
-              <FilterDropdown label="Estado" value={filterStatus} options={filterStatusOptions} onChange={setFilterStatus} />
+              <OpsSelect label="Estado" value={filterStatus} options={filterStatusOptions} onChange={setFilterStatus} />
               <DateFilterPicker label="Fecha" value={dateFilter} onChange={setDateFilter} ariaLabel="Filtrar por fecha" />
               <div className="flex items-end gap-1.5">
                 <AdminActionButton onClick={() => setTableVariant("data")} className="text-[10px]">Data</AdminActionButton>
@@ -222,7 +322,9 @@ export default function DemoPage() {
                   <td className="px-4 py-2.5">{row.color}</td>
                   <td className="px-4 py-2.5">{row.talla}</td>
                   <td className="px-4 py-2.5">
-                    <OpsInlineBadge label={String(row.stock)} tone={row.stock > 10 ? "success" : row.stock > 0 ? "warning" : "danger"} />
+                    <OpsStatusBadge tone={row.stock > 10 ? "success" : row.stock > 0 ? "warning" : "danger"} size="xs">
+                      {row.stock}
+                    </OpsStatusBadge>
                   </td>
                   <td className="px-4 py-2.5 font-semibold">{row.precio}</td>
                 </tr>
@@ -235,8 +337,13 @@ export default function DemoPage() {
         <OpsSectionDivider>
           <OpsSectionHeader icon={<CheckCircle2 className="h-4 w-4" />} title="3. Status Badges" />
           <div className="space-y-3">
+            <DemoNote>
+              Base canonica: <strong className="text-[var(--ops-text)]">OpsStatusBadge</strong>.{" "}
+              <strong className="text-[var(--ops-text)]">OpsInlineBadge</strong> queda como alias compacto para tablas
+              densas y casos heredados.
+            </DemoNote>
             <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">OpsStatusBadge (5 tones × 2 sizes)</p>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Canonico · OpsStatusBadge (5 tones × 2 sizes)</p>
               <div className="flex flex-wrap items-center gap-2">
                 {(["neutral", "accent", "success", "warning", "danger"] as const).flatMap((tone) =>
                   (["sm", "xs"] as const).map((size) => (
@@ -251,13 +358,13 @@ export default function DemoPage() {
               </div>
             </div>
             <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">OpsInlineBadge</p>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Derivado / alias · OpsInlineBadge</p>
               <div className="flex flex-wrap items-center gap-2">
                 <OpsInlineBadge label="OK" tone="success" />
                 <OpsInlineBadge label="Pend" tone="warning" />
                 <OpsInlineBadge label="Err" tone="danger" />
                 <OpsInlineBadge label="N/A" tone="neutral" />
-                <OpsInlineBadge label="VIP" tone="purple" />
+                <OpsInlineBadge label="VIP" tone="accent" />
               </div>
             </div>
             <div>
@@ -275,26 +382,43 @@ export default function DemoPage() {
         <OpsSectionDivider>
           <OpsSectionHeader icon={<Box className="h-4 w-4" />} title="4. Metrics" />
           <div className="space-y-3">
+            <DemoNote>
+              Orden recomendado: <strong className="text-[var(--ops-text)]">OpsMetricInlineGroup</strong> (texto plano, sin contenedor) como métrica canónica,
+              <strong className="text-[var(--ops-text)]"> OpsMetricCard</strong> para KPIs con más contexto y{" "}
+              <strong className="text-[var(--ops-text)]">OpsMetricRow</strong> para desglose. OpsMetricPill, Strip y summary band quedan
+              como variantes legacy.
+            </DemoNote>
             <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">OpsMetricPill (4 tones × active/inactive)</p>
-              <div className="flex flex-wrap items-center gap-2">
-                {(["default", "accent", "warning", "success"] as const).flatMap((tone) =>
-                  ([false, true] as const).map((active) => (
-                    <OpsMetricPill
-                      key={`${tone}-${active}`}
-                      label={active ? `${tone} activo` : tone}
-                      value={42}
-                      tone={tone}
-                      active={active}
-                    />
-                  ))
-                )}
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Canonico · OpsMetricInlineGroup (con separadores)</p>
+              <OpsMetricInlineGroup items={metricInlineItems} />
+            </div>
+            <div>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Canonico · OpsMetricInline (standalone, tones)</p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                {(["default", "accent", "warning", "success", "danger"] as const).map((tone) => (
+                  <OpsMetricInline
+                    key={tone}
+                    icon={<BarChart3 className="h-4 w-4" />}
+                    label={`Metric ${tone}`}
+                    value={42}
+                    tone={tone as OpsMetricInlineTone}
+                  />
+                ))}
               </div>
             </div>
             <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">OpsMetricCard (6 tones)</p>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Legacy · OpsMetricPill</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <OpsMetricPill label="Sin icono" value={42} tone="default" />
+                <OpsMetricPill label="Accent activo" value={42} tone="accent" active icon={<BarChart3 className="h-3.5 w-3.5" />} />
+                <OpsMetricPill label="Warning" value={42} tone="warning" icon={<Clock className="h-3.5 w-3.5" />} />
+                <OpsMetricPill label="Success" value={42} tone="success" active icon={<CheckCircle2 className="h-3.5 w-3.5" />} />
+              </div>
+            </div>
+            <div>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Canonico · OpsMetricCard (6 tones)</p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                {(["default", "accent", "success", "warning", "danger", "neutral"] as const).map((tone) => (
+                {(["default", "accent", "info", "success", "warning", "danger", "neutral"] as const).map((tone) => (
                   <OpsMetricCard
                     key={tone}
                     icon={<Package className="h-4 w-4" />}
@@ -307,7 +431,7 @@ export default function DemoPage() {
               </div>
             </div>
             <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">OpsMetricStripItem (3 tones)</p>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Derivado · OpsMetricStripItem</p>
               <div className="grid grid-cols-3 gap-3">
                 <OpsMetricStripItem label="Ventas hoy" value="S/. 2,450" tone="accent" />
                 <OpsMetricStripItem label="Pendientes" value="12" tone="warning" />
@@ -315,7 +439,7 @@ export default function DemoPage() {
               </div>
             </div>
             <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">OpsMetricRow (3 tones)</p>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Canonico · OpsMetricRow</p>
               <div className="max-w-xs space-y-1.5 rounded-xl border border-[var(--ops-border-strong)] p-3">
                 <OpsMetricRow label="Subtotal" value="S/. 180.00" tone="default" />
                 <OpsMetricRow label="Descuento" value="-S/. 25.00" tone="warning" />
@@ -323,13 +447,13 @@ export default function DemoPage() {
               </div>
             </div>
             <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">OpsSummaryBand (4 tones)</p>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Derivado · OpsSummaryBand</p>
               <OpsSummaryBand items={summaryBandItems} />
             </div>
             <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">OpsActionLink (6 tones × 2 sizes)</p>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Canonico · OpsActionLink (6 tones × 2 sizes)</p>
               <div className="flex flex-wrap items-center gap-2">
-                {(["neutral", "accent", "success", "warning", "danger"] as const).flatMap((tone) =>
+                {(["neutral", "accent", "info", "success", "warning", "danger"] as const).flatMap((tone) =>
                   (["sm", "md"] as const).map((size) => (
                     <OpsActionLink key={`${tone}-${size}`} href="#" tone={tone} size={size}>{tone} {size}</OpsActionLink>
                   ))
@@ -359,6 +483,25 @@ export default function DemoPage() {
                   <p className="text-sm text-[var(--ops-text-muted)]">Origen: Almacen Principal</p>
                   <p className="text-sm text-[var(--ops-text-muted)]">Items: 12 unidades</p>
                 </OpsInfoCard>
+              </div>
+            </div>
+            <div>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">OpsPanel + OpsPanelMuted</p>
+              <div className="max-w-lg">
+                <OpsPanel>
+                  <h3 className="text-sm font-semibold text-[var(--ops-text)]">Panel con shadow (rounded-xl)</h3>
+                  <p className="mt-1 text-xs text-[var(--ops-text-muted)]">Contenedor principal con borde y sombra estandar.</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <OpsPanelMuted>
+                      <p className="text-xs font-medium text-[var(--ops-text)]">Sub-panel muted</p>
+                      <p className="text-[11px] text-[var(--ops-text-muted)]">Fondo muted, sin sombra</p>
+                    </OpsPanelMuted>
+                    <OpsPanelMuted>
+                      <p className="text-xs font-medium text-[var(--ops-text)]">Sub-panel muted</p>
+                      <p className="text-[11px] text-[var(--ops-text-muted)]">Para secciones internas</p>
+                    </OpsPanelMuted>
+                  </div>
+                </OpsPanel>
               </div>
             </div>
             <div>
@@ -415,12 +558,44 @@ export default function DemoPage() {
         <OpsSectionDivider>
           <OpsSectionHeader icon={<PencilLine className="h-4 w-4" />} title="7. Form Inputs" />
           <div className="space-y-3">
+            <DemoNote>
+              Para filtros operativos: <strong className="text-[var(--ops-text)]">OpsSearchField</strong> +{" "}
+              <strong className="text-[var(--ops-text)]">FilterDropdown</strong> +{" "}
+              <strong className="text-[var(--ops-text)]">DateFilterPicker</strong>. Para formularios y selección estructurada:
+              <strong className="text-[var(--ops-text)]"> OpsSelect</strong> y su familia.
+            </DemoNote>
             <div className="flex flex-wrap gap-3">
               <div className="min-w-[220px]">
                 <OpsSearchField label="Buscar" value={searchTerm} onChange={setSearchTerm} placeholder="Buscar..." ariaLabel="Buscar en demo" />
               </div>
-              <FilterDropdown label="Filtro" value={filterStatus} options={filterStatusOptions} onChange={setFilterStatus} />
+              <OpsSelect label="Filtro" value={filterStatus} options={filterStatusOptions} onChange={setFilterStatus} />
               <DateFilterPicker label="Desde" value={dateFilter} onChange={setDateFilter} ariaLabel="Seleccionar fecha" />
+            </div>
+            <div>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">OpsSegmentedControl (default / accent / switch)</p>
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <OpsSegmentedControl
+                    options={[{ value: "7d", label: "7 días" }, { value: "30d", label: "30 días" }]}
+                    value={segmentedValue}
+                    onChange={setSegmentedValue}
+                  />
+                  <OpsSegmentedControl
+                    options={[{ value: "all", label: "Todas" }, { value: "open", label: "Pendientes" }, { value: "closed", label: "Cerradas" }]}
+                    value={segmentedAccentValue}
+                    onChange={setSegmentedAccentValue}
+                    tone="accent"
+                  />
+                </div>
+                <OpsSegmentedControl
+                  options={[{ value: "single", label: "Pago unico" }, { value: "mixed", label: "Pago mixto" }]}
+                  value={switchSegmentedValue}
+                  onChange={setSwitchSegmentedValue}
+                  tone="accent"
+                  size="compact"
+                  variant="switch"
+                />
+              </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <AdminField label="Nombre del producto" hint="Maximo 120 caracteres." htmlFor="demo-name">
@@ -441,19 +616,19 @@ export default function DemoPage() {
               />
             </div>
             <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">OpsSelectMenu</p>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Canonico · OpsSelect</p>
               <div className="max-w-xs">
-                <OpsSelectMenu value={selectValue} onValueChange={setSelectValue} placeholder="Seleccionar tipo" options={selectOptions} />
+                <OpsSelect value={selectValue} onValueChange={setSelectValue} placeholder="Seleccionar tipo" options={selectOptions} />
               </div>
             </div>
             <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">OpsMultiSelectMenu</p>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Canonico · OpsMultiSelectMenu</p>
               <div className="max-w-xs">
                 <OpsMultiSelectMenu selectedValues={multiSelectValues} onToggle={(v) => setMultiSelectValues((p) => p.includes(v) ? p.filter((x) => x !== v) : [...p, v])} placeholder="Seleccionar tallas" options={[{ value: "s", label: "Small" }, { value: "m", label: "Medium" }, { value: "l", label: "Large" }, { value: "xl", label: "X-Large" }]} />
               </div>
             </div>
             <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">OpsSelectionChip</p>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Canonico · OpsSelectionChip</p>
               <div className="flex flex-wrap gap-2">
                 <OpsSelectionChip label="Talla M" selected />
                 <OpsSelectionChip label="Color Negro" selected onRemove={() => {}} />
@@ -488,7 +663,7 @@ export default function DemoPage() {
               </div>
             </div>
             <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Stepper</p>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Formulario compacto · Stepper</p>
               <div className="flex flex-wrap gap-3">
                 <AdminActionButton onClick={() => setStepperStep(Math.max(0, stepperStep - 1))} className="text-[10px]">Anterior</AdminActionButton>
                 <AdminActionButton onClick={() => setStepperStep(Math.min(2, stepperStep + 1))} className="text-[10px]">Siguiente</AdminActionButton>
@@ -526,6 +701,10 @@ export default function DemoPage() {
         <OpsSectionDivider>
           <OpsSectionHeader icon={<MapPin className="h-4 w-4" />} title="8. Pickers" />
           <div className="space-y-3">
+            <DemoNote>
+              Canonico para búsqueda con resultados: <strong className="text-[var(--ops-text)]">SearchablePicker</strong>.
+              <strong className="text-[var(--ops-text)]"> CompactPicker</strong> queda como primitive interna para popovers ligeros.
+            </DemoNote>
             <div className="relative inline-block">
               <AdminActionButton onClick={() => setPickerOpen((p) => !p)}>
                 <Search className="h-3.5 w-3.5" />
@@ -601,11 +780,15 @@ export default function DemoPage() {
           <OpsSectionHeader icon={<Power className="h-4 w-4" />} title="9. Actions" />
           <div className="space-y-3">
             <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">OpsCardActionLink</p>
-              <OpsCardActionLink href={appRoutes.home} label="Ir al inicio" />
+              <DemoNote>
+                Canonico: <strong className="text-[var(--ops-text)]">Button</strong> /{" "}
+                <strong className="text-[var(--ops-text)]">AdminActionButton</strong> para acciones directas y{" "}
+                <strong className="text-[var(--ops-text)]">OpsActionLink</strong> para CTA liviano.{" "}
+                <strong className="text-[var(--ops-text)]">OpsCardActionLink</strong> queda como atajo heredado para cards.
+              </DemoNote>
             </div>
             <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">AdminActionButton (accent / neutral / danger)</p>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Canonico · AdminActionButton (accent / neutral / danger)</p>
               <div className="flex flex-wrap gap-2">
                 <AdminActionButton tone="accent"><Plus className="h-3.5 w-3.5" />Crear</AdminActionButton>
                 <AdminActionButton tone="neutral"><Settings className="h-3.5 w-3.5" />Configurar</AdminActionButton>
@@ -613,7 +796,7 @@ export default function DemoPage() {
               </div>
             </div>
             <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">AdminRowActionButton</p>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Derivado · AdminRowActionButton</p>
               <div className="flex flex-wrap gap-2">
                 <AdminRowActionButton icon={<Eye className="h-3.5 w-3.5" />}>Ver</AdminRowActionButton>
                 <AdminRowActionButton icon={<PencilLine className="h-3.5 w-3.5" />} tone="accent">Editar</AdminRowActionButton>
@@ -621,7 +804,7 @@ export default function DemoPage() {
               </div>
             </div>
             <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">AdminRowActionsMenu</p>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Canonico en tablas densas · AdminRowActionsMenu</p>
               <div className="w-14">
                 <AdminRowActionsMenu
                   items={[
@@ -631,6 +814,10 @@ export default function DemoPage() {
                   ]}
                 />
               </div>
+            </div>
+            <div>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Legacy liviano · OpsCardActionLink</p>
+              <OpsCardActionLink href={appRoutes.home} label="Ir al inicio" />
             </div>
           </div>
         </OpsSectionDivider>
@@ -659,9 +846,9 @@ export default function DemoPage() {
               </div>
             </div>
             <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">OpsSelectMenu / OpsReadonlyFieldState</p>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">OpsSelect / OpsReadonlyFieldState</p>
               <div className="max-w-xs space-y-2">
-                <OpsSelectMenu value={selectValue} onValueChange={setSelectValue} placeholder="Seleccionar tipo" options={selectOptions.slice(0, 2)} />
+                <OpsSelect value={selectValue} onValueChange={setSelectValue} placeholder="Seleccionar tipo" options={selectOptions.slice(0, 2)} />
                 <OpsReadonlyFieldState value="ADM-001" badge="Codigo" />
               </div>
             </div>
@@ -686,8 +873,13 @@ export default function DemoPage() {
         <OpsSectionDivider>
           <OpsSectionHeader icon={<Info className="h-4 w-4" />} title="12. Alerts & Attention" />
           <div className="space-y-3">
+            <DemoNote>
+              Canonico inline: <strong className="text-[var(--ops-text)]">OpsAttentionRow</strong>.{" "}
+              <strong className="text-[var(--ops-text)]">OpsActionBanner</strong> sube un nivel para alertas de módulo y{" "}
+              <strong className="text-[var(--ops-text)]">OpsPendingRow</strong> queda como derivado compacto.
+            </DemoNote>
             <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">OpsAttentionRow (embedded)</p>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Canonico · OpsAttentionRow (embedded)</p>
               <div className="space-y-2">
                 <OpsAttentionRow
                   icon={<Package className="h-4 w-4" />}
@@ -714,7 +906,35 @@ export default function DemoPage() {
               </div>
             </div>
             <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">OpsPendingRow (critical / warning / info)</p>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Elevado / modulo · OpsActionBanner</p>
+              <div className="space-y-3">
+                <OpsActionBanner
+                  icon={CheckCircle2}
+                  tone="success"
+                  title="Caja operativa abierta"
+                  description="Abierta por Juan Pérez"
+                  actionLabel="Cerrar caja"
+                  onAction={() => {}}
+                />
+                <OpsActionBanner
+                  icon={Clock}
+                  tone="warning"
+                  title="Aún no se abrió caja"
+                  description="Abre caja para habilitar ventas en esta sede."
+                  actionLabel="Abrir caja"
+                  actionTone="accent"
+                  onAction={() => {}}
+                />
+                <OpsActionBanner
+                  icon={CheckCircle2}
+                  tone="neutral"
+                  title="Caja cerrada"
+                  description="Cerrada por María López a las 18:45"
+                />
+              </div>
+            </div>
+            <div>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Derivado compacto · OpsPendingRow</p>
               <div className="space-y-2 rounded-xl border border-[var(--ops-border-strong)]">
                 <OpsPendingRow
                   icon={<AlertTriangle className="h-4 w-4" />}
@@ -760,8 +980,12 @@ export default function DemoPage() {
         <OpsSectionDivider>
           <OpsSectionHeader icon={<Ticket className="h-4 w-4" />} title="13. Wizard & Progress" />
           <div className="space-y-3">
+            <DemoNote>
+              Canonico para flujos operativos multietapa: <strong className="text-[var(--ops-text)]">SalesWizardRail</strong>.
+              El header ya no es la referencia principal para progreso; el stepper compacto queda para formularios.
+            </DemoNote>
             <div>
-              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">SalesWizardRail (4 steps)</p>
+              <p className="mb-1.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Canonico · SalesWizardRail (4 steps)</p>
               <SalesWizardRail items={wizardItems} canGoPrevious canGoNext canAdvance />
             </div>
             <div>
@@ -794,30 +1018,48 @@ export default function DemoPage() {
         {/* ──────────── 14. STATUS PAGES ──────────── */}
         <OpsSectionDivider>
           <OpsSectionHeader icon={<Ban className="h-4 w-4" />} title="14. Status Pages" />
-          <div className="grid gap-3 lg:grid-cols-2">
-            <div className="overflow-hidden rounded-xl border border-[var(--ops-border-strong)]">
-              <div className="scale-[0.28] origin-top-left w-[357%]">
-                <LoadingPage variant="ops" />
+          <div className="space-y-3">
+            <DemoNote>
+              Aqui se muestra una vista ampliada para leer mejor la jerarquia real. Debajo quedan miniaturas para cambiar entre estados sin perder el contexto del demo.
+            </DemoNote>
+            <div className="overflow-hidden rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+              <div className="border-b border-[var(--ops-border-strong)] px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                  Vista ampliada · {activeStatusPage.label}
+                </p>
+                <p className="mt-1 text-xs text-[var(--ops-text-muted)]">{activeStatusPage.helper}</p>
               </div>
-              <p className="-mt-1 px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">LoadingPage</p>
+              <div className="overflow-hidden">
+                <div className="origin-top-left scale-[0.52] sm:scale-[0.62] xl:scale-[0.72] w-[192%] sm:w-[161%] xl:w-[139%]">
+                  {activeStatusPage.preview}
+                </div>
+              </div>
             </div>
-            <div className="overflow-hidden rounded-xl border border-[var(--ops-border-strong)]">
-              <div className="scale-[0.28] origin-top-left w-[357%]">
-                <NotFoundPage variant="ops" />
-              </div>
-              <p className="-mt-1 px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">NotFoundPage</p>
-            </div>
-            <div className="overflow-hidden rounded-xl border border-[var(--ops-border-strong)]">
-              <div className="scale-[0.28] origin-top-left w-[357%]">
-                <ForbiddenPage variant="ops" />
-              </div>
-              <p className="-mt-1 px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">ForbiddenPage</p>
-            </div>
-            <div className="overflow-hidden rounded-xl border border-[var(--ops-border-strong)]">
-              <div className="scale-[0.28] origin-top-left w-[357%]">
-                <ErrorPage variant="ops" />
-              </div>
-              <p className="-mt-1 px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">ErrorPage</p>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {statusPagePresets.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setStatusPagePreview(item.key)}
+                  className={`overflow-hidden rounded-xl border text-left transition ${
+                    statusPagePreview === item.key
+                      ? "border-[var(--ripnel-accent)] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_52%,var(--ops-surface))]"
+                      : "border-[var(--ops-border-strong)] bg-[var(--ops-surface)] hover:border-[var(--ops-border-soft)]"
+                  }`}
+                >
+                  <div className="border-b border-[var(--ops-border-strong)] px-3 py-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
+                      {item.label}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-[var(--ops-text-muted)]">{item.helper}</p>
+                  </div>
+                  <div className="overflow-hidden">
+                    <div className="origin-top-left scale-[0.22] w-[455%]">
+                      {item.preview}
+                    </div>
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
         </OpsSectionDivider>

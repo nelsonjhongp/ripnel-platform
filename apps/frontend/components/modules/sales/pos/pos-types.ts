@@ -33,6 +33,9 @@ export interface PriceOverride {
   reason: string
 }
 
+export type EffectivePriceMode = "retail" | "wholesale"
+export type PriceModeOverride = EffectivePriceMode | "auto"
+
 export interface CartItem {
   variant_id: string
   sku: string
@@ -50,7 +53,7 @@ export interface CartItem {
 }
 
 export interface SaleDiscountState {
-  mode: 'percent' | 'fixed' | 'none'
+  mode: 'percent' | 'amount' | 'none'
   value: string
   reason: string
 }
@@ -74,6 +77,14 @@ export interface CustomerFormState {
   email: string
 }
 
+export interface CustomerFormErrors {
+  _form?: string
+  business_name?: string
+  document_number?: string
+  address?: string
+  full_name?: string
+}
+
 export interface PriceFormState {
   unit_price_final: string
   reason: string
@@ -83,6 +94,7 @@ export interface PosCashState {
   status: string
   sale_enabled: boolean
   message?: string
+  cash_closing_id?: string
 }
 
 export interface PosPricingConfig {
@@ -91,6 +103,7 @@ export interface PosPricingConfig {
 }
 
 export interface PosContext {
+  business_date?: string
   cash: PosCashState
   pricing: PosPricingConfig
 }
@@ -144,7 +157,7 @@ export interface SalePreview {
   hasMissingPrice: boolean
   baseSubtotal: number
   saleDiscountAmount: number
-  priceMode: string
+  priceMode: EffectivePriceMode
   wholesaleApplied: boolean
 }
 
@@ -174,6 +187,15 @@ export interface ProgressItem {
 export interface ConfirmedSale {
   sale_id: string
   sale_number: string
+  customer_name?: string
+  document_type?: string
+  document_label?: string
+  total?: number
+  payment_label?: string
+  confirmed_at?: string
+  item_count?: number
+  unit_count?: number
+  item_preview_labels?: string[]
 }
 
 export type Stage = "products" | "customer" | "payment" | "summary"
@@ -189,11 +211,6 @@ export interface PaymentMethodOption {
 }
 
 export interface SaleDiscountOption {
-  value: string
-  label: string
-}
-
-export interface SaleDiscountReasonOption {
   value: string
   label: string
 }
@@ -223,14 +240,16 @@ export const SALE_DISCOUNT_OPTIONS: SaleDiscountOption[] = [
   { value: "amount", label: "Monto fijo" },
 ]
 
-export const SALE_DISCOUNT_REASON_OPTIONS: SaleDiscountReasonOption[] = [
-  { value: "", label: "Seleccionar motivo" },
-  { value: "Promocion de tienda", label: "Promocion de tienda" },
-  { value: "Ajuste comercial", label: "Ajuste comercial" },
-  { value: "Fidelizacion", label: "Fidelizacion" },
-  { value: "Autorizacion interna", label: "Autorizacion interna" },
-  { value: "custom", label: "Motivo personalizado" },
-]
+export const ADJUSTMENT_REASON_PRESETS = [
+  "Promocion de tienda",
+  "Cliente frecuente",
+  "Cierre comercial",
+  "Ajuste por temporada",
+  "Autorizacion interna",
+  "Promocion especial",
+] as const
+
+export type AdjustmentReasonPreset = (typeof ADJUSTMENT_REASON_PRESETS)[number]
 
 export const TAX_RATE: Record<string, number> = {
   none: 0,

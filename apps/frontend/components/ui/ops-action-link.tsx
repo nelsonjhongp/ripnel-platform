@@ -22,7 +22,7 @@ const toneClasses: Record<NonNullable<OpsActionLinkProps["tone"]>, string> = {
   danger:
     "border-[var(--ops-tone-danger-border)] text-[var(--ops-tone-danger-text)] hover:bg-[var(--ops-tone-danger-bg)]",
   info:
-    "border-[color:color-mix(in_srgb,#38bdf8_28%,var(--ops-border-strong))] text-[color:color-mix(in_srgb,#0369a1_74%,var(--ops-text))] hover:bg-[color:color-mix(in_srgb,#38bdf8_10%,var(--ops-surface))]",
+    "border-[var(--ops-tone-info-border)] text-[var(--ops-tone-info-text)] hover:bg-[var(--ops-tone-info-bg)]",
   neutral:
     "border-[var(--ops-border-strong)] text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)]",
 }
@@ -43,7 +43,7 @@ export function OpsActionLink({
     <Link
       href={href}
       className={cn(
-        "inline-flex items-center rounded-full border bg-[color:color-mix(in_srgb,var(--ops-surface)_84%,var(--ops-surface-muted))] font-medium transition",
+        "inline-flex items-center rounded-lg border bg-[color:color-mix(in_srgb,var(--ops-surface)_84%,var(--ops-surface-muted))] font-medium transition",
         toneClasses[tone],
         sizeClasses[size],
         className

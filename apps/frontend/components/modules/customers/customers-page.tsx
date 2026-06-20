@@ -27,8 +27,12 @@ import {
   toFormState,
   validateCustomerInput,
 } from "./customer-form"
+import {
+  findDuplicateCustomerByDocument,
+  mapCustomerSaveError,
+} from "./customer-document-guard"
 import { Button } from "@/components/ui/button"
-import { FilterDropdown } from "@/components/ui/filter-dropdown"
+import { OpsSelect } from "@/components/ui/ops-selection"
 import {
   OpsFiltersRow,
   OpsPageShell,
@@ -57,6 +61,7 @@ export default function CustomersPage() {
   const [editingCustomer, setEditingCustomer] = useState<CustomerRecord | null>(null)
   const [editState, setEditState] = useState<CustomerFormState>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  const [saveState, setSaveState] = useState<"idle" | "validating" | "saving">("idle")
   const [saveError, setSaveError] = useState<string | null>(null)
   const [activeChangeCustomer, setActiveChangeCustomer] = useState<CustomerRecord | null>(null)
   const [savingActiveChange, setSavingActiveChange] = useState(false)
@@ -92,6 +97,7 @@ export default function CustomersPage() {
   function closeEditModal() {
     setEditingCustomer(null)
     setEditState(EMPTY_FORM)
+    setSaveState("idle")
     setSaveError(null)
   }
 
@@ -107,9 +113,22 @@ export default function CustomersPage() {
     }
 
     setSaving(true)
+    setSaveState("validating")
     setSaveError(null)
 
     try {
+      const duplicateCustomer = await findDuplicateCustomerByDocument({
+        documentType: editState.document_type,
+        documentNumber: editState.document_number,
+        excludeCustomerId: editingCustomer.customer_id,
+      })
+
+      if (duplicateCustomer) {
+        setSaveError("Ya existe un cliente con este documento.")
+        return
+      }
+
+      setSaveState("saving")
       await apiFetchData<CustomerRecord>(`/api/customers/${editingCustomer.customer_id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -120,9 +139,12 @@ export default function CustomersPage() {
       closeEditModal()
       showSuccess("Cliente actualizado", editingCustomer ? buildDisplayName(editingCustomer) : undefined)
     } catch (submitError: unknown) {
-      showError("Error al guardar", submitError instanceof Error ? submitError.message : "No se pudo guardar el cliente")
+      const message = mapCustomerSaveError(submitError)
+      setSaveError(message)
+      showError("Error al guardar", message)
     } finally {
       setSaving(false)
+      setSaveState("idle")
     }
   }
 
@@ -280,7 +302,7 @@ export default function CustomersPage() {
                   </div>
                 </div>
 
-                <FilterDropdown
+                <OpsSelect
                   label="Tipo de documento"
                   value={docFilter}
                   options={docFilterOptions}
@@ -290,7 +312,7 @@ export default function CustomersPage() {
                   }}
                 />
 
-                <FilterDropdown
+                <OpsSelect
                   label="Orden"
                   value={sort}
                   options={sortOptions}
@@ -429,6 +451,7 @@ export default function CustomersPage() {
                 onCancel={closeEditModal}
                 submitLabel="Guardar cambios"
                 submitting={saving}
+                submissionState={saveState}
                 error={saveError}
               />
           </AdminModalShell>

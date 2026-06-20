@@ -25,11 +25,9 @@ import { HomeHeader, type HomeHeaderAction } from "@/components/home/home-hero";
 import { HomeCriticalStockTable } from "@/components/home/home-critical-stock-table";
 import { HomeTransferRequests } from "@/components/home/home-transfer-requests";
 import { OpsActionTile } from "@/components/ui/ops-action-tile";
+import { OpsAttentionRow } from "@/components/ui/ops-attention-row";
 import { OpsEmptyState } from "@/components/ui/ops-empty-state";
 import { OpsMetricCard } from "@/components/ui/ops-metric-card";
-import { OpsMetricStripItem } from "@/components/ui/ops-metric-strip-item";
-import { OpsPendingRow } from "@/components/ui/ops-pending-row";
-import { OpsSummaryBand } from "@/components/ui/ops-summary-band";
 import type { HomeOverview } from "@/components/home/home-types";
 import { useApiGet } from "@/hooks/use-api-get";
 import { apiFetch } from "@/lib/api";
@@ -80,14 +78,14 @@ const priorityIconMap: Record<string, React.ReactNode> = {
   "cash-difference": <CircleAlert className="h-4 w-4" />,
 };
 
-const priorityToneMap: Record<string, "critical" | "warning" | "info"> = {
-  "cash-open": "critical",
-  "cash-difference": "critical",
+const priorityToneMap: Record<string, "danger" | "warning" | "accent"> = {
+  "cash-open": "danger",
+  "cash-difference": "danger",
   "request-replenishment": "warning",
   "transfer-receive": "warning",
   "transfer-ship": "warning",
-  "transfer-approve": "info",
-  "low-stock": "info",
+  "transfer-approve": "accent",
+  "low-stock": "accent",
 };
 
 const priorityCtaMap: Record<string, string> = {
@@ -128,7 +126,7 @@ const quickActionToneMap: Record<
 export default function InicioPage() {
   const { loading: authLoading, has } = useAuth();
 
-  const { data: overview, loading, error, refetch } = useApiGet(
+  const { data: overview, loading, error } = useApiGet(
     () => apiFetch<HomeOverview>("/api/home/overview", {
       cache: "no-store",
     }),
@@ -258,20 +256,21 @@ export default function InicioPage() {
                   key={item.key}
                   className="border-b border-[var(--ops-border-soft)] last:border-b-0"
                 >
-                <OpsPendingRow
-                  icon={
-                    priorityIconMap[item.key] ?? (
-                      <CircleAlert className="h-4 w-4" />
-                    )
-                  }
-                  title={item.title}
-                  description={item.description}
-                  ctaLabel={priorityCtaMap[item.key] ?? "Resolver"}
-                  ctaHref={item.href}
-                  tone={
-                    priorityToneMap[item.key] ??
-                    (item.tone === "warning" ? "warning" : "info")
-                  }
+                  <OpsAttentionRow
+                    icon={
+                      priorityIconMap[item.key] ?? (
+                        <CircleAlert className="h-4 w-4" />
+                      )
+                    }
+                    title={item.title}
+                    description={item.description}
+                    ctaLabel={priorityCtaMap[item.key] ?? "Resolver"}
+                    href={item.href}
+                    tone={
+                      priorityToneMap[item.key] ??
+                      (item.tone === "warning" ? "warning" : "accent")
+                    }
+                    embedded
                   />
                 </div>
               ))}
@@ -389,23 +388,26 @@ export default function InicioPage() {
 
                 <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4">
                   <div className="grid gap-2 sm:grid-cols-3">
-                    <OpsMetricStripItem
+                    <OpsMetricCard
+                      icon={<ShoppingCart className="h-4 w-4" />}
                       label="Ventas hoy"
                       value={personalSales.today.sale_count}
                       tone="accent"
-                      isNeutral={personalSales.today.sale_count === 0}
+                      className="px-3 py-3"
                     />
-                    <OpsMetricStripItem
+                    <OpsMetricCard
+                      icon={<BarChart3 className="h-4 w-4" />}
                       label="Semana"
                       value={personalSales.week.sale_count}
-                      tone="info"
-                      isNeutral={personalSales.week.sale_count === 0}
+                      tone={personalSales.week.sale_count === 0 ? "neutral" : "info"}
+                      className="px-3 py-3"
                     />
-                    <OpsMetricStripItem
+                    <OpsMetricCard
+                      icon={<Wallet className="h-4 w-4" />}
                       label="Facturado hoy"
                       value={formatCurrency(personalSales.today.total_amount)}
                       tone="accent"
-                      isNeutral={personalSales.today.total_amount === 0}
+                      className="px-3 py-3"
                     />
                   </div>
 
@@ -503,25 +505,32 @@ export default function InicioPage() {
                   </div>
 
                   <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                    <OpsMetricStripItem
+                    <OpsMetricCard
+                      icon={<ShoppingCart className="h-4 w-4" />}
                       label="Ventas"
                       value={formatCurrency(cashConsistency?.sales_total)}
-                      tone="accent"
-                      isNeutral={!cashConsistency}
+                      tone={cashConsistency ? "accent" : "neutral"}
+                      className="px-3 py-3"
                     />
-                    <OpsMetricStripItem
+                    <OpsMetricCard
+                      icon={<Wallet className="h-4 w-4" />}
                       label="Pagos"
                       value={formatCurrency(cashConsistency?.payment_total)}
-                      tone="info"
-                      isNeutral={!cashConsistency}
+                      tone={cashConsistency ? "info" : "neutral"}
+                      className="px-3 py-3"
                     />
-                    <OpsMetricStripItem
+                    <OpsMetricCard
+                      icon={<CircleAlert className="h-4 w-4" />}
                       label="Diferencia"
                       value={formatCurrency(cashConsistency?.difference)}
                       tone={
-                        cashConsistency?.is_consistent ? "accent" : "warning"
+                        !cashConsistency
+                          ? "neutral"
+                          : cashConsistency.is_consistent
+                            ? "accent"
+                            : "warning"
                       }
-                      isNeutral={!cashConsistency}
+                      className="px-3 py-3"
                     />
                   </div>
                 </div>
@@ -549,31 +558,29 @@ export default function InicioPage() {
                   </Link>
                 </div>
 
-                <OpsSummaryBand
-                  items={[
-                    {
-                      icon: <Users className="h-4 w-4" />,
-                      label: "Usuarios activos",
-                      value: adminSection.active_user_count,
-                      meta: `${adminSection.active_location_count} sede(s)`,
-                      tone: "accent",
-                    },
-                    {
-                      icon: <Store className="h-4 w-4" />,
-                      label: "Sedes asignadas",
-                      value: adminSection.active_location_count,
-                      meta: "Activas",
-                      tone: "info",
-                    },
-                    {
-                      icon: <ClipboardList className="h-4 w-4" />,
-                      label: "Solicitudes abiertas",
-                      value: adminSection.pending_requests_count,
-                      meta: "Red asignada",
-                      tone: "success",
-                    },
-                  ]}
-                />
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <OpsMetricCard
+                    icon={<Users className="h-4 w-4" />}
+                    label="Usuarios activos"
+                    value={adminSection.active_user_count}
+                    detail={`${adminSection.active_location_count} sede(s)`}
+                    tone="accent"
+                  />
+                  <OpsMetricCard
+                    icon={<Store className="h-4 w-4" />}
+                    label="Sedes asignadas"
+                    value={adminSection.active_location_count}
+                    detail="Activas"
+                    tone="info"
+                  />
+                  <OpsMetricCard
+                    icon={<ClipboardList className="h-4 w-4" />}
+                    label="Solicitudes abiertas"
+                    value={adminSection.pending_requests_count}
+                    detail="Red asignada"
+                    tone="success"
+                  />
+                </div>
               </section>
             )}
 

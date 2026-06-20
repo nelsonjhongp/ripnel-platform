@@ -4,6 +4,8 @@ const {
   requireAnyPermission,
   requirePermission,
 } = require("../../middlewares/auth");
+const { validate } = require("../../middlewares/validate");
+const { openCash, closeCash, reopenCash } = require("../../shared/schemas");
 const {
   getCashClosings,
   getCashCurrent,
@@ -12,6 +14,7 @@ const {
   getCashAdminSessionsController,
   postOpenCash,
   patchCloseCash,
+  patchReopenCash,
 } = require("./cash.controller");
 
 const router = express.Router();
@@ -43,7 +46,8 @@ router.get(
   requireAnyPermission(["cash.view", "cash.operate"]),
   getCashClosingById,
 );
-router.post("/open", requirePermission("cash.operate"), postOpenCash);
-router.patch("/:id/close", requirePermission("cash.operate"), patchCloseCash);
+router.post("/open", requirePermission("cash.operate"), validate(openCash), postOpenCash);
+router.patch("/:id/close", requirePermission("cash.operate"), validate(closeCash), patchCloseCash);
+router.patch("/:id/reopen", requirePermission("cash.admin.reopen"), validate(reopenCash), patchReopenCash);
 
 module.exports = router;

@@ -16,7 +16,7 @@ import {
   AdminInlineMessage,
   AdminSection,
 } from "@/components/admin/admin-ui"
-import { OpsMultiSelectMenu, OpsSelectionChip, OpsSelectMenu } from "@/components/ui/ops-selection"
+import { OpsMultiSelectMenu, OpsSelectionChip, OpsSelect } from "@/components/ui/ops-selection"
 
 type Role = {
   role_id: string
@@ -205,7 +205,7 @@ export default function UsersCreatePage() {
                 </AdminField>
 
                 <AdminField label="Rol" hint={rolesError || undefined}>
-                  <OpsSelectMenu
+                  <OpsSelect
                     value={userForm.role_id}
                     onValueChange={(value) => setUserForm((current) => ({ ...current, role_id: value }))}
                     placeholder={
@@ -270,7 +270,7 @@ export default function UsersCreatePage() {
 
                   <AdminField label="Sede por defecto">
                     <div className="space-y-3">
-                      <OpsSelectMenu
+                      <OpsSelect
                         value={userForm.default_location_id}
                         onValueChange={chooseUserFormDefaultLocation}
                         placeholder={

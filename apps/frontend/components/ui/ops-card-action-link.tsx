@@ -1,21 +1,23 @@
 "use client"
 
 import { ArrowRight } from "lucide-react"
-import Link from "next/link"
+import { OpsActionLink } from "@/components/ui/ops-action-link"
 
 export interface OpsCardActionLinkProps {
   href: string
   label: string
 }
 
+/**
+ * @deprecated Prefer OpsActionLink for new modules.
+ * Do not use in new screens; this wrapper is temporary compatibility.
+ * This wrapper is kept for card-footers already used in dashboard-style surfaces.
+ */
 export function OpsCardActionLink({ href, label }: OpsCardActionLinkProps) {
   return (
-    <Link
-      href={href}
-      className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--ripnel-accent-hover)] transition hover:text-[var(--ripnel-accent)]"
-    >
+    <OpsActionLink href={href} tone="accent" size="sm" className="gap-1.5 border-transparent bg-transparent px-0 hover:bg-transparent">
       {label}
       <ArrowRight className="h-3.5 w-3.5" />
-    </Link>
+    </OpsActionLink>
   )
 }

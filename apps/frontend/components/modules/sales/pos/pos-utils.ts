@@ -1,10 +1,13 @@
 import type {
   CartItem,
+  CustomerFormErrors,
   CustomerFormState,
+  EffectivePriceMode,
   GroupedStyle,
   PaymentDraft,
   PosCustomer,
   PosPricingConfig,
+  PriceModeOverride,
   PreviewItem,
   SaleDiscountState,
   SalePreview,
@@ -60,7 +63,7 @@ export function buildVariantTone(isWholesale: boolean): "success" | "neutral" {
   return isWholesale ? "success" : "neutral"
 }
 
-export function createPaymentDraft(method = "cash", amount = ""): PaymentDraft {
+export function createPaymentDraft(method = "", amount = ""): PaymentDraft {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     method,
@@ -70,15 +73,12 @@ export function createPaymentDraft(method = "cash", amount = ""): PaymentDraft {
 }
 
 export function createDefaultMixedPayments(
-  _totalAmount: number,
-  preferredMethod = "cash"
+  totalAmount: number,
+  preferredMethod = ""
 ): PaymentDraft[] {
-  const secondaryMethod =
-    PAYMENT_METHODS.find((method) => method.value !== preferredMethod)?.value || "yape"
-
   return [
-    createPaymentDraft(preferredMethod, ""),
-    createPaymentDraft(secondaryMethod, ""),
+    createPaymentDraft(preferredMethod, totalAmount > 0 ? totalAmount.toFixed(2) : ""),
+    createPaymentDraft("", ""),
   ]
 }
 
@@ -112,7 +112,7 @@ export function computeSaleDiscountAmount(
     return 0
   }
 
-  if (saleDiscount.mode === 'fixed') {
+  if (saleDiscount.mode === "amount") {
     return round2(Math.min(value, subtotalAmount))
   }
 
@@ -248,29 +248,73 @@ export function shouldApplyWholesalePreview(
   return totalQuantity >= wholesaleMinQty
 }
 
+export function resolveEffectivePriceMode(
+  cart: CartItem[],
+  pricingConfig: PosPricingConfig | null | undefined,
+  pricingModeOverride: PriceModeOverride | "auto" = "auto"
+): EffectivePriceMode {
+  if (pricingModeOverride === "retail" || pricingModeOverride === "wholesale") {
+    return pricingModeOverride
+  }
+
+  return shouldApplyWholesalePreview(cart, pricingConfig) ? "wholesale" : "retail"
+}
+
+export function resolveListPriceForMode(
+  priceSource: Pick<CartItem, "retail_price" | "wholesale_price">,
+  priceMode: EffectivePriceMode
+): {
+  unitPrice: number | null
+  priceTypeApplied: EffectivePriceMode
+} {
+  if (
+    priceMode === "wholesale" &&
+    priceSource.wholesale_price !== null &&
+    priceSource.wholesale_price !== undefined
+  ) {
+    return {
+      unitPrice: Number(priceSource.wholesale_price || 0),
+      priceTypeApplied: "wholesale",
+    }
+  }
+
+  return {
+    unitPrice:
+      priceSource.retail_price !== null && priceSource.retail_price !== undefined
+        ? Number(priceSource.retail_price || 0)
+        : null,
+    priceTypeApplied: "retail",
+  }
+}
+
+export function buildForcedPriceOverrideReason(priceMode: EffectivePriceMode): string {
+  return priceMode === "wholesale"
+    ? "Modo de precio forzado: Mayorista"
+    : "Modo de precio forzado: Minorista"
+}
+
 export function calculateSalePreview(
   cart: CartItem[],
   documentType: string,
   saleDiscount: SaleDiscountState | null,
-  pricingConfig: PosPricingConfig | null | undefined
+  pricingConfig: PosPricingConfig | null | undefined,
+  pricingModeOverride: PriceModeOverride | "auto" = "auto"
 ): SalePreview {
   const taxRate = TAX_RATE[documentType] ?? 0
-  const wholesaleApplies = shouldApplyWholesalePreview(cart, pricingConfig)
+  const effectivePriceMode = resolveEffectivePriceMode(
+    cart,
+    pricingConfig,
+    pricingModeOverride
+  )
 
   const preparedItems: PreparedCartItem[] = cart.map((item) => {
-    const autoUnitPrice =
-      wholesaleApplies && item.wholesale_price !== null && item.wholesale_price !== undefined
-        ? Number(item.wholesale_price || 0)
-        : item.retail_price !== null && item.retail_price !== undefined
-          ? Number(item.retail_price || 0)
-          : null
+    const { unitPrice: autoUnitPrice, priceTypeApplied } = resolveListPriceForMode(
+      item,
+      effectivePriceMode
+    )
     const unitPriceBeforeDiscount =
       item.price_override?.unit_price_final ?? Number(autoUnitPrice || 0)
     const lineSubtotalBeforeDiscount = round2(unitPriceBeforeDiscount * item.quantity)
-    const priceTypeApplied =
-      wholesaleApplies && item.wholesale_price !== null && item.wholesale_price !== undefined
-        ? "wholesale"
-        : "retail"
 
     return {
       ...item,
@@ -304,15 +348,15 @@ export function calculateSalePreview(
     hasMissingPrice,
     baseSubtotal,
     saleDiscountAmount,
-    priceMode: wholesaleApplies ? "wholesale" : "retail",
-    wholesaleApplied: wholesaleApplies,
+    priceMode: effectivePriceMode,
+    wholesaleApplied: effectivePriceMode === "wholesale",
   }
 }
 
 export function buildCashLabel(status: string): string {
   if (status === "open") return "Caja operativa abierta"
-  if (status === "closed") return "Caja operativa cerrada"
-  return "Caja pendiente de apertura"
+  if (status === "closed") return "Caja cerrada"
+  return "Aún no se abrió caja"
 }
 
 export function buildCashTone(status: string): string {
@@ -326,7 +370,7 @@ export function buildCashTone(status: string): string {
 // with direct JSX imports rather than string-based icon selection.
 
 export function getPaymentMethodLabel(method: string): string {
-  return PAYMENT_METHODS.find((option) => option.value === method)?.label || "Sin definir"
+  return PAYMENT_METHODS.find((option) => option.value === method)?.label || "Selecciona"
 }
 
 export function getPaymentReferenceMeta(method: string): {
@@ -338,29 +382,29 @@ export function getPaymentReferenceMeta(method: string): {
     return {
       label: "Referencia",
       placeholder: "Opcional",
-      helper: "En efectivo es opcional. Solo usalo si necesitas dejar una observacion corta.",
+      helper: "En efectivo es opcional. Solo úsalo si necesitas dejar una observación corta.",
     }
   }
 
   if (method === "transfer") {
     return {
-      label: "Operacion / voucher",
-      placeholder: "Nro. de operacion o voucher",
-      helper: "Registra el numero de operacion o voucher para rastrear el deposito.",
+      label: "Operación / voucher",
+      placeholder: "Nro. de operación o voucher",
+      helper: "Registra el número de operación o voucher para rastrear el depósito.",
     }
   }
 
   if (method === "yape" || method === "plin") {
     return {
-      label: "Operacion / celular",
-      placeholder: "Ultimos 4 digitos o codigo",
-      helper: "Registra codigo o ultimos 4 digitos para identificar el abono.",
+      label: "Operación / celular",
+      placeholder: "Últimos 4 dígitos o código",
+      helper: "Registra código o últimos 4 dígitos para identificar el abono.",
     }
   }
 
   return {
     label: "Referencia",
-    placeholder: "Codigo de referencia",
+    placeholder: "Código de referencia",
     helper: "Usa este campo para dejar el dato que ayude a rastrear el pago.",
   }
 }
@@ -380,7 +424,7 @@ export function isCustomerValidForDocumentType(
     }
 
     if (customerDocType === "ce") {
-      return /^\d{9}$/.test(documentNumber)
+      return SELLER_DOC_RULES.ce.regex.test(documentNumber)
     }
 
     return false
@@ -589,7 +633,7 @@ export function explainApiError(
   }
 
   if (e.status === 403) {
-    return "Tu usuario no tiene permisos para operar ventas en este modulo."
+    return "Tu usuario no tiene permisos para operar ventas en este módulo."
   }
 
   if (e.status === 409 || e.status === 400) {
@@ -597,7 +641,7 @@ export function explainApiError(
   }
 
   if (e.status === 401) {
-    return "La sesion ya no es valida. Inicia sesion otra vez para continuar."
+    return "La sesión ya no es válida. Inicia sesión otra vez para continuar."
   }
 
   return e.message || fallback
@@ -655,10 +699,12 @@ export function buildCustomerFormFromCustomer(
   }
 }
 
-export function validateCustomerForm(form: CustomerFormState): string | null {
+export function validateCustomerForm(form: CustomerFormState): CustomerFormErrors | null {
   if (form.entry_mode === "factura") {
+    const errors: CustomerFormErrors = {};
+
     if (!trimOrNull(form.business_name)) {
-      return "La razon social es obligatoria para cliente factura."
+      errors.business_name = "La razon social es obligatoria para cliente factura."
     }
 
     if (
@@ -666,41 +712,37 @@ export function validateCustomerForm(form: CustomerFormState): string | null {
         String(form.document_number || "").trim()
       )
     ) {
-      return "El RUC debe tener 11 digitos."
+      errors.document_number = "El RUC debe tener 11 digitos."
     }
 
     if (!trimOrNull(form.address)) {
-      return "La direccion fiscal es obligatoria para factura."
+      errors.address = "La direccion fiscal es obligatoria para factura."
     }
 
-    return null
+    return Object.keys(errors).length > 0 ? errors : null
   }
 
+  const errors: CustomerFormErrors = {};
+
   if (!trimOrNull(form.full_name)) {
-    return "Ingresa el nombre completo del cliente."
+    errors.full_name = "Ingresa el nombre completo del cliente."
   }
 
   if (form.document_type === "none") {
     if (String(form.document_number || "").trim()) {
-      return "Si el cliente no tiene documento, el numero debe ir vacio."
+      errors.document_number = "Si el cliente no tiene documento, el numero debe ir vacio."
     }
+  } else {
+    const rule = SELLER_DOC_RULES[form.document_type]
 
-    return null
+    if (!rule) {
+      errors.document_number = "Selecciona un tipo de documento valido."
+    } else if (!rule.regex.test(String(form.document_number || "").trim())) {
+      errors.document_number = `Formato invalido para ${rule.label}.`
+    }
   }
 
-  const rule = SELLER_DOC_RULES[form.document_type]
-
-  if (!rule) {
-    return "Selecciona un tipo de documento valido."
-  }
-
-  if (
-    !rule.regex.test(String(form.document_number || "").trim())
-  ) {
-    return `Formato invalido para ${rule.label}.`
-  }
-
-  return null
+  return Object.keys(errors).length > 0 ? errors : null
 }
 
 export function buildCustomerPayload(form: CustomerFormState): Record<string, unknown> {

@@ -11,6 +11,7 @@ import {
   RefreshCw,
   ShieldCheck,
 } from "lucide-react";
+import { RotateCw } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -24,6 +25,7 @@ import {
 } from "recharts";
 
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
+import { useAuth } from "@/components/auth/AuthProvider";
 import {
   ErrorPage,
   InlineStatusCard,
@@ -31,7 +33,23 @@ import {
 } from "@/components/feedback/status-page";
 import {
   TooltipProvider,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
 } from "@/components/ui/tooltip";
+import { OpsPageShell, OpsFiltersRow } from "@/components/ui/ops-page-shell";
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
+import { OpsPanel } from "@/components/ui/ops-panel";
+import { OpsAttentionRow } from "@/components/ui/ops-attention-row";
+import { OpsMetricCard } from "@/components/ui/ops-metric-card";
+import { OpsDataTable, type OpsDataTableColumn } from "@/components/ui/ops-data-table";
+import { DashboardChartCard } from "@/components/dashboard/dashboard-chart-card";
+import { OpsSelect, type OpsOption } from "@/components/ui/ops-selection";
+import { Pagination } from "@/components/ui/pagination";
+import { Button } from "@/components/ui/button";
+import { OpsDialog } from "@/components/ui/ops-dialog";
+import { OpsFormField } from "@/components/ui/ops-form-field";
+import { AdminActionButton } from "@/components/admin/admin-ui";
 import { ApiError, apiFetch } from "@/lib/api";
 import {
   CashAdminSessionsResponse,
@@ -42,25 +60,34 @@ import {
 } from "@/lib/cash";
 import { formatDateTime } from "@/lib/date-utils";
 
+import { CashStatusBadge } from "./cash-status-badge";
+import { explainApiError } from "@/components/modules/sales/pos/pos-utils";
+import { showError } from "@/lib/toast";
+
 const PAGE_SIZE = 20;
 
-type RangeFilter = "7d" | "30d";
+type RangeFilter = "7d" | "30d" | "60d";
 type StatusFilter = "all" | "open" | "closed";
 
-import { CashStatusBadge } from "./cash-status-badge"
-import { HelpTooltip } from "@/components/ui/help-tooltip"
+const RANGE_OPTIONS: OpsOption[] = [
+  { value: "7d", label: "Últimos 7 días" },
+  { value: "30d", label: "Últimos 30 días" },
+  { value: "60d", label: "Últimos 60 días" },
+];
 
-function explainControlError(error: unknown, fallback: string) {
-  if (!(error instanceof ApiError)) {
-    return error instanceof Error ? error.message : fallback;
-  }
+const STATUS_OPTIONS: OpsOption[] = [
+  { value: "all", label: "Todas" },
+  { value: "open", label: "Pendientes" },
+  { value: "closed", label: "Cerradas" },
+];
 
-  if (error.status === 403) {
-    return "Tu usuario no tiene permiso para ver el control transversal de cajas.";
-  }
-
-  return error.message || fallback;
-}
+const tableColumns: OpsDataTableColumn[] = [
+  { key: "fecha", header: "Fecha / estado" },
+  { key: "sede", header: "Sede" },
+  { key: "movimiento", header: "Apertura / cierre" },
+  { key: "total", header: "Total" },
+  { key: "accion", header: "" },
+];
 
 function buildQuery(params: {
   range: RangeFilter;
@@ -102,6 +129,42 @@ export default function CashControlPage() {
   const [page, setPage] = useState(1);
   const [reloadKey, setReloadKey] = useState(0);
 
+  const { has } = useAuth();
+  const canReopenCash = has("cash.admin.reopen");
+
+  const [reopenTarget, setReopenTarget] = useState<string | null>(null);
+  const [reopenNotes, setReopenNotes] = useState("");
+  const [reopeningCash, setReopeningCash] = useState(false);
+
+  const handleReopenCash = async () => {
+    if (!reopenTarget || reopeningCash) return
+    setReopeningCash(true)
+    try {
+      await apiFetch(`/api/cash/${reopenTarget}/reopen`, {
+        method: "PATCH",
+        body: JSON.stringify({ reopen_notes: reopenNotes.trim() || null }),
+      })
+      setReopenTarget(null)
+      setReopenNotes("")
+      setReloadKey((k) => k + 1)
+    } catch (e) {
+      showError("Error al reabrir caja", explainApiError(e, "No se pudo reabrir la caja."));
+    } finally {
+      setReopeningCash(false)
+    }
+  }
+
+  const locationOptions: OpsOption[] = useMemo(
+    () => [
+      { value: "all", label: "Todas las sedes" },
+      ...locations.map((l) => ({
+        value: l.location_id,
+        label: l.name,
+      })),
+    ],
+    [locations],
+  );
+
   useEffect(() => {
     let active = true;
 
@@ -132,7 +195,6 @@ export default function CashControlPage() {
   }, []);
 
   useEffect(() => {
-    // defer setPage to avoid synchronous setState inside effect
     void Promise.resolve().then(() => setPage(1));
   }, [range, status, locationId]);
 
@@ -150,15 +212,11 @@ export default function CashControlPage() {
         const [summaryData, sessionsData] = await Promise.all([
           apiFetch<CashAdminSummaryResponse>(
             `/api/cash/admin/summary?${summaryQuery}`,
-            {
-              cache: "no-store",
-            },
+            { cache: "no-store" },
           ),
           apiFetch<CashAdminSessionsResponse>(
             `/api/cash/admin/sessions?${sessionsQuery}`,
-            {
-              cache: "no-store",
-            },
+            { cache: "no-store" },
           ),
         ]);
 
@@ -171,7 +229,7 @@ export default function CashControlPage() {
           setSummary(null);
           setSessions(null);
           setError(
-            explainControlError(
+            explainApiError(
               loadError,
               "No se pudo cargar el control de cajas.",
             ),
@@ -189,7 +247,7 @@ export default function CashControlPage() {
     return () => {
       active = false;
     };
-  }, [range, status, locationId, page, reloadKey]);
+    }, [range, status, locationId, page, reloadKey]);
 
   const trendData = useMemo(() => {
     return (summary?.trend || []).map((item) => ({
@@ -207,6 +265,15 @@ export default function CashControlPage() {
           : item.location_name,
     }));
   }, [summary]);
+
+  const hasActiveFilters = status !== "all" || locationId !== "all";
+
+  function clearFilters() {
+    setRange("7d");
+    setStatus("all");
+    setLocationId("all");
+    setPage(1);
+  }
 
   if (loading && !summary && !sessions) {
     return (
@@ -234,472 +301,398 @@ export default function CashControlPage() {
   return (
     <PermissionGuard permission="cash.admin.view">
       <TooltipProvider delayDuration={120}>
-        <section className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
-          <div className="mx-auto max-w-7xl space-y-5">
-            <header className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-xs uppercase tracking-wide text-[var(--ripnel-accent-hover)]">
-                      Caja
-                    </p>
-                    <HelpTooltip content="Vista administrativa transversal para revisar varias sedes, estados de caja y alertas operativas sin intervenir otras cajas." />
-                  </div>
-                  <h1 className="mt-1 text-2xl font-semibold text-[var(--ops-text)] md:text-3xl">
-                    Control de cajas
-                  </h1>
-                </div>
+        <OpsPageShell width="wide">
+          <PosHeader
+            eyebrow="Caja"
+            title="Control de cajas"
 
-                <div className="flex flex-wrap gap-2">
-                  <Link
-                    href="/caja"
-                    className="sales-field sales-field-interactive inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--ops-text)] shadow-sm"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    Caja del día
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => setReloadKey((current) => current + 1)}
-                    className="sales-field sales-field-interactive inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--ops-text)] shadow-sm"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    Actualizar
-                  </button>
-                </div>
-              </div>
-            </header>
-
-            {error ? (
-              <div
-                role="alert"
-                aria-live="polite"
-                className="sales-chip sales-chip-danger rounded-xl px-4 py-3 text-sm"
-              >
-                {error}
-              </div>
-            ) : null}
-
-            <div className="sales-panel rounded-lg p-4 shadow-sm lg:flex lg:items-center lg:justify-between">
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { value: "7d", label: "7 días" },
-                  { value: "30d", label: "30 días" },
-                ].map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setRange(option.value as RangeFilter)}
-                    className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
-                      range === option.value
-                        ? "bg-[var(--ops-text)] text-[var(--ops-surface)]"
-                        : "sales-field text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { value: "all", label: "Todas" },
-                    { value: "open", label: "Pendientes" },
-                    { value: "closed", label: "Cerradas" },
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => setStatus(option.value as StatusFilter)}
-                      className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${
-                        status === option.value
-                          ? "bg-[var(--ripnel-accent)] text-white"
-                          : "sales-field text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]"
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-
-                <select
-                  value={locationId}
-                  onChange={(event) => setLocationId(event.target.value)}
-                  className="sales-field rounded-xl px-3 py-2 text-sm text-[var(--ops-text)] outline-none transition focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_72%,transparent)]"
+            actions={
+              <>
+                <Link
+                  href="/caja"
+                  className="sales-field sales-field-interactive inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--ops-text)] shadow-sm"
                 >
-                  <option value="all">Todas las sedes</option>
-                  {locations.map((location) => (
-                    <option
-                      key={location.location_id}
-                      value={location.location_id}
-                    >
-                      {location.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+                  <ArrowLeft className="h-4 w-4" />
+                  Caja del día
+                </Link>
+                <AdminActionButton
+                  onClick={() => setReloadKey((current) => current + 1)}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Actualizar
+                </AdminActionButton>
+              </>
+            }
+          />
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <article className="ops-metric-pill rounded-xl p-4 shadow-sm">
-                <p className="text-[11px] uppercase tracking-wide text-[var(--ops-text-muted)]">
-                  Sesiones
-                </p>
-                <p className="mt-2 text-2xl font-bold text-[var(--ops-text)]">
-                  {stats?.session_count || 0}
-                </p>
-              </article>
-              <article className="sales-chip sales-chip-warning rounded-xl p-4 shadow-sm">
-                <p className="text-[11px] uppercase tracking-wide text-amber-700">
-                  Pendientes de cierre
-                </p>
-                <p className="mt-2 text-2xl font-bold text-amber-800">
-                  {stats?.open_count || 0}
-                </p>
-              </article>
-              <article className="sales-chip sales-chip-success rounded-xl p-4 shadow-sm">
-                <p className="text-[11px] uppercase tracking-wide">
-                  Sedes abiertas
-                </p>
-                <p className="mt-2 text-2xl font-bold">
-                  {stats?.open_location_count || 0}
-                </p>
-              </article>
-              <article className="sales-chip sales-chip-accent rounded-xl p-4 shadow-sm">
-                <p className="text-[11px] uppercase tracking-wide">
-                  Total registrado
-                </p>
-                <p className="mt-2 text-2xl font-bold">
-                  {formatAmount(stats?.total_registered || 0)}
-                </p>
-              </article>
-            </div>
+          {error ? (
+            <InlineStatusCard
+              title="Error"
+              description={error}
+              tone="danger"
+              variant="ops"
+            />
+          ) : null}
 
-            <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-              <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
-                <div className="flex items-center gap-2">
-                  <LineChart className="h-4 w-4 text-sky-600" />
-                  <h2 className="text-sm font-semibold text-[var(--ops-text)]">
-                    Tendencia diaria
-                  </h2>
-                </div>
+          <OpsFiltersRow
+            className="lg:grid-cols-[0.92fr_0.84fr_0.95fr_auto]"
+          >
+            <OpsSelect
+              label="Rango"
+              value={range}
+              options={RANGE_OPTIONS}
+              onChange={(v) => { setRange(v as RangeFilter); setPage(1); }}
+            />
+            <OpsSelect
+              label="Estado"
+              value={status}
+              options={STATUS_OPTIONS}
+              onChange={(v) => { setStatus(v as StatusFilter); setPage(1); }}
+            />
+            <OpsSelect
+              label="Sede"
+              value={locationId}
+              options={locationOptions}
+              onChange={(v) => { setLocationId(v); setPage(1); }}
+            />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  className="h-10 w-10 rounded-lg"
+                  onClick={clearFilters}
+                  disabled={!hasActiveFilters}
+                  aria-label="Limpiar filtros"
+                >
+                  <RotateCw className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Limpiar filtros</TooltipContent>
+            </Tooltip>
+          </OpsFiltersRow>
 
-                <div className="mt-4 h-64">
-                  {trendData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={trendData}>
-                        <defs>
-                          <linearGradient
-                            id="cashTrend"
-                            x1="0"
-                            y1="0"
-                            x2="0"
-                            y2="1"
-                          >
-                            <stop
-                              offset="0%"
-                              stopColor="#0ea5e9"
-                              stopOpacity={0.35}
-                            />
-                            <stop
-                              offset="100%"
-                              stopColor="#0ea5e9"
-                              stopOpacity={0.02}
-                            />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid
-                          stroke="var(--ops-border-strong)"
-                          strokeDasharray="3 3"
-                        />
-                        <XAxis
-                          dataKey="short_date"
-                          tick={{ fontSize: 12, fill: "var(--ops-text-muted)" }}
-                        />
-                        <YAxis
-                          tick={{ fontSize: 12, fill: "var(--ops-text-muted)" }}
-                          tickFormatter={(value) => `S/. ${value}`}
-                          width={72}
-                        />
-                        <RechartsTooltip
-                          formatter={(value: number) => formatAmount(value)}
-                          labelFormatter={(label) => `Fecha ${label}`}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="total_registered"
-                          stroke="#0ea5e9"
-                          strokeWidth={2}
-                          fill="url(#cashTrend)"
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <InlineStatusCard
-                      title="Sin datos para la tendencia"
-                      description="Ajusta los filtros o espera nuevas sesiones registradas."
-                      tone="neutral"
-                      variant="ops"
-                    />
-                  )}
-                </div>
-              </article>
-
-              <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
-                <div className="flex items-center gap-2">
-                  <MapPinned className="h-4 w-4 text-violet-600" />
-                  <h2 className="text-sm font-semibold text-[var(--ops-text)]">
-                    Comparativo por sede
-                  </h2>
-                </div>
-
-                <div className="mt-4 h-64">
-                  {locationChartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={locationChartData}
-                        layout="vertical"
-                        margin={{ left: 24 }}
-                      >
-                        <CartesianGrid
-                          stroke="var(--ops-border-strong)"
-                          strokeDasharray="3 3"
-                          horizontal={false}
-                        />
-                        <XAxis
-                          type="number"
-                          tick={{ fontSize: 12, fill: "var(--ops-text-muted)" }}
-                        />
-                        <YAxis
-                          type="category"
-                          dataKey="short_name"
-                          tick={{ fontSize: 12, fill: "var(--ops-text-muted)" }}
-                          width={110}
-                        />
-                        <RechartsTooltip
-                          formatter={(value: number) => formatAmount(value)}
-                          labelFormatter={(label) => String(label)}
-                        />
-                        <Bar
-                          dataKey="total_registered"
-                          fill="var(--ripnel-accent)"
-                          radius={[0, 8, 8, 0]}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <InlineStatusCard
-                      title="Sin datos por sede"
-                      description="Todavía no hay suficiente información para comparar sedes con estos filtros."
-                      tone="neutral"
-                      variant="ops"
-                    />
-                  )}
-                </div>
-              </article>
-            </div>
-
-            <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-              <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                  <h2 className="text-sm font-semibold text-[var(--ops-text)]">
-                    Sesiones multi-sede
-                  </h2>
-                </div>
-
-                {!sessions || sessions.items.length === 0 ? (
-                  <div className="mt-4">
-                    <InlineStatusCard
-                      title="Sin sesiones para mostrar"
-                      description="No hay sesiones registradas para los filtros seleccionados."
-                      tone="neutral"
-                      variant="ops"
-                    />
-                  </div>
-                ) : (
-                  <>
-                    <div className="mt-4 hidden grid-cols-[0.9fr_0.95fr_1fr_0.85fr_36px] items-center gap-3 border-b border-[var(--ops-border-strong)] px-3 pb-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--ops-text-muted)] md:grid">
-                      <span>Fecha / estado</span>
-                      <span>Sede</span>
-                      <span>Apertura / cierre</span>
-                      <span className="text-right">Total</span>
-                      <span />
-                    </div>
-
-                    <div className="divide-y divide-[var(--ops-border-strong)]">
-                      {sessions.items.map((closing) => (
-                        <Link
-                          key={closing.cash_closing_id}
-                          href={`/caja/historial/${closing.cash_closing_id}`}
-                          className="grid gap-3 px-3 py-4 transition hover:bg-[var(--ops-surface-muted)] md:grid-cols-[0.9fr_0.95fr_1fr_0.85fr_36px] md:items-center"
-                        >
-                          <div className="space-y-2">
-                            <p className="text-sm font-semibold text-[var(--ops-text)]">
-                              {formatBusinessDate(closing.business_date)}
-                            </p>
-                            <CashStatusBadge status={closing.status} />
-                          </div>
-
-                          <div className="space-y-1 text-sm text-[var(--ops-text-muted)]">
-                            <p className="font-medium text-[var(--ops-text)]">
-                              {closing.location_name}
-                            </p>
-                            <p>
-                              {closing.opened_by_name ||
-                                "Usuario no identificado"}
-                            </p>
-                          </div>
-
-                          <div className="space-y-1 text-sm text-[var(--ops-text-muted)]">
-                            <p>
-                              Apertura: {formatDateTime(closing.created_at)}
-                            </p>
-                            <p>
-                              {closing.closed_at
-                                ? `Cierre: ${formatDateTime(closing.closed_at)}`
-                                : "Cierre pendiente"}
-                            </p>
-                          </div>
-
-                          <div className="text-left md:text-right">
-                            <p className="text-sm font-semibold text-[var(--ops-text)]">
-                              {formatAmount(closing.total_all)}
-                            </p>
-                            {closing.is_consistent === false ? (
-                              <p className="text-xs text-amber-700">
-                                Dif. {formatAmount(closing.difference)}
-                              </p>
-                            ) : (
-                              <p className="text-xs text-emerald-700">
-                                Consistencia OK
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="flex items-center justify-end text-[var(--ops-text-muted)]">
-                            <ChevronRight className="h-4 w-4" />
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-
-                    <div className="mt-4 flex flex-col gap-3 border-t border-[var(--ops-border-strong)] pt-4 md:flex-row md:items-center md:justify-between">
-                      <p className="text-sm text-[var(--ops-text-muted)]">
-                        Página {pagination?.page || 1} de{" "}
-                        {pagination?.total_pages || 1}
-                      </p>
-
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setPage((current) => Math.max(current - 1, 1))
-                          }
-                          disabled={!pagination || pagination.page <= 1}
-                          className="sales-field sales-field-interactive rounded-xl px-3 py-2 text-sm font-medium text-[var(--ops-text)] disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          Anterior
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setPage((current) =>
-                              Math.min(
-                                current + 1,
-                                pagination?.total_pages || current,
-                              ),
-                            )
-                          }
-                          disabled={
-                            !pagination ||
-                            pagination.page >= pagination.total_pages
-                          }
-                          className="sales-field sales-field-interactive rounded-xl px-3 py-2 text-sm font-medium text-[var(--ops-text)] disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          Siguiente
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </article>
-
-              <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-600" />
-                  <h2 className="text-sm font-semibold text-[var(--ops-text)]">
-                    Alertas operativas
-                  </h2>
-                </div>
-
-                <div className="mt-4 space-y-4">
-                  <div className="sales-panel-muted rounded-xl p-4">
-                    <p className="text-xs uppercase tracking-wide text-[var(--ops-text-muted)]">
-                      Sedes con caja pendiente
-                    </p>
-                    <div className="mt-3 space-y-2">
-                      {summary?.alerts.open_locations.length ? (
-                        summary.alerts.open_locations.map((location) => (
-                          <div
-                            key={location.location_id}
-                            className="sales-field flex items-center justify-between rounded-xl px-3 py-2"
-                          >
-                            <span className="text-sm text-[var(--ops-text)]">
-                              {location.location_name}
-                            </span>
-                            <span className="text-sm font-semibold text-amber-700">
-                              {location.open_count}
-                            </span>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-sm text-[var(--ops-text-muted)]">
-                          No hay sedes pendientes con estos filtros.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="sales-panel-muted rounded-xl p-4">
-                    <p className="text-xs uppercase tracking-wide text-[var(--ops-text-muted)]">
-                      Diferencias por revisar
-                    </p>
-                    <div className="mt-3 space-y-2">
-                      {summary?.alerts.inconsistent_sessions.length ? (
-                        summary.alerts.inconsistent_sessions.map((session) => (
-                          <Link
-                            key={session.cash_closing_id}
-                            href={`/caja/historial/${session.cash_closing_id}`}
-                            className="sales-field sales-field-interactive flex items-center justify-between gap-3 rounded-xl px-3 py-2"
-                          >
-                            <div>
-                              <p className="text-sm font-medium text-[var(--ops-text)]">
-                                {session.location_name}
-                              </p>
-                              <p className="text-xs text-[var(--ops-text-muted)]">
-                                {formatBusinessDate(session.business_date)}
-                              </p>
-                            </div>
-                            <span className="text-sm font-semibold text-amber-700">
-                              {formatAmount(session.difference)}
-                            </span>
-                          </Link>
-                        ))
-                      ) : (
-                        <p className="text-sm text-[var(--ops-text-muted)]">
-                          No hay diferencias activas para revisar.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </article>
-            </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <OpsMetricCard
+              icon={<ShieldCheck className="h-4 w-4" />}
+              label="Sesiones"
+              value={stats?.session_count || 0}
+            />
+            <OpsMetricCard
+              icon={<LineChart className="h-4 w-4" />}
+              label="Total registrado"
+              value={formatAmount(stats?.total_registered || 0)}
+              tone="accent"
+            />
+            <OpsMetricCard
+              icon={<AlertTriangle className="h-4 w-4" />}
+              label="Pendientes de cierre"
+              value={stats?.open_count || 0}
+              tone="warning"
+            />
+            <OpsMetricCard
+              icon={<MapPinned className="h-4 w-4" />}
+              label="Sedes abiertas"
+              value={stats?.open_location_count || 0}
+              tone="success"
+            />
           </div>
-        </section>
+
+          <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
+            <DashboardChartCard
+              title="Tendencia diaria"
+              subtitle="Evolución del total registrado por fecha"
+              height={260}
+            >
+              {trendData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={260}>
+                  <AreaChart data={trendData}>
+                    <defs>
+                      <linearGradient
+                        id="cashTrend"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="0%"
+                          stopColor="var(--ripnel-accent)"
+                          stopOpacity={0.35}
+                        />
+                        <stop
+                          offset="100%"
+                          stopColor="var(--ripnel-accent)"
+                          stopOpacity={0.02}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid
+                      stroke="var(--ops-border-strong)"
+                      strokeDasharray="3 3"
+                    />
+                    <XAxis
+                      dataKey="short_date"
+                      tick={{ fontSize: 12, fill: "var(--ops-text-muted)" }}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 12, fill: "var(--ops-text-muted)" }}
+                      tickFormatter={(value) => `S/. ${value}`}
+                      width={72}
+                    />
+                    <RechartsTooltip
+                      formatter={(value: number) => formatAmount(value)}
+                      labelFormatter={(label) => `Fecha ${label}`}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="total_registered"
+                      stroke="var(--ripnel-accent)"
+                      strokeWidth={2}
+                      fill="url(#cashTrend)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <InlineStatusCard
+                  title="Sin datos para la tendencia"
+                  description="Ajusta los filtros o espera nuevas sesiones registradas."
+                  tone="neutral"
+                  variant="ops"
+                />
+              )}
+            </DashboardChartCard>
+
+            <DashboardChartCard
+              title="Comparativo por sede"
+              subtitle="Top 6 sedes por total registrado"
+              height={260}
+            >
+              {locationChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart
+                    data={locationChartData}
+                    layout="vertical"
+                    margin={{ left: 24 }}
+                  >
+                    <CartesianGrid
+                      stroke="var(--ops-border-strong)"
+                      strokeDasharray="3 3"
+                      horizontal={false}
+                    />
+                    <XAxis
+                      type="number"
+                      tick={{ fontSize: 12, fill: "var(--ops-text-muted)" }}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="short_name"
+                      tick={{ fontSize: 12, fill: "var(--ops-text-muted)" }}
+                      width={110}
+                    />
+                    <RechartsTooltip
+                      formatter={(value: number) => formatAmount(value)}
+                      labelFormatter={(label) => String(label)}
+                    />
+                    <Bar
+                      dataKey="total_registered"
+                      fill="var(--ripnel-accent)"
+                      radius={[0, 8, 8, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <InlineStatusCard
+                  title="Sin datos por sede"
+                  description="Todavía no hay suficiente información para comparar sedes con estos filtros."
+                  tone="neutral"
+                  variant="ops"
+                />
+              )}
+            </DashboardChartCard>
+          </div>
+
+          {/* Title - spans both columns */}
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-[var(--ops-text-muted)]" />
+            <h2 className="text-sm font-semibold text-[var(--ops-text)]">
+              Sesiones multi-sede
+            </h2>
+          </div>
+
+          {/* Sub-grid for table + alerts side by side */}
+          <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+            <div className="min-w-0">
+              <OpsDataTable
+                columns={tableColumns}
+                isEmpty={!sessions || sessions.items.length === 0}
+                emptyMessage="No hay sesiones registradas para los filtros seleccionados."
+                footer={
+                  sessions && sessions.items.length > 0 ? (
+                    <Pagination
+                      page={pagination?.page || 1}
+                      totalPages={pagination?.total_pages || 1}
+                      onPageChange={setPage}
+                    />
+                  ) : undefined
+                }
+              >
+                {sessions?.items.map((closing) => (
+                  <tr
+                    key={closing.cash_closing_id}
+                    className="text-sm text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
+                  >
+                    <td className="px-4 py-[var(--ops-row-py)]">
+                      <div className="space-y-2">
+                        <p className="font-semibold">
+                          {formatBusinessDate(closing.business_date)}
+                        </p>
+                        <CashStatusBadge status={closing.status} />
+                      </div>
+                    </td>
+                    <td className="px-4 py-[var(--ops-row-py)] text-[var(--ops-text-muted)]">
+                      <p className="font-medium text-[var(--ops-text)]">
+                        {closing.location_name}
+                      </p>
+                      <p>
+                        {closing.opened_by_name ||
+                          "Usuario no identificado"}
+                      </p>
+                    </td>
+                    <td className="px-4 py-[var(--ops-row-py)] text-[var(--ops-text-muted)]">
+                      <p>
+                        Apertura: {formatDateTime(closing.created_at)}
+                      </p>
+                      <p>
+                        {closing.closed_at
+                          ? `Cierre: ${formatDateTime(closing.closed_at)}`
+                          : "Cierre pendiente"}
+                      </p>
+                    </td>
+                    <td className="px-4 py-[var(--ops-row-py)]">
+                      <p className="font-semibold">
+                        {formatAmount(closing.total_all)}
+                      </p>
+                      {closing.is_consistent === false ? (
+                        <p className="text-xs text-[var(--ops-tone-warning-text)]">
+                          Dif. {formatAmount(closing.difference)}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-[var(--ops-tone-success-text)]">
+                          Consistencia OK
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-4 py-[var(--ops-row-py)]">
+                      <div className="flex items-center gap-2">
+                        {canReopenCash && closing.status === "closed" ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="rounded-lg"
+                            disabled={reopeningCash}
+                            onClick={() => {
+                              setReopenNotes("")
+                              setReopenTarget(closing.cash_closing_id)
+                            }}
+                          >
+                            Reabrir
+                          </Button>
+                        ) : null}
+                        <Link
+                          href={`/caja/historial/${closing.cash_closing_id}`}
+                          className="inline-flex items-center text-[var(--ops-text-muted)] transition hover:text-[var(--ops-text)]"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </OpsDataTable>
+            </div>
+
+            <OpsPanel>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-[var(--ops-tone-warning-text)]" />
+                <h2 className="text-sm font-semibold text-[var(--ops-text)]">
+                  Alertas operativas
+                </h2>
+              </div>
+
+              <div className="mt-4 space-y-2">
+                {summary && summary.alerts.open_locations.length > 0 &&
+                  summary.alerts.open_locations.map((location) => (
+                    <OpsAttentionRow
+                      key={location.location_id}
+                      icon={<AlertTriangle className="h-4 w-4" />}
+                      title={location.location_name}
+                      description={`${location.open_count} sesión abierta`}
+                      ctaLabel="Ver"
+                      href={`/caja/historial`}
+                      highlightValue={String(location.open_count)}
+                      badge="Pendiente"
+                      tone="warning"
+                      embedded
+                    />
+                  ))}
+                {summary && summary.alerts.inconsistent_sessions.length > 0 &&
+                  summary.alerts.inconsistent_sessions.map((session) => (
+                    <OpsAttentionRow
+                      key={session.cash_closing_id}
+                      icon={<AlertTriangle className="h-4 w-4" />}
+                      title={session.location_name}
+                      description={formatBusinessDate(session.business_date)}
+                      ctaLabel="Revisar"
+                      href={`/caja/historial/${session.cash_closing_id}`}
+                      highlightValue={formatAmount(session.difference)}
+                      tone="danger"
+                      embedded
+                    />
+                  ))}
+                {!summary || (summary.alerts.open_locations.length === 0 &&
+                  summary.alerts.inconsistent_sessions.length === 0) && (
+                  <p className="text-sm text-[var(--ops-text-muted)]">
+                    No hay alertas operativas con estos filtros.
+                  </p>
+                )}
+              </div>
+            </OpsPanel>
+          </div>
+        </OpsPageShell>
       </TooltipProvider>
+
+      <OpsDialog
+        open={reopenTarget !== null}
+        onOpenChange={(open) => { if (!open) setReopenTarget(null) }}
+        title="Reabrir caja"
+        description="Confirma la reapertura de esta sesion de caja."
+        size="sm"
+        bodyClassName="space-y-4"
+        footer={
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button type="button" variant="outline" size="sm" className="rounded-lg px-4" onClick={() => setReopenTarget(null)} disabled={reopeningCash}>
+              Cancelar
+            </Button>
+            <Button type="button" variant="accent" size="sm" className="rounded-lg px-4" onClick={handleReopenCash} disabled={reopeningCash || !reopenNotes.trim()}>
+              {reopeningCash ? "Reabriendo..." : "Reabrir caja"}
+            </Button>
+          </div>
+        }
+      >
+        <OpsFormField label="Motivo de reapertura" required density="compact">
+          <input
+            value={reopenNotes}
+            onChange={(event) => setReopenNotes(event.target.value)}
+            placeholder="Ej. Error en cierre, venta pendiente de registrar..."
+            className="sales-field h-9 w-full rounded-lg px-3 py-2 text-sm"
+          />
+        </OpsFormField>
+        <p className="text-sm text-[var(--ops-text-muted)]">
+          Al reabrir la caja se volvera a habilitar el registro de ventas en esa sede para la fecha de la sesion. Esta accion quedara registrada en el historial.
+        </p>
+      </OpsDialog>
     </PermissionGuard>
   );
 }

@@ -1,30 +1,35 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import {
+  AlertTriangle,
   ArrowRightLeft,
   Banknote,
   CheckCircle2,
-  ChevronDown,
   Clock3,
   RefreshCw,
   Smartphone,
-  X,
 } from "lucide-react";
 
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { InlineStatusCard } from "@/components/feedback/status-page";
+import { LoadingPage } from "@/components/feedback/status-page";
 import { useAuth } from "@/components/auth/AuthProvider";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { OpsPageShell } from "@/components/ui/ops-page-shell";
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
+import { OpsActionBanner } from "@/components/ui/ops-action-banner";
+import { Button } from "@/components/ui/button";
+import { OpsPanelMuted } from "@/components/ui/ops-panel";
+import { OpsMetricCard } from "@/components/ui/ops-metric-card";
+import { OpsMetricRow } from "@/components/ui/ops-metric-row";
 import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
-import { ApiError, apiFetch } from "@/lib/api";
+import { AdminActionButton } from "@/components/admin/admin-ui";
+import { OpsDialog } from "@/components/ui/ops-dialog";
+import { apiFetch } from "@/lib/api";
 import { useApiGet } from "@/hooks/use-api-get";
 import { resolveCashCapabilities } from "@/lib/capabilities";
 import {
@@ -33,51 +38,16 @@ import {
   formatBusinessDate,
 } from "@/lib/cash";
 import { showSuccess, showError } from "@/lib/toast";
+import { explainApiError } from "@/components/modules/sales/pos/pos-utils";
+
+import { HelpTooltip } from "@/components/ui/help-tooltip";
 
 const METHOD_CONFIG = [
-  {
-    key: "cash" as const,
-    label: "Efectivo",
-    icon: Banknote,
-    valueClass: "text-[var(--ops-text)]",
-  },
-  {
-    key: "yape" as const,
-    label: "Yape",
-    icon: Smartphone,
-    valueClass: "text-[var(--ops-text)]",
-  },
-  {
-    key: "plin" as const,
-    label: "Plin",
-    icon: Smartphone,
-    valueClass: "text-[var(--ops-text)]",
-  },
-  {
-    key: "transfer" as const,
-    label: "Transferencia",
-    icon: ArrowRightLeft,
-    valueClass: "text-[var(--ops-text)]",
-  },
+  { key: "cash" as const, label: "Efectivo", icon: Banknote },
+  { key: "yape" as const, label: "Yape", icon: Smartphone },
+  { key: "plin" as const, label: "Plin", icon: Smartphone },
+  { key: "transfer" as const, label: "Transferencia", icon: ArrowRightLeft },
 ];
-
-function explainCashError(error: unknown, fallback: string) {
-  if (!(error instanceof ApiError)) {
-    return error instanceof Error ? error.message : fallback;
-  }
-
-  if (error.status === 409) {
-    return error.message;
-  }
-
-  if (error.status === 403) {
-    return "Tu usuario no tiene permisos para operar caja.";
-  }
-
-  return error.message || fallback;
-}
-
-import { HelpTooltip } from "@/components/ui/help-tooltip"
 
 export default function CajaPage() {
   const { defaultLocation, permissions } = useAuth();
@@ -109,9 +79,9 @@ export default function CajaPage() {
         body: JSON.stringify({ location_id: locationId }),
       });
       refetch();
-      showSuccess("Caja abierta", "La sesión de caja está lista para operar.")
+      showSuccess("Caja abierta", "La sesión de caja está lista para operar.");
     } catch (err) {
-      showError("Error al abrir caja", explainCashError(err, "No se pudo aperturar la caja."))
+      showError("Error al abrir caja", explainApiError(err, "No se pudo aperturar la caja."));
     } finally {
       setActionLoading(false);
     }
@@ -131,9 +101,9 @@ export default function CajaPage() {
       setShowCloseConfirm(false);
       setCloseNotes("");
       refetch();
-      showSuccess("Caja cerrada", "La jornada fue cerrada correctamente.")
+      showSuccess("Caja cerrada", "La jornada fue cerrada correctamente.");
     } catch (err) {
-      showError("Error al cerrar caja", explainCashError(err, "No se pudo cerrar la caja."))
+      showError("Error al cerrar caja", explainApiError(err, "No se pudo cerrar la caja."));
     } finally {
       setActionLoading(false);
     }
@@ -143,16 +113,14 @@ export default function CajaPage() {
     return (
       <ErrorBoundary>
         <PermissionGuard anyPermissions={["cash.view", "cash.operate"]}>
-          <section className="sales-page min-h-dvh px-4 py-[var(--ops-page-py)] md:px-8">
-            <div className="mx-auto max-w-4xl">
-              <InlineStatusCard
-                title="Sin sede asignada"
-                description="Tu usuario no tiene una sede default configurada. Contacta a un administrador antes de aperturar caja."
-                tone="warning"
-                variant="ops"
-              />
-            </div>
-          </section>
+          <OpsPageShell>
+            <InlineStatusCard
+              title="Sin sede asignada"
+              description="Tu usuario no tiene una sede default configurada. Contacta a un administrador antes de aperturar caja."
+              tone="warning"
+              variant="ops"
+            />
+          </OpsPageShell>
         </PermissionGuard>
       </ErrorBoundary>
     );
@@ -160,378 +128,264 @@ export default function CajaPage() {
 
   const isClosed = current?.closing?.status === "closed";
   const isOpen = current?.closing?.status === "open";
-  const hasNoClosing = current !== null && current.closing === null;
   const summary = current?.sales_summary;
   const businessDate = current?.business_date;
   const consistencyOk = summary?.consistency.is_consistent ?? true;
+
+  const cashStatusMeta = businessDate ? (
+    <span className="inline-flex items-center gap-1 text-sm font-medium text-[var(--ops-text)]">
+      {formatBusinessDate(businessDate)}
+      <HelpTooltip content="La fecha operativa corresponde al día de trabajo de la sede actual en horario de Lima." />
+    </span>
+  ) : null;
+
+  const headerActions = (
+    <div className="flex flex-wrap items-center gap-2">
+      {isOpen ? (
+        <Button variant="outline" size="sm" className="rounded-lg gap-2" asChild>
+          <Link href="/ventas">Ir a venta</Link>
+        </Button>
+      ) : null}
+      <Button variant="outline" size="sm" className="rounded-lg gap-2" asChild>
+        <Link href="/caja/historial">Historial</Link>
+      </Button>
+      <AdminActionButton
+        onClick={refetch}
+        disabled={loading || actionLoading}
+      >
+        <RefreshCw className="h-4 w-4" />
+        Actualizar
+      </AdminActionButton>
+    </div>
+  );
+
+  const cashStatusBanner = isOpen ? (
+    <OpsActionBanner
+      icon={CheckCircle2}
+      tone="success"
+      title="Caja operativa abierta"
+      description={
+        current?.closing?.opened_by_name
+          ? `Abierta por ${current.closing.opened_by_name}`
+          : undefined
+      }
+      actionLabel="Cerrar caja"
+      actionTone="neutral"
+      onAction={() => setShowCloseConfirm(true)}
+      loading={actionLoading}
+    />
+  ) : isClosed ? (
+    <OpsActionBanner
+      icon={Clock3}
+      tone="neutral"
+      title="Caja cerrada"
+      description={
+        current?.closing?.closed_by_name
+          ? `Cerrada por ${current.closing.closed_by_name}`
+          : undefined
+      }
+    />
+  ) : (
+    <OpsActionBanner
+      icon={Clock3}
+      tone="warning"
+      title="Aún no se abrió caja"
+      description="Abre caja para habilitar ventas en esta sede."
+      actionLabel="Abrir caja"
+      actionTone="accent"
+      onAction={handleOpen}
+      loading={actionLoading}
+    />
+  );
+
+  const summaryMetricItems = summary
+    ? [
+        {
+          key: "total",
+          icon: <Banknote className="h-4 w-4" />,
+          label: (
+            <>
+              Total del día
+              <HelpTooltip content="Suma de ventas confirmadas en la fecha operativa actual." />
+            </>
+          ),
+          value: formatAmount(summary.grand_total),
+          tone: "accent" as const,
+        },
+        {
+          key: "ventas",
+          icon: <CheckCircle2 className="h-4 w-4" />,
+          label: "Ventas",
+          value: `${summary.sale_count} confirmadas`,
+          tone: "success" as const,
+        },
+        {
+          key: "consistencia",
+          icon: consistencyOk ? (
+            <CheckCircle2 className="h-4 w-4" />
+          ) : (
+            <AlertTriangle className="h-4 w-4" />
+          ),
+          label: (
+            <>
+              Consistencia
+              <HelpTooltip content="Compara el total de ventas contra los pagos registrados. Si no cuadra, revisa posibles diferencias." />
+            </>
+          ),
+          value: consistencyOk ? "Cuadra" : "Revisar",
+          tone: consistencyOk ? ("success" as const) : ("warning" as const),
+        },
+      ]
+    : null;
 
   return (
     <ErrorBoundary>
       <PermissionGuard anyPermissions={["cash.view", "cash.operate"]}>
         <TooltipProvider delayDuration={120}>
-          <section className="sales-page min-h-dvh px-4 py-[var(--ops-page-py)] md:px-8">
-            <div className="mx-auto max-w-5xl space-y-5">
-              <header className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
-                <p className="text-xs uppercase tracking-wide text-[var(--ripnel-accent-hover)]">
-                  Operaciones de caja
-                </p>
-                <h1 className="mt-1 text-2xl font-semibold text-[var(--ops-text)] md:text-3xl">
-                  Caja del día
-                </h1>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-[var(--ops-text-muted)]">
-                  <span>{defaultLocation.name}</span>
-                  {businessDate ? (
-                    <>
-                      <span className="text-[var(--ops-border-soft)]">•</span>
-                      <span className="font-medium text-[var(--ops-text)]">
-                        {formatBusinessDate(businessDate)}
-                      </span>
-                      <HelpTooltip content="La fecha operativa corresponde al día de trabajo de la sede actual en horario de Lima." />
-                    </>
-                  ) : null}
-                </div>
-              </header>
+          <OpsPageShell>
+            <PosHeader
+              eyebrow="Caja"
+              title="Caja del día"
+              meta={cashStatusMeta}
+              actions={headerActions}
+            />
 
-              {(error || actionError) ? (
-                <div
-                  role="alert"
-                  aria-live="polite"
-                  className="sales-chip sales-chip-danger flex items-center gap-3 rounded-xl px-4 py-3 text-sm"
-                >
-                  <X className="h-4 w-4 shrink-0" />
-                  {actionError || error}
-                  <button
-                    onClick={() => setActionError(null)}
-                    className="ml-auto text-current transition hover:opacity-80"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ) : null}
+            {(error || actionError) ? (
+              <InlineStatusCard
+                title="Error de caja"
+                description={actionError || error || ""}
+                tone="danger"
+                variant="ops"
+              />
+            ) : null}
 
-              {!canOperateCash ? (
-                <InlineStatusCard
-                  title="Acceso de consulta"
-                  description="Tu usuario puede revisar la caja y su consistencia, pero no aperturar ni cerrar sesiones desde esta pantalla."
-                  tone="warning"
-                  variant="ops"
-                />
-              ) : null}
+            {!canOperateCash ? (
+              <InlineStatusCard
+                title="Acceso de consulta"
+                description="Tu usuario puede revisar la caja y su consistencia, pero no aperturar ni cerrar sesiones desde esta pantalla."
+                tone="warning"
+                variant="ops"
+              />
+            ) : null}
 
-              {loading ? (
-                <div className="flex items-center justify-center py-16 text-[var(--ops-text-muted)]">
-                  <RefreshCw className="h-5 w-5 animate-spin" />
-                  <span className="ml-2 text-sm">Cargando caja...</span>
-                </div>
-              ) : (
-                <>
-                  <article
-                    className={`sales-panel rounded-lg p-5 shadow-sm md:p-6 ${
-                      isOpen
-                        ? "border-emerald-300/70 bg-[color:color-mix(in_srgb,#22c55e_12%,var(--ops-surface))]"
-                        : isClosed
-                          ? "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)]"
-                          : "border-amber-300/70 bg-[color:color-mix(in_srgb,#f59e0b_13%,var(--ops-surface))]"
-                    }`}
-                  >
-                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                      <div className="flex items-center gap-3">
-                        {isOpen ? (
-                          <CheckCircle2 className="h-6 w-6 text-emerald-600" />
-                        ) : isClosed ? (
-                          <X className="h-6 w-6 text-slate-500" />
-                        ) : (
-                          <Clock3 className="h-6 w-6 text-amber-600" />
-                        )}
+            {loading ? (
+              <LoadingPage
+                title="Cargando caja"
+                description="Consultando el estado de la caja actual para tu sede operativa."
+                variant="ops"
+              />
+            ) : (
+              <>
+                {cashStatusBanner}
 
-                        <div>
-                          <p
-                            className={`text-lg font-semibold ${
-                              isOpen
-                                ? "text-emerald-700"
-                                : isClosed
-                                  ? "text-[var(--ops-text)]"
-                                  : "text-amber-700"
-                            }`}
-                          >
-                            {isOpen
-                              ? "Caja operativa abierta"
-                              : isClosed
-                                ? "Caja operativa cerrada"
-                                : "Aún no se abrió caja"}
-                          </p>
-
-                          {isOpen && current?.closing?.opened_by_name ? (
-                            <p className="text-sm text-emerald-700/90">
-                              Aperturada por{" "}
-                              <span className="font-medium">
-                                {current.closing.opened_by_name}
-                              </span>
-                            </p>
-                          ) : null}
-
-                          {isClosed && current?.closing?.closed_by_name ? (
-                            <p className="text-sm text-[var(--ops-text-muted)]">
-                              Cerrada por{" "}
-                              <span className="font-medium">
-                                {current.closing.closed_by_name}
-                              </span>
-                            </p>
-                          ) : null}
-
-                          {hasNoClosing ? (
-                            <p className="text-sm text-amber-700/90">
-                              Abre caja para habilitar ventas en esta sede.
-                            </p>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        {hasNoClosing ? (
-                          <button
-                            onClick={handleOpen}
-                            disabled={actionLoading || !canOperateCash}
-                            className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-60"
-                          >
-                            {actionLoading ? "Abriendo..." : "Abrir caja"}
-                          </button>
-                        ) : null}
-
-                        {isOpen ? (
-                          <button
-                            onClick={() => setShowCloseConfirm(true)}
-                            disabled={actionLoading || !canOperateCash}
-                            className="rounded-xl bg-[var(--ops-text)] px-4 py-2 text-sm font-semibold text-[var(--ops-surface)] shadow-sm transition hover:opacity-90 disabled:opacity-60"
-                          >
-                            Cerrar caja
-                          </button>
-                        ) : null}
-
-                        <button
-                          onClick={refetch}
-                          disabled={loading || actionLoading}
-                          className="sales-field sales-field-interactive rounded-xl px-3 py-2 text-[var(--ops-text-muted)] disabled:opacity-60"
-                          title="Actualizar"
-                        >
-                          <RefreshCw className="h-4 w-4" />
-                        </button>
-                      </div>
+                {summary && summaryMetricItems ? (
+                  <>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      {summaryMetricItems.map((item) => (
+                        <OpsMetricCard
+                          key={item.key}
+                          icon={item.icon}
+                          label={item.label}
+                          value={item.value}
+                          tone={item.tone}
+                          className="px-3 py-3.5"
+                        />
+                      ))}
                     </div>
-                  </article>
 
-                  {summary ? (
-                    <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-                      <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="text-xs uppercase tracking-wide text-[var(--ops-text-muted)]">
-                                Total del día
-                              </p>
-                              <HelpTooltip content="Suma las ventas confirmadas de la sede en la fecha operativa actual." />
-                            </div>
-                            <p className="mt-2 text-4xl font-bold text-[var(--ops-text)]">
-                              {formatAmount(summary.grand_total)}
-                            </p>
-                          </div>
-
-                          <div className="sales-chip sales-chip-accent rounded-xl px-4 py-3 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <p className="text-[11px] uppercase tracking-wide">
-                                Ventas confirmadas
-                              </p>
-                              <HelpTooltip content="Cantidad de ventas confirmadas para la sede actual en esta fecha operativa." />
-                            </div>
-                            <p className="mt-1 text-2xl font-bold">
-                              {summary.sale_count}
-                            </p>
-                          </div>
-                        </div>
-                      </article>
-
-                      <Collapsible className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="text-xs uppercase tracking-wide text-[var(--ops-text-muted)]">
-                                Pagos del sistema
-                              </p>
-                              <HelpTooltip content="Total de pagos registrados en el sistema para la fecha operativa actual." />
-                            </div>
-                            <p className="mt-1 text-2xl font-bold text-[var(--ops-text)]">
-                              {formatAmount(summary.consistency.payment_total)}
-                            </p>
-                          </div>
-
-                          <CollapsibleTrigger className="sales-field sales-field-interactive group inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[var(--ops-text)]">
-                            Ver medios de pago
-                            <ChevronDown className="h-4 w-4 transition group-data-[state=open]:rotate-180" />
-                          </CollapsibleTrigger>
-                        </div>
-
-                        <CollapsibleContent className="mt-4 space-y-2">
-                          {METHOD_CONFIG.map((method) => {
-                            const Icon = method.icon;
-                            const value = summary.by_method[method.key];
-
-                            return (
-                              <div
-                                key={method.key}
-                                className="sales-panel-muted flex items-center justify-between rounded-xl px-4 py-3"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <Icon className="h-4 w-4 text-[var(--ops-text-muted)]" />
-                                  <span className="text-sm font-medium text-[var(--ops-text)]">
-                                    {method.label}
-                                  </span>
-                                </div>
-                                <span
-                                  className={`text-sm font-semibold ${method.valueClass}`}
-                                >
-                                  {formatAmount(value)}
-                                </span>
-                              </div>
-                            );
-                          })}
-                        </CollapsibleContent>
-                      </Collapsible>
-                    </div>
-                  ) : null}
-
-                  {summary ? (
-                    <article
-                      className={`sales-panel rounded-lg p-4 shadow-sm md:px-5 md:py-4 ${
-                        consistencyOk
-                          ? "border-emerald-300/70 bg-[color:color-mix(in_srgb,#22c55e_12%,var(--ops-surface))]"
-                          : "border-amber-300/70 bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))]"
-                      }`}
-                    >
-                      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p
-                              className={`text-xs uppercase tracking-wide ${
-                                consistencyOk
-                                  ? "text-emerald-700"
-                                  : "text-amber-700"
-                              }`}
-                            >
-                              {consistencyOk
-                                ? "Caja cuadra"
-                                : "Revisar diferencia"}
-                            </p>
-                            <HelpTooltip content="La diferencia compara ventas confirmadas contra pagos registrados en el sistema. No representa conteo físico." />
-                          </div>
-                        </div>
-
-                        <div className="grid gap-2 sm:grid-cols-3 md:min-w-[28rem]">
-                          <div className="sales-panel-muted rounded-xl px-4 py-3">
-                            <p className="text-[11px] uppercase tracking-wide text-[var(--ops-text-muted)]">
-                              Ventas
-                            </p>
-                            <p className="mt-1 text-lg font-semibold text-[var(--ops-text)]">
-                              {formatAmount(summary.grand_total)}
-                            </p>
-                          </div>
-                          <div className="sales-panel-muted rounded-xl px-4 py-3">
-                            <p className="text-[11px] uppercase tracking-wide text-[var(--ops-text-muted)]">
-                              Pagos
-                            </p>
-                            <p className="mt-1 text-lg font-semibold text-[var(--ops-text)]">
-                              {formatAmount(summary.consistency.payment_total)}
-                            </p>
-                          </div>
-                          <div className="sales-panel-muted rounded-xl px-4 py-3">
-                            <p className="text-[11px] uppercase tracking-wide text-[var(--ops-text-muted)]">
-                              Diferencia
-                            </p>
-                            <p
-                              className={`mt-1 text-lg font-semibold ${
-                                consistencyOk
-                                  ? "text-emerald-800"
-                                  : "text-amber-800"
-                              }`}
-                            >
-                              {formatAmount(summary.consistency.difference)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </article>
-                  ) : null}
-                </>
-              )}
-
-              {showCloseConfirm && canOperateCash ? (
-                <div className="ops-overlay-backdrop fixed inset-0 z-50 flex items-center justify-center px-4">
-                  <div className="ops-overlay-panel w-full max-w-md rounded-2xl p-6">
-                    <h2 className="text-lg font-semibold text-[var(--ops-text)]">
-                      Confirmar cierre de caja
-                    </h2>
-                    <p className="mt-1 text-sm text-[var(--ops-text-muted)]">
-                      Se consolidarán los pagos registrados y ventas confirmadas
-                      de la fecha operativa actual para esta sede.
-                    </p>
-
-                    {summary ? (
-                      <div className="sales-panel-muted mt-4 space-y-1 rounded-xl p-4">
+                    <OpsPanelMuted className="mt-4">
+                      <p className="text-xs uppercase tracking-wide text-[var(--ops-text-muted)]">
+                        Medios de pago
+                      </p>
+                      <div className="mt-3 space-y-1.5">
                         {METHOD_CONFIG.map((method) => (
-                          <div
-                            key={method.key}
-                            className="flex justify-between text-sm"
-                          >
-                            <span className="text-[var(--ops-text-muted)]">
-                              {method.label}
-                            </span>
-                            <span className="font-medium text-[var(--ops-text)]">
-                              {formatAmount(summary.by_method[method.key])}
-                            </span>
-                          </div>
+                            <OpsMetricRow
+                              key={method.key}
+                              label={method.label}
+                              value={formatAmount(summary.by_method[method.key])}
+                            />
                         ))}
-                        <div className="mt-2 flex justify-between border-t border-[var(--ops-border-strong)] pt-2 text-sm font-semibold">
-                          <span className="text-[var(--ops-text)]">Total</span>
-                          <span className="text-[var(--ops-text)]">
-                            {formatAmount(summary.grand_total)}
-                          </span>
-                        </div>
                       </div>
-                    ) : null}
+                      <div className="mt-3 border-t border-[var(--ops-border-soft)] pt-3">
+                        <OpsMetricRow
+                          label={
+                            <>
+                              Total pagos
+                              <HelpTooltip content="Total de pagos registrados en el sistema para esta fecha." />
+                            </>
+                          }
+                          value={formatAmount(summary.consistency.payment_total)}
+                        />
+                      </div>
+                    </OpsPanelMuted>
+                  </>
+                ) : null}
+              </>
+            )}
 
-                    <div className="mt-4">
-                      <label className="mb-1 block text-xs font-medium text-[var(--ops-text)]">
-                        Observaciones (opcional)
-                      </label>
-                      <textarea
-                        value={closeNotes}
-                        onChange={(event) => setCloseNotes(event.target.value)}
-                        rows={2}
-                        placeholder="Ej: Sin novedades"
-                        className="sales-field w-full rounded-xl px-3 py-2 text-sm outline-none transition focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_72%,transparent)]"
-                      />
-                    </div>
+            <OpsDialog
+              open={showCloseConfirm && canOperateCash}
+              onOpenChange={(open) => { if (!open) setShowCloseConfirm(false) }}
+              title="Confirmar cierre de caja"
+              size="md"
+              bodyClassName="space-y-4"
+              footer={
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <AdminActionButton type="button" onClick={() => setShowCloseConfirm(false)} disabled={actionLoading}>
+                    Cancelar
+                  </AdminActionButton>
+                  <AdminActionButton type="button" tone="accent" onClick={handleClose} disabled={actionLoading}>
+                    {actionLoading ? "Procesando..." : "Cerrar caja"}
+                  </AdminActionButton>
+                </div>
+              }
+            >
+              <div>
+                <p className="mb-3 text-sm text-[var(--ops-text-muted)]">
+                  Se consolidaran los pagos registrados y ventas confirmadas
+                  de la fecha operativa actual para esta sede.
+                </p>
 
-                    <div className="mt-5 flex gap-3">
-                      <button
-                        onClick={() => setShowCloseConfirm(false)}
-                        disabled={actionLoading}
-                        className="sales-field sales-field-interactive flex-1 rounded-xl py-2 text-sm font-medium text-[var(--ops-text)]"
+                {summary ? (
+                  <div className="sales-panel-muted space-y-1 rounded-xl p-4">
+                    {METHOD_CONFIG.map((method) => (
+                      <div
+                        key={method.key}
+                        className="flex justify-between text-sm"
                       >
-                        Cancelar
-                      </button>
-                      <button
-                        onClick={handleClose}
-                        disabled={actionLoading}
-                        className="flex-1 rounded-xl bg-[var(--ops-text)] py-2 text-sm font-semibold text-[var(--ops-surface)] shadow-sm transition hover:opacity-90 disabled:opacity-60"
-                      >
-                        {actionLoading ? "Cerrando..." : "Cerrar caja"}
-                      </button>
+                        <span className="text-[var(--ops-text-muted)]">
+                          {method.label}
+                        </span>
+                        <span className="font-medium text-[var(--ops-text)]">
+                          {formatAmount(summary.by_method[method.key])}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="mt-2 flex justify-between border-t border-[var(--ops-border-strong)] pt-2 text-sm font-semibold">
+                      <span className="text-[var(--ops-text)]">Total</span>
+                      <span className="text-[var(--ops-text)]">
+                        {formatAmount(summary.grand_total)}
+                      </span>
                     </div>
                   </div>
+                ) : null}
+
+                <div className="mt-4">
+                  <label htmlFor="close-notes" className="mb-1 block text-xs font-medium text-[var(--ops-text)]">
+                    Observaciones (opcional)
+                  </label>
+                  <textarea
+                    id="close-notes"
+                    value={closeNotes}
+                    onChange={(event) => setCloseNotes(event.target.value)}
+                    rows={2}
+                    placeholder="Ej: Sin novedades"
+                    className="sales-field w-full rounded-lg px-3 py-2 text-sm outline-none transition focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_72%,transparent)]"
+                  />
                 </div>
-              ) : null}
-            </div>
-          </section>
+              </div>
+            </OpsDialog>
+          </OpsPageShell>
         </TooltipProvider>
       </PermissionGuard>
     </ErrorBoundary>

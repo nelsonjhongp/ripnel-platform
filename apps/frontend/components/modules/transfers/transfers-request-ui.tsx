@@ -4,38 +4,21 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
-  Building2,
   Check,
-  ChevronDown,
-  ChevronUp,
   CircleAlert,
-  Eraser,
-  FileText,
   LoaderCircle,
-  ListRestart,
-  PencilLine,
   Plus,
-  Store,
   Trash2,
-  Warehouse,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { AdminTextarea } from "@/components/admin/admin-ui";
+import { PresetTextField } from "@/components/ui/preset-text-field";
 import { cn } from "@/lib/utils";
-import { OpsSelectMenu, type OpsOption } from "@/components/ui/ops-selection";
+import { OpsSelect, type OpsOption } from "@/components/ui/ops-selection";
 import { OpsTableWrap } from "@/components/ui/ops-page-shell";
 import { Pagination } from "@/components/ui/pagination";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import type {
   DraftLine,
-  RequestCandidate,
   RequestCandidateSource,
   RequestLocationOption,
   RequestProductGroup,
@@ -127,44 +110,25 @@ export function RequestRouteField({
       <div className="flex flex-col gap-3 md:grid md:grid-cols-[minmax(0,1fr)_36px_minmax(0,1fr)] md:items-end">
         <div className="min-w-0 space-y-2">
           <FieldLabel>Origen</FieldLabel>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                disabled={disabled}
-                className="sales-field sales-field-interactive flex min-h-12 w-full min-w-0 items-center justify-between gap-3 rounded-2xl border-[color:color-mix(in_srgb,var(--ops-border-strong)_88%,var(--ripnel-accent)_12%)] bg-[color:color-mix(in_srgb,var(--ops-surface)_98%,var(--ops-surface-muted))] px-4 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] focus-visible:outline-none"
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <OpsLocationIcon
-                    type={selectedOrigin?.type}
-                    className="h-4 w-4 shrink-0 text-[var(--ops-text)]"
-                  />
-                  <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                    {selectedOriginLabel}
-                  </p>
-                </div>
-                <ChevronDown className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
-              </button>
-            </DropdownMenuTrigger>
-
-            <DropdownMenuContent
-              align="start"
-              sideOffset={8}
-              className="min-w-[var(--radix-dropdown-menu-trigger-width)] rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1"
-            >
-              <DropdownMenuRadioGroup value={originValue} onValueChange={onOriginChange}>
-                {originOptions.map((option) => (
-                  <DropdownMenuRadioItem
-                    key={option.value}
-                    value={option.value}
-                    className="cursor-pointer rounded-lg px-3 py-2 text-sm text-[var(--ops-text)] focus:bg-[var(--ops-surface-muted)] focus:text-[var(--ops-text)]"
-                  >
-                    {option.label}
-                  </DropdownMenuRadioItem>
-                ))}
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <OpsSelect
+            value={originValue}
+            onChange={onOriginChange}
+            placeholder="Seleccionar origen"
+            options={originOptions.map((o) => ({ value: o.value, label: o.label }))}
+            disabled={disabled}
+            className="sales-field sales-field-interactive flex min-h-12 w-full min-w-0 items-center justify-between gap-3 rounded-2xl border-[color:color-mix(in_srgb,var(--ops-border-strong)_88%,var(--ripnel-accent)_12%)] bg-[color:color-mix(in_srgb,var(--ops-surface)_98%,var(--ops-surface-muted))] px-4 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] focus-visible:outline-none"
+            triggerContent={(opt) => (
+              <div className="flex min-w-0 items-center gap-3">
+                <OpsLocationIcon
+                  type={selectedOrigin?.type}
+                  className="h-4 w-4 shrink-0 text-[var(--ops-text)]"
+                />
+                <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
+                  {opt?.label ?? selectedOriginLabel}
+                </p>
+              </div>
+            )}
+          />
         </div>
 
         <div className="hidden items-center justify-center pb-3 md:flex">
@@ -358,7 +322,7 @@ export function RequestProductComposer({
         <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
           <div className="space-y-1.5">
             <FieldLabel>Color</FieldLabel>
-            <OpsSelectMenu
+            <OpsSelect
               value={resolvedColor}
               onValueChange={(value) => {
                 setSelectedColor(value);
@@ -542,12 +506,6 @@ export function RequestDraftTable({
   );
 
   useEffect(() => {
-    if (safeDraftPage > totalDraftPages) {
-      setDraftPage(totalDraftPages);
-    }
-  }, [safeDraftPage, totalDraftPages]);
-
-  useEffect(() => {
     if (!highlightedVariantId || !highlightToken) {
       return;
     }
@@ -686,13 +644,9 @@ export function DraftSummaryPanel({
   submittedSummary,
   notes,
   onNotesChange,
-  noteMode,
-  selectedNotePreset,
-  notePresetOptions,
-  onSelectNotePreset,
-  onNoteModeChange,
   onClearNotes,
   notesMaxLength,
+  notePresets,
   submittedTransfer,
   onViewSubmittedTransfer,
   onStartNewRequest,
@@ -717,13 +671,9 @@ export function DraftSummaryPanel({
   } | null;
   notes: string;
   onNotesChange: (value: string) => void;
-  noteMode: "preset" | "manual";
-  selectedNotePreset: string;
-  notePresetOptions: OpsOption[];
-  onSelectNotePreset: (value: string) => void;
-  onNoteModeChange: (mode: "preset" | "manual") => void;
   onClearNotes: () => void;
   notesMaxLength: number;
+  notePresets: readonly string[];
   submittedTransfer: { transfer_id: string; transfer_number: string | null } | null;
   onViewSubmittedTransfer: () => void;
   onStartNewRequest: () => void;
@@ -762,7 +712,6 @@ export function DraftSummaryPanel({
     },
   ];
   const canSubmit = validations.every((item) => item.ok) && !submitting && !submittedTransfer;
-  const noteCounter = `${notes.length}/${notesMaxLength}`;
 
   return (
     <aside className={cn(panelClass, "space-y-4 p-5")}>
@@ -822,82 +771,30 @@ export function DraftSummaryPanel({
       </section>
 
       <div className="space-y-2 border-t border-[var(--ops-border-strong)] pt-4">
-        <div className="flex items-center justify-between gap-3">
-          <label
-            htmlFor="transfer-request-notes"
-            className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]"
-          >
-            Notas
-          </label>
-
-          {!submittedTransfer ? (
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => onNoteModeChange(noteMode === "preset" ? "manual" : "preset")}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ripnel-accent-soft)]"
-              >
-                {noteMode === "preset" ? (
-                  <>
-                    <PencilLine className="h-3.5 w-3.5" />
-                    Editar
-                  </>
-                ) : (
-                  <>
-                    <ListRestart className="h-3.5 w-3.5" />
-                    Usar opciones
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={onClearNotes}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-[var(--ops-text-muted)] transition hover:bg-[color:color-mix(in_srgb,#dc2626_8%,transparent)] hover:text-[color:color-mix(in_srgb,#dc2626_88%,var(--ops-text))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:color-mix(in_srgb,#dc2626_18%,transparent)]"
-              >
-                <Eraser className="h-3.5 w-3.5" />
-                Limpiar
-              </button>
-            </div>
-          ) : null}
-        </div>
-
         {submittedTransfer ? (
-          <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3.5 py-3 text-sm text-[var(--ops-text)]">
-            {activeNotes || "Sin notas"}
-          </div>
-        ) : noteMode === "preset" ? (
-          <OpsSelectMenu
-            value={selectedNotePreset}
-            onValueChange={onSelectNotePreset}
-            placeholder="Selecciona un motivo frecuente"
-            options={notePresetOptions}
-            triggerContent={(option) =>
-              option ? (
-                <span className="flex min-w-0 items-center gap-2">
-                  <FileText className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
-                  <span className="truncate text-[var(--ops-text)]">{option.label}</span>
-                </span>
-              ) : null
-            }
-          />
-        ) : (
-          <div className="space-y-1.5">
-            <AdminTextarea
-              id="transfer-request-notes"
-              value={notes}
-              onChange={(event) => onNotesChange(event.target.value)}
-              rows={4}
-              maxLength={notesMaxLength}
-              placeholder="Motivo de la transferencia"
-              className="min-h-[110px] rounded-xl border-[var(--ops-border-strong)] bg-[var(--ops-field)]"
-            />
-            <div className="flex justify-end">
-              <span className="text-[11px] font-medium tabular-nums text-[var(--ops-text-muted)]">
-                {noteCounter}
-              </span>
+          <>
+            <label
+              htmlFor="transfer-request-notes"
+              className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]"
+            >
+              Notas
+            </label>
+            <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3.5 py-3 text-sm text-[var(--ops-text)]">
+              {activeNotes || "Sin notas"}
             </div>
-          </div>
+          </>
+        ) : (
+          <PresetTextField
+            label="Notas"
+            value={notes}
+            onChange={onNotesChange}
+            presets={notePresets}
+            placeholder="Selecciona un motivo frecuente"
+            maxLength={notesMaxLength}
+            onClear={onClearNotes}
+            textareaRows={4}
+            textareaClassName="min-h-[110px]"
+          />
         )}
       </div>
 

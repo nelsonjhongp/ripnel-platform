@@ -2,7 +2,7 @@ import { useMemo, useState } from "react"
 import { Search } from "lucide-react"
 
 import { AdminActionButton, AdminCheckboxOption, AdminInlineMessage } from "@/components/admin/admin-ui"
-import { FilterDropdown } from "@/components/ui/filter-dropdown"
+import { OpsSelect } from "@/components/ui/ops-selection"
 import { OpsSelectionChip } from "@/components/ui/ops-selection"
 import { cn } from "@/lib/utils"
 
@@ -192,7 +192,7 @@ export function RolePermissionPicker({
           </div>
         </div>
 
-        <FilterDropdown
+        <OpsSelect
           label="Módulo"
           value={moduleFilter}
           options={moduleOptions}
