@@ -43,7 +43,6 @@ import type {
   RequestProductGroup,
 } from "./transfers-shared";
 import { useTransferDraft } from "./use-transfer-draft";
-import type { OpsOption } from "@/components/ui/ops-selection";
 
 type LocationOption = {
   location_id: string;
@@ -157,8 +156,6 @@ export function TransfersRequestPage() {
   const [requestPickerOpen, setRequestPickerOpen] = useState(false);
   const [highlightedRequestIndex, setHighlightedRequestIndex] = useState(0);
   const [clearDraftModalOpen, setClearDraftModalOpen] = useState(false);
-  const [noteMode, setNoteMode] = useState<"preset" | "manual">("preset");
-  const [selectedNotePreset, setSelectedNotePreset] = useState("");
   const requestSearchInputRef = useRef<HTMLInputElement | null>(null);
 
   const transferCapabilities = useTransferCapabilities();
@@ -215,10 +212,6 @@ export function TransfersRequestPage() {
   const originId = requestLocationFilter === "all" ? "" : requestLocationFilter;
   const hasOriginSelected = Boolean(originId);
   const requestCompleted = Boolean(submittedTransfer);
-  const notePresetOptions = useMemo<OpsOption[]>(
-    () => REQUEST_NOTE_PRESETS.map((preset) => ({ value: preset, label: preset })),
-    []
-  );
 
   const loadRequestCandidates = useCallback(async (queryValue: string) => {
     const normalizedQuery = queryValue.trim();
@@ -420,24 +413,12 @@ export function TransfersRequestPage() {
     });
   }
 
-  function handleSelectNotePreset(value: string) {
-    setSelectedNotePreset(value);
-    setNotes(value);
-  }
-
-  function handleNotesModeChange(mode: "preset" | "manual") {
-    setNoteMode(mode);
-  }
-
   function handleClearNotes() {
-    setSelectedNotePreset("");
     setNotes("");
   }
 
   function handleStartNewRequest() {
     startNewRequest();
-    setNoteMode("preset");
-    setSelectedNotePreset("");
   }
 
   if (authLoading) {
@@ -659,13 +640,9 @@ export function TransfersRequestPage() {
                   submittedSummary={submittedSummary}
                   notes={notes}
                   onNotesChange={setNotes}
-                  noteMode={noteMode}
-                  selectedNotePreset={selectedNotePreset}
-                  notePresetOptions={notePresetOptions}
-                  onSelectNotePreset={handleSelectNotePreset}
-                  onNoteModeChange={handleNotesModeChange}
                   onClearNotes={handleClearNotes}
                   notesMaxLength={REQUEST_NOTE_MAX_LENGTH}
+                  notePresets={REQUEST_NOTE_PRESETS}
                   submittedTransfer={submittedTransfer}
                   onViewSubmittedTransfer={() => {
                     if (!submittedTransfer) return;

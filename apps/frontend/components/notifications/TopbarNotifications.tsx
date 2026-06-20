@@ -2,23 +2,29 @@
 
 import Link from "next/link"
 import * as React from "react"
-import { Bell, ChevronRight, RefreshCw, TriangleAlert } from "lucide-react"
+import { ArrowRight, Bell, Package, RefreshCw, Store, Truck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { useTopbarNotifications, type TopbarNotificationItem } from "./NotificationsProvider"
-import { formatDateTime } from "@/lib/date-utils"
 
-function severityClasses(severity: TopbarNotificationItem["severity"]) {
-  if (severity === "danger") return "sales-chip-danger"
-  if (severity === "warning") return "sales-chip-warning"
-  return "sales-chip-neutral"
+function severityBorder(severity: TopbarNotificationItem["severity"]) {
+  if (severity === "danger") return "border-l-rose-400 dark:border-l-rose-500"
+  if (severity === "warning") return "border-l-amber-400 dark:border-l-amber-500"
+  return "border-l-[var(--ops-border-strong)]"
 }
 
-function severityLabel(severity: TopbarNotificationItem["severity"]) {
-  if (severity === "danger") return "Critica"
-  if (severity === "warning") return "Atencion"
-  return "Info"
+function moduleIcon(module: string) {
+  switch (module) {
+    case "cash":
+      return { Icon: Store, className: "text-[var(--ops-text-muted)]" }
+    case "transfers":
+      return { Icon: Truck, className: "text-[var(--ops-text-muted)]" }
+    case "inventory":
+      return { Icon: Package, className: "text-[var(--ops-text-muted)]" }
+    default:
+      return { Icon: Bell, className: "text-[var(--ops-text-muted)]" }
+  }
 }
 
 export function TopbarNotifications() {
@@ -58,15 +64,12 @@ export function TopbarNotifications() {
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent align="end" className="ops-picker-popover w-[22rem] overflow-hidden rounded-2xl p-0">
+      <PopoverContent align="end" className="ops-picker-popover w-[20rem] overflow-hidden rounded-2xl p-0">
         <div className="border-b border-[var(--ops-border-soft)] px-4 py-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ripnel-accent-hover)]">
-                Topbar
-              </p>
-              <h3 className="mt-1 text-sm font-semibold text-[var(--ops-text)]">Alertas operativas</h3>
-              <p className="mt-1 text-xs text-[var(--ops-text-muted)]">
+              <h3 className="text-sm font-semibold text-[var(--ops-text)]">Alertas operativas</h3>
+              <p className="mt-0.5 text-xs text-[var(--ops-text-muted)]">
                 {total > 0
                   ? `${summary?.danger_count || 0} críticas · ${summary?.warning_count || 0} de atención`
                   : "Sin pendientes inmediatos en tu sede activa."}
@@ -105,39 +108,36 @@ export function TopbarNotifications() {
         ) : null}
 
         {items.length > 0 ? (
-          <div className="max-h-[24rem] overflow-y-auto p-2">
-            {items.map((item) => (
-              <Link
-                key={item.id}
-                href={item.href}
-                className="group block rounded-xl border border-transparent px-3 py-3 transition hover:border-[color:color-mix(in_srgb,var(--ripnel-accent)_18%,transparent)] hover:bg-[var(--ops-surface-muted)]"
-              >
-                <div className="flex items-start gap-3">
-                  <div className={cn("mt-0.5 rounded-full px-2 py-1 text-[10px] font-semibold", severityClasses(item.severity))}>
-                    {severityLabel(item.severity)}
-                  </div>
-
+          <div className="max-h-[20rem] overflow-y-auto">
+            {items.map((item) => {
+              const { Icon, className: iconClassName } = moduleIcon(item.module)
+              return (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  className={cn(
+                    "group flex items-start gap-2.5 border-l-2 px-3 py-2.5 transition hover:bg-[var(--ops-surface-muted)]",
+                    severityBorder(item.severity)
+                  )}
+                >
+                  <Icon className={cn("mt-0.5 h-4 w-4 shrink-0", iconClassName)} />
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="text-sm font-semibold text-[var(--ops-text)]">{item.title}</p>
-                      <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ops-text-muted)] transition group-hover:text-[var(--ripnel-accent-hover)]" />
-                    </div>
-
-                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--ops-text-muted)]">
-                      {item.description}
+                    <p className="text-sm font-medium text-[var(--ops-text)] line-clamp-1">{item.title}</p>
+                    <p className="mt-0.5 text-[11px] text-[var(--ops-text-muted)] line-clamp-1">
+                      {item.action_label}
                     </p>
-
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-[var(--ops-text-muted)]">
-                      <span className="inline-flex items-center gap-1 rounded-full border border-[var(--ops-border-soft)] px-2 py-0.5">
-                        <TriangleAlert className="h-3 w-3" />
-                        {item.action_label}
-                      </span>
-                      <span>{formatDateTime(item.created_at)}</span>
-                    </div>
                   </div>
-                </div>
-              </Link>
-            ))}
+                  <ArrowRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--ops-text-muted)]/40 transition group-hover:text-[var(--ripnel-accent-hover)] group-hover:opacity-100" />
+                </Link>
+              )
+            })}
+            <Link
+              href="/notificaciones"
+              className="flex items-center justify-center gap-1.5 border-t border-[var(--ops-border-soft)] px-4 py-2.5 text-xs font-medium text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ripnel-accent-hover)]"
+            >
+              Ver todas las alertas
+              <ArrowRight className="h-3 w-3" />
+            </Link>
           </div>
         ) : null}
       </PopoverContent>

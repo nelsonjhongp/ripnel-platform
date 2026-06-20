@@ -121,7 +121,7 @@ export function SalesWizardRail({
           {canGoNext ? (
             <Button
               type="button"
-              variant="accent"
+              variant="outline"
               size="sm"
               onClick={onNext}
               disabled={!canAdvance}

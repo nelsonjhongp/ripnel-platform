@@ -44,6 +44,16 @@ export type CashClosing = {
   is_consistent?: boolean
 }
 
+export type CashClosingsResponse = {
+  items: CashClosing[]
+  pagination: {
+    page: number
+    page_size: number
+    total_items: number
+    total_pages: number
+  }
+}
+
 export type CashClosingDetail = CashClosing & {
   sales_summary: SalesSummary
 }
@@ -143,8 +153,3 @@ export function getCashStatusLabel(status: CashClosing["status"]) {
   return status === "open" ? "Pendiente de cierre" : "Cerrada"
 }
 
-export function getCashStatusTone(status: CashClosing["status"]) {
-  return status === "open"
-    ? "sales-chip sales-chip-warning"
-    : "sales-chip sales-chip-neutral"
-}

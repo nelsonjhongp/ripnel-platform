@@ -1,9 +1,8 @@
-import type { CartItem, PreviewItem, SalePreview, SearchableStyle, PaymentDraft, PosContext, SaleDiscountState, PosCustomer, MixedPaymentPreview, SaleVariant } from "./pos-types"
-
-export type Stage = "products" | "customer" | "payment" | "summary"
+import type { CartItem, PreviewItem, SalePreview, SearchableStyle, PaymentDraft, PosContext, PosCustomer, MixedPaymentPreview, SaleVariant, PriceModeOverride, Stage } from "./pos-types"
 
 export type ProductStageProps = {
   active: boolean
+  pulseStage?: Stage | null
   query: string
   setQuery: (v: string) => void
   searchableStyles: SearchableStyle[]
@@ -14,18 +13,10 @@ export type ProductStageProps = {
   setHighlightedProductIndex: (v: number) => void
   selectedProductStyle: SearchableStyle | null
   selectProductStyle: (style: SearchableStyle | null) => void
-  selectedSizeCode: string
-  setSelectedSizeCode: (v: string) => void
-  selectedColorCode: string
-  setSelectedColorCode: (v: string) => void
-  sizeSelectOptions: { value: string; label: string }[]
-  colorSelectOptions: { value: string; label: string }[]
-  selectedVariant: SaleVariant | null
   previewWholesaleApplies: boolean
-  selectedVariantAutoPrice: number | null | undefined
   cart: CartItem[]
   totals: SalePreview
-  addToCart: (variant: SaleVariant) => void
+  addToCart: (variant: SaleVariant, quantity?: number) => void
   updateQty: (id: string, delta: number) => void
   removeFromCart: (id: string) => void
   openPriceSheet: (item: PreviewItem) => void
@@ -34,15 +25,16 @@ export type ProductStageProps = {
   defaultLocation: { location_id: string } | null
   productSearchInputRef: React.RefObject<HTMLInputElement | null>
   productSectionRef: React.RefObject<HTMLElement | null>
+  pricingModeOverride: PriceModeOverride
+  setPricingModeOverride: (value: PriceModeOverride) => void
   onActivate: () => void
 }
 
 export type CustomerStageProps = {
   active: boolean
+  pulseStage?: Stage | null
   documentType: string
   setDocumentType: (v: string) => void
-  documentPickerOpen: boolean
-  setDocumentPickerOpen: (v: boolean) => void
   customerQuery: string
   setCustomerQuery: (v: string) => void
   customerResults: PosCustomer[]
@@ -53,66 +45,59 @@ export type CustomerStageProps = {
   setHighlightedCustomerIndex: (v: number) => void
   selectedCustomer: PosCustomer | null
   selectCustomer: (c: PosCustomer | null) => void
-  genericCustomer: PosCustomer | null
-  isGenericCustomerSelected: boolean
   customerStepReady: boolean
   customerIsValid: boolean
   canEditSelectedCustomer: boolean
   activeDocumentOption: { label: string; value: string } | null
   selectedCustomerName: string
   selectedCustomerDocument: string
-  openCustomerSheet: (mode: "create" | "edit") => void
-  goToPayment: () => void
+  openCustomerDialog: (mode: "create" | "edit") => void
+  goToPayment?: () => void
   customerSearchInputRef: React.RefObject<HTMLInputElement | null>
   customerSectionRef: React.RefObject<HTMLElement | null>
-  documentPickerRef: React.RefObject<HTMLDivElement | null>
   onActivate: () => void
 }
 
 export type PaymentStageProps = {
   active: boolean
-  activeDocumentOption: CustomerStageProps["activeDocumentOption"]
+  pulseStage?: Stage | null
   cartCount: number
   totals: ProductStageProps["totals"]
-  saleDiscount: SaleDiscountState
-  saleDiscountError: string | null
-  saleDiscountTargetTotal: number
-  setDiscountModalOpen: (v: boolean) => void
+  openDiscountModal: () => void
   paymentMode: "single" | "mixed"
   setPaymentModeWithDefaults: (mode: "single" | "mixed") => void
   paymentMethod: string
   setPaymentMethod: (v: string) => void
+  singleReference: string
+  setSingleReference: (v: string) => void
   mixedPayments: PaymentDraft[]
   mixedPaymentsPreview: MixedPaymentPreview | null
-  updateMixedPaymentDraft: (id: string, field: "method" | "amountValue" | "reference", value: string) => void
+  updateMixedPaymentDraft: (id: string, field: "method" | "amount" | "reference", value: string) => void
   addMixedPaymentDraft: () => void
   removeMixedPaymentDraft: (id: string) => void
   onActivate: () => void
+  paymentSectionRef: React.RefObject<HTMLElement | null>
 }
 
 export type SummaryStageProps = {
-  active: boolean
   activeDocumentOption: CustomerStageProps["activeDocumentOption"]
   selectedCustomerName: string
   selectedCustomerDocument: string
-  selectedCustomer: PosCustomer | null
-  isGenericCustomerSelected: boolean
+  documentType: string
   customerStepReady: boolean
   cartCount: number
   totals: ProductStageProps["totals"]
   paymentMode: PaymentStageProps["paymentMode"]
+  paymentMethod: string
   paymentSummaryLabel: string
   mixedPaymentsPreview: PaymentStageProps["mixedPaymentsPreview"]
   mixedPayments: PaymentStageProps["mixedPayments"]
   cashReady: boolean
   cashStatus: string
-  canOpenCashModule: boolean
-  posContext: PosContext | null
   summaryStatusMessage: string | null
   submitDisabled: boolean
   submitting: boolean
   error: string | null
   goToStage: (stage: Stage) => void
-  confirmSale: () => void
-  onActivate: () => void
+  onReviewSale: () => void
 }

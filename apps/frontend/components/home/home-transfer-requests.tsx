@@ -2,7 +2,7 @@ import Link from "next/link"
 
 import { Inbox } from "lucide-react"
 
-import { OpsMetricStripItem } from "@/components/ui/ops-metric-strip-item"
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group"
 import type { HomeOverview } from "./home-types"
 
 function flowLabel(flow: string) {
@@ -35,32 +35,30 @@ export function HomeTransferRequests({
 
   return (
     <div>
-      <div className="grid gap-2 grid-cols-2 sm:grid-cols-4">
-        <OpsMetricStripItem
-          label="Abiertas"
-          value={section.counts.open_for_store_count}
-          tone="accent"
-          isNeutral={section.counts.open_for_store_count === 0}
-        />
-        <OpsMetricStripItem
-          label="Por aprobar"
-          value={section.counts.pending_approval_count}
-          tone="info"
-          isNeutral={section.counts.pending_approval_count === 0}
-        />
-        <OpsMetricStripItem
-          label="Por despachar"
-          value={section.counts.pending_dispatch_count}
-          tone="warning"
-          isNeutral={section.counts.pending_dispatch_count === 0}
-        />
-        <OpsMetricStripItem
-          label="Por recibir"
-          value={section.counts.pending_receipts_count}
-          tone="info"
-          isNeutral={section.counts.pending_receipts_count === 0}
-        />
-      </div>
+      <OpsMetricInlineGroup
+        items={[
+          {
+            label: "Abiertas",
+            value: section.counts.open_for_store_count,
+            tone: "accent",
+          },
+          {
+            label: "Por aprobar",
+            value: section.counts.pending_approval_count,
+            tone: section.counts.pending_approval_count === 0 ? "default" : "accent",
+          },
+          {
+            label: "Por despachar",
+            value: section.counts.pending_dispatch_count,
+            tone: "warning",
+          },
+          {
+            label: "Por recibir",
+            value: section.counts.pending_receipts_count,
+            tone: section.counts.pending_receipts_count === 0 ? "default" : "accent",
+          },
+        ]}
+      />
 
       {hasItems ? (
         <div className="mt-3 space-y-1">

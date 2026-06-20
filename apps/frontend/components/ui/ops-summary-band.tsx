@@ -2,12 +2,17 @@
 
 import { cn } from "@/lib/utils"
 
+/**
+ * @deprecated Prefer OpsMetricCard, OpsMetricRow or OpsMetricInlineGroup for new modules.
+ * Do not use in new screens; this wrapper is temporary compatibility.
+ * This component stays as a composed summary strip for existing operational overviews.
+ */
 export interface OpsSummaryBandItem {
   icon: React.ReactNode
   label: string
   value: string | number
   meta?: string
-  tone?: "accent" | "info" | "success" | "neutral"
+  tone?: "accent" | "info" | "success" | "warning" | "neutral"
 }
 
 export interface OpsSummaryBandProps {
@@ -16,9 +21,10 @@ export interface OpsSummaryBandProps {
 
 const iconToneClasses: Record<NonNullable<OpsSummaryBandItem["tone"]>, string> = {
   accent: "text-[var(--ripnel-accent)]",
-  info: "text-sky-600 dark:text-sky-400",
-  success: "text-emerald-600 dark:text-emerald-400",
-  neutral: "text-[var(--ops-text-muted)]",
+  info: "text-[var(--ops-tone-info-text)]",
+  success: "text-[var(--ops-tone-success-text)]",
+  warning: "text-[var(--ops-tone-warning-text)]",
+  neutral: "text-[var(--ops-tone-neutral-text)]",
 }
 
 export function OpsSummaryBand({ items }: OpsSummaryBandProps) {

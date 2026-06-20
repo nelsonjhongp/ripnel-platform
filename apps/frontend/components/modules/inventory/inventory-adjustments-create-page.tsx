@@ -7,11 +7,11 @@ import { ArrowLeft, LoaderCircle, PackagePlus, Search, Trash2 } from "lucide-rea
 import {
   AdminTextarea,
 } from "@/components/admin/admin-ui";
-import { OpsSelectMenu } from "@/components/ui/ops-selection";
+import { OpsSelect } from "@/components/ui/ops-selection";
 import { InlineStatusCard } from "@/components/feedback/status-page";
 import { ForbiddenPage } from "@/components/feedback/status-page";
 import { Button } from "@/components/ui/button";
-import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import {
   OpsPageShell,
   OpsSectionDivider,
@@ -278,10 +278,10 @@ export function InventoryAdjustmentsCreatePage() {
         }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <OpsMetricPill label="Lineas" value={draftTotals.lines} />
-        <OpsMetricPill label="Diferencia" value={draftTotals.difference} tone="warning" />
-      </div>
+      <OpsMetricInlineGroup items={[
+        { label: "Lineas", value: draftTotals.lines },
+        { label: "Diferencia", value: draftTotals.difference, tone: "warning" },
+      ]} />
 
       <OpsSectionDivider>
         <form id="inventory-adjustment-create-form" onSubmit={submitAdjustment} className="space-y-4">
@@ -295,7 +295,7 @@ export function InventoryAdjustmentsCreatePage() {
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                   Sede
                 </label>
-                <OpsSelectMenu
+                <OpsSelect
                   value={effectiveCreateLocationId}
                   onValueChange={setCreateLocationId}
                   placeholder="Selecciona una sede"
@@ -308,7 +308,7 @@ export function InventoryAdjustmentsCreatePage() {
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                   Tipo operativo
                 </label>
-                <OpsSelectMenu
+                <OpsSelect
                   value={adjustmentIntent}
                   onValueChange={(value) => setAdjustmentIntent(value as AdjustmentIntent)}
                   placeholder="Selecciona una intención"

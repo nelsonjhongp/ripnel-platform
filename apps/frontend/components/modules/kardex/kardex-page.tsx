@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/date-utils";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { Button } from "@/components/ui/button";
-import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsSelect } from "@/components/ui/ops-selection";
 import { OpsDataTable } from "@/components/ui/ops-data-table";
 import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import { Pagination } from "@/components/ui/pagination";
@@ -337,7 +337,7 @@ function KardexPageContent({
               ariaLabel="Buscar movimientos de stock"
             />
 
-            <FilterDropdown
+            <OpsSelect
               label="Sede"
               value={effectiveLocationFilter}
               options={[
@@ -350,7 +350,7 @@ function KardexPageContent({
               onChange={(value) => handleFilterChange(() => setLocationFilter(value))}
             />
 
-            <FilterDropdown
+            <OpsSelect
               label="Operación"
               value={movementType}
               options={[
@@ -363,7 +363,7 @@ function KardexPageContent({
               onChange={(v) => handleFilterChange(() => setMovementType(v as MovementOperationFilter))}
             />
 
-            <FilterDropdown
+            <OpsSelect
               label="Origen"
               value={originFilter}
               options={[

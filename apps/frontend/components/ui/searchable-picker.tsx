@@ -1,7 +1,7 @@
 "use client"
 
 import type { ReactNode, Ref } from "react"
-import { useEffect, useRef } from "react"
+import { useEffect, useId, useRef } from "react"
 import { Search, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -16,9 +16,15 @@ export interface SearchablePickerProps<T> {
   value: string
   onChange: (value: string) => void
   onFocus?: () => void
+  openOnFocus?: boolean
   placeholder?: string
   disabled?: boolean
   label?: string
+  name?: string
+  autoComplete?: string
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"]
+  spellCheck?: boolean
+  enterKeyHint?: React.HTMLAttributes<HTMLInputElement>["enterKeyHint"]
   inputRef?: Ref<HTMLInputElement>
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -36,6 +42,7 @@ export interface SearchablePickerProps<T> {
   selectedItemKey?: string
   onClear?: () => void
   showClear?: boolean
+  density?: "default" | "compact"
   className?: string
 }
 
@@ -43,16 +50,22 @@ export function SearchablePicker<T>({
   value,
   onChange,
   onFocus,
-  placeholder = "Buscar...",
+  openOnFocus = false,
+  placeholder = "Buscar…",
   disabled = false,
   label,
+  name,
+  autoComplete = "off",
+  inputMode,
+  spellCheck = false,
+  enterKeyHint,
   inputRef,
   open,
   onOpenChange,
   items,
   loading = false,
   error = null,
-  loadingMessage = "Buscando...",
+  loadingMessage = "Buscando…",
   emptyMessage = "Sin resultados",
   maxVisibleItems,
   highlightedIndex,
@@ -63,11 +76,13 @@ export function SearchablePicker<T>({
   selectedItemKey,
   onClear,
   showClear,
+  density = "default",
   className,
 }: SearchablePickerProps<T>) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const defaultInputRef = useRef<HTMLInputElement | null>(null)
   const effectiveInputRef = inputRef || defaultInputRef
+  const listId = useId()
 
   const visibleItems = maxVisibleItems ? items.slice(0, maxVisibleItems) : items
 
@@ -131,8 +146,10 @@ export function SearchablePicker<T>({
   }
 
   const handleFocus = () => {
-    onOpenChange(true)
-    onHighlightChange(0)
+    if (openOnFocus) {
+      onOpenChange(true)
+      onHighlightChange(0)
+    }
     onFocus?.()
   }
 
@@ -149,7 +166,8 @@ export function SearchablePicker<T>({
 
       <div
         className={cn(
-          "sales-field flex h-10 items-center gap-2 rounded-lg px-3 transition",
+          "sales-field flex items-center gap-2 rounded-lg transition",
+          density === "compact" ? "h-9 px-2.5" : "h-10 px-3",
           disabled
             ? "cursor-not-allowed border-dashed bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_82%,var(--ops-surface))] text-[var(--ops-text-muted)]"
             : "hover:bg-[var(--ops-surface-muted)]",
@@ -159,19 +177,35 @@ export function SearchablePicker<T>({
         <input
           ref={effectiveInputRef as Ref<HTMLInputElement>}
           type="text"
+          name={name}
           value={value}
           onChange={(e) => handleChange(e.target.value)}
           onFocus={handleFocus}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
+          autoComplete={autoComplete}
+          inputMode={inputMode}
+          spellCheck={spellCheck}
+          enterKeyHint={enterKeyHint}
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={listId}
+          aria-haspopup="listbox"
+          aria-autocomplete="list"
+          aria-activedescendant={
+            open && clampedIndex >= 0
+              ? `picker-option-${listId}-${clampedIndex}`
+              : undefined
+          }
+          aria-label={label || placeholder}
           className="h-full w-full bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)] disabled:cursor-not-allowed"
         />
         {effectiveShowClear ? (
           <Button
             type="button"
             variant="ghost"
-            size="icon-sm"
+            size={density === "compact" ? "icon-xs" : "icon-sm"}
             onClick={() => {
               onClear?.()
               onHighlightChange(0)
@@ -179,7 +213,7 @@ export function SearchablePicker<T>({
             className="rounded-lg text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)]"
             aria-label="Limpiar búsqueda"
           >
-            <X className="h-4 w-4" />
+            <X className="h-3.5 w-3.5" strokeWidth={2.5} />
           </Button>
         ) : null}
       </div>
@@ -194,6 +228,8 @@ export function SearchablePicker<T>({
             <CompactPickerEmpty>{emptyMessage}</CompactPickerEmpty>
           ) : (
             <CompactPickerList
+              role="listbox"
+              id={listId}
               className="max-h-72 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               style={{ scrollbarWidth: "none" }}
             >
@@ -201,6 +237,9 @@ export function SearchablePicker<T>({
                 {visibleItems.map((item, index) => (
                   <CompactPickerOption
                     key={getItemKey(item)}
+                    role="option"
+                    aria-selected={index === clampedIndex}
+                    id={`picker-option-${listId}-${index}`}
                     active={index === clampedIndex}
                     selected={selectedItemKey === getItemKey(item)}
                     onMouseEnter={() => onHighlightChange(index)}
@@ -208,7 +247,7 @@ export function SearchablePicker<T>({
                       onSelect(item)
                       onHighlightChange(0)
                     }}
-                    className="px-4 py-3"
+                    className={density === "compact" ? "px-3 py-2.5" : "px-4 py-3"}
                   >
                     {renderItem(item)}
                   </CompactPickerOption>

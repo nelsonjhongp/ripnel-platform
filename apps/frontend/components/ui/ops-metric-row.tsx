@@ -3,7 +3,7 @@
 import { cn } from "@/lib/utils"
 
 export interface OpsMetricRowProps {
-  label: string
+  label: React.ReactNode
   value: string
   tone?: "default" | "warning" | "danger"
 }
@@ -19,8 +19,8 @@ export function OpsMetricRow({
       <span
         className={cn(
           "font-semibold",
-          tone === "warning" && "text-[var(--ops-chart-4)]",
-          tone === "danger" && "text-[var(--ops-chart-5)]",
+          tone === "warning" && "text-[var(--ops-tone-warning-text)]",
+          tone === "danger" && "text-[var(--ops-tone-danger-text)]",
           tone === "default" && "text-[var(--ops-text)]"
         )}
       >

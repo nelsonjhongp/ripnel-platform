@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
-import { ArrowLeft, ChevronDown } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -192,35 +192,6 @@ export function ValueRow({
     <SettingsFormRow label={label} detail={detail}>
       <div className="min-h-8 rounded-md border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 py-1.5 text-sm font-medium text-[var(--ops-text)]">
         {value}
-      </div>
-    </SettingsFormRow>
-  );
-}
-
-export function SelectRow({
-  label,
-  detail,
-  value,
-  onChange,
-  children,
-}: {
-  label: string;
-  detail?: string;
-  value: string;
-  onChange: (value: string) => void;
-  children: ReactNode;
-}) {
-  return (
-    <SettingsFormRow label={label} detail={detail}>
-      <div className="relative">
-        <select
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className="h-8 w-full cursor-pointer appearance-none rounded-md border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3 pr-10 text-sm font-medium text-[var(--ops-text)] outline-none transition hover:border-[var(--ops-border-soft)] focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[var(--ripnel-accent-soft)]"
-        >
-          {children}
-        </select>
-        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ops-text-muted)]" />
       </div>
     </SettingsFormRow>
   );

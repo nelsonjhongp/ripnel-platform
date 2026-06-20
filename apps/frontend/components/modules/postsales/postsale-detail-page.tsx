@@ -24,6 +24,8 @@ import {
   ProtectedLoadingPage,
 } from "@/components/feedback/status-page"
 import { Button } from "@/components/ui/button"
+import { OpsDialog } from "@/components/ui/ops-dialog"
+import { OpsFormField } from "@/components/ui/ops-form-field"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { ReceiptOptionsModal } from "@/components/ui/purchase-system/ReceiptOptionsModal"
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
@@ -178,7 +180,7 @@ function SectionCard({
       className={cn(
         sectionClass,
         tone === "danger" &&
-          "border-rose-200 bg-[color:color-mix(in_srgb,#fb7185_7%,var(--ops-surface))] dark:border-rose-500/30 dark:bg-rose-500/10"
+          "border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)]"
       )}
     >
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -214,6 +216,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
   const [actionSuccess, setActionSuccess] = useState<string | null>(null)
   const [exchangeSubmitting, setExchangeSubmitting] = useState(false)
   const [cancelSubmitting, setCancelSubmitting] = useState(false)
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false)
   const [receiptModalOpen, setReceiptModalOpen] = useState(false)
 
   useEffect(() => {
@@ -362,14 +365,17 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
     }
   }
 
-  async function handleCancelSubmit(event: React.FormEvent<HTMLFormElement>) {
+  function initiateCancel(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     if (!saleId) return
+    if (!cancelReason.trim()) return
 
-    if (!window.confirm("¿Confirmas que deseas anular esta venta? Esta acción es irreversible.")) {
-      return
-    }
+    setCancelConfirmOpen(true)
+  }
+
+  async function executeCancellation() {
+    if (!saleId) return
 
     setActionError(null)
     setActionSuccess(null)
@@ -604,15 +610,15 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
 
               {context.cancellation ? (
                 <SectionCard title="Anulación registrada" tone="danger">
-                  <p className="text-sm text-[color:color-mix(in_srgb,#be123c_78%,var(--ops-text))]">
+                  <p className="text-sm text-[var(--ops-tone-danger-text)]">
                     {context.cancellation.reason} • {formatDateTime(context.cancellation.cancelled_at)}
                   </p>
                   {context.cancellation.notes ? (
-                    <p className="mt-2 text-sm text-[color:color-mix(in_srgb,#be123c_68%,var(--ops-text))]">
+                    <p className="mt-2 text-sm text-[var(--ops-tone-danger-text)]">
                       {context.cancellation.notes}
                     </p>
                   ) : null}
-                  <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:color-mix(in_srgb,#be123c_72%,var(--ops-text))]">
+                  <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-tone-danger-text)]">
                     Ejecutado por {context.cancellation.cancelled_by_name || "Usuario no identificado"}
                   </p>
                 </SectionCard>
@@ -679,18 +685,18 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                       {context.payment_reversals.map((reversal) => (
                         <div
                           key={reversal.payment_reversal_id}
-                          className="rounded-lg border border-rose-200 bg-[color:color-mix(in_srgb,#fb7185_8%,var(--ops-surface))] px-3 py-3 dark:border-rose-500/30 dark:bg-rose-500/10"
+                          className="rounded-lg border border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] px-3 py-3"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <p className="text-sm font-semibold capitalize text-[color:color-mix(in_srgb,#be123c_78%,var(--ops-text))]">
+                              <p className="text-sm font-semibold capitalize text-[var(--ops-tone-danger-text)]">
                                 Reverso {reversal.method}
                               </p>
-                              <p className="mt-1 text-xs text-[color:color-mix(in_srgb,#be123c_68%,var(--ops-text))]">
+                              <p className="mt-1 text-xs text-[var(--ops-tone-danger-text)]">
                                 {reversal.reason} • {formatDateTime(reversal.reversed_at)}
                               </p>
                             </div>
-                            <p className="text-sm font-semibold text-[color:color-mix(in_srgb,#be123c_82%,var(--ops-text))]">
+                            <p className="text-sm font-semibold text-[var(--ops-tone-danger-text)]">
                               - {formatCurrency(Number(reversal.amount))}
                             </p>
                           </div>
@@ -725,23 +731,21 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
 
                   {context.availability.exchange.allowed ? (
                     <div className="space-y-4">
-                      <div>
-                        <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">
-                          Buscar reemplazo
-                        </label>
+                      <OpsFormField
+                        label="Buscar reemplazo"
+                        error={replacementError}
+                        density="compact"
+                      >
                         <input
                           type="text"
+                          name="postsale_replacement_search"
+                          autoComplete="off"
                           value={replacementSearch}
                           onChange={(event) => setReplacementSearch(event.target.value)}
                           placeholder="Busca por SKU, estilo o código"
                           className={inputClass}
                         />
-                        {replacementError ? (
-                          <p className="mt-2 text-sm text-[color:color-mix(in_srgb,#be123c_78%,var(--ops-text))]">
-                            {replacementError}
-                          </p>
-                        ) : null}
-                      </div>
+                      </OpsFormField>
 
                       {selectedLine ? (
                         <div className={mutedBlockClass}>
@@ -821,8 +825,8 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                       ) : null}
 
                       {selectedReplacement ? (
-                        <div className="rounded-lg border border-emerald-200 bg-[color:color-mix(in_srgb,#10b981_10%,var(--ops-surface))] px-3 py-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[color:color-mix(in_srgb,#047857_76%,var(--ops-text))]">
+                        <div className="rounded-lg border border-[var(--ops-tone-success-border)] bg-[var(--ops-tone-success-bg)] px-3 py-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-tone-success-text)]">
                             Reemplazo seleccionado
                           </p>
                           <p className="mt-1 text-sm font-medium text-[var(--ops-text)]">
@@ -834,31 +838,29 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                         </div>
                       ) : null}
 
-                      <div>
-                        <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">
-                          Motivo obligatorio
-                        </label>
+                      <OpsFormField label="Motivo obligatorio" required density="compact">
                         <input
                           type="text"
+                          name="postsale_exchange_reason"
+                          autoComplete="off"
                           value={exchangeReason}
                           onChange={(event) => setExchangeReason(event.target.value)}
                           placeholder="Ej. talla no adecuada, color reemplazado"
                           className={inputClass}
                         />
-                      </div>
+                      </OpsFormField>
 
-                      <div>
-                        <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">
-                          Notas
-                        </label>
+                      <OpsFormField label="Notas" density="compact">
                         <textarea
+                          name="postsale_exchange_notes"
+                          autoComplete="off"
                           value={exchangeNotes}
                           onChange={(event) => setExchangeNotes(event.target.value)}
                           rows={3}
                           className={textareaClass}
                           placeholder="Detalle adicional del cambio"
                         />
-                      </div>
+                      </OpsFormField>
 
                       <Button
                         type="submit"
@@ -885,7 +887,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
               ) : null}
 
               {has("sales.postsale.cancel") ? (
-                <form onSubmit={handleCancelSubmit} className={sectionClass}>
+                <form onSubmit={initiateCancel} className={sectionClass}>
                   <div className="mb-4 flex items-center gap-2">
                     <Undo2 className="h-4 w-4 text-[var(--ops-text-muted)]" />
                     <h2 className="text-lg font-semibold text-[var(--ops-text)]">Anulación total</h2>
@@ -893,31 +895,29 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
 
                   {context.availability.cancel.allowed ? (
                     <div className="space-y-4">
-                      <div>
-                        <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">
-                          Motivo obligatorio
-                        </label>
+                      <OpsFormField label="Motivo obligatorio" required density="compact">
                         <input
                           type="text"
+                          name="postsale_cancel_reason"
+                          autoComplete="off"
                           value={cancelReason}
                           onChange={(event) => setCancelReason(event.target.value)}
                           placeholder="Ej. venta digitada por error"
                           className={inputClass}
                         />
-                      </div>
+                      </OpsFormField>
 
-                      <div>
-                        <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">
-                          Notas
-                        </label>
+                      <OpsFormField label="Notas" density="compact">
                         <textarea
+                          name="postsale_cancel_notes"
+                          autoComplete="off"
                           value={cancelNotes}
                           onChange={(event) => setCancelNotes(event.target.value)}
                           rows={3}
                           className={textareaClass}
                           placeholder="Detalle adicional de la anulación"
                         />
-                      </div>
+                      </OpsFormField>
 
                       <Button
                         type="submit"
@@ -955,6 +955,34 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
             setReceiptModalOpen(false)
           }}
         />
+
+        <OpsDialog
+          open={cancelConfirmOpen}
+          onOpenChange={setCancelConfirmOpen}
+          title="Confirmar anulación"
+          description="¿Confirmas que deseas anular esta venta? Esta acción es irreversible."
+          size="sm"
+          footer={
+            <>
+              <Button variant="outline" onClick={() => setCancelConfirmOpen(false)} className="rounded-lg">
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  setCancelConfirmOpen(false)
+                  executeCancellation()
+                }}
+                disabled={cancelSubmitting}
+                className="rounded-lg"
+              >
+                {cancelSubmitting ? "Anulando..." : "Anular venta"}
+              </Button>
+            </>
+          }
+        >
+          <></>
+        </OpsDialog>
       </section>
     </PermissionGuard>
   )

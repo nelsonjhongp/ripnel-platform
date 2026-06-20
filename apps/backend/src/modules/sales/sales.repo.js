@@ -577,6 +577,8 @@ async function nextSaleNumberInTx(clientQuery, documentType) {
   const prefixMap = { proforma: 'P', boleta: 'B', factura: 'F', none: 'N' };
   const prefix = prefixMap[documentType] || 'N';
 
+  await clientQuery('SELECT pg_advisory_xact_lock(hashtext($1))', [`saleseq:${prefix}`]);
+
   const result = await clientQuery(
     `SELECT COALESCE(MAX(CAST(SUBSTRING(sale_number FROM 3) AS INT)), 0) + 1 AS next_seq
      FROM sales
@@ -600,6 +602,7 @@ async function insertSale(clientQuery, saleData) {
      ) VALUES (
        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
      )
+     ON CONFLICT (sale_number) DO NOTHING
      RETURNING sale_id`,
     [
       saleData.location_id,

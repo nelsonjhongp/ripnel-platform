@@ -7,10 +7,17 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Select as SelectPrimitive } from "radix-ui"
+import {
+  opsSelectContentClassName,
+  opsDropdownContentClassName,
+  opsSelectOptionClassName,
+  opsSelectTriggerClassName,
+  opsFieldLabelClassName,
+} from "@/components/ui/ops-control-styles"
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import { cn } from "@/lib/utils"
 
 export type OpsOption = {
@@ -21,12 +28,9 @@ export type OpsOption = {
   leading?: ReactNode
   trailing?: ReactNode
   layout?: "stacked" | "between"
+  badge?: string
+  tone?: "neutral" | "accent" | "success" | "warning" | "danger"
 }
-
-const opsPickerTriggerClass =
-  "flex h-10 w-full cursor-pointer items-center justify-between rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3.5 text-left text-sm text-[var(--ops-text)] outline-none transition hover:border-[var(--ops-border-soft)] hover:bg-[var(--ops-surface-muted)] focus-visible:border-[var(--ripnel-accent)] focus-visible:ring-2 focus-visible:ring-[var(--ripnel-accent-soft)] disabled:cursor-not-allowed disabled:opacity-60"
-const opsPickerContentClass =
-  "max-h-64 min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto overscroll-contain border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1"
 
 function OpsOptionContent({ option }: { option: OpsOption }) {
   if (option.layout === "between") {
@@ -36,7 +40,14 @@ function OpsOptionContent({ option }: { option: OpsOption }) {
           {option.leading ? <span className="shrink-0">{option.leading}</span> : null}
           <p className="truncate text-sm font-medium text-[var(--ops-text)]">{option.label}</p>
         </div>
-        {option.trailing ? <span className="shrink-0">{option.trailing}</span> : null}
+        <div className="flex shrink-0 items-center gap-1.5">
+          {option.badge ? (
+            <OpsStatusBadge tone={option.tone || "accent"} size="xs">
+              {option.badge}
+            </OpsStatusBadge>
+          ) : null}
+          {option.trailing ? <span className="shrink-0">{option.trailing}</span> : null}
+        </div>
       </div>
     )
   }
@@ -44,68 +55,127 @@ function OpsOptionContent({ option }: { option: OpsOption }) {
   return (
     <div className="flex min-w-0 items-start gap-2">
       {option.leading ? <span className="mt-0.5 shrink-0">{option.leading}</span> : null}
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-[var(--ops-text)]">{option.label}</p>
         {option.helper ? (
           <p className="mt-0.5 text-xs text-[var(--ops-text-muted)]">{option.helper}</p>
         ) : null}
       </div>
+      {option.badge ? (
+        <OpsStatusBadge tone={option.tone || "accent"} size="xs" className="shrink-0">
+          {option.badge}
+        </OpsStatusBadge>
+      ) : null}
     </div>
   )
 }
 
-export function OpsSelectMenu({
+export function OpsSelect({
   value,
   onValueChange,
+  onChange,
   placeholder,
   options,
   disabled = false,
+  label,
+  inlineLabel = false,
   triggerLabel,
   triggerContent,
+  className,
+  triggerClassName,
 }: {
   value: string
-  onValueChange: (value: string) => void
-  placeholder: string
-  options: OpsOption[]
+  onValueChange?: (value: string) => void
+  onChange?: (value: string) => void
+  placeholder?: string
+  options: readonly OpsOption[]
   disabled?: boolean
+  label?: string
+  inlineLabel?: boolean
   triggerLabel?: (option: OpsOption | null) => string
   triggerContent?: (option: OpsOption | null) => ReactNode
+  className?: string
+  triggerClassName?: string
 }) {
+  const handleChange = onValueChange || onChange || (() => {})
   const selectedOption = options.find((option) => option.value === value) || null
+  const resolvedPlaceholder = placeholder || "Seleccionar..."
 
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild disabled={disabled}>
-        <button type="button" className={opsPickerTriggerClass} disabled={disabled}>
+  const trigger = (
+    <SelectPrimitive.Trigger asChild>
+      <button
+        type="button"
+        disabled={disabled}
+        className={cn(
+          opsSelectTriggerClassName,
+          inlineLabel && label ? "justify-between gap-3" : "",
+          !label ? className : triggerClassName,
+        )}
+      >
+        {inlineLabel && label ? (
+          <span className={`shrink-0 ${opsFieldLabelClassName}`}>{label}</span>
+        ) : null}
+        <span className="min-w-0 flex-1">
           {selectedOption ? (
             triggerContent ? (
-              <span className="min-w-0 flex-1">{triggerContent(selectedOption)}</span>
+              triggerContent(selectedOption)
             ) : (
-              <span className="truncate text-[var(--ops-text)]">
+              <span className="block truncate text-[var(--ops-text)]">
                 {triggerLabel ? triggerLabel(selectedOption) : selectedOption.label}
               </span>
             )
           ) : (
-            <span className="truncate text-[var(--ops-text-muted)]">{placeholder}</span>
+            <span className="block truncate text-[var(--ops-text-muted)]">{resolvedPlaceholder}</span>
           )}
+        </span>
+        <SelectPrimitive.Icon asChild>
           <ChevronDown className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" sideOffset={8} className={opsPickerContentClass}>
-        <DropdownMenuRadioGroup value={value} onValueChange={onValueChange}>
+        </SelectPrimitive.Icon>
+      </button>
+    </SelectPrimitive.Trigger>
+  )
+
+  const content = (
+    <SelectPrimitive.Portal>
+      <SelectPrimitive.Content
+        position="popper"
+        sideOffset={4}
+        className={opsSelectContentClassName}
+      >
+        <SelectPrimitive.Viewport>
           {options.map((option) => (
-            <DropdownMenuRadioItem
+            <SelectPrimitive.Item
               key={option.value}
               value={option.value}
               disabled={option.disabled}
-              className="cursor-pointer gap-2 rounded-lg px-2 py-2"
+              className={opsSelectOptionClassName}
             >
-              <OpsOptionContent option={option} />
-            </DropdownMenuRadioItem>
+              <SelectPrimitive.ItemText>
+                <OpsOptionContent option={option} />
+              </SelectPrimitive.ItemText>
+            </SelectPrimitive.Item>
           ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </SelectPrimitive.Viewport>
+      </SelectPrimitive.Content>
+    </SelectPrimitive.Portal>
+  )
+
+  const selectElement = (
+    <SelectPrimitive.Root value={value} onValueChange={handleChange} disabled={disabled}>
+      {trigger}
+      {content}
+    </SelectPrimitive.Root>
+  )
+
+  if (!label) return selectElement
+
+  return (
+    <div className={className}>
+      {!inlineLabel && (
+        <label className={`mb-1 ${opsFieldLabelClassName}`}>{label}</label>
+      )}
+      {selectElement}
+    </div>
   )
 }
 
@@ -129,7 +199,7 @@ export function OpsMultiSelectMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild disabled={disabled}>
-        <button type="button" className={opsPickerTriggerClass} disabled={disabled}>
+        <button type="button" className={opsSelectTriggerClassName} disabled={disabled}>
           <span className={selectedCount ? "text-[var(--ops-text)]" : "text-[var(--ops-text-muted)]"}>
             {selectedCount
               ? formatCountLabel
@@ -140,7 +210,7 @@ export function OpsMultiSelectMenu({
           <ChevronDown className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" sideOffset={8} className={opsPickerContentClass}>
+      <DropdownMenuContent align="start" sideOffset={4} className={opsDropdownContentClassName}>
         {options.map((option) => {
           const checked = selectedValues.includes(option.value)
 
@@ -151,7 +221,7 @@ export function OpsMultiSelectMenu({
               disabled={option.disabled}
               onCheckedChange={() => onToggle(option.value)}
               onSelect={(event) => event.preventDefault()}
-              className="cursor-pointer gap-2 rounded-lg px-2 py-2"
+              className={opsSelectOptionClassName}
             >
               <OpsOptionContent option={option} />
             </DropdownMenuCheckboxItem>

@@ -43,13 +43,21 @@ type PosHeaderProps = {
   subtitle?: ReactNode
   meta?: ReactNode
   actions?: ReactNode
+  // Deprecated: prefer rendering a dedicated flow component like SalesWizardRail
+  // below the header instead of coupling progress UI into PosHeader.
   steps?: PosHeaderStep[]
   currentStep?: number
+  // Deprecated: prefer a dedicated progress rail outside the header.
   progress?: PosHeaderProgress
   className?: string
   surface?: "plain" | "panel"
 }
 
+/**
+ * PosHeader is intentionally focused on eyebrow/title/meta/actions.
+ * Legacy stepper/progress props are preserved only for compatibility while
+ * operational flows migrate to dedicated progress components like SalesWizardRail.
+ */
 export function PosHeader({
   eyebrow = "Operacion comercial",
   title = "Nueva venta",
@@ -79,7 +87,7 @@ export function PosHeader({
     >
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="min-w-0 space-y-1.5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ripnel-accent-hover)]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ripnel-accent-hover)]">
             {eyebrow}
           </p>
           <h1 className="text-2xl leading-8 font-semibold tracking-[-0.025em] text-[var(--ops-text)] md:text-[1.75rem]">
@@ -118,7 +126,7 @@ export function PosHeader({
                   type="button"
                   data-active={item.active ? "true" : "false"}
                   onClick={() => progress?.onSelect?.(item.id)}
-                  className="ops-progress-button inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium"
+                  className="ops-progress-button inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium"
                 >
                   <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_86%,var(--ops-surface))]">
                     {item.complete ? (
@@ -141,7 +149,7 @@ export function PosHeader({
                 size="sm"
                 onClick={progress?.onPrevious}
                 disabled={!progress?.canGoPrevious}
-                className="rounded-full"
+                className="rounded-lg"
               >
                 <ChevronLeft className="h-4 w-4" />
                 Anterior
@@ -152,7 +160,7 @@ export function PosHeader({
                 size="sm"
                 onClick={progress?.onNext}
                 disabled={!progress?.canGoNext}
-                className="rounded-full"
+                className="rounded-lg"
               >
                 Siguiente
                 <ChevronRight className="h-4 w-4" />

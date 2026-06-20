@@ -22,10 +22,9 @@ import {
   AdminRowActionsMenu,
   AdminSection,
 } from "@/components/admin/admin-ui";
-import { OpsSelectMenu } from "@/components/ui/ops-selection";
-import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsSelect } from "@/components/ui/ops-selection";
 import { OpsEmptyState } from "@/components/ui/ops-empty-state";
-import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import {
   OpsFiltersRow,
   OpsPageShell,
@@ -430,11 +429,13 @@ export default function UsuariosPage() {
             }
           />
 
-          <div className="flex flex-wrap gap-2">
-            <OpsMetricPill label="Total usuarios" value={users.length} />
-            <OpsMetricPill label="Activos" value={activeUsers} tone="accent" />
-            <OpsMetricPill label="Inactivos" value={inactiveUsers} />
-          </div>
+          <OpsMetricInlineGroup
+            items={[
+              { label: "Total usuarios", value: users.length },
+              { label: "Activos", value: activeUsers, tone: "accent" },
+              { label: "Inactivos", value: inactiveUsers },
+            ]}
+          />
 
           <OpsSectionDivider>
             <OpsTableBlock>
@@ -448,8 +449,8 @@ export default function UsuariosPage() {
                 placeholder="Buscar por nombre, usuario, email o rol"
                 ariaLabel="Buscar usuarios"
               />
-              <FilterDropdown label="Rol" value={roleFilter} options={roleFilterOptions} onChange={(v) => { setRoleFilter(v); setPage(1); }} />
-              <FilterDropdown label="Orden" value={sortOrder} options={[{ value: "desc", label: "Más reciente" }, { value: "asc", label: "Más antiguo" }]} onChange={(v) => { setSortOrder(v as "desc" | "asc"); setPage(1); }} />
+              <OpsSelect label="Rol" value={roleFilter} options={roleFilterOptions} onChange={(v) => { setRoleFilter(v); setPage(1); }} />
+              <OpsSelect label="Orden" value={sortOrder} options={[{ value: "desc", label: "Más reciente" }, { value: "asc", label: "Más antiguo" }]} onChange={(v) => { setSortOrder(v as "desc" | "asc"); setPage(1); }} />
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button onClick={clearFilters} disabled={!hasActiveFilters} variant="outline" size="icon-sm" className="mt-auto h-10 w-10 rounded-lg" aria-label="Limpiar filtros">
@@ -636,7 +637,7 @@ export default function UsuariosPage() {
                       </AdminField>
 
                       <AdminField label="Rol" hint={rolesError || undefined}>
-                        <OpsSelectMenu
+                        <OpsSelect
                           value={userForm.role_id}
                           onValueChange={(value) =>
                             setUserForm((current) => ({ ...current, role_id: value }))

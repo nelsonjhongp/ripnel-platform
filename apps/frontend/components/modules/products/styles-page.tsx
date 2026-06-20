@@ -26,14 +26,13 @@ import {
   AdminRowActionsMenu,
   AdminTextarea,
 } from "@/components/admin/admin-ui";
-import { OpsReadonlyFieldState, OpsSelectMenu } from "@/components/ui/ops-selection";
+import { OpsReadonlyFieldState, OpsSelect } from "@/components/ui/ops-selection";
 import { apiFetchData } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/date-utils";
 import { Button } from "@/components/ui/button";
-import { FilterDropdown } from "@/components/ui/filter-dropdown";
 import { OpsEmptyState } from "@/components/ui/ops-empty-state";
-import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import {
   OpsFiltersRow,
   OpsPageShell,
@@ -408,11 +407,11 @@ export function StylesPage({
             }
           />
 
-          <div className="flex flex-wrap items-center gap-2">
-            <OpsMetricPill label="Styles base" value={styles.length} />
-            <OpsMetricPill label="Activos" value={activeCount} tone="success" />
-            <OpsMetricPill label="Inactivos" value={inactiveCount} tone="warning" />
-          </div>
+          <OpsMetricInlineGroup items={[
+            { label: "Styles base", value: styles.length },
+            { label: "Activos", value: activeCount, tone: "success" },
+            { label: "Inactivos", value: inactiveCount, tone: "warning" },
+          ]} />
 
           <OpsSectionDivider className="space-y-4">
             <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_auto]">
@@ -426,7 +425,7 @@ export function StylesPage({
                 ariaLabel="Buscar styles"
               />
 
-              <FilterDropdown
+              <OpsSelect
                 label="Estado"
                 value={statusFilter}
                 options={STATUS_OPTIONS}
@@ -651,7 +650,7 @@ export function StylesPage({
                   </AdminField>
 
                   <AdminField label="Target">
-                    <OpsSelectMenu
+                    <OpsSelect
                       value={formState.target_id}
                       onValueChange={(value) =>
                         setFormState((current) => ({

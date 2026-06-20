@@ -15,13 +15,13 @@ const toneClasses: Record<NonNullable<OpsActionTileProps["tone"]>, string> = {
   accent:
     "bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))] text-[var(--ripnel-accent-hover)]",
   warning:
-    "bg-[var(--ops-tone-warning-bg)] text-amber-700 dark:text-amber-400",
+    "bg-[var(--ops-tone-warning-bg)] text-[var(--ops-tone-warning-text)]",
   success:
-    "bg-[var(--ops-tone-success-bg)] text-emerald-700 dark:text-emerald-400",
+    "bg-[var(--ops-tone-success-bg)] text-[var(--ops-tone-success-text)]",
   info:
-    "bg-[color:color-mix(in_srgb,#38bdf8_10%,var(--ops-surface))] text-sky-700 dark:text-sky-400",
+    "bg-[var(--ops-tone-info-bg)] text-[var(--ops-tone-info-text)]",
   neutral:
-    "bg-[color:color-mix(in_srgb,#94a3b8_14%,var(--ops-surface))] text-slate-600 dark:text-slate-300",
+    "bg-[var(--ops-tone-neutral-bg)] text-[var(--ops-tone-neutral-text)]",
 }
 
 export function OpsActionTile({

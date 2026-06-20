@@ -1,5 +1,7 @@
 const { pool } = require("../../shared/db");
 const { AppError } = require("../../shared/errors");
+const { round2 } = require("../../shared/numbers");
+const { normalizeUuid } = require("../../shared/uuid");
 const { findActiveUserById } = require("../auth/auth.repo");
 const { findDefaultLocationByUserId } = require("../users/users.repo");
 const {
@@ -23,17 +25,6 @@ function todayPeruDate() {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/Lima" });
 }
 
-function normalizeUuid(value) {
-  const normalized = String(value || "").trim();
-  if (!normalized) return null;
-
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    normalized,
-  )
-    ? normalized
-    : null;
-}
-
 function hasPermission(permissions, permissionKey) {
   return (
     Array.isArray(permissions) &&
@@ -53,10 +44,6 @@ function normalizeTransferCapabilities(rawCapabilities = {}) {
     cancel: Boolean(rawCapabilities.cancel),
     visible: Boolean(rawCapabilities.visible),
   };
-}
-
-function round2(value) {
-  return Math.round(Number(value || 0) * 100) / 100;
 }
 
 function buildPaymentTotals(rows) {
@@ -394,6 +381,7 @@ function buildSummary(items) {
 }
 
 async function getTopbarNotifications(input = {}) {
+  const maxItems = Number(input.max_items) > 0 ? Number(input.max_items) : MAX_VISIBLE_ITEMS;
   const { user, location } = await resolveNotificationsContext(input.user_id);
   const permissions = Array.isArray(input.permissions) ? input.permissions : [];
   const roleName = input.role_name || user.role_name || null;
@@ -498,7 +486,7 @@ async function getTopbarNotifications(input = {}) {
       inventoryCounts,
       inventoryItems,
     }),
-  ]).slice(0, MAX_VISIBLE_ITEMS);
+  ]).slice(0, maxItems);
 
   return {
     context: {

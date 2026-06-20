@@ -17,7 +17,7 @@ import {
 import { AdminRowActionsMenu } from "@/components/admin/admin-ui";
 import { ApiEnvelope, apiFetch, unwrapApiData } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import {
   OpsFiltersRow,
   OpsPageShell,
@@ -27,7 +27,7 @@ import {
 import { OpsDataTable } from "@/components/ui/ops-data-table";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { Button } from "@/components/ui/button";
-import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsSelect } from "@/components/ui/ops-selection";
 import { Pagination } from "@/components/ui/pagination";
 import {
   Tooltip,
@@ -37,7 +37,6 @@ import {
 } from "@/components/ui/tooltip";
 import { useAuth } from "@/components/auth/AuthProvider";
 import type { ProductStatus } from "@/types/products";
-import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
 
 type ProductSizeStock = {
   size_id: string;
@@ -275,11 +274,11 @@ export function ProductsOverviewPage() {
             }
           />
 
-          <div className="flex flex-wrap items-center gap-2">
-            <OpsMetricPill label="Total styles" value={totalItems} />
-            <OpsMetricPill label="Listos" value={readyCount} tone="success" />
-            <OpsMetricPill label="Pendientes" value={pendingCount} tone="warning" />
-          </div>
+          <OpsMetricInlineGroup items={[
+            { label: "Total estilos", value: totalItems },
+            { label: "Listos", value: readyCount, tone: "success" },
+            { label: "Pendientes", value: pendingCount, tone: "warning" },
+          ]} />
 
           <OpsSectionDivider className="space-y-4">
             <OpsFiltersRow>
@@ -293,7 +292,7 @@ export function ProductsOverviewPage() {
                 ariaLabel="Buscar productos"
               />
 
-              <FilterDropdown
+              <OpsSelect
                 label="Filtro"
                 value={filterMode}
                 options={[
@@ -308,7 +307,7 @@ export function ProductsOverviewPage() {
                 }}
               />
 
-              <FilterDropdown
+              <OpsSelect
                 label="Sede activa"
                 value={effectiveLocationId}
                 options={locationAssignments.map((assignment) => ({

@@ -137,6 +137,20 @@ async function findAllCashClosings(filters = {}) {
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
+  const limit = Math.min(
+    Math.max(Number(filters.limit) || 20, 1),
+    50,
+  );
+  const offset = Math.max(Number(filters.offset) || 0, 0);
+
+  const countResult = await query(
+    `SELECT COUNT(*)::int AS total_items
+     FROM cash_closings cc
+     ${whereClause}`,
+    values,
+  );
+  const totalItems = countResult.rows[0]?.total_items || 0;
+
   const result = await query(
     `SELECT
        ${buildCashClosingProjection('cc', true)}
@@ -147,10 +161,10 @@ async function findAllCashClosings(filters = {}) {
      ${buildConsistencyJoins('cc')}
      ${whereClause}
      ORDER BY cc.business_date DESC, cc.created_at DESC
-     LIMIT 200`,
+     LIMIT ${limit} OFFSET ${offset}`,
     values
   );
-  return result.rows;
+  return { rows: result.rows, totalItems };
 }
 
 async function insertCashClosing(data) {
@@ -193,6 +207,25 @@ async function updateCashClosingClose(cashClosingId, data) {
   return result.rows[0];
 }
 
+async function updateCashClosingReopen(cashClosingId, data) {
+  const result = await query(
+    `UPDATE cash_closings
+     SET
+       status = 'open',
+       reopened_by = $2,
+       reopened_at = NOW(),
+       reopen_notes = $3
+     WHERE cash_closing_id = $1
+     RETURNING *`,
+    [
+      cashClosingId,
+      data.reopened_by,
+      data.reopen_notes || null,
+    ]
+  );
+  return result.rows[0];
+}
+
 async function sumSalesPaymentsByLocationAndDate(locationId, businessDate) {
   const result = await query(
     `WITH payment_movements AS (
@@ -201,8 +234,9 @@ async function sumSalesPaymentsByLocationAndDate(locationId, businessDate) {
          sp.amount AS signed_amount
        FROM sales_payments sp
        INNER JOIN sales s ON s.sale_id = sp.sale_id
-       WHERE s.location_id = $1
-         AND DATE(COALESCE(s.confirmed_at, s.created_at) AT TIME ZONE 'America/Lima') = $2::date
+        WHERE s.location_id = $1
+          AND s.status = 'confirmed'
+          AND DATE(COALESCE(s.confirmed_at, s.created_at) AT TIME ZONE 'America/Lima') = $2::date
 
        UNION ALL
 
@@ -245,6 +279,19 @@ async function countSalesByLocationAndDate(locationId, dateFrom, dateToOrExecuto
     [locationId, dateFrom, dateEnd]
   );
   return result.rows[0];
+}
+
+async function countUnconfirmedSalesByLocationAndDate(locationId, businessDate, executor) {
+  const exec = typeof executor === "function" ? executor : query;
+  const result = await exec(
+    `SELECT COUNT(*)::int AS unconfirmed_count
+     FROM sales
+     WHERE location_id = $1
+       AND status != 'confirmed'
+       AND DATE(created_at AT TIME ZONE 'America/Lima') = $2::date`,
+    [locationId, businessDate]
+  );
+  return result.rows[0].unconfirmed_count;
 }
 
 async function getAdminCashSummary(filters = {}) {
@@ -439,8 +486,10 @@ module.exports = {
   findAllCashClosings,
   insertCashClosing,
   updateCashClosingClose,
+  updateCashClosingReopen,
   sumSalesPaymentsByLocationAndDate,
   countSalesByLocationAndDate,
+  countUnconfirmedSalesByLocationAndDate,
   getAdminCashSummary,
   findAdminCashSessions,
 };

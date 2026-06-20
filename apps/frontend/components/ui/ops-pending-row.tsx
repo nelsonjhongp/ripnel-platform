@@ -1,8 +1,6 @@
 "use client"
 
-import Link from "next/link"
-
-import { cn } from "@/lib/utils"
+import { OpsAttentionRow } from "@/components/ui/ops-attention-row"
 
 export interface OpsPendingRowProps {
   icon: React.ReactNode
@@ -10,30 +8,24 @@ export interface OpsPendingRowProps {
   description: string
   ctaLabel: string
   ctaHref: string
-  tone?: "critical" | "warning" | "info"
+  tone?: "critical" | "danger" | "warning" | "info"
 }
 
-const iconToneClasses: Record<NonNullable<OpsPendingRowProps["tone"]>, string> = {
-  critical: "bg-[var(--ops-tone-danger-bg)] text-rose-700 dark:text-rose-400",
-  warning: "bg-[var(--ops-tone-warning-bg)] text-amber-700 dark:text-amber-400",
-  info: "bg-[color:color-mix(in_srgb,#38bdf8_10%,var(--ops-surface))] text-sky-700 dark:text-sky-400",
+const toneMap: Record<
+  NonNullable<OpsPendingRowProps["tone"]>,
+  "danger" | "warning" | "accent"
+> = {
+  critical: "danger",
+  danger: "danger",
+  warning: "warning",
+  info: "accent",
 }
 
-const accentToneClasses: Record<NonNullable<OpsPendingRowProps["tone"]>, string> = {
-  critical: "border-l-rose-500",
-  warning: "border-l-amber-500",
-  info: "border-l-sky-500",
-}
-
-const buttonToneClasses: Record<NonNullable<OpsPendingRowProps["tone"]>, string> = {
-  critical:
-    "border-rose-200 text-rose-700 hover:bg-[var(--ops-tone-danger-bg)] dark:text-rose-400",
-  warning:
-    "border-amber-200 text-amber-700 hover:bg-[var(--ops-tone-warning-bg)] dark:text-amber-400",
-  info:
-    "border-sky-200 text-sky-700 hover:bg-[color:color-mix(in_srgb,#38bdf8_8%,var(--ops-surface))] dark:text-sky-400",
-}
-
+/**
+ * @deprecated Prefer OpsAttentionRow for new inline operational alerts.
+ * Do not use in new screens; this wrapper is temporary compatibility.
+ * This wrapper preserves the compact pending-row API used by existing screens.
+ */
 export function OpsPendingRow({
   icon,
   title,
@@ -43,38 +35,14 @@ export function OpsPendingRow({
   tone = "info",
 }: OpsPendingRowProps) {
   return (
-    <div
-      className={cn(
-        "flex items-center gap-3 bg-transparent px-4 py-2.5",
-        "border-l-2",
-        accentToneClasses[tone]
-      )}
-    >
-      <div
-        className={cn(
-          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
-          iconToneClasses[tone]
-        )}
-      >
-        {icon}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-[var(--ops-text)]">{title}</p>
-        <p className="mt-0.5 line-clamp-2 text-[13px] text-[var(--ops-text-muted)]">
-          {description}
-        </p>
-      </div>
-
-      <Link
-        href={ctaHref}
-        className={cn(
-          "inline-flex h-8 shrink-0 items-center justify-center self-center rounded-full border bg-[color:color-mix(in_srgb,var(--ops-surface)_84%,var(--ops-surface-muted))] px-4 text-[13px] font-medium transition",
-          buttonToneClasses[tone]
-        )}
-      >
-        {ctaLabel}
-      </Link>
-    </div>
+    <OpsAttentionRow
+      icon={icon}
+      title={title}
+      description={description}
+      ctaLabel={ctaLabel}
+      href={ctaHref}
+      tone={toneMap[tone]}
+      embedded
+    />
   )
 }

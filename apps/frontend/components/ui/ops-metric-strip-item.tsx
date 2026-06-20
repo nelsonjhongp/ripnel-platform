@@ -2,10 +2,15 @@
 
 import { cn } from "@/lib/utils"
 
+/**
+ * @deprecated Prefer OpsMetricCard or OpsMetricPill for new modules.
+ * Do not use in new screens; this wrapper is temporary compatibility.
+ * This remains as a derived, denser KPI surface used by legacy home/dashboard layouts.
+ */
 export interface OpsMetricStripItemProps {
   label: string
   value: string | number
-  tone?: "accent" | "warning" | "info"
+  tone?: "accent" | "warning" | "info" | "neutral"
   isNeutral?: boolean
 }
 
@@ -22,10 +27,14 @@ function stripToneClass(
   }
 
   if (tone === "warning") {
-    return "border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)] text-amber-800 dark:text-amber-300"
+    return "border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)] text-[var(--ops-tone-warning-text)]"
   }
 
-  return "border-[color:color-mix(in_srgb,#38bdf8_20%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#38bdf8_8%,var(--ops-surface))] text-sky-800 dark:text-sky-300"
+  if (tone === "neutral") {
+    return "border-[var(--ops-tone-neutral-border)] bg-[var(--ops-tone-neutral-bg)] text-[var(--ops-tone-neutral-text)]"
+  }
+
+  return "border-[var(--ops-tone-info-border)] bg-[var(--ops-tone-info-bg)] text-[var(--ops-tone-info-text)]"
 }
 
 export function OpsMetricStripItem({

@@ -40,6 +40,7 @@ with seeded_permissions(permission_key, description) as (
     ('cash.view', 'Consultar caja del dia e historial operativo de la sede activa.'),
     ('cash.operate', 'Abrir y cerrar la caja operativa de la sede activa.'),
     ('cash.admin.view', 'Consultar el control transversal de cajas multi-sede.'),
+    ('cash.admin.reopen', 'Reabrir cajas cerradas de cualquier sede.'),
     ('dashboard.view', 'Consultar el panel operativo y gerencial.'),
     ('dashboard.global.view', 'Consultar el panel con alcance multi-sede.')
 )
@@ -86,6 +87,7 @@ permission_keys(permission_key) as (
     ('cash.view'),
     ('cash.operate'),
     ('cash.admin.view'),
+    ('cash.admin.reopen'),
     ('dashboard.view'),
     ('dashboard.global.view'),
     ('users.manage'),
@@ -125,6 +127,7 @@ with seeded_role_permissions(role_name, permission_key) as (
     ('ADMIN', 'cash.view'),
     ('ADMIN', 'cash.operate'),
     ('ADMIN', 'cash.admin.view'),
+    ('ADMIN', 'cash.admin.reopen'),
     ('ADMIN', 'dashboard.view'),
     ('ADMIN', 'dashboard.global.view'),
 

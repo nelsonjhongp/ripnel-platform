@@ -23,9 +23,9 @@ import { InlineStatusCard } from "@/components/feedback/status-page";
 import { ForbiddenPage } from "@/components/feedback/status-page";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
-import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsSelect } from "@/components/ui/ops-selection";
 import { OpsEmptyState } from "@/components/ui/ops-empty-state";
-import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import {
   OpsFiltersRow,
   OpsPageShell,
@@ -280,11 +280,11 @@ export function InventoryAdjustmentsPage() {
           }
         />
 
-        <div className="flex flex-wrap items-center gap-2">
-          <OpsMetricPill label="Total" value={totals.total} />
-          <OpsMetricPill label="Borradores" value={totals.drafts} tone="warning" />
-          <OpsMetricPill label="Confirmados" value={totals.confirmed} tone="accent" />
-        </div>
+        <OpsMetricInlineGroup items={[
+          { label: "Total", value: totals.total },
+          { label: "Borradores", value: totals.drafts, tone: "warning" },
+          { label: "Confirmados", value: totals.confirmed, tone: "accent" },
+        ]} />
 
         {notice ? (
             <AdminInlineMessage tone="success">{notice}</AdminInlineMessage>
@@ -304,7 +304,7 @@ export function InventoryAdjustmentsPage() {
               ariaLabel="Buscar ajustes de inventario"
             />
 
-            <FilterDropdown
+            <OpsSelect
               label="Sede"
               value={effectiveLocationFilter}
               options={[
@@ -320,7 +320,7 @@ export function InventoryAdjustmentsPage() {
               }}
             />
 
-            <FilterDropdown
+            <OpsSelect
               label="Estado"
               value={statusFilter}
               options={[

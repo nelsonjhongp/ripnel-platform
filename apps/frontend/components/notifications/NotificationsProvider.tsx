@@ -24,7 +24,7 @@ export type TopbarNotificationItem = {
   created_at: string
 }
 
-type TopbarNotificationsResponse = {
+export type TopbarNotificationsResponse = {
   context: {
     generated_at: string
     business_date: string
@@ -68,6 +68,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const pathname = usePathname()
   const hasLoadedRef = React.useRef(false)
   const unauthRef = React.useRef(false)
+  const refreshingRef = React.useRef(false)
   const [notifications, setNotifications] = React.useState<TopbarNotificationsResponse | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [refreshing, setRefreshing] = React.useState(false)
@@ -88,6 +89,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
   const refresh = React.useCallback(async (options: { silent?: boolean } = {}) => {
     if (unauthRef.current) return
+    if (refreshingRef.current) return
 
     const isSilent = options.silent === true
 
@@ -97,6 +99,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       setLoading(true)
     }
 
+    refreshingRef.current = true
     setError(null)
 
     try {
@@ -112,6 +115,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         unauthRef.current = true
         setLoading(false)
         setRefreshing(false)
+        refreshingRef.current = false
         return
       }
       setError(explainNotificationsError(loadError))
@@ -119,6 +123,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     } finally {
       setLoading(false)
       setRefreshing(false)
+      refreshingRef.current = false
     }
   }, [])
 
@@ -135,6 +140,18 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return () => {
       window.removeEventListener("focus", handleFocus)
     }
+  }, [refresh])
+
+  React.useEffect(() => {
+    const POLL_INTERVAL_MS = 60_000
+
+    const intervalId = setInterval(() => {
+      if (unauthRef.current) return
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return
+      void refresh({ silent: true })
+    }, POLL_INTERVAL_MS)
+
+    return () => clearInterval(intervalId)
   }, [refresh])
 
   const value = React.useMemo(

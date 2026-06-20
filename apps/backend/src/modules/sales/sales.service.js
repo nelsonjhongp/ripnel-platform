@@ -1,5 +1,7 @@
 const { AppError } = require('../../shared/errors');
 const { pool } = require('../../shared/db');
+const { round2 } = require('../../shared/numbers');
+const { normalizeUuid } = require('../../shared/uuid');
 const { resolveDashboardScope } = require('../dashboard/dashboard-scope');
 const { renderProformaSalePdfBuffer } = require('./sales-proforma-pdf');
 const { renderReceiptSalePdfBuffer } = require('./sales-receipt-pdf');
@@ -41,17 +43,6 @@ const TAX_RATE_BY_DOCUMENT = {
 
 function todayPeruDate() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
-}
-
-function normalizeUuid(value) {
-  const normalized = String(value || '').trim();
-  if (!normalized) return null;
-
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    normalized
-  )
-    ? normalized
-    : null;
 }
 
 function normalizeText(value) {
@@ -104,18 +95,18 @@ function normalizePriceOverride(input) {
   }
 
   if (typeof input !== 'object' || Array.isArray(input)) {
-    throw new AppError('price_override must be an object', 400);
+    throw new AppError('price_override debe ser un objeto', 400);
   }
 
   const unitPriceFinal = normalizeAmount(input.unit_price_final);
   const reason = normalizeText(input.reason);
 
   if (unitPriceFinal === null) {
-    throw new AppError('price_override.unit_price_final must be a valid amount', 400);
+    throw new AppError('price_override.unit_price_final debe ser un monto válido', 400);
   }
 
   if (!reason) {
-    throw new AppError('price_override.reason is required', 400);
+    throw new AppError('price_override.reason es requerido', 400);
   }
 
   return {
@@ -130,7 +121,7 @@ function normalizeSaleDiscount(input) {
   }
 
   if (typeof input !== 'object' || Array.isArray(input)) {
-    throw new AppError('sale_discount must be an object', 400);
+    throw new AppError('sale_discount debe ser un objeto', 400);
   }
 
   const mode = normalizeDiscountMode(input.mode);
@@ -138,15 +129,15 @@ function normalizeSaleDiscount(input) {
   const reason = normalizeText(input.reason);
 
   if (!mode) {
-    throw new AppError('sale_discount.mode must be amount or percent', 400);
+    throw new AppError('sale_discount.mode debe ser amount o percent', 400);
   }
 
   if (value === null) {
-    throw new AppError('sale_discount.value must be a positive amount', 400);
+    throw new AppError('sale_discount.value debe ser un monto positivo', 400);
   }
 
   if (!reason) {
-    throw new AppError('sale_discount.reason is required', 400);
+    throw new AppError('sale_discount.reason es requerido', 400);
   }
 
   return {
@@ -160,19 +151,19 @@ function computeSaleDiscountAmount(discount, subtotalAmount) {
   if (!discount) return 0;
 
   if (subtotalAmount <= 0) {
-    throw new AppError('A discount cannot be applied to an empty subtotal', 400);
+    throw new AppError('No se puede aplicar descuento a un subtotal vacío', 400);
   }
 
   if (discount.mode === 'percent') {
     if (discount.value > 100) {
-      throw new AppError('sale_discount.value cannot exceed 100 when mode is percent', 400);
+      throw new AppError('sale_discount.value no puede exceder 100 en modo porcentaje', 400);
     }
 
     return round2((subtotalAmount * discount.value) / 100);
   }
 
   if (discount.value > subtotalAmount) {
-    throw new AppError('sale_discount.value cannot exceed subtotal amount', 400);
+    throw new AppError('sale_discount.value no puede exceder el subtotal', 400);
   }
 
   return round2(discount.value);
@@ -254,7 +245,7 @@ function applyTaxesToComputedItems(items, taxRate) {
 function normalizeSalePayments(rawPayments, fallbackPaymentMethod, totalAmount) {
   if (rawPayments !== undefined && rawPayments !== null) {
     if (!Array.isArray(rawPayments) || !rawPayments.length) {
-      throw new AppError('payments must be a non-empty array when provided', 400);
+      throw new AppError('payments debe ser un array no vacío cuando se proporciona', 400);
     }
 
     const normalizedPayments = rawPayments.map((payment, index) => {
@@ -263,11 +254,11 @@ function normalizeSalePayments(rawPayments, fallbackPaymentMethod, totalAmount) 
       const reference = normalizeText(payment && payment.reference);
 
       if (!ALLOWED_PAYMENT_METHODS.includes(method)) {
-        throw new AppError(`payments[${index}].method is invalid`, 400);
+        throw new AppError(`payments[${index}].method no es válido`, 400);
       }
 
       if (amount === null) {
-        throw new AppError(`payments[${index}].amount must be a positive amount`, 400);
+        throw new AppError(`payments[${index}].amount debe ser un monto positivo`, 400);
       }
 
       return {
@@ -282,14 +273,14 @@ function normalizeSalePayments(rawPayments, fallbackPaymentMethod, totalAmount) 
     );
 
     if (Math.abs(paymentTotal - totalAmount) >= 0.01) {
-      throw new AppError('The sum of payments must match the sale total amount', 400);
+      throw new AppError('La suma de los pagos debe coincidir con el total de la venta', 400);
     }
 
     return normalizedPayments;
   }
 
   if (!ALLOWED_PAYMENT_METHODS.includes(fallbackPaymentMethod)) {
-    throw new AppError('Invalid payment_method', 400);
+    throw new AppError('payment_method no válido', 400);
   }
 
   return [
@@ -334,7 +325,7 @@ function normalizeSalesCursor(value) {
     const sortDate = normalizeText(parsed && parsed.sort_date);
 
     if (!saleId || !sortDate || Number.isNaN(Date.parse(sortDate))) {
-      throw new Error('Invalid cursor payload');
+      throw new Error('Payload de cursor no válido');
     }
 
     return {
@@ -343,12 +334,8 @@ function normalizeSalesCursor(value) {
       raw: normalized,
     };
   } catch (error) {
-    throw new AppError('Invalid cursor value', 400);
+    throw new AppError('Valor de cursor no válido', 400);
   }
-}
-
-function round2(value) {
-  return Math.round(value * 100) / 100;
 }
 
 function sumSaleItemQuantity(items = []) {
@@ -376,21 +363,21 @@ async function resolveOperatingContext(userId) {
   const normalizedUserId = normalizeUuid(userId);
 
   if (!normalizedUserId) {
-    throw new AppError('Not authenticated', 401);
+    throw new AppError('No autenticado', 401);
   }
 
   const user = await findActiveUserById(normalizedUserId);
   if (!user) {
-    throw new AppError('Not authenticated', 401);
+    throw new AppError('No autenticado', 401);
   }
 
   const defaultLocation = await findDefaultLocationByUserId(normalizedUserId);
   if (!defaultLocation) {
-    throw new AppError('Authenticated user has no default location assigned', 409);
+    throw new AppError('El usuario no tiene una sede asignada por defecto', 409);
   }
 
   if (!defaultLocation.active) {
-    throw new AppError('Default location is inactive', 409);
+    throw new AppError('La sede por defecto está inactiva', 409);
   }
 
   return {
@@ -431,11 +418,11 @@ async function resolveCustomerForSale(customerId) {
     const customer = await findCustomerById(customerId);
 
     if (!customer) {
-      throw new AppError('Customer not found', 404);
+      throw new AppError('Cliente no encontrado', 404);
     }
 
     if (!customer.active) {
-      throw new AppError('Customer is inactive', 409);
+      throw new AppError('El cliente está inactivo', 409);
     }
 
     return customer;
@@ -443,11 +430,11 @@ async function resolveCustomerForSale(customerId) {
 
   const fallbackCustomer = await findCustomerByInternalCode(GENERIC_COUNTER_CUSTOMER_CODE);
   if (!fallbackCustomer) {
-    throw new AppError('Generic counter customer is not configured', 500);
+    throw new AppError('El cliente mostrador genérico no está configurado', 500);
   }
 
   if (!fallbackCustomer.active) {
-    throw new AppError('Generic counter customer is inactive', 500);
+    throw new AppError('El cliente mostrador genérico está inactivo', 500);
   }
 
   return fallbackCustomer;
@@ -459,50 +446,50 @@ function validateCustomerAgainstDocumentType(customer, documentType) {
 
   if (documentType === 'boleta') {
     if (!customerName) {
-      throw new AppError('Customer name is required for boleta', 400);
+      throw new AppError('El nombre del cliente es requerido para boleta', 400);
     }
 
     if (!['dni', 'ce'].includes(customerDocType)) {
-      throw new AppError('A customer with DNI or CE is required for boleta', 400);
+      throw new AppError('Se requiere un cliente con DNI o CE para boleta', 400);
     }
 
     if (!normalizeText(customer.document_number)) {
-      throw new AppError('Customer document number is required for boleta', 400);
+      throw new AppError('El número de documento del cliente es requerido para boleta', 400);
     }
 
     if (
       customerDocType === 'ce' &&
       !/^\d{9}$/.test(String(customer.document_number || '').trim())
     ) {
-      throw new AppError('CE document number must have exactly 9 digits for boleta', 400);
+      throw new AppError('El número de documento CE debe tener exactamente 9 dígitos para boleta', 400);
     }
   }
 
   if (documentType === 'factura') {
     if (!customerName) {
-      throw new AppError('Customer name is required for factura', 400);
+      throw new AppError('El nombre del cliente es requerido para factura', 400);
     }
 
     if (customerDocType !== 'ruc') {
-      throw new AppError('A customer with RUC is required for factura', 400);
+      throw new AppError('Se requiere un cliente con RUC para factura', 400);
     }
 
     if (!normalizeText(customer.document_number)) {
-      throw new AppError('Customer document number is required for factura', 400);
+      throw new AppError('El número de documento del cliente es requerido para factura', 400);
     }
 
     if (!normalizeText(customer.address)) {
-      throw new AppError('Customer address is required for factura', 400);
+      throw new AppError('La dirección del cliente es requerida para factura', 400);
     }
   }
 }
 
 async function getSaleByLocation(saleId, locationId) {
   const normalizedId = normalizeUuid(saleId);
-  if (!normalizedId) throw new AppError('Sale id is required', 400);
+  if (!normalizedId) throw new AppError('El id de venta es requerido', 400);
 
   const header = await findSaleById(normalizedId, locationId);
-  if (!header) throw new AppError('Sale not found', 404);
+  if (!header) throw new AppError('Venta no encontrada', 404);
 
   const [details, payments] = await Promise.all([
     findSaleDetailsBySaleId(normalizedId),
@@ -586,27 +573,27 @@ async function listSales(input = {}) {
   const limit = pageSize;
 
   if (status && !['draft', 'confirmed', 'cancelled'].includes(status)) {
-    throw new AppError('Invalid status value', 400);
+    throw new AppError('Valor de status no válido', 400);
   }
 
   if (cashStatus && !['open', 'closed', 'missing'].includes(cashStatus)) {
-    throw new AppError('Invalid cash_status value', 400);
+    throw new AppError('Valor de cash_status no válido', 400);
   }
 
   if (documentType && !ALLOWED_DOCUMENT_TYPES.includes(documentType)) {
-    throw new AppError('Invalid document_type value', 400);
+    throw new AppError('Valor de document_type no válido', 400);
   }
 
   if (input.date_from !== undefined && input.date_from !== null && !dateFrom) {
-    throw new AppError('Invalid date_from value', 400);
+    throw new AppError('Valor de date_from no válido', 400);
   }
 
   if (input.date_to !== undefined && input.date_to !== null && !dateTo) {
-    throw new AppError('Invalid date_to value', 400);
+    throw new AppError('Valor de date_to no válido', 400);
   }
 
   if (dateFrom && dateTo && dateFrom > dateTo) {
-    throw new AppError('date_from cannot be greater than date_to', 400);
+    throw new AppError('date_from no puede ser mayor que date_to', 400);
   }
 
   const salesPage = await findAllSales({
@@ -658,15 +645,15 @@ async function getCustomerAnalytics(input = {}) {
   const limit = normalizeReceiptQueueLimit(input.limit, 8);
 
   if (input.date_from !== undefined && input.date_from !== null && !dateFrom) {
-    throw new AppError('Invalid date_from value', 400);
+    throw new AppError('Valor de date_from no válido', 400);
   }
 
   if (input.date_to !== undefined && input.date_to !== null && !dateTo) {
-    throw new AppError('Invalid date_to value', 400);
+    throw new AppError('Valor de date_to no válido', 400);
   }
 
   if (dateFrom && dateTo && dateFrom > dateTo) {
-    throw new AppError('date_from cannot be greater than date_to', 400);
+    throw new AppError('date_from no puede ser mayor que date_to', 400);
   }
 
   const dashboardScope = await resolveDashboardScope({
@@ -699,15 +686,15 @@ async function createSale(input = {}) {
   const saleDiscount = normalizeSaleDiscount(input.sale_discount);
 
   if (input.customer_id !== undefined && input.customer_id !== null && !customerId) {
-    throw new AppError('Invalid customer_id', 400);
+    throw new AppError('customer_id no válido', 400);
   }
 
   if (!ALLOWED_DOCUMENT_TYPES.includes(documentType)) {
-    throw new AppError('Invalid document_type', 400);
+    throw new AppError('document_type no válido', 400);
   }
 
   if (!items.length) {
-    throw new AppError('At least one item is required', 400);
+    throw new AppError('Se requiere al menos un ítem', 400);
   }
 
   const { user, location } = await resolveOperatingContext(input.user_id);
@@ -722,24 +709,24 @@ async function createSale(input = {}) {
     const qty = normalizePositiveInteger(item && item.quantity);
 
     if (!variantId) {
-      throw new AppError('variant_id is required for each item', 400);
+      throw new AppError('variant_id es requerido para cada ítem', 400);
     }
 
     if (!qty) {
-      throw new AppError('quantity must be a positive integer for each item', 400);
+      throw new AppError('quantity debe ser un entero positivo para cada ítem', 400);
     }
 
     if (seenVariantIds.has(variantId)) {
-      throw new AppError('Duplicate variant_id in items is not allowed', 400);
+      throw new AppError('No se permiten variant_id duplicados en los ítems', 400);
     }
 
     const variant = await findVariantById(variantId);
     if (!variant) {
-      throw new AppError(`Variant ${variantId} not found`, 404);
+      throw new AppError(`Variante ${variantId} no encontrada`, 404);
     }
 
     if (!variant.active) {
-      throw new AppError(`Variant ${variant.sku} is inactive`, 400);
+      throw new AppError(`La variante ${variant.sku} está inactiva`, 400);
     }
 
     seenVariantIds.add(variantId);
@@ -776,7 +763,7 @@ async function createSale(input = {}) {
 
       if (availableQty < item.quantity) {
         throw new AppError(
-          `Insufficient stock for ${item.sku}: available ${availableQty}, requested ${item.quantity}`,
+          `Stock insuficiente para ${item.sku}: disponible ${availableQty}, solicitado ${item.quantity}`,
           409
         );
       }
@@ -786,7 +773,7 @@ async function createSale(input = {}) {
       );
 
       if (resolvedRetailPrice === null) {
-        throw new AppError(`No current retail price found for ${item.sku}`, 409);
+        throw new AppError(`No se encontró precio retail vigente para ${item.sku}`, 409);
       }
 
       const resolvedWholesalePrice = wholesaleApplies
@@ -836,7 +823,7 @@ async function createSale(input = {}) {
     const totalAmount = pricedSale.totalAmount;
 
     if (totalAmount <= 0) {
-      throw new AppError('The final sale total must be greater than zero', 400);
+      throw new AppError('El total final de la venta debe ser mayor a cero', 400);
     }
 
     const payments = normalizeSalePayments(input.payments, paymentMethod, totalAmount);
@@ -865,6 +852,12 @@ async function createSale(input = {}) {
       confirmed_at: confirmedAt,
       currency: 'PEN',
     });
+
+    if (!saleRow) {
+      throw new AppError('Conflicto de número de venta. Reintente la operación.', 409, {
+        code: 'SALE_NUMBER_CONFLICT',
+      });
+    }
 
     const saleId = saleRow.sale_id;
 
@@ -949,7 +942,7 @@ async function getSaleReceiptPdf(input = {}) {
   const sale = await getSaleByLocation(input.sale_id, location.location_id);
 
   if (sale.document_type !== 'boleta' && sale.document_type !== 'factura') {
-    throw new AppError('Only boleta or factura sales can be downloaded from this endpoint', 400);
+    throw new AppError('Solo ventas con boleta o factura pueden descargarse desde este endpoint', 400);
   }
 
   const pdfBuffer = await renderReceiptSalePdfBuffer(sale);

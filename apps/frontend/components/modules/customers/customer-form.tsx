@@ -1,5 +1,6 @@
 "use client"
 
+import { LoaderCircle } from "lucide-react"
 import {
   AdminActionButton,
   AdminCheckboxField,
@@ -10,7 +11,7 @@ import {
   AdminSection,
   AdminTextarea,
 } from "@/components/admin/admin-ui"
-import { OpsSelectMenu } from "@/components/ui/ops-selection"
+import { OpsSelect } from "@/components/ui/ops-selection"
 import { cn } from "@/lib/utils"
 import { formatDate } from "@/lib/date-utils"
 
@@ -174,6 +175,7 @@ type CustomerFormProps = {
   onCancel?: () => void
   submitLabel: string
   submitting?: boolean
+  submissionState?: "idle" | "validating" | "saving"
   error?: string | null
   mode?: "create" | "edit"
   className?: string
@@ -186,6 +188,7 @@ export function CustomerForm({
   onCancel,
   submitLabel,
   submitting = false,
+  submissionState = "idle",
   error,
   mode = "create",
   className,
@@ -207,6 +210,22 @@ export function CustomerForm({
     { value: "wholesale", label: "Mayorista" },
   ]
 
+  const isBusy = submitting || submissionState !== "idle"
+  const submitContent =
+    submissionState === "validating" ? (
+      <span className="inline-flex items-center gap-2">
+        <LoaderCircle className="h-4 w-4 animate-spin" />
+        Validando...
+      </span>
+    ) : submissionState === "saving" || submitting ? (
+      <span className="inline-flex items-center gap-2">
+        <LoaderCircle className="h-4 w-4 animate-spin" />
+        Guardando...
+      </span>
+    ) : (
+      submitLabel
+    )
+
   return (
     <div className={cn("space-y-5", className)}>
       {error ? (
@@ -218,7 +237,7 @@ export function CustomerForm({
           <AdminSection title="Identidad comercial">
             <div className="grid gap-4 md:grid-cols-2">
               <AdminField label="Tipo de documento">
-                <OpsSelectMenu
+                <OpsSelect
                   value={state.document_type}
                   onValueChange={(value) =>
                     patch({
@@ -265,7 +284,7 @@ export function CustomerForm({
               </AdminField>
 
               <AdminField label="Tipo de cliente">
-                <OpsSelectMenu
+                <OpsSelect
                   value={state.customer_type}
                   onValueChange={(value) => patch({ customer_type: value })}
                   placeholder="Selecciona un tipo"
@@ -321,12 +340,12 @@ export function CustomerForm({
 
       <AdminFormActionsBar>
         {onCancel ? (
-          <AdminActionButton type="button" onClick={onCancel}>
+          <AdminActionButton type="button" onClick={onCancel} disabled={isBusy}>
             {mode === "edit" ? "Cancelar" : "Volver"}
           </AdminActionButton>
         ) : null}
-        <AdminActionButton type="button" tone="accent" onClick={onSubmit} disabled={submitting}>
-          {submitting ? (mode === "create" ? "Creando..." : "Guardando...") : submitLabel}
+        <AdminActionButton type="button" tone="accent" onClick={onSubmit} disabled={isBusy}>
+          {submitContent}
         </AdminActionButton>
       </AdminFormActionsBar>
     </div>

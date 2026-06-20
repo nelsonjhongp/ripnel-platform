@@ -9,7 +9,7 @@ import {
   OpsSectionDivider,
   OpsTableWrap,
 } from "@/components/ui/ops-page-shell"
-import { OpsMetricPill } from "@/components/ui/ops-metric-pill"
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group"
 import { DateFilterPicker } from "@/components/ui/date-filter-picker"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -269,23 +269,14 @@ export function PricesWorkspacePage() {
         <>
 
           {workspace ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <OpsMetricPill label="Tallas" value={workspace.product.configured_size_count} />
-              <OpsMetricPill
-                label="Retail cubierto"
-                value={workspace.product.retail_sizes_covered_count}
-                tone="accent"
-              />
-              <OpsMetricPill
-                label="Mayorista cubierto"
-                value={workspace.product.wholesale_sizes_covered_count}
-              />
-              <OpsMetricPill
-                label="Stock"
-                value={workspace.product.total_stock_qty}
-                tone={workspace.product.total_stock_qty > 0 ? "success" : "default"}
-              />
-            </div>
+            <OpsMetricInlineGroup
+              items={[
+                { label: "Tallas", value: workspace.product.configured_size_count },
+                { label: "Retail cubierto", value: workspace.product.retail_sizes_covered_count, tone: "accent" },
+                { label: "Mayorista cubierto", value: workspace.product.wholesale_sizes_covered_count },
+                { label: "Stock", value: workspace.product.total_stock_qty, tone: workspace.product.total_stock_qty > 0 ? "success" : "default" },
+              ]}
+            />
           ) : null}
 
           <OpsSectionDivider>

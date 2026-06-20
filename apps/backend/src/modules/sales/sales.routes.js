@@ -24,7 +24,7 @@ router.get('/analytics/customers', getCustomersAnalytics);
 router.get('/', getSales);
 router.get('/:saleId/proforma-pdf', getSaleProformaPdfFile);
 router.get('/:saleId/pdf', getSaleReceiptPdfFile);
-router.get('/:saleId/receipt-pdf', getSaleProformaPdfFile);
+router.get('/:saleId/receipt-pdf', getSaleReceiptPdfFile);
 router.post('/:saleId/send-email', sendSaleEmail);
 router.get('/:saleId', getSaleById);
 router.post('/', validate(createSale), postSale);
