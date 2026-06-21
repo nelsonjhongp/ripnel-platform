@@ -22,7 +22,10 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip";
-import { apiFetch } from "@/lib/api";
+import { OpsPageShell } from "@/components/ui/ops-page-shell";
+import { ApiError, apiFetch } from "@/lib/api";
+import { useApiGet } from "@/hooks/use-api-get";
+import { usePagination } from "@/hooks/use-pagination";
 import {
   CashClosingsResponse,
   formatAmount,
@@ -135,17 +138,20 @@ export default function CashHistoryPage() {
   return (
     <PermissionGuard anyPermissions={["cash.view", "cash.operate"]}>
       <TooltipProvider delayDuration={120}>
-        <OpsPageShell width="wide">
-          <PosHeader
-            eyebrow="Caja"
-            title="Historial de caja"
-            actions={
-              <AdminActionButton onClick={refetch}>
-                <RotateCw className="h-4 w-4" />
-                Actualizar
-              </AdminActionButton>
-            }
-          />
+        <OpsPageShell width="wide" className="space-y-5">
+            <header className="px-1 space-y-4">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ripnel-accent-hover)]">
+                      Caja
+                    </p>
+                    <HelpTooltip content="Aquí revisas las sesiones diarias registradas de la sede actual, con su estado y total consolidado." />
+                  </div>
+                  <h1 className="mt-1 text-2xl font-semibold text-[var(--ops-text)] md:text-[1.75rem]">
+                    Historial de caja
+                  </h1>
+                </div>
 
           <OpsTableBlock>
             <OpsFiltersRow className="lg:grid-cols-[0.84fr_auto]">
@@ -188,64 +194,10 @@ export default function CashHistoryPage() {
                       totalPages={pagination.total_pages}
                       onPageChange={setPage}
                     />
-                  </OpsTableFooter>
-                ) : undefined
-              }
-            >
-              {items.map((closing) => (
-                <tr
-                  key={closing.cash_closing_id}
-                  className="text-sm text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
-                >
-                  <td className="px-4 py-[var(--ops-row-py)] text-sm font-medium text-[var(--ops-text)]">
-                    {formatBusinessDate(closing.business_date)}
-                  </td>
-                  <td className="px-4 py-[var(--ops-row-py)] text-[var(--ops-text-muted)]">
-                    <span className="font-medium text-[var(--ops-text)]">
-                      {closing.opened_by_name || "—"}
-                    </span>
-                    <span className="ml-2 text-xs">
-                      {formatDateTime(closing.created_at)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-[var(--ops-row-py)]">
-                    {closing.closed_at ? (
-                      <span className="text-[var(--ops-text-muted)]">
-                        <span className="font-medium text-[var(--ops-text)]">
-                          {closing.closed_by_name || "—"}
-                        </span>
-                        <span className="ml-2 text-xs">
-                          {formatDateTime(closing.closed_at)}
-                        </span>
-                      </span>
-                    ) : (
-                      <CashStatusBadge status={closing.status} />
-                    )}
-                  </td>
-                  <td className="px-4 py-[var(--ops-row-py)]">
-                    <p className="font-semibold">
-                      {formatAmount(closing.total_all)}
-                    </p>
-                    {closing.is_consistent === false ? (
-                       <p className="text-xs text-[var(--ops-tone-warning-text)]">
-                        Dif. {formatAmount(closing.difference)}
-                      </p>
-                    ) : closing.status === "closed" ? (
-                       <p className="text-xs text-[var(--ops-tone-success-text)]">OK</p>
-                    ) : null}
-                  </td>
-                  <td className="px-4 py-[var(--ops-row-py)]">
-                    <Link
-                      href={`/caja/historial/${closing.cash_closing_id}`}
-                      className="inline-flex items-center text-[var(--ops-text-muted)] transition hover:text-[var(--ops-text)]"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </OpsDataTable>
-          </OpsTableBlock>
+                  </div>
+                </>
+              )}
+            </article>
         </OpsPageShell>
       </TooltipProvider>
     </PermissionGuard>

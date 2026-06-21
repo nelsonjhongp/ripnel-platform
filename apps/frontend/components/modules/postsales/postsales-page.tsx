@@ -14,13 +14,15 @@ import {
 
 import { useAuth } from "@/components/auth/AuthProvider"
 import { PermissionGuard } from "@/components/auth/PermissionGuard"
+
 import { Button } from "@/components/ui/button"
 import { DateFilterPicker } from "@/components/ui/date-filter-picker"
 import { OpsSelect } from "@/components/ui/ops-selection"
 import { OpsDataTable, type OpsDataTableColumn } from "@/components/ui/ops-data-table"
 import { OpsPageShell, OpsSearchField, OpsTableBlock, OpsFiltersRow } from "@/components/ui/ops-page-shell"
 import { Pagination } from "@/components/ui/pagination"
-import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group"
+import { OpsDataTable } from "@/components/ui/ops-data-table"
+import { OpsMetricPill } from "@/components/ui/ops-metric-pill"
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import {
@@ -324,30 +326,35 @@ export default function PostsalePage() {
               </OpsFiltersRow>
 
               <OpsDataTable
-                columns={COLUMNS}
+                columns={[
+                  { key: "venta", header: "Venta" },
+                  { key: "fecha", header: "Fecha" },
+                  { key: "cliente", header: "Cliente" },
+                  { key: "sede", header: "Sede" },
+                  { key: "estado", header: "Estado" },
+                  { key: "total", header: "Total" },
+                  { key: "postventa", header: "Postventa" },
+                  { key: "acciones", header: "Acciones", className: "text-right" },
+                ]}
                 minWidth="1080px"
                 loading={loading}
                 loadingMessage="Cargando ventas elegibles..."
                 error={error}
                 errorTitle="No pudimos cargar la cola de postventa"
                 emptyMessage="No se encontraron ventas para los filtros aplicados."
-                isEmpty={paginatedSales.length === 0}
+                isEmpty={!loading && !error && paginatedSales.length === 0}
                 footer={
-                  sales.length > 0 ? (
-                    <>
-                      <span className="text-sm text-[var(--ops-text-muted)]">
-                        {firstVisible}-{lastVisible} de {sales.length}
-                      </span>
-                      <Pagination
-                        page={safePage}
-                        totalPages={totalPages}
-                        onPageChange={setPage}
-                        className="self-end md:self-auto"
-                      />
-                    </>
-                  ) : (
-                    <span className="text-sm text-[var(--ops-text-muted)]">0 resultados</span>
-                  )
+                  <>
+                    <span className="text-sm text-[var(--ops-text-muted)]">
+                      {sales.length === 0 ? "0 resultados" : `${firstVisible}-${lastVisible} de ${sales.length}`}
+                    </span>
+                    <Pagination
+                      page={safePage}
+                      totalPages={totalPages}
+                      onPageChange={setPage}
+                      className="self-end md:self-auto"
+                    />
+                  </>
                 }
               >
                 {paginatedSales.map((sale) => (
@@ -442,7 +449,7 @@ export default function PostsalePage() {
                   </tr>
                 ))}
               </OpsDataTable>
-            </OpsTableBlock>
+            </div>
           </div>
         </section>
       </TooltipProvider>

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
-  LoaderCircle,
   PencilLine,
   Plus,
   Power,
@@ -21,8 +20,6 @@ import {
   OpsSearchField,
   OpsSectionDivider,
   OpsTableBlock,
-  OpsTableFooter,
-  OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
 import { Pagination } from "@/components/ui/pagination";
 import {
@@ -36,8 +33,8 @@ import { useApiGet } from "@/hooks/use-api-get";
 import { fetchCatalogItems, updateCatalogItem } from "@/lib/api-catalogs";
 import type { CatalogRecord } from "@/lib/api-catalogs";
 import type { CatalogListFieldConfig, CatalogFieldConfig } from "@/lib/product-master-metadata";
-import { OpsEmptyState } from "@/components/ui/ops-empty-state";
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
+import { OpsDataTable } from "@/components/ui/ops-data-table";
 import { activeBadgeLabel } from "@/lib/badge-utils";
 import { showSuccess, showError } from "@/lib/toast";
 import { exportToCsv } from "@/lib/export-csv";
@@ -133,6 +130,13 @@ export function CatalogCrudPage({
   const { paginatedItems, totalPages, safePage, firstVisible, lastVisible, setPage } =
     usePagination(filteredItems);
   const hasActiveFilters = Boolean(search.trim()) || statusFilter !== "all";
+
+  const columns = useMemo(() => [
+    { key: "registro", header: "Registro" },
+    ...listFields.map((f) => ({ key: f.key, header: f.label })),
+    { key: "estado", header: "Estado" },
+    { key: "actions", header: "", className: "w-[3.5rem]" },
+  ], [listFields]);
 
   async function handleToggleActive() {
     if (!pendingToggleItem) return;
@@ -314,131 +318,106 @@ export function CatalogCrudPage({
               </Tooltip>
             </OpsFiltersRow>
 
-            {error || mutationError ? (
-              <AdminInlineMessage tone="danger">{error || mutationError}</AdminInlineMessage>
+            {mutationError ? (
+              <AdminInlineMessage tone="danger">{mutationError}</AdminInlineMessage>
             ) : null}
 
             {successMessage ? (
               <AdminInlineMessage tone="success">{successMessage}</AdminInlineMessage>
             ) : null}
 
-            <OpsTableWrap minWidth="920px">
-              <table className="w-full border-collapse">
-                <thead className="bg-[var(--ops-surface-muted)]">
-                  <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                    <th className="px-4 py-3">Registro</th>
-                    {listFields.map((field) => (
-                      <th key={field.key} className="px-4 py-3">{field.label}</th>
-                    ))}
-                    <th className="px-4 py-3">Estado</th>
-                    <th className="w-[3.5rem] px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={listFields.length + 3} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                        <LoaderCircle className="mr-2 inline-block h-5 w-5 animate-spin" />
-                        Cargando registros...
-                      </td>
-                    </tr>
-                  ) : filteredItems.length ? (
-                    paginatedItems.map((item, index) => (
-                      <tr
-                        key={String(item.code || item.name || index)}
-                        className={`transition hover:bg-[var(--ops-surface-muted)] ${!item.active ? "opacity-80" : ""}`}
-                      >
-                        <td className="px-4 py-[var(--ops-row-py)]">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                                {formatValue(item.name)}
-                              </p>
-                              {"code" in item && item.code ? (
-                                <span className="inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]">
-                                  {String(item.code)}
-                                </span>
-                              ) : null}
-                            </div>
-                            {item.created_at ? (
-                              <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                                {new Date(String(item.created_at)).toLocaleDateString("es-PE")}
-                              </p>
-                            ) : null}
-                          </div>
-                        </td>
-                        {listFields.map((field) => (
-                          <td key={field.key} className="px-4 py-[var(--ops-row-py)]">
-                            {field.render === "hex" ? (
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className="inline-flex h-4 w-4 shrink-0 rounded-[4px] border border-[color:var(--ops-border-strong)]"
-                                  style={{
-                                    backgroundColor: String(item[field.key] || "transparent"),
-                                  }}
-                                  aria-hidden="true"
-                                />
-                                <span className="truncate text-sm text-[var(--ops-text)]">
-                                  {formatValue(item[field.key])}
-                                </span>
-                              </div>
-                            ) : (
-                              <p className="truncate text-sm text-[var(--ops-text)]">
-                                {formatValue(item[field.key])}
-                              </p>
-                            )}
-                          </td>
-                        ))}
-                        <td className="px-4 py-[var(--ops-row-py)]">
-                          <OpsStatusBadge tone={item.active ? "success" : "neutral"}>
-                            {activeBadgeLabel(!!item.active)}
-                          </OpsStatusBadge>
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)]">
-                          <AdminRowActionsMenu
-                            ariaLabel={`Acciones para ${buildDisplayName(item)}`}
-                            items={[
-                              {
-                                label: "Editar",
-                                icon: <PencilLine className="h-3.5 w-3.5" />,
-                                onSelect: () => openEdit(item),
-                              },
-                              {
-                                label: item.active ? "Inactivar" : "Activar",
-                                icon: <Power className="h-3.5 w-3.5" />,
-                                tone: item.active ? "danger" : "neutral",
-                                onSelect: () => setPendingToggleItem(item),
-                              },
-                            ]}
+            <OpsDataTable
+              columns={columns}
+              loading={loading}
+              error={error}
+              emptyMessage={items.length ? "No hay resultados para este filtro." : emptyDescription}
+              isEmpty={!loading && !error && filteredItems.length === 0}
+              footer={
+                <>
+                  <span className="text-sm text-[var(--ops-text-muted)]">
+                    {filteredItems.length ? `${firstVisible}-${lastVisible} de ${filteredItems.length}` : "0 resultados"}
+                  </span>
+                  <Pagination
+                    page={safePage}
+                    totalPages={totalPages}
+                    onPageChange={setPage}
+                    className="self-end md:self-auto"
+                  />
+                </>
+              }
+            >
+              {paginatedItems.map((item, index) => (
+                <tr
+                  key={String(item.code || item.name || index)}
+                  className={`transition hover:bg-[var(--ops-surface-muted)] ${!item.active ? "opacity-80" : ""}`}
+                >
+                  <td className="px-4 py-[var(--ops-row-py)]">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
+                          {formatValue(item.name)}
+                        </p>
+                        {"code" in item && item.code ? (
+                          <span className="inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]">
+                            {String(item.code)}
+                          </span>
+                        ) : null}
+                      </div>
+                      {item.created_at ? (
+                        <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                          {new Date(String(item.created_at)).toLocaleDateString("es-PE")}
+                        </p>
+                      ) : null}
+                    </div>
+                  </td>
+                  {listFields.map((field) => (
+                    <td key={field.key} className="px-4 py-[var(--ops-row-py)]">
+                      {field.render === "hex" ? (
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="inline-flex h-4 w-4 shrink-0 rounded-[4px] border border-[color:var(--ops-border-strong)]"
+                            style={{
+                              backgroundColor: String(item[field.key] || "transparent"),
+                            }}
+                            aria-hidden="true"
                           />
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={listFields.length + 3}>
-                        <OpsEmptyState
-                          variant="compact"
-                          description={items.length ? "No hay resultados para este filtro." : emptyDescription}
-                        />
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </OpsTableWrap>
-
-            <OpsTableFooter>
-              <span className="text-sm text-[var(--ops-text-muted)]">
-                {filteredItems.length ? `${firstVisible}-${lastVisible} de ${filteredItems.length}` : "0 resultados"}
-              </span>
-              <Pagination
-                page={safePage}
-                totalPages={totalPages}
-                onPageChange={setPage}
-                className="self-end md:self-auto"
-              />
-            </OpsTableFooter>
+                          <span className="truncate text-sm text-[var(--ops-text)]">
+                            {formatValue(item[field.key])}
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="truncate text-sm text-[var(--ops-text)]">
+                          {formatValue(item[field.key])}
+                        </p>
+                      )}
+                    </td>
+                  ))}
+                  <td className="px-4 py-[var(--ops-row-py)]">
+                    <OpsStatusBadge tone={item.active ? "success" : "neutral"}>
+                      {activeBadgeLabel(!!item.active)}
+                    </OpsStatusBadge>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)]">
+                    <AdminRowActionsMenu
+                      ariaLabel={`Acciones para ${buildDisplayName(item)}`}
+                      items={[
+                        {
+                          label: "Editar",
+                          icon: <PencilLine className="h-3.5 w-3.5" />,
+                          onSelect: () => openEdit(item),
+                        },
+                        {
+                          label: item.active ? "Inactivar" : "Activar",
+                          icon: <Power className="h-3.5 w-3.5" />,
+                          tone: item.active ? "danger" : "neutral",
+                          onSelect: () => setPendingToggleItem(item),
+                        },
+                      ]}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </OpsDataTable>
           </OpsTableBlock>
         </OpsSectionDivider>
 

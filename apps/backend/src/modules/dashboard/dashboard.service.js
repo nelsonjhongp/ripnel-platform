@@ -1,5 +1,3 @@
-const { pool } = require("../../shared/db");
-const { round2 } = require("../../shared/numbers");
 const { findCashClosingByLocationAndDate } = require("../cash/cash.repo");
 const { resolveCashCapabilities } = require("../cash/cash-access");
 const {
@@ -11,6 +9,7 @@ const {
   findPostsalesWindowItems,
   findPendingTransfersCounts,
   findPendingTransfersItems,
+  findTransferPendingData,
   findCriticalInventoryCounts,
   findCriticalInventoryItems,
   findRecentSalesEvents,
@@ -362,7 +361,7 @@ async function getDashboardOverview(input = {}) {
   const sections = buildSections({ permissions, roleName });
 
   const needsSalesAggregates = sections.sales || sections.cash;
-  const client = await pool.connect();
+
   let salesHeadline = null;
   let paymentRows = [];
   let currentCashClosing = null;
@@ -375,89 +374,54 @@ async function getDashboardOverview(input = {}) {
   let inventoryCounts = null;
   let inventoryItems = [];
 
-  try {
-    const executor = client.query.bind(client);
+  const queries = [];
 
-    if (needsSalesAggregates) {
-      salesHeadline = await findSalesHeadlineByLocationAndDate(
-        activeLocationIds,
-        dateFrom,
-        dateTo,
-        executor,
-      );
-      paymentRows = await findPaymentTotalsByLocationAndDate(
-        activeLocationIds,
-        dateFrom,
-        dateTo,
-        executor,
-      );
-      previousSalesHeadline = await findSalesHeadlineByLocationAndDate(
-        activeLocationIds,
-        previousRange.date_from,
-        previousRange.date_to,
-        executor,
-      );
-      previousPaymentRows = await findPaymentTotalsByLocationAndDate(
-        activeLocationIds,
-        previousRange.date_from,
-        previousRange.date_to,
-        executor,
-      );
-    }
-
-    if (sections.cash && activeLocationIds.length === 1) {
-      currentCashClosing = await findCashClosingByLocationAndDate(
-        activeLocationIds[0],
-        dateFrom,
-        dateTo,
-        executor,
-      );
-    }
-
-    if (sections.postsales) {
-      postsalesCounts = await findPostsalesWindowCounts(
-        activeLocationIds,
-        businessDate,
-        POSTSALE_LOOKBACK_DAYS,
-        executor,
-      );
-      postsalesItems = await findPostsalesWindowItems(
-        activeLocationIds,
-        businessDate,
-        POSTSALE_LOOKBACK_DAYS,
-        5,
-        executor,
-      );
-    }
-
-    if (sections.transfers) {
-      transferCounts = await findPendingTransfersCounts(
-        activeLocationIds,
-        executor,
-      );
-      transferItems = await findPendingTransfersItems(
-        activeLocationIds,
-        5,
-        executor,
-      );
-    }
-
-    if (sections.inventory) {
-      inventoryCounts = await findCriticalInventoryCounts(
-        activeLocationIds,
-        LOW_STOCK_THRESHOLD,
-        executor,
-      );
-      inventoryItems = await findCriticalInventoryItems(
-        activeLocationIds,
-        LOW_STOCK_THRESHOLD,
-        6,
-        executor,
-      );
-    }
-  } finally {
-    client.release();
+  if (needsSalesAggregates) {
+    queries.push(
+      findSalesHeadlineByLocationAndDate(activeLocationIds, dateFrom, dateTo)
+        .then(r => { salesHeadline = r; }),
+      findPaymentTotalsByLocationAndDate(activeLocationIds, dateFrom, dateTo)
+        .then(r => { paymentRows = r; }),
+      findSalesHeadlineByLocationAndDate(activeLocationIds, previousRange.date_from, previousRange.date_to)
+        .then(r => { previousSalesHeadline = r; }),
+      findPaymentTotalsByLocationAndDate(activeLocationIds, previousRange.date_from, previousRange.date_to)
+        .then(r => { previousPaymentRows = r; }),
+    );
   }
+
+  if (sections.cash && activeLocationIds.length === 1) {
+    queries.push(
+      findCashClosingByLocationAndDate(activeLocationIds[0], dateFrom, dateTo)
+        .then(r => { currentCashClosing = r; return r; })
+    );
+  }
+
+  if (sections.postsales) {
+    queries.push(
+      findPostsalesWindowCounts(activeLocationIds, businessDate, POSTSALE_LOOKBACK_DAYS)
+        .then(r => { postsalesCounts = r; return r; }),
+      findPostsalesWindowItems(activeLocationIds, businessDate, POSTSALE_LOOKBACK_DAYS, 5)
+        .then(r => { postsalesItems = r; return r; }),
+    );
+  }
+
+  if (sections.transfers) {
+    queries.push(
+      findTransferPendingData(activeLocationIds, 5)
+        .then(r => { transferCounts = r.counts; transferItems = r.items; return r; })
+    );
+  }
+
+  if (sections.inventory) {
+    queries.push(
+      findCriticalInventoryCounts(activeLocationIds, LOW_STOCK_THRESHOLD)
+        .then(r => { inventoryCounts = r; return r; }),
+      findCriticalInventoryItems(activeLocationIds, LOW_STOCK_THRESHOLD, 6)
+        .then(r => { inventoryItems = r; return r; }),
+    );
+  }
+
+  await Promise.all(queries);
 
   const paymentTotals = buildPaymentTotals(paymentRows);
   const currentSalesRow = {
@@ -812,34 +776,31 @@ async function getDashboardActivity(input = {}) {
   const roleName = input.role_name || user.role_name || null;
   const sections = buildSections({ permissions, roleName });
 
-  const client = await pool.connect();
-  let salesEvents = [];
-  let postsaleEvents = [];
-  let transferEvents = [];
-  let adjustmentEvents = [];
-  let cashEvents = [];
+  const activityQueries = [];
 
-  try {
-    const executor = client.query.bind(client);
-
-    salesEvents = sections.sales
-      ? await findRecentSalesEvents(activeLocationIds, 5, executor)
-      : [];
-    postsaleEvents = sections.postsales
-      ? await findRecentPostsaleEvents(activeLocationIds, 5, executor)
-      : [];
-    transferEvents = sections.transfers
-      ? await findRecentTransferEvents(activeLocationIds, 5, executor)
-      : [];
-    adjustmentEvents = sections.inventory
-      ? await findRecentAdjustmentEvents(activeLocationIds, 5, executor)
-      : [];
-    cashEvents = sections.cash
-      ? await findRecentCashEvents(activeLocationIds, 5, executor)
-      : [];
-  } finally {
-    client.release();
+  if (sections.sales) {
+    activityQueries.push(findRecentSalesEvents(activeLocationIds, 5));
   }
+  if (sections.postsales) {
+    activityQueries.push(findRecentPostsaleEvents(activeLocationIds, 5));
+  }
+  if (sections.transfers) {
+    activityQueries.push(findRecentTransferEvents(activeLocationIds, 5));
+  }
+  if (sections.inventory) {
+    activityQueries.push(findRecentAdjustmentEvents(activeLocationIds, 5));
+  }
+  if (sections.cash) {
+    activityQueries.push(findRecentCashEvents(activeLocationIds, 5));
+  }
+
+  const results = await Promise.all(activityQueries);
+  let idx = 0;
+  const salesEvents = sections.sales ? results[idx++] : [];
+  const postsaleEvents = sections.postsales ? results[idx++] : [];
+  const transferEvents = sections.transfers ? results[idx++] : [];
+  const adjustmentEvents = sections.inventory ? results[idx++] : [];
+  const cashEvents = sections.cash ? results[idx++] : [];
 
   const items = [
     ...salesEvents.map(mapSalesEvent),

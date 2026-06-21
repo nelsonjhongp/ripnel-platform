@@ -18,7 +18,7 @@ import {
   AdminRowActionsMenu,
 } from "@/components/admin/admin-ui";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { ForbiddenPage, InlineStatusCard, LoadingPage } from "@/components/feedback/status-page";
+import { ForbiddenPage, LoadingPage } from "@/components/feedback/status-page";
 import { apiFetch, type ApiEnvelope, unwrapApiData } from "@/lib/api";
 import { useApiGet } from "@/hooks/use-api-get";
 import { useTransferCapabilities } from "@/hooks/use-transfer-capabilities";
@@ -36,9 +36,8 @@ import {
   OpsSearchField,
   OpsSectionDivider,
   OpsTableBlock,
-  OpsTableFooter,
-  OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
+import { OpsDataTable } from "@/components/ui/ops-data-table";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
   Tooltip,
@@ -521,188 +520,163 @@ export function TransfersListPage({
             </TooltipProvider>
           </OpsFiltersRow>
 
-          <OpsTableWrap minWidth="1120px">
-            <table className="w-full border-collapse">
-              <thead className="bg-[var(--ops-surface-muted)]">
-                <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  <th className="px-4 py-3">Transferencia</th>
-                  <th className="px-4 py-3">Origen</th>
-                  <th className="px-4 py-3">Destino</th>
-                  <th className="px-4 py-3">Estado</th>
-                  <th className="px-4 py-3">Productos</th>
-                  <th className="px-4 py-3 text-right">Unidades</th>
-                  <th className="px-4 py-3 text-right">Pendiente</th>
-                  <th className="px-4 py-3">Actualizada</th>
-                  <th className="px-4 py-3 text-right">Acción</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                {loading ? (
-                  <tr>
-                    <td colSpan={9} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                      Cargando transferencias...
-                    </td>
-                  </tr>
-                ) : error || actionError ? (
-                  <tr>
-                    <td colSpan={9} className="px-4 py-6">
-                      <InlineStatusCard
-                        title="No pudimos cargar transferencias"
-                        description={actionError || error || ""}
-                        tone="danger"
-                        variant="ops"
-                      />
-                    </td>
-                  </tr>
-                ) : filteredRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                      {queueRows.length === 0
-                        ? getQueueEmptyMessage(selectedQueue)
-                        : "No encontramos transferencias con ese criterio."}
-                    </td>
-                  </tr>
-                ) : (
-                  paginatedTransfers.map((transfer) => {
-                    const primaryAction = getPrimaryRowAction(selectedQueue, transfer);
-                    const menuItems = buildSecondaryMenuItems(
-                      transfer,
-                      primaryAction,
-                      router,
-                      busyAction,
-                      (action, record) => setPendingAction({ action, transfer: record })
-                    );
-                    const stateCopy = getVisibleStateCopy(transfer);
-                    const units = getTransferUnitsTotal(transfer);
-                    const pendingUnits = getTransferPendingUnits(transfer);
-                    const happenedAt =
-                      transfer.happened_at ||
-                      transfer.shipped_at ||
-                      transfer.updated_at ||
-                      transfer.created_at;
-                    const happenedAtParts = formatDateTimeParts(happenedAt);
-                    const busyPrimaryAction =
-                      primaryAction !== "detail" &&
-                      busyAction?.transferId === transfer.transfer_id &&
-                      busyAction.action === primaryAction;
+          <OpsDataTable
+            columns={[
+              { key: "transferencia", header: "Transferencia" },
+              { key: "origen", header: "Origen" },
+              { key: "destino", header: "Destino" },
+              { key: "estado", header: "Estado" },
+              { key: "productos", header: "Productos" },
+              { key: "unidades", header: "Unidades", className: "text-right" },
+              { key: "pendiente", header: "Pendiente", className: "text-right" },
+              { key: "actualizada", header: "Actualizada" },
+              { key: "accion", header: "Acción", className: "text-right" },
+            ]}
+            minWidth="1120px"
+            loading={loading}
+            loadingMessage="Cargando transferencias..."
+            error={error || actionError || undefined}
+            errorTitle="No pudimos cargar transferencias"
+            emptyMessage={queueRows.length === 0 ? getQueueEmptyMessage(selectedQueue) : "No encontramos transferencias con ese criterio."}
+            isEmpty={!loading && !error && !actionError && filteredRows.length === 0}
+            footer={
+              <>
+                {notice ? <AdminInlineMessage tone="success">{notice}</AdminInlineMessage> : null}
+                <span className="text-sm text-[var(--ops-text-muted)]">
+                  {filteredRows.length === 0
+                    ? "0 resultados"
+                    : `${firstVisible}-${lastVisible} de ${filteredRows.length}`}
+                </span>
+                <Pagination
+                  page={safePage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  className="self-end md:self-auto"
+                />
+              </>
+            }
+          >
+            {paginatedTransfers.map((transfer) => {
+              const primaryAction = getPrimaryRowAction(selectedQueue, transfer);
+              const menuItems = buildSecondaryMenuItems(
+                transfer,
+                primaryAction,
+                router,
+                busyAction,
+                (action, record) => setPendingAction({ action, transfer: record })
+              );
+              const stateCopy = getVisibleStateCopy(transfer);
+              const units = getTransferUnitsTotal(transfer);
+              const pendingUnits = getTransferPendingUnits(transfer);
+              const happenedAt =
+                transfer.happened_at ||
+                transfer.shipped_at ||
+                transfer.updated_at ||
+                transfer.created_at;
+              const happenedAtParts = formatDateTimeParts(happenedAt);
+              const busyPrimaryAction =
+                primaryAction !== "detail" &&
+                busyAction?.transferId === transfer.transfer_id &&
+                busyAction.action === primaryAction;
 
-                    return (
-                      <tr
-                        key={transfer.transfer_id}
-                        className="transition hover:bg-[var(--ops-surface-muted)]"
+              return (
+                <tr
+                  key={transfer.transfer_id}
+                  className="transition hover:bg-[var(--ops-surface-muted)]"
+                >
+                  <td className="px-4 py-[var(--ops-row-py)] align-top">
+                    <div className="space-y-1.5">
+                      <Link
+                        href={`/transferencias/${transfer.transfer_id}`}
+                        className="inline-flex rounded-md text-sm font-semibold text-[var(--ops-text)] transition hover:text-[var(--ripnel-accent-hover)]"
                       >
-                        <td className="px-4 py-[var(--ops-row-py)] align-top">
-                          <div className="space-y-1.5">
-                            <Link
-                              href={`/transferencias/${transfer.transfer_id}`}
-                              className="inline-flex rounded-md text-sm font-semibold text-[var(--ops-text)] transition hover:text-[var(--ripnel-accent-hover)]"
-                            >
-                              {transfer.transfer_number || "Sin número"}
-                            </Link>
-                            <p className="text-[13px] text-[var(--ops-text-muted)]">
-                              {getTransferContextCopy(transfer)}
-                            </p>
-                          </div>
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top">
-                          <p className="text-sm text-[var(--ops-text)]">{transfer.from_location_name}</p>
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top">
-                          <p className="text-sm text-[var(--ops-text)]">{transfer.to_location_name}</p>
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top">
-                          <div className="space-y-1.5">
-                            <p className="text-sm font-medium text-[var(--ops-text)]">{stateCopy.title}</p>
-                            <p className="text-[13px] text-[var(--ops-text-muted)]">{stateCopy.subtitle}</p>
-                          </div>
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top">
-                          <p className="text-sm text-[var(--ops-text)]">
-                            {formatProductsCount(transfer.line_count)}
-                          </p>
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
-                          <p className="text-sm font-semibold tabular-nums text-[var(--ops-text)]">
-                            {units}
-                          </p>
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
-                          <p
-                            className={`text-sm font-semibold tabular-nums ${
-                              pendingUnits === null
-                                ? "text-[var(--ops-text-muted)]"
-                                : pendingUnits === 0
-                                  ? "text-[color:color-mix(in_srgb,#059669_78%,var(--ops-text))]"
-                                  : "text-[var(--ops-text)]"
-                            }`}
-                          >
-                            {pendingUnits === null ? "—" : pendingUnits}
-                          </p>
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top">
-                          <div className="space-y-1">
-                            <p className="text-sm text-[var(--ops-text)]">{happenedAtParts.date}</p>
-                            {happenedAtParts.time ? (
-                              <p className="text-[13px] text-[var(--ops-text-muted)]">
-                                {happenedAtParts.time}
-                              </p>
-                            ) : null}
-                          </div>
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
-                          <div className="flex justify-end gap-2">
-                            {primaryAction === "detail" ? (
-                              <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
-                                <Link href={`/transferencias/${transfer.transfer_id}`}>Ver detalle</Link>
-                              </Button>
-                            ) : (
-                              <Button
-                                type="button"
-                                variant={primaryAction === "cancel" ? "destructive" : "accent"}
-                                size="sm"
-                                className="rounded-lg px-3"
-                                onClick={() =>
-                                  setPendingAction({ action: primaryAction, transfer })
-                                }
-                                disabled={busyPrimaryAction}
-                              >
-                                {busyPrimaryAction ? (
-                                  <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-                                ) : null}
-                                {TRANSFER_ACTION_CONFIG[primaryAction].label}
-                              </Button>
-                            )}
-                            {menuItems.length > 0 ? (
-                              <AdminRowActionsMenu
-                                items={menuItems}
-                                ariaLabel={`Acciones para ${transfer.transfer_number || "transferencia"}`}
-                              />
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </OpsTableWrap>
-
-          {notice ? <AdminInlineMessage tone="success">{notice}</AdminInlineMessage> : null}
-
-          <OpsTableFooter>
-            <span className="text-sm text-[var(--ops-text-muted)]">
-              {filteredRows.length === 0
-                ? "0 resultados"
-                : `${firstVisible}-${lastVisible} de ${filteredRows.length}`}
-            </span>
-            <Pagination
-              page={safePage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-              className="self-end md:self-auto"
-            />
-          </OpsTableFooter>
+                        {transfer.transfer_number || "Sin número"}
+                      </Link>
+                      <p className="text-[13px] text-[var(--ops-text-muted)]">
+                        {getTransferContextCopy(transfer)}
+                      </p>
+                    </div>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] align-top">
+                    <p className="text-sm text-[var(--ops-text)]">{transfer.from_location_name}</p>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] align-top">
+                    <p className="text-sm text-[var(--ops-text)]">{transfer.to_location_name}</p>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] align-top">
+                    <div className="space-y-1.5">
+                      <p className="text-sm font-medium text-[var(--ops-text)]">{stateCopy.title}</p>
+                      <p className="text-[13px] text-[var(--ops-text-muted)]">{stateCopy.subtitle}</p>
+                    </div>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] align-top">
+                    <p className="text-sm text-[var(--ops-text)]">
+                      {formatProductsCount(transfer.line_count)}
+                    </p>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
+                    <p className="text-sm font-semibold tabular-nums text-[var(--ops-text)]">
+                      {units}
+                    </p>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
+                    <p
+                      className={`text-sm font-semibold tabular-nums ${
+                        pendingUnits === null
+                          ? "text-[var(--ops-text-muted)]"
+                          : pendingUnits === 0
+                            ? "text-[color:color-mix(in_srgb,#059669_78%,var(--ops-text))]"
+                            : "text-[var(--ops-text)]"
+                      }`}
+                    >
+                      {pendingUnits === null ? "—" : pendingUnits}
+                    </p>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] align-top">
+                    <div className="space-y-1">
+                      <p className="text-sm text-[var(--ops-text)]">{happenedAtParts.date}</p>
+                      {happenedAtParts.time ? (
+                        <p className="text-[13px] text-[var(--ops-text-muted)]">
+                          {happenedAtParts.time}
+                        </p>
+                      ) : null}
+                    </div>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
+                    <div className="flex justify-end gap-2">
+                      {primaryAction === "detail" ? (
+                        <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
+                          <Link href={`/transferencias/${transfer.transfer_id}`}>Ver detalle</Link>
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant={primaryAction === "cancel" ? "destructive" : "accent"}
+                          size="sm"
+                          className="rounded-lg px-3"
+                          onClick={() =>
+                            setPendingAction({ action: primaryAction, transfer })
+                          }
+                          disabled={busyPrimaryAction}
+                        >
+                          {busyPrimaryAction ? (
+                            <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                          ) : null}
+                          {TRANSFER_ACTION_CONFIG[primaryAction].label}
+                        </Button>
+                      )}
+                      {menuItems.length > 0 ? (
+                        <AdminRowActionsMenu
+                          items={menuItems}
+                          ariaLabel={`Acciones para ${transfer.transfer_number || "transferencia"}`}
+                        />
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </OpsDataTable>
         </OpsTableBlock>
       </OpsSectionDivider>
 

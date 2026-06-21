@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { usePagination } from "@/hooks/use-pagination";
 import Link from "next/link";
 import {
@@ -8,6 +9,7 @@ import {
   LoaderCircle,
   MapPin,
   PackagePlus,
+  PencilLine,
   RefreshCw,
   RotateCcw,
   SquareCheckBig,
@@ -19,22 +21,19 @@ import {
   AdminModalShell,
   AdminRowActionsMenu,
 } from "@/components/admin/admin-ui";
-import { InlineStatusCard } from "@/components/feedback/status-page";
 import { ForbiddenPage } from "@/components/feedback/status-page";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
-import { OpsSelect } from "@/components/ui/ops-selection";
-import { OpsEmptyState } from "@/components/ui/ops-empty-state";
-import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
+import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
 import {
   OpsFiltersRow,
   OpsPageShell,
   OpsSearchField,
   OpsSectionDivider,
   OpsTableBlock,
-  OpsTableFooter,
-  OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
+import { OpsDataTable } from "@/components/ui/ops-data-table";
 import { Pagination } from "@/components/ui/pagination";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
@@ -94,6 +93,7 @@ function AdjustmentIntentChip({
 }
 
 export function InventoryAdjustmentsPage() {
+  const router = useRouter();
   const { user } = useAuth();
   const [notice, setNotice] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -357,124 +357,98 @@ export function InventoryAdjustmentsPage() {
             </Tooltip>
           </OpsFiltersRow>
 
-          <OpsTableWrap minWidth="980px">
-            <table className="w-full border-collapse">
-              <thead className="bg-[var(--ops-surface-muted)]">
-                <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  <th className="px-4 py-3">Numero</th>
-                  <th className="px-4 py-3">Sede</th>
-                  <th className="px-4 py-3">Estado</th>
-                  <th className="px-4 py-3">Intención</th>
-                  <th className="px-4 py-3">Motivo</th>
-                  <th className="px-4 py-3 text-right">Lineas</th>
-                  <th className="px-4 py-3">Creado</th>
-                  <th className="px-4 py-3 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                {loadingAdjustments ? (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
-                    >
-                      <LoaderCircle className="mr-2 inline-block h-5 w-5 animate-spin align-middle" />
-                      Cargando ajustes...
-                    </td>
-                  </tr>
-                ) : error ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-6">
-                      <InlineStatusCard
-                        title="No pudimos cargar ajustes"
-                        description={error}
-                        tone="danger"
-                        variant="ops"
-                      />
-                    </td>
-                  </tr>
-                ) : paginatedAdjustments.length ? (
-                  paginatedAdjustments.map((adjustment) => (
-                    <tr
-                      key={adjustment.adjustment_id}
-                      className="transition hover:bg-[var(--ops-surface-muted)]"
-                    >
-                      <td className="px-4 py-[var(--ops-row-py)] align-top">
-                        <span className="text-sm font-semibold text-[var(--ops-text)]">
-                          {adjustment.adjustment_number}
-                        </span>
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] align-top">
-                        <div className="text-sm text-[var(--ops-text)]">
-                          <span className="inline-flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />
-                            {adjustment.location_name}
-                          </span>
-                          <p className="text-[11px] text-[var(--ops-text-muted)]">
-                            {adjustment.location_code}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] align-top">
-                        <AdjustmentStatusChip status={adjustment.status} />
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] align-top">
-                        <AdjustmentIntentChip adjustment={adjustment} />
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] align-top">
-                        <span className="block max-w-[180px] truncate text-sm text-[var(--ops-text)]">
-                          {adjustment.reason || "Sin motivo"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] align-top text-right text-sm font-semibold text-[var(--ops-text)]">
-                        {adjustment.line_count}
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] align-top">
-                        <div className="text-sm text-[var(--ops-text)]">
-                          {formatAdjustmentDateTime(adjustment.created_at)}
-                          <p className="text-[11px] text-[var(--ops-text-muted)]">
-                            {adjustment.created_by_name || "Sistema"}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
-                        <AdminRowActionsMenu
-                          ariaLabel={`Acciones para ${adjustment.adjustment_number}`}
-                          items={[
-                            {
-                              label: "Ver detalle",
-                              icon: <Eye className="h-4 w-4" />,
-                              onSelect: () => void openDetail(adjustment.adjustment_id),
-                            },
-                          ]}
-                        />
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-10">
-                      <OpsEmptyState variant="compact" description="No hay ajustes para los filtros actuales." />
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </OpsTableWrap>
-
-          <OpsTableFooter>
-            <span className="text-sm text-[var(--ops-text-muted)]">
-              {filteredAdjustments.length
-                ? `${firstVisible}-${lastVisible} de ${filteredAdjustments.length}`
-                : "0 resultados"}
-            </span>
-            <Pagination
-              page={safePage}
-              totalPages={totalPages}
-              onPageChange={setPage}
-              className="self-end md:self-auto"
-            />
-          </OpsTableFooter>
+          <OpsDataTable
+            columns={[
+              { key: "numero", header: "Numero" },
+              { key: "sede", header: "Sede" },
+              { key: "estado", header: "Estado" },
+              { key: "intencion", header: "Intención" },
+              { key: "motivo", header: "Motivo" },
+              { key: "lineas", header: "Lineas", className: "text-right" },
+              { key: "creado", header: "Creado" },
+              { key: "acciones", header: "Acciones", className: "text-right" },
+            ]}
+            minWidth="980px"
+            loading={loadingAdjustments}
+            loadingMessage="Cargando ajustes..."
+            error={error}
+            errorTitle="No pudimos cargar ajustes"
+            emptyMessage="No hay ajustes para los filtros actuales."
+            isEmpty={!loadingAdjustments && !error && paginatedAdjustments.length === 0}
+            footer={
+              <>
+                <span className="text-sm text-[var(--ops-text-muted)]">
+                  {filteredAdjustments.length
+                    ? `${firstVisible}-${lastVisible} de ${filteredAdjustments.length}`
+                    : "0 resultados"}
+                </span>
+                <Pagination
+                  page={safePage}
+                  totalPages={totalPages}
+                  onPageChange={setPage}
+                  className="self-end md:self-auto"
+                />
+              </>
+            }
+          >
+            {paginatedAdjustments.map((adjustment) => (
+              <tr
+                key={adjustment.adjustment_id}
+                className="transition hover:bg-[var(--ops-surface-muted)]"
+              >
+                <td className="px-4 py-[var(--ops-row-py)] align-top">
+                  <span className="text-sm font-semibold text-[var(--ops-text)]">
+                    {adjustment.adjustment_number}
+                  </span>
+                </td>
+                <td className="px-4 py-[var(--ops-row-py)] align-top">
+                  <div className="text-sm text-[var(--ops-text)]">
+                    <span className="inline-flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />
+                      {adjustment.location_name}
+                    </span>
+                    <p className="text-[11px] text-[var(--ops-text-muted)]">
+                      {adjustment.location_code}
+                    </p>
+                  </div>
+                </td>
+                <td className="px-4 py-[var(--ops-row-py)] align-top">
+                  <AdjustmentStatusChip status={adjustment.status} />
+                </td>
+                <td className="px-4 py-[var(--ops-row-py)] align-top">
+                  <AdjustmentIntentChip adjustment={adjustment} />
+                </td>
+                <td className="px-4 py-[var(--ops-row-py)] align-top">
+                  <span className="block max-w-[180px] truncate text-sm text-[var(--ops-text)]">
+                    {adjustment.reason || "Sin motivo"}
+                  </span>
+                </td>
+                <td className="px-4 py-[var(--ops-row-py)] align-top text-right text-sm font-semibold text-[var(--ops-text)]">
+                  {adjustment.line_count}
+                </td>
+                <td className="px-4 py-[var(--ops-row-py)] align-top">
+                  <div className="text-sm text-[var(--ops-text)]">
+                    {formatAdjustmentDateTime(adjustment.created_at)}
+                    <p className="text-[11px] text-[var(--ops-text-muted)]">
+                      {adjustment.created_by_name || "Sistema"}
+                    </p>
+                  </div>
+                </td>
+                <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
+                  <AdminRowActionsMenu
+                    ariaLabel={`Acciones para ${adjustment.adjustment_number}`}
+                    items={[
+                      {
+                        label: "Ver detalle",
+                        icon: <Eye className="h-4 w-4" />,
+                        onSelect: () => void openDetail(adjustment.adjustment_id),
+                      },
+                    ]}
+                  />
+                </td>
+              </tr>
+            ))}
+          </OpsDataTable>
           </OpsTableBlock>
         </OpsSectionDivider>
 
@@ -506,6 +480,22 @@ export function InventoryAdjustmentsPage() {
                     >
                       <X className="h-4 w-4" />
                       Cancelar ajuste
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="rounded-lg"
+                      onClick={() => {
+                        closeDetail();
+                        router.push(
+                          `${appRoutes.inventoryAdjustments}/nuevo?edit_id=${encodeURIComponent(detail.adjustment_id)}`
+                        );
+                      }}
+                      disabled={detailLoading || confirmingAdjustment || cancellingAdjustment}
+                    >
+                      <PencilLine className="h-4 w-4" />
+                      Editar ajuste
                     </Button>
                     <Button
                       type="button"

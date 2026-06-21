@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { RefreshCw, RotateCcw, Download } from "lucide-react";
-import { usePagination } from "@/hooks/use-pagination";
+import { LoaderCircle, RefreshCw, RotateCcw, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { OpsSelect, type OpsOption } from "@/components/ui/ops-selection";
-import { OpsDataTable } from "@/components/ui/ops-data-table";
-import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
+import { PAGE_SIZE } from "@/lib/constants";
+import { FilterDropdown, type FilterDropdownOption } from "@/components/ui/filter-dropdown";
+import { OpsEmptyState } from "@/components/ui/ops-empty-state";
+import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
 import {
   OpsFiltersRow,
   OpsPageShell,
@@ -78,6 +78,8 @@ function buildProductSummaryParams(input: {
   locationId: string;
   status: ProductStatusFilter;
   garmentType: string;
+  page: number;
+  pageSize: number;
 }) {
   const params = new URLSearchParams();
 
@@ -97,12 +99,17 @@ function buildProductSummaryParams(input: {
     params.set("garment_type", input.garmentType);
   }
 
+  params.set("page", String(input.page));
+  params.set("page_size", String(input.pageSize));
+
   return params;
 }
 
 function buildLocationSummaryParams(input: {
   query: string;
   status: LocationStatusFilter;
+  page: number;
+  pageSize: number;
 }) {
   const params = new URLSearchParams();
 
@@ -113,6 +120,9 @@ function buildLocationSummaryParams(input: {
   if (input.status !== "all") {
     params.set("status", input.status);
   }
+
+  params.set("page", String(input.page));
+  params.set("page_size", String(input.pageSize));
 
   return params;
 }
@@ -133,6 +143,8 @@ export default function InventoryPage() {
   const [locationStatus, setLocationStatus] = useState<LocationStatusFilter>(
     normalizeLocationStatusFilter(searchParams.get("location_health"))
   );
+  const [productPage, setProductPage] = useState(Number(searchParams.get("page")) || 1);
+  const [locationPage, setLocationPage] = useState(Number(searchParams.get("location_page")) || 1);
   const [refreshNonce, setRefreshNonce] = useState(0);
 
   const productParams = useMemo(
@@ -142,8 +154,10 @@ export default function InventoryPage() {
         locationId: locationFilter,
         status: productStatus,
         garmentType,
+        page: productPage,
+        pageSize: PAGE_SIZE,
       }),
-    [garmentType, locationFilter, productStatus, query]
+    [garmentType, locationFilter, productPage, productStatus, query]
   );
 
   const locationParams = useMemo(
@@ -151,8 +165,10 @@ export default function InventoryPage() {
       buildLocationSummaryParams({
         query: locationQuery,
         status: locationStatus,
+        page: locationPage,
+        pageSize: PAGE_SIZE,
       }),
-    [locationQuery, locationStatus]
+    [locationPage, locationQuery, locationStatus]
   );
 
   const { data: productData, loading: loadingProducts, error: productError } = useApiGet(
@@ -209,14 +225,24 @@ export default function InventoryPage() {
       params.set("location_health", locationStatus);
     }
 
+    if (productPage > 1) {
+      params.set("page", String(productPage));
+    }
+
+    if (locationPage > 1) {
+      params.set("location_page", String(locationPage));
+    }
+
     const nextUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
     router.replace(nextUrl, { scroll: false });
   }, [
     garmentType,
     locationFilter,
+    locationPage,
     locationQuery,
     locationStatus,
     pathname,
+    productPage,
     productStatus,
     query,
     router,
@@ -260,19 +286,8 @@ export default function InventoryPage() {
     };
   }, [locationRows]);
 
-  const {
-    paginatedItems: paginatedProducts,
-    totalPages: productsTotalPages,
-    safePage: productsSafePage,
-    setPage: setProductPage,
-  } = usePagination(productRows);
-
-  const {
-    paginatedItems: paginatedLocations,
-    totalPages: locationsTotalPages,
-    safePage: locationsSafePage,
-    setPage: setLocationPage,
-  } = usePagination(locationRows);
+  const productsTotalPages = productSummary?.meta.total_pages || 1;
+  const locationsTotalPages = locationSummary?.meta.total_pages || 1;
 
   const hasProductFilters =
     Boolean(query.trim()) ||
@@ -480,39 +495,47 @@ export default function InventoryPage() {
                 </Tooltip>
               </OpsFiltersRow>
 
-              <OpsDataTable
-                columns={[
-                  { key: "producto", header: "Producto" },
-                  { key: "tipo", header: "Tipo" },
-                  { key: "stock", header: "Stock" },
-                  { key: "variantes", header: "Variantes" },
-                  ...(showLocationsColumn ? [{ key: "sedes", header: "Sedes" }] : []),
-                  { key: "estado", header: "Estado" },
-                  { key: "accion", header: "Acción", className: "text-right" },
-                ]}
-                minWidth={showLocationsColumn ? "1020px" : "920px"}
-                loading={loading}
-                loadingMessage="Cargando stock actual..."
-                error={error}
-                errorTitle="No pudimos cargar stock actual"
-                isEmpty={paginatedProducts.length === 0}
-                emptyMessage="No encontramos productos para los filtros actuales."
-                footer={
-                  <>
-                    <p className="text-[13px] text-[var(--ops-text-muted)]">
-                      {selectedLocation
-                        ? `Stock en sede: ${selectedLocation.name}`
-                        : productSummary?.meta.scope_label || "Todas las sedes"}
-                    </p>
-                    <Pagination
-                      page={productsSafePage}
-                      totalPages={productsTotalPages}
-                      onPageChange={setProductPage}
-                    />
-                  </>
-                }
-              >
-                {paginatedProducts.map((row) => (
+              <OpsTableWrap minWidth={showLocationsColumn ? "1020px" : "920px"}>
+                <table className="w-full border-collapse">
+                  <thead className="bg-[var(--ops-surface-muted)]">
+                    <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                      <th className="px-4 py-3">Producto</th>
+                      <th className="px-4 py-3">Tipo</th>
+                      <th className="px-4 py-3">Stock</th>
+                      <th className="px-4 py-3">Variantes</th>
+                      {showLocationsColumn ? <th className="px-4 py-3">Sedes</th> : null}
+                      <th className="px-4 py-3">Estado</th>
+                      <th className="px-4 py-3 text-right">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                    {loading ? (
+                      <tr>
+                        <td
+                          colSpan={showLocationsColumn ? 7 : 6}
+                          className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
+                        >
+                          <LoaderCircle className="mr-2 inline-block h-5 w-5 animate-spin" />
+                          Cargando stock actual...
+                        </td>
+                      </tr>
+                    ) : error ? (
+                      <tr>
+                        <td
+                          colSpan={showLocationsColumn ? 7 : 6}
+                          className="px-4 py-8 text-center text-sm text-[var(--ops-text-muted)]"
+                        >
+                          {error}
+                        </td>
+                      </tr>
+                    ) : productRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={showLocationsColumn ? 7 : 6} className="px-4 py-10">
+                          <OpsEmptyState variant="compact" description="No encontramos productos para los filtros actuales." />
+                        </td>
+                      </tr>
+                    ) : (
+                      productRows.map((row) => (
                         <tr key={row.style_id} className="transition hover:bg-[var(--ops-surface-muted)]">
                           <td className="px-4 py-[var(--ops-row-py)]">
                             <div className="space-y-1">
@@ -553,8 +576,24 @@ export default function InventoryPage() {
                             </Button>
                           </td>
                         </tr>
-                ))}
-              </OpsDataTable>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </OpsTableWrap>
+
+              <OpsTableFooter>
+                <p className="text-[13px] text-[var(--ops-text-muted)]">
+                  {selectedLocation
+                    ? `Stock en sede: ${selectedLocation.name}`
+                    : productSummary?.meta.scope_label || "Todas las sedes"}
+                </p>
+                <Pagination
+                  page={productPage}
+                  totalPages={productsTotalPages}
+                  onPageChange={setProductPage}
+                />
+              </OpsTableFooter>
             </OpsTableBlock>
           ) : (
             <OpsTableBlock>
@@ -596,37 +635,41 @@ export default function InventoryPage() {
                 </Tooltip>
               </OpsFiltersRow>
 
-              <OpsDataTable
-                columns={[
-                  { key: "sede", header: "Sede" },
-                  { key: "stock", header: "Stock total" },
-                  { key: "productos", header: "Productos" },
-                  { key: "bajo", header: "Bajo stock" },
-                  { key: "sin-stock", header: "Sin stock" },
-                  { key: "estado", header: "Estado" },
-                  { key: "accion", header: "Acción", className: "text-right" },
-                ]}
-                minWidth="960px"
-                loading={loading}
-                loadingMessage="Cargando sedes..."
-                error={error}
-                errorTitle="No pudimos cargar sedes"
-                isEmpty={paginatedLocations.length === 0}
-                emptyMessage="No encontramos sedes para los filtros actuales."
-                footer={
-                  <>
-                    <p className="text-[13px] text-[var(--ops-text-muted)]">
-                      Vista consolidada por ubicación visible.
-                    </p>
-                    <Pagination
-                      page={locationsSafePage}
-                      totalPages={locationsTotalPages}
-                      onPageChange={setLocationPage}
-                    />
-                  </>
-                }
-              >
-                {paginatedLocations.map((row) => (
+              <OpsTableWrap minWidth="960px">
+                <table className="w-full border-collapse">
+                  <thead className="bg-[var(--ops-surface-muted)]">
+                    <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                      <th className="px-4 py-3">Sede</th>
+                      <th className="px-4 py-3">Stock total</th>
+                      <th className="px-4 py-3">Productos</th>
+                      <th className="px-4 py-3">Bajo stock</th>
+                      <th className="px-4 py-3">Sin stock</th>
+                      <th className="px-4 py-3">Estado</th>
+                      <th className="px-4 py-3 text-right">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                          <LoaderCircle className="mr-2 inline-block h-5 w-5 animate-spin" />
+                          Cargando sedes...
+                        </td>
+                      </tr>
+                    ) : error ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-8 text-center text-sm text-[var(--ops-text-muted)]">
+                          {error}
+                        </td>
+                      </tr>
+                    ) : locationRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-10">
+                          <OpsEmptyState variant="compact" description="No encontramos sedes para los filtros actuales." />
+                        </td>
+                      </tr>
+                    ) : (
+                      locationRows.map((row) => (
                         <tr key={row.location_id} className="transition hover:bg-[var(--ops-surface-muted)]">
                           <td className="px-4 py-[var(--ops-row-py)]">
                             <div className="space-y-1">
@@ -662,8 +705,22 @@ export default function InventoryPage() {
                             </Button>
                           </td>
                         </tr>
-                ))}
-              </OpsDataTable>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </OpsTableWrap>
+
+              <OpsTableFooter>
+                <p className="text-[13px] text-[var(--ops-text-muted)]">
+                  Vista consolidada por ubicación visible.
+                </p>
+                <Pagination
+                  page={locationPage}
+                  totalPages={locationsTotalPages}
+                  onPageChange={setLocationPage}
+                />
+              </OpsTableFooter>
             </OpsTableBlock>
           )}
         </OpsSectionDivider>
