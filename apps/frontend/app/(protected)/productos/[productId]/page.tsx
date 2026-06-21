@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation"
+import { PermissionGuard } from "@/components/auth/PermissionGuard"
 import { ModulePlaceholder } from "@/components/modules/shared/module-placeholder"
 import { StylesPage } from "@/components/modules/products/styles-page"
 import { VariantsPage } from "@/components/modules/products/variants-page"
@@ -50,15 +51,19 @@ export default async function ProductPage({
     notFound()
   }
 
+  const guard = (children: React.ReactNode) => (
+    <PermissionGuard permission="products.manage">{children}</PermissionGuard>
+  )
+
   if (productId === productRouteSlugs.styles) {
-    return <StylesPage initialStyleId={initialStyleId || null} />
+    return guard(<StylesPage initialStyleId={initialStyleId || null} />)
   }
 
   if (productId === productRouteSlugs.variants) {
-    return <VariantsPage initialStyleId={initialStyleId || null} />
+    return guard(<VariantsPage initialStyleId={initialStyleId || null} />)
   }
 
-  return (
+  return guard(
     <ModulePlaceholder
       eyebrow="Productos"
       title={page.title}

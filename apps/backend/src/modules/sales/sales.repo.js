@@ -700,6 +700,128 @@ async function insertStockMovementInTx(clientQuery, movementData) {
   );
 }
 
+async function findVariantsByIds(variantIds) {
+  const result = await query(
+    `SELECT
+       pv.variant_id, pv.sku, pv.active, pv.style_id, pv.size_id,
+       ps.name AS style_name, s.code AS size_code
+     FROM product_variants pv
+     INNER JOIN product_styles ps ON ps.style_id = pv.style_id
+     INNER JOIN sizes s ON s.size_id = pv.size_id
+     WHERE pv.variant_id = ANY($1::uuid[])`,
+    [variantIds]
+  );
+  return result.rows;
+}
+
+async function getInventoryQtysInTx(clientQuery, locationId, variantIds) {
+  const result = await clientQuery(
+    `SELECT variant_id, qty FROM inventory
+     WHERE location_id = $1 AND variant_id = ANY($2::uuid[])
+     FOR UPDATE`,
+    [locationId, variantIds]
+  );
+  const map = {};
+  for (const row of result.rows) {
+    map[row.variant_id] = row.qty;
+  }
+  return map;
+}
+
+async function getCurrentPricesInTx(clientQuery, items) {
+  const placeholders = items.map((_, i) => {
+    const base = i * 3;
+    return `($${base + 1}::uuid, $${base + 2}::uuid, $${base + 3}::uuid)`;
+  }).join(', ');
+  const values = items.flatMap(item => [item.variant_id, item.style_id, item.size_id]);
+
+  const result = await clientQuery(
+    `SELECT
+       v.variant_id,
+       get_current_style_size_price(v.style_id, v.size_id, 'retail', CURRENT_DATE) AS retail_price,
+       get_current_style_size_price(v.style_id, v.size_id, 'wholesale', CURRENT_DATE) AS wholesale_price
+     FROM (VALUES ${placeholders}) AS v(variant_id, style_id, size_id)`,
+    values
+  );
+  const map = {};
+  for (const row of result.rows) {
+    map[row.variant_id] = { retail_price: row.retail_price, wholesale_price: row.wholesale_price };
+  }
+  return map;
+}
+
+async function insertSaleDetails(clientQuery, details) {
+  if (details.length === 0) return [];
+  const fields = 14;
+  const placeholders = details.map((_, i) => {
+    const base = i * fields;
+    const cols = [];
+    for (let j = 0; j < fields; j++) {
+      cols.push(`$${base + j + 1}`);
+    }
+    return `(${cols.join(', ')})`;
+  }).join(', ');
+  const values = details.flatMap(d => [
+    d.sale_id, d.variant_id, d.quantity,
+    d.unit_price_list, d.unit_price_final,
+    d.price_type_applied, d.pricing_basis, d.pricing_rule_applied || null,
+    d.override_reason || null, d.overridden_by || null, d.overridden_at || null,
+    d.line_subtotal, d.line_tax, d.line_total,
+  ]);
+  const result = await clientQuery(
+    `INSERT INTO sales_details (
+       sale_id, variant_id, quantity,
+       unit_price_list, unit_price_final,
+       price_type_applied, pricing_basis, pricing_rule_applied,
+       override_reason, overridden_by, overridden_at,
+       line_subtotal, line_tax, line_total
+     ) VALUES ${placeholders}
+     RETURNING sale_detail_id`,
+    values
+  );
+  return result.rows;
+}
+
+async function decrementInventoryBatch(clientQuery, locationId, items) {
+  if (items.length === 0) return;
+  const placeholders = items.map((_, i) => {
+    const base = i * 2;
+    return `($${base + 2}::uuid, $${base + 3}::int)`;
+  }).join(', ');
+  const values = [locationId, ...items.flatMap(item => [item.variant_id, item.quantity])];
+  await clientQuery(
+    `UPDATE inventory
+     SET qty = qty - v.qty
+     FROM (VALUES ${placeholders}) AS v(variant_id, qty)
+     WHERE inventory.location_id = $1 AND inventory.variant_id = v.variant_id`,
+    values
+  );
+}
+
+async function insertStockMovements(clientQuery, movements) {
+  if (movements.length === 0) return;
+  const fields = 8;
+  const placeholders = movements.map((_, i) => {
+    const base = i * fields;
+    const cols = [];
+    for (let j = 0; j < fields; j++) {
+      cols.push(`$${base + j + 1}`);
+    }
+    return `(${cols.join(', ')})`;
+  }).join(', ');
+  const values = movements.flatMap(m => [
+    m.location_id, m.variant_id, m.movement_type, m.quantity,
+    m.reason, m.reference_type, m.reference_id, m.created_by,
+  ]);
+  await clientQuery(
+    `INSERT INTO stock_movements (
+       location_id, variant_id, movement_type, quantity,
+       reason, reference_type, reference_id, created_by
+     ) VALUES ${placeholders}`,
+    values
+  );
+}
+
 module.exports = {
   findSellableVariants,
   findActiveWholesaleMinQtyRule,
@@ -712,13 +834,19 @@ module.exports = {
   findCustomerById,
   findCustomerByInternalCode,
   findVariantById,
+  findVariantsByIds,
   getCurrentRetailPriceInTx,
   getCurrentWholesalePriceInTx,
+  getCurrentPricesInTx,
   getInventoryQtyInTx,
+  getInventoryQtysInTx,
   nextSaleNumberInTx,
   insertSale,
   insertSaleDetail,
+  insertSaleDetails,
   insertSalePayment,
   decrementInventoryInTx,
+  decrementInventoryBatch,
   insertStockMovementInTx,
+  insertStockMovements,
 };

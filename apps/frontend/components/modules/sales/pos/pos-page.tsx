@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import dynamic from "next/dynamic"
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary"
+import Link from "next/link"
+import { Dialog as DialogPrimitive } from "radix-ui"
 import {
   BadgeCheck,
   CircleAlert,
@@ -11,10 +14,36 @@ import {
   ShieldAlert,
 } from "lucide-react";
 
-import { ProductStage } from "./stage-products";
-import { CustomerStage } from "./stage-customer";
-import { PaymentStage } from "./stage-payment";
-import { SummaryStage } from "./stage-summary";
+import { Skeleton } from "@/components/ui/skeleton"
+import { OpsPageShell } from "@/components/ui/ops-page-shell"
+
+const ProductStage = dynamic(() => import("./stage-products").then((m) => m.ProductStage), {
+  ssr: false,
+  loading: () => <StageSkeleton />,
+})
+const CustomerStage = dynamic(() => import("./stage-customer").then((m) => m.CustomerStage), {
+  ssr: false,
+  loading: () => <StageSkeleton />,
+})
+const PaymentStage = dynamic(() => import("./stage-payment").then((m) => m.PaymentStage), {
+  ssr: false,
+  loading: () => <StageSkeleton />,
+})
+const SummaryStage = dynamic(() => import("./stage-summary").then((m) => m.SummaryStage), {
+  ssr: false,
+  loading: () => <StageSkeleton />,
+})
+
+function StageSkeleton() {
+  return (
+    <div className="space-y-4 rounded-2xl border border-[var(--ops-border-strong)] p-4">
+      <Skeleton className="h-6 w-48" />
+      <Skeleton className="h-10 w-full" />
+      <Skeleton className="h-10 w-full" />
+      <Skeleton className="h-24 w-full" />
+    </div>
+  )
+}
 
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { InlineStatusCard } from "@/components/feedback/status-page";
@@ -195,8 +224,9 @@ export default function NuevaVentaPage() {
   return (
     <ErrorBoundary>
       <PermissionGuard permission="sales.pos">
-        <TooltipProvider delayDuration={120}>
-            <OpsPageShell width="wide" className="max-w-[1380px] space-y-4">
+        <Sheet open={customerSheetOpen} onOpenChange={setCustomerSheetOpen}>
+          <TooltipProvider delayDuration={120}>
+            <OpsPageShell width="wide">
                 <PosHeader
                   eyebrow="Punto de venta"
                   title="Nueva venta"
@@ -382,32 +412,22 @@ export default function NuevaVentaPage() {
                         onActivate={() => {}}
                       />
 
-                      <CustomerStage
-                        active={true}
-                        pulseStage={pulseStage}
-                        documentType={documentType}
-                        setDocumentType={setDocumentType}
-                        customerQuery={customerQuery}
-                        setCustomerQuery={setCustomerQuery}
-                        customerResults={customerResults}
-                        loadingCustomers={loadingCustomers}
-                        customerPickerOpen={customerPickerOpen}
-                        setCustomerPickerOpen={setCustomerPickerOpen}
-                        highlightedCustomerIndex={highlightedCustomerIndex}
-                        setHighlightedCustomerIndex={setHighlightedCustomerIndex}
-                        selectedCustomer={selectedCustomer}
-                        selectCustomer={selectCustomer}
-                        customerStepReady={customerStepReady}
-                        customerIsValid={customerIsValid}
-                        canEditSelectedCustomer={canEditSelectedCustomer}
-                        activeDocumentOption={activeDocumentOption}
-                        selectedCustomerName={selectedCustomerName}
-                        selectedCustomerDocument={selectedCustomerDocument}
-                        openCustomerDialog={openCustomerDialog}
-                        customerSearchInputRef={customerSearchInputRef}
-                        customerSectionRef={customerSectionRef}
-                        onActivate={() => {}}
-                      />
+                <div className="relative">
+                  {cashOverlayVisible ? (
+                    <div className="ops-overlay-backdrop absolute inset-0 z-20 flex items-center justify-center rounded-[28px] p-4">
+                      <div className="ops-overlay-panel w-full max-w-md rounded-2xl p-6">
+                        <div className="flex items-start gap-3">
+                          <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-[var(--ops-tone-warning-text)]" />
+                          <div className="space-y-2">
+                            <p className="text-lg font-semibold">
+                              Venta bloqueada por caja
+                            </p>
+                            <p className="text-sm leading-6 text-[var(--ops-text-muted)]">
+                              {posContext?.cash?.message ||
+                                "No pudimos validar la caja operativa de esta sede."}
+                            </p>
+                          </div>
+                        </div>
 
                       <PaymentStage
                         active={true}
@@ -454,39 +474,8 @@ export default function NuevaVentaPage() {
                       onReviewSale={openSaleReview}
                     />
                   </section>
+                </div>
             </OpsPageShell>
-            <SaleReviewDialog
-              open={saleReviewOpen}
-              onOpenChange={setSaleReviewOpen}
-              onClose={closeSaleReview}
-              onConfirm={confirmSale}
-              confirming={submitting}
-              customerLabel={selectedCustomerName || "Cliente pendiente"}
-              customerDetail={selectedCustomerDocument || "Sin documento"}
-              documentLabel={documentReviewLabel}
-              documentDetail={documentReviewDetail}
-              paymentModeLabel={paymentReviewModeLabel}
-              paymentAssignedAmount={paymentMode === "mixed"
-                ? mixedPaymentsPreview?.enteredTotal ?? totals.total
-                : totals.total}
-              payments={paymentReviewItems}
-              discountAmount={totals.saleDiscountAmount}
-              totalAmount={totals.total}
-              baseSubtotal={totals.baseSubtotal}
-              items={productReviewItems}
-            />
-            <SaleConfirmationDialog
-              open={saleConfirmationOpen}
-              onOpenChange={setSaleConfirmationOpen}
-              sale={confirmedSale}
-              canOpenPostsale={has("sales.postsale.view")}
-              onNewSale={startNextSale}
-              onPrint={() => {
-                if (confirmedSale?.sale_id) {
-                  printConfirmedSaleReceipt(confirmedSale.sale_id)
-                }
-              }}
-            />
           </TooltipProvider>
 
           <ProductConfigDialog
@@ -517,7 +506,378 @@ export default function NuevaVentaPage() {
             onClose={closeCustomerDialog}
           />
 
-        <PriceAdjustmentDialog
+                    <div className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-3 py-2 text-xs">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-[var(--ops-text-muted)]">Subtotal base</span>
+                        <span className="font-semibold text-[var(--ops-text)]">
+                          S/. {formatMoney(totals.baseSubtotal)}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between gap-3">
+                        <span className="text-[var(--ops-text-muted)]">Descuento</span>
+                        <span className="font-semibold text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]">
+                          - S/. {formatMoney(totals.saleDiscountAmount)}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between gap-3 border-t border-[var(--ops-border-strong)] pt-1">
+                        <span className="font-semibold text-[var(--ops-text)]">Total documento</span>
+                        <span className="font-semibold text-[var(--ops-text)]">
+                          S/. {formatMoney(saleDiscountTargetTotal)}
+                        </span>
+                      </div>
+                      {totals.taxRate > 0 ? (
+                        <div className="mt-1 flex items-center justify-between gap-3">
+                          <span className="text-[var(--ops-text-muted)]">
+                            IGV incluido ({(totals.taxRate * 100).toFixed(0)}%)
+                          </span>
+                          <span className="font-semibold text-[var(--ops-text)]">
+                            S/. {formatMoney(totals.tax)}
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  {saleDiscount.mode !== "none" ? (
+                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                      <div>
+                        <label className={COMPACT_LABEL_CLASS}>Motivo</label>
+                        <OpsSelectMenu
+                          value={discountReasonSelection}
+                          onValueChange={(value) =>
+                            setSaleDiscount((current) => ({
+                              ...current,
+                              reason: value === "custom" ? "" : value,
+                            }))
+                          }
+                          placeholder="Seleccionar motivo"
+                          options={SALE_DISCOUNT_REASON_OPTIONS}
+                        />
+                      </div>
+
+                      {discountReasonSelection === "custom" ? (
+                        <div>
+                          <label className={COMPACT_LABEL_CLASS}>Detalle</label>
+                          <input
+                            value={saleDiscount.reason}
+                            onChange={(event) =>
+                              setSaleDiscount((current) => ({
+                                ...current,
+                                reason: event.target.value,
+                              }))
+                            }
+                            placeholder="Motivo personalizado"
+                            className={INPUT_CLASS}
+                          />
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border border-dashed border-[var(--ops-border-soft)] px-3 py-2 text-sm text-[var(--ops-text-muted)]">
+                          El descuento quedará trazado en el comprobante y en el resumen final.
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-[var(--ops-border-soft)] px-3 py-2 text-sm text-[var(--ops-text-muted)]">
+                      Sin descuento general aplicado.
+                    </div>
+                  )}
+
+                  {saleDiscountError ? (
+                    <p className={`rounded-lg border px-3 py-2 text-sm ${buildSemanticChipClass("warning")}`}>
+                      {saleDiscountError}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="mt-5 flex justify-end gap-3 border-t border-[var(--ops-border-strong)] pt-4">
+                  <DialogPrimitive.Close asChild>
+                    <Button type="button" variant="outline" className="rounded-lg">
+                      Cerrar
+                    </Button>
+                  </DialogPrimitive.Close>
+                </div>
+              </DialogPrimitive.Content>
+            </DialogPrimitive.Portal>
+          </DialogPrimitive.Root>
+
+          <SheetContent
+            side="right"
+            className="w-full border-l border-[var(--ops-border-strong)] bg-[var(--ops-surface)] sm:max-w-lg"
+          >
+            <SheetHeader className="border-b border-[var(--ops-border-strong)] px-5 py-4">
+              <SheetTitle>
+                {customerSheetMode === "edit"
+                  ? "Editar cliente"
+                  : "Crear cliente rapido"}
+              </SheetTitle>
+              <SheetDescription>
+                {customerSheetMode === "edit"
+                  ? "Ajusta el cliente seleccionado sin salir de la venta."
+                  : "Crea un cliente operativo y dejalo seleccionado automaticamente en la venta."}
+              </SheetDescription>
+            </SheetHeader>
+
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-[var(--ops-text-muted)]">
+                    Tipo de alta
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCustomerForm(createEmptyCustomerForm("retail"))
+                      }
+                      disabled={customerSheetMode === "edit"}
+                      className={`cursor-pointer rounded-xl border px-3 py-2 text-left text-sm transition ${
+                        customerForm.entry_mode === "retail"
+                          ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_40%,var(--ops-border-strong))] bg-[var(--ripnel-accent-soft)] font-semibold text-[var(--ripnel-accent-hover)] ring-1 ring-[color:color-mix(in_srgb,var(--ripnel-accent)_28%,transparent)]"
+                          : "border-[var(--ops-border-strong)] text-[var(--ops-text)] hover:border-[color:color-mix(in_srgb,var(--ripnel-accent)_28%,var(--ops-border-strong))]"
+                      } disabled:cursor-not-allowed disabled:opacity-60`}
+                    >
+                      Cliente retail
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCustomerForm(createEmptyCustomerForm("factura"))
+                      }
+                      disabled={customerSheetMode === "edit"}
+                      className={`cursor-pointer rounded-xl border px-3 py-2 text-left text-sm transition ${
+                        customerForm.entry_mode === "factura"
+                          ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_40%,var(--ops-border-strong))] bg-[var(--ripnel-accent-soft)] font-semibold text-[var(--ripnel-accent-hover)] ring-1 ring-[color:color-mix(in_srgb,var(--ripnel-accent)_28%,transparent)]"
+                          : "border-[var(--ops-border-strong)] text-[var(--ops-text)] hover:border-[color:color-mix(in_srgb,var(--ripnel-accent)_28%,var(--ops-border-strong))]"
+                      } disabled:cursor-not-allowed disabled:opacity-60`}
+                    >
+                      Cliente factura
+                    </button>
+                  </div>
+                </div>
+
+                {customerForm.entry_mode === "factura" ? (
+                  <>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--ops-text-muted)]">
+                        RUC
+                      </label>
+                      <input
+                        value={customerForm.document_number}
+                        onChange={(event) =>
+                          setCustomerForm((current) => ({
+                            ...current,
+                            document_number: event.target.value,
+                          }))
+                        }
+                        placeholder="20123456789"
+                        className={INPUT_CLASS}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--ops-text-muted)]">
+                        Razon social
+                      </label>
+                      <input
+                        value={customerForm.business_name}
+                        onChange={(event) =>
+                          setCustomerForm((current) => ({
+                            ...current,
+                            business_name: event.target.value,
+                          }))
+                        }
+                        placeholder="Empresa Demo S.A.C."
+                        className={INPUT_CLASS}
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--ops-text-muted)]">
+                        Direccion fiscal
+                      </label>
+                      <input
+                        value={customerForm.address}
+                        onChange={(event) =>
+                          setCustomerForm((current) => ({
+                            ...current,
+                            address: event.target.value,
+                          }))
+                        }
+                        placeholder="Av. Ejemplo 123, Lima"
+                        className={INPUT_CLASS}
+                      />
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-[var(--ops-text-muted)]">
+                          Telefono
+                        </label>
+                        <input
+                          value={customerForm.phone}
+                          onChange={(event) =>
+                            setCustomerForm((current) => ({
+                              ...current,
+                              phone: event.target.value,
+                            }))
+                          }
+                          placeholder="999 000 000"
+                          className={INPUT_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-[var(--ops-text-muted)]">
+                          Correo
+                        </label>
+                        <input
+                          value={customerForm.email}
+                          onChange={(event) =>
+                            setCustomerForm((current) => ({
+                              ...current,
+                              email: event.target.value,
+                            }))
+                          }
+                          placeholder="ventas@empresa.com"
+                          className={INPUT_CLASS}
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid gap-3 md:grid-cols-[0.9fr_1.1fr]">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-[var(--ops-text-muted)]">
+                          Tipo de documento
+                        </label>
+                        <select
+                          value={customerForm.document_type}
+                          onChange={(event) =>
+                            setCustomerForm((current) => ({
+                              ...current,
+                              document_type: event.target.value,
+                              document_number:
+                                event.target.value === "none"
+                                  ? ""
+                                  : current.document_number,
+                            }))
+                          }
+                          className={INPUT_CLASS}
+                        >
+                          <option value="dni">DNI</option>
+                          <option value="ce">CE</option>
+                          <option value="passport">Pasaporte</option>
+                          <option value="none">Sin documento</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-[var(--ops-text-muted)]">
+                          Numero de documento
+                        </label>
+                        <input
+                          value={customerForm.document_number}
+                          onChange={(event) =>
+                            setCustomerForm((current) => ({
+                              ...current,
+                              document_number: event.target.value,
+                            }))
+                          }
+                          placeholder="Ingresa el numero"
+                          className={`${INPUT_CLASS} ${
+                            customerForm.document_type === "none"
+                              ? "bg-[var(--ops-surface-muted)]"
+                              : ""
+                          }`}
+                          disabled={customerForm.document_type === "none"}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-[var(--ops-text-muted)]">
+                        Nombre completo
+                      </label>
+                      <input
+                        value={customerForm.full_name}
+                        onChange={(event) =>
+                          setCustomerForm((current) => ({
+                            ...current,
+                            full_name: event.target.value,
+                          }))
+                        }
+                        placeholder="Nombre del cliente"
+                        className={INPUT_CLASS}
+                      />
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-[var(--ops-text-muted)]">
+                          Telefono
+                        </label>
+                        <input
+                          value={customerForm.phone}
+                          onChange={(event) =>
+                            setCustomerForm((current) => ({
+                              ...current,
+                              phone: event.target.value,
+                            }))
+                          }
+                          placeholder="999 000 000"
+                          className={INPUT_CLASS}
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-[var(--ops-text-muted)]">
+                          Correo
+                        </label>
+                        <input
+                          value={customerForm.email}
+                          onChange={(event) =>
+                            setCustomerForm((current) => ({
+                              ...current,
+                              email: event.target.value,
+                            }))
+                          }
+                          placeholder="cliente@correo.com"
+                          className={INPUT_CLASS}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {customerFormError ? (
+                  <div className="rounded-xl border border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] px-3 py-2 text-sm text-[var(--ops-tone-danger-text)]">
+                    {customerFormError}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <SheetFooter className="border-t border-[var(--ops-border-strong)] px-5 py-4">
+              <div className="flex w-full gap-3">
+                <button
+                  type="button"
+                  onClick={closeCustomerSheet}
+                  disabled={customerSaving}
+                  className="flex-1 rounded-lg border border-[var(--ops-border-strong)] px-4 py-2.5 text-sm font-medium text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)] disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={submitCustomerForm}
+                  disabled={customerSaving}
+                  className="flex-1 cursor-pointer rounded-2xl bg-[var(--ripnel-accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {customerSaving
+                    ? "Guardando..."
+                    : customerSheetMode === "edit"
+                      ? "Guardar cliente"
+                      : "Crear y seleccionar"}
+                </button>
+              </div>
+            </SheetFooter>
+          </SheetContent>
+        </Sheet>
+
+        <Sheet
           open={priceSheetOpen}
           onOpenChange={() => {}}
           item={priceTargetItem}
@@ -537,37 +897,51 @@ export default function NuevaVentaPage() {
           onConfirm={confirmRemoveFromCart}
         />
 
-        <OpsDialog
-          open={clearSaleDialogOpen}
-          onOpenChange={setClearSaleDialogOpen}
-          title="Limpiar venta actual"
-          description="Se quitarán productos, cliente, comprobante, cobro y descuento no confirmados."
-          size="sm"
-          bodyClassName="space-y-3"
-          footer={
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="rounded-lg px-4"
-                onClick={() => setClearSaleDialogOpen(false)}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="button"
-                variant="accent"
-                size="sm"
-                className="rounded-lg px-4"
-                onClick={() => {
-                  resetSaleDraft()
-                  setClearSaleDialogOpen(false)
-                  productSearchInputRef.current?.focus()
-                }}
-              >
-                Limpiar venta
-              </Button>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ops-text-muted)]">
+                      Precio final por unidad
+                    </label>
+                    <input
+                      value={priceForm.unit_price_final}
+                      onChange={(event) =>
+                        setPriceForm((current) => ({
+                          ...current,
+                          unit_price_final: event.target.value,
+                        }))
+                      }
+                      placeholder="0.00"
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-[var(--ops-text-muted)]">
+                      Motivo del ajuste
+                    </label>
+                    <input
+                      value={priceForm.reason}
+                      onChange={(event) =>
+                        setPriceForm((current) => ({
+                          ...current,
+                          reason: event.target.value,
+                        }))
+                      }
+                      placeholder="Cliente frecuente, cierre comercial, observacion..."
+                      className={INPUT_CLASS}
+                    />
+                  </div>
+
+                  {priceFormError ? (
+                    <div className="rounded-xl border border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] px-3 py-2 text-sm text-[var(--ops-tone-danger-text)]">
+                      {priceFormError}
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-[var(--ops-border-soft)] px-4 py-8 text-center text-sm text-[var(--ops-text-muted)]">
+                  Selecciona un item para ajustar su precio.
+                </div>
+              )}
             </div>
           }
         >

@@ -16,8 +16,8 @@ import {
   OpsPageShell,
   OpsSectionDivider,
   OpsTableBlock,
-  OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
+import { OpsDataTable } from "@/components/ui/ops-data-table";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { apiFetchData } from "@/lib/api";
 import { appRoutes } from "@/lib/routes";
@@ -51,6 +51,81 @@ export function InventoryAdjustmentsCreatePage() {
   const [variantResults, setVariantResults] = useState<AdjustmentVariant[]>([]);
   const [loadingVariants, setLoadingVariants] = useState(false);
   const [variantSearchError, setVariantSearchError] = useState<string | null>(null);
+  const editId = initialSearchParams.get("edit_id") || "";
+  const [loadingEdit, setLoadingEdit] = useState(Boolean(editId));
+  const [editError, setEditError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!editId) return;
+    let cancelled = false;
+
+    (async () => {
+      setLoadingEdit(true);
+      try {
+        const { adjustment } = await apiFetchData<AdjustmentDetailData>(
+          `/api/inventory/adjustments/${encodeURIComponent(editId)}`
+        );
+        if (cancelled) return;
+
+        if (adjustment.status !== "draft") {
+          setEditError("Este ajuste ya fue confirmado o cancelado y no se puede editar.");
+          setLoadingEdit(false);
+          return;
+        }
+
+        setCreateLocationId(adjustment.location_id);
+        setAdjustmentIntent(adjustment.intent_type || "adjustment");
+        setCreateReason(adjustment.reason || "");
+        setCreateNotes(adjustment.notes || "");
+        setDraftLines(
+          (adjustment.lines || []).map((line) => ({
+            variant_id: line.variant_id,
+            sku: line.sku || "",
+            style_code: line.style_code || "",
+            style_name: line.style_name || "",
+            size_code: line.size_code || "",
+            color_name: line.color_name || "",
+            variant_label: [line.size_code, line.color_name].filter(Boolean).join(" / "),
+            system_qty: line.system_qty,
+            counted_qty: line.counted_qty,
+          }))
+        );
+      } catch (err) {
+        if (!cancelled) {
+          setEditError(err instanceof Error ? err.message : "No se pudo cargar el ajuste para editar.");
+        }
+      } finally {
+        if (!cancelled) setLoadingEdit(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [editId]);
+
+  const handleSubmitWithRollback = async (event: FormEvent) => {
+    event.preventDefault();
+    setSavingAdjustment(true);
+    setCreateError(null);
+
+    try {
+      if (editId) {
+        try {
+          await apiFetchData(`/api/inventory/adjustments/${encodeURIComponent(editId)}/cancel`, {
+            method: "POST",
+            body: JSON.stringify({}),
+          });
+        } catch {
+          /* old draft may already be cancelled, proceed */
+        }
+      }
+
+      await createNewAdjustment();
+    } catch (submitError) {
+      setCreateError(submitError instanceof Error ? submitError.message : "No se pudo guardar el ajuste");
+      setSavingAdjustment(false);
+    }
+  };
+
   const canManageAdjustments = ["ADMIN", "ALMACEN"].includes(
     String(user?.role_name || "").toUpperCase()
   );
@@ -201,45 +276,31 @@ export function InventoryAdjustmentsCreatePage() {
     );
   }
 
-  async function submitAdjustment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSavingAdjustment(true);
-    setCreateError(null);
-
-    try {
-      if (!effectiveCreateLocationId) {
-        throw new Error("Debes seleccionar una sede");
-      }
-
-      if (!draftLines.length) {
-        throw new Error("Debes agregar al menos una variante");
-      }
-
-      await apiFetchData<AdjustmentDetailData>("/api/inventory/adjustments", {
-        method: "POST",
-        cache: "no-store",
-        body: JSON.stringify({
-          location_id: effectiveCreateLocationId,
-          reason: buildAdjustmentReason(adjustmentIntent, createReason),
-          notes: createNotes.trim() || null,
-          lines: draftLines.map((line) => ({
-            variant_id: line.variant_id,
-            counted_qty: line.counted_qty,
-            notes: null,
-          })),
-        }),
-      });
-
-      router.push(appRoutes.inventoryAdjustments);
-    } catch (requestError) {
-      setCreateError(
-        requestError instanceof Error
-          ? requestError.message
-          : "No se pudo guardar el ajuste"
-      );
-    } finally {
-      setSavingAdjustment(false);
+  async function createNewAdjustment() {
+    if (!effectiveCreateLocationId) {
+      throw new Error("Debes seleccionar una sede");
     }
+
+    if (!draftLines.length) {
+      throw new Error("Debes agregar al menos una variante");
+    }
+
+    await apiFetchData<AdjustmentDetailData>("/api/inventory/adjustments", {
+      method: "POST",
+      cache: "no-store",
+      body: JSON.stringify({
+        location_id: effectiveCreateLocationId,
+        reason: buildAdjustmentReason(adjustmentIntent, createReason),
+        notes: createNotes.trim() || null,
+        lines: draftLines.map((line) => ({
+          variant_id: line.variant_id,
+          counted_qty: line.counted_qty,
+          notes: null,
+        })),
+      }),
+    });
+
+    router.push(appRoutes.inventoryAdjustments);
   }
 
   if (!canManageAdjustments) {
@@ -284,9 +345,25 @@ export function InventoryAdjustmentsCreatePage() {
       ]} />
 
       <OpsSectionDivider>
-        <form id="inventory-adjustment-create-form" onSubmit={submitAdjustment} className="space-y-4">
+        {loadingEdit ? (
+          <div className="flex items-center gap-3 rounded-xl border border-[var(--ops-border-strong)] px-4 py-8">
+            <LoaderCircle className="h-5 w-5 animate-spin text-[var(--ripnel-accent)]" />
+            <span className="text-sm text-[var(--ops-text-muted)]">Cargando datos del ajuste...</span>
+          </div>
+        ) : editError ? (
+          <InlineStatusCard title="No se pudo cargar el ajuste" description={editError} tone="danger" variant="ops" />
+        ) : (
+        <form id="inventory-adjustment-create-form" onSubmit={handleSubmitWithRollback} className="space-y-4">
           {createError ? (
             <InlineStatusCard title="Error al crear ajuste" description={createError} tone="danger" variant="ops" />
+          ) : null}
+          {editId && !createError ? (
+            <InlineStatusCard
+              title="Editando ajuste existente"
+              description="El borrador anterior se cancelara al guardar y se creara uno nuevo con estos datos."
+              tone="neutral"
+              variant="ops"
+            />
           ) : null}
 
           <section className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-5">
@@ -484,78 +561,66 @@ export function InventoryAdjustmentsCreatePage() {
                 </span>
               </div>
 
-              <OpsTableWrap minWidth="680px">
-                <table className="w-full border-collapse">
-                  <thead className="bg-[var(--ops-surface-muted)]">
-                    <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                      <th className="px-4 py-3">Variante</th>
-                      <th className="px-4 py-3 text-right">Sistema</th>
-                      <th className="px-4 py-3 text-right">Conteo</th>
-                      <th className="px-4 py-3 text-right">Quitar</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                    {draftLines.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={4}
-                          className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
-                        >
-                          Aún no agregas variantes al ajuste.
-                        </td>
-                      </tr>
-                    ) : (
-                      draftLines.map((line) => (
-                        <tr
-                          key={line.variant_id}
-                          className="transition hover:bg-[var(--ops-surface-muted)]"
-                        >
-                          <td className="px-4 py-[var(--ops-row-py)]">
-                            <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                              {line.style_name}
-                            </p>
-                            <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ripnel-accent-hover)]">
-                              {line.sku}
-                            </p>
-                            <p className="mt-1 text-xs text-[var(--ops-text-muted)]">
-                              {line.style_code} · {line.size_code} / {line.color_name}
-                            </p>
-                          </td>
-                          <td className="px-4 py-[var(--ops-row-py)] text-right text-sm text-[var(--ops-text)]">
-                            {line.system_qty}
-                          </td>
-                          <td className="px-4 py-[var(--ops-row-py)] text-right">
-                            <input
-                              type="number"
-                              min={0}
-                              value={line.counted_qty}
-                              onChange={(event) =>
-                                updateCountedQty(line.variant_id, event.target.value)
-                              }
-                              className="sales-field h-9 w-24 rounded-lg px-2 py-1 text-center text-sm"
-                            />
-                          </td>
-                          <td className="px-4 py-[var(--ops-row-py)] text-right">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              onClick={() => removeDraftLine(line.variant_id)}
-                              className="rounded-lg text-[var(--ops-text-muted)] hover:text-[color:color-mix(in_srgb,#e11d48_82%,var(--ops-text))]"
-                              aria-label="Quitar linea"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </OpsTableWrap>
+              <OpsDataTable
+                columns={[
+                  { key: "variante", header: "Variante" },
+                  { key: "sistema", header: "Sistema", className: "text-right" },
+                  { key: "conteo", header: "Conteo", className: "text-right" },
+                  { key: "quitar", header: "Quitar", className: "text-right" },
+                ]}
+                minWidth="680px"
+                emptyMessage="Aún no agregas variantes al ajuste."
+                isEmpty={draftLines.length === 0}
+              >
+                {draftLines.map((line) => (
+                  <tr
+                    key={line.variant_id}
+                    className="transition hover:bg-[var(--ops-surface-muted)]"
+                  >
+                    <td className="px-4 py-[var(--ops-row-py)]">
+                      <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
+                        {line.style_name}
+                      </p>
+                      <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ripnel-accent-hover)]">
+                        {line.sku}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--ops-text-muted)]">
+                        {line.style_code} · {line.size_code} / {line.color_name}
+                      </p>
+                    </td>
+                    <td className="px-4 py-[var(--ops-row-py)] text-right text-sm text-[var(--ops-text)]">
+                      {line.system_qty}
+                    </td>
+                    <td className="px-4 py-[var(--ops-row-py)] text-right">
+                      <input
+                        type="number"
+                        min={0}
+                        value={line.counted_qty}
+                        onChange={(event) =>
+                          updateCountedQty(line.variant_id, event.target.value)
+                        }
+                        className="sales-field h-9 w-24 rounded-lg px-2 py-1 text-center text-sm"
+                      />
+                    </td>
+                    <td className="px-4 py-[var(--ops-row-py)] text-right">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => removeDraftLine(line.variant_id)}
+                        className="rounded-lg text-[var(--ops-text-muted)] hover:text-[color:color-mix(in_srgb,#e11d48_82%,var(--ops-text))]"
+                        aria-label="Quitar linea"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </OpsDataTable>
             </OpsTableBlock>
           </div>
         </form>
+        )}
       </OpsSectionDivider>
     </OpsPageShell>
   );

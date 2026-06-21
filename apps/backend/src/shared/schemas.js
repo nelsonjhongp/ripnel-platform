@@ -15,6 +15,8 @@ const userAssignment = z.object({
   is_default: z.boolean().optional().default(false),
 });
 
+const userAssignments = z.array(userAssignment).min(1, 'At least one location assignment is required');
+
 const createUser = z.object({
   full_name: z.string({ message: 'full_name is required' }).min(1, 'full_name is required'),
   username: z.string({ message: 'username is required' }).min(1, 'username is required'),
@@ -128,6 +130,7 @@ module.exports = {
   changePassword,
   createUser,
   patchUser,
+  userAssignments,
   createCustomer,
   patchCustomer,
   createSale,

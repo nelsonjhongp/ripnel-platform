@@ -19,6 +19,7 @@ import {
   ProtectedLoadingPage,
   ProtectedNotFoundPage,
 } from "@/components/feedback/status-page"
+import { OpsDataTable } from "@/components/ui/ops-data-table"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -258,57 +259,48 @@ export default function SaleDetailPage({ params }: { params: Promise<{ saleId: s
                 <Package className="h-4 w-4 text-[var(--ripnel-accent)]" />Productos
               </h2>
               <article className="sales-panel rounded-lg p-0 shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-sm">
-                    <thead className="bg-[var(--ops-surface-muted)]">
-                      <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                        <th scope="col" className="px-4 py-3">Producto</th>
-                        <th scope="col" className="px-4 py-3">Variante</th>
-                        <th scope="col" className="px-4 py-3 text-right">Cant.</th>
-                        <th scope="col" className="px-4 py-3 text-right">P. Unit.</th>
-                        <th scope="col" className="px-4 py-3 text-right">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                      {sale.details.length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="px-4 py-8 text-center text-sm text-[var(--ops-text-muted)]">Sin productos registrados.</td>
-                        </tr>
-                      ) : (
-                        sale.details.map((line) => {
-                          const quantity = Number(line.quantity || 0)
-                          const finalPrice = Number(line.unit_price_final || 0)
-                          const listPrice = Number(line.unit_price_list || 0)
-                          const lineDiscount = Math.max(0, round2((listPrice - finalPrice) * quantity))
+                <OpsDataTable
+                  columns={[
+                    { key: "producto", header: "Producto" },
+                    { key: "variante", header: "Variante" },
+                    { key: "cant", header: "Cant.", className: "text-right" },
+                    { key: "p_unit", header: "P. Unit.", className: "text-right" },
+                    { key: "total", header: "Total", className: "text-right" },
+                  ]}
+                  isEmpty={sale.details.length === 0}
+                  emptyMessage="Sin productos registrados."
+                >
+                  {sale.details.map((line) => {
+                    const quantity = Number(line.quantity || 0)
+                    const finalPrice = Number(line.unit_price_final || 0)
+                    const listPrice = Number(line.unit_price_list || 0)
+                    const lineDiscount = Math.max(0, round2((listPrice - finalPrice) * quantity))
 
-                          return (
-                            <tr key={line.sale_detail_id} className="transition hover:bg-[var(--ops-surface-muted)]">
-                              <td className="px-4 py-[var(--ops-row-py)] align-top">
-                                <p className="font-semibold text-[var(--ops-text)]">{line.style_name}</p>
-                                <p className="mt-0.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">{line.style_code || line.sku || "-"}</p>
-                              </td>
-                              <td className="px-4 py-[var(--ops-row-py)] align-top text-[var(--ops-text)]">
-                                {line.size_code || "ST"} / {line.color_code || "Único"}
-                                <p className="mt-0.5 text-[11px] text-[var(--ops-text-muted)]">{line.sku}</p>
-                              </td>
-                              <td className="px-4 py-[var(--ops-row-py)] text-right font-medium text-[var(--ops-text)]">{quantity}</td>
-                              <td className="px-4 py-[var(--ops-row-py)] text-right align-top">
-                                <p className="font-medium text-[var(--ops-text)]">{formatCurrency(finalPrice)}</p>
-                                {!isCloseEnough(listPrice, finalPrice) ? (
-                                  <p className="mt-0.5 text-[11px] text-[var(--ops-text-muted)]">Lista {formatCurrency(listPrice)}</p>
-                                ) : null}
-                                {lineDiscount > 0 ? (
-                                  <p className="text-[11px] text-[var(--ops-tone-danger-text)]">-{formatCurrency(lineDiscount)}</p>
-                                ) : null}
-                              </td>
-                              <td className="px-4 py-[var(--ops-row-py)] text-right font-semibold text-[var(--ops-text)]">{formatCurrency(Number(line.line_total))}</td>
-                            </tr>
-                          )
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                    return (
+                      <tr key={line.sale_detail_id} className="transition hover:bg-[var(--ops-surface-muted)]">
+                        <td className="px-4 py-[var(--ops-row-py)] align-top">
+                          <p className="font-semibold text-[var(--ops-text)]">{line.style_name}</p>
+                          <p className="mt-0.5 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">{line.style_code || line.sku || "-"}</p>
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] align-top text-[var(--ops-text)]">
+                          {line.size_code || "ST"} / {line.color_code || "Único"}
+                          <p className="mt-0.5 text-[11px] text-[var(--ops-text-muted)]">{line.sku}</p>
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] text-right font-medium text-[var(--ops-text)]">{quantity}</td>
+                        <td className="px-4 py-[var(--ops-row-py)] text-right align-top">
+                          <p className="font-medium text-[var(--ops-text)]">{formatCurrency(finalPrice)}</p>
+                          {!isCloseEnough(listPrice, finalPrice) ? (
+                            <p className="mt-0.5 text-[11px] text-[var(--ops-text-muted)]">Lista {formatCurrency(listPrice)}</p>
+                          ) : null}
+                          {lineDiscount > 0 ? (
+                            <p className="text-[11px] text-[color:color-mix(in_srgb,#dc2626_76%,var(--ops-text))]">-{formatCurrency(lineDiscount)}</p>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] text-right font-semibold text-[var(--ops-text)]">{formatCurrency(Number(line.line_total))}</td>
+                      </tr>
+                    )
+                  })}
+                </OpsDataTable>
               </article>
             </section>
 

@@ -5,6 +5,7 @@ import { useMemo, useState } from "react"
 import { RotateCcw, Banknote, Clock } from "lucide-react"
 
 import { PermissionGuard } from "@/components/auth/PermissionGuard"
+
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Button } from "@/components/ui/button"
 import { DateFilterPicker } from "@/components/ui/date-filter-picker"
@@ -16,10 +17,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { OpsDataTable, type OpsDataTableColumn } from "@/components/ui/ops-data-table"
-import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group"
+import { OpsMetricPill } from "@/components/ui/ops-metric-pill"
+import { OpsDataTable } from "@/components/ui/ops-data-table"
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
-import { OpsPageShell, OpsSearchField, OpsTableBlock, OpsFiltersRow } from "@/components/ui/ops-page-shell"
+import { OpsPageShell } from "@/components/ui/ops-page-shell"
 import { formatDateTime } from "@/lib/date-utils"
 import { formatCurrency } from "@/lib/format-utils"
 import { apiFetch } from "@/lib/api"
@@ -105,7 +106,7 @@ export default function TransactionHistoryPage() {
     <PermissionGuard permission="sales.pos">
       <TooltipProvider delayDuration={120}>
         <OpsPageShell width="wide">
-            <PosHeader
+          <PosHeader
               eyebrow="Operacion comercial"
               title="Historial de ventas"
             />
@@ -197,29 +198,35 @@ export default function TransactionHistoryPage() {
               </OpsFiltersRow>
 
               <OpsDataTable
-                columns={COLUMNS}
+                columns={[
+                  { key: "venta", header: "Venta" },
+                  { key: "fecha", header: "Fecha" },
+                  { key: "cliente", header: "Cliente" },
+                  { key: "vendedor", header: "Vendedor" },
+                  { key: "sede", header: "Sede" },
+                  { key: "estado", header: "Estado" },
+                  { key: "total", header: "Total" },
+                  { key: "acciones", header: "Acciones", className: "text-right" },
+                ]}
                 minWidth="980px"
                 loading={loading}
+                loadingMessage="Cargando ventas..."
                 error={error}
                 errorTitle="No pudimos cargar el historial"
                 emptyMessage="No se encontraron ventas con los filtros aplicados."
-                isEmpty={sales.length === 0}
+                isEmpty={!loading && !error && sales.length === 0}
                 footer={
-                  totalResults > 0 ? (
-                    <>
-                      <span className="text-sm text-[var(--ops-text-muted)]">
-                        {firstVisible}-{lastVisible} de {totalResults}
-                      </span>
-                      <Pagination
-                        page={safeCurrentPage}
-                        totalPages={totalPages}
-                        onPageChange={setCurrentPage}
-                        className="self-end md:self-auto"
-                      />
-                    </>
-                  ) : (
-                    <span className="text-sm text-[var(--ops-text-muted)]">0 resultados</span>
-                  )
+                  <>
+                    <span className="text-sm text-[var(--ops-text-muted)]">
+                      {totalResults === 0 ? "0 resultados" : `${firstVisible}-${lastVisible} de ${totalResults}`}
+                    </span>
+                    <Pagination
+                      page={safeCurrentPage}
+                      totalPages={totalPages}
+                      onPageChange={setCurrentPage}
+                      className="self-end md:self-auto"
+                    />
+                  </>
                 }
               >
                 {sales.map((sale) => (
@@ -289,8 +296,8 @@ export default function TransactionHistoryPage() {
                             <Link href={`/postventa/${sale.sale_id}`}>Postventa</Link>
                           </Button>
                         ) : sale.status === "draft" ? (
-                          <Button asChild variant="outline" size="sm" className="rounded-lg border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)] px-3 text-[var(--ops-tone-warning-text)] hover:bg-[color:color-mix(in_srgb,var(--ops-tone-warning-bg)_80%,var(--ops-surface))]">
-                            <Link href="/ventas">CONTINUAR VENTA</Link>
+                          <Button asChild variant="outline" size="sm" className="rounded-lg border-[color:color-mix(in_srgb,#f59e0b_40%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] px-3 text-[color:color-mix(in_srgb,#d97706_82%,var(--ops-text))] hover:bg-[color:color-mix(in_srgb,#f59e0b_18%,var(--ops-surface))]">
+                            <Link href={`/ventas/${sale.sale_id}`}>CONTINUAR VENTA</Link>
                           </Button>
                         ) : (
                           <span className="inline-block h-7 w-[5.25rem]" aria-hidden="true" />
@@ -300,7 +307,7 @@ export default function TransactionHistoryPage() {
                   </tr>
                 ))}
               </OpsDataTable>
-            </OpsTableBlock>
+            </div>
         </OpsPageShell>
       </TooltipProvider>
     </PermissionGuard>

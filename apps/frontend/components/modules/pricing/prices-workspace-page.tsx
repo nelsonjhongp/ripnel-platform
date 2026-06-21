@@ -6,10 +6,11 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { ArrowLeft, Building2, LoaderCircle, PencilLine, Plus, RefreshCw, Save, Settings2, ShoppingBag } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
+  OpsPageShell,
   OpsSectionDivider,
-  OpsTableWrap,
 } from "@/components/ui/ops-page-shell"
-import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group"
+import { OpsDataTable } from "@/components/ui/ops-data-table"
+import { OpsMetricPill } from "@/components/ui/ops-metric-pill"
 import { DateFilterPicker } from "@/components/ui/date-filter-picker"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -219,8 +220,9 @@ export function PricesWorkspacePage() {
   }
 
   return (
-    <TooltipProvider delayDuration={120}>
-      <PosHeader
+    <OpsPageShell width="wide">
+      <TooltipProvider delayDuration={120}>
+        <PosHeader
         eyebrow="Precios"
         title="Gestion de precios"
         actions={
@@ -304,98 +306,94 @@ export function PricesWorkspacePage() {
 
                   </div>
 
-                   <OpsTableWrap minWidth="640px">
-                    <table className="w-full border-collapse">
-                      <thead className="bg-[var(--ops-surface-muted)]">
-                        <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                           <th className="px-4 py-3">Talla</th>
-                           <th className="px-4 py-3">Retail</th>
-                           <th className="px-4 py-3">Mayorista</th>
-                           <th className="px-4 py-3">Estado</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                        {workspace.configured_sizes.map((size) => {
-                          const selected = size.size_id === resolvedSelectedSizeId
+                   <OpsDataTable
+                    columns={[
+                      { key: "talla", header: "Talla" },
+                      { key: "retail", header: "Retail" },
+                      { key: "mayorista", header: "Mayorista" },
+                      { key: "estado", header: "Estado" },
+                    ]}
+                    minWidth="640px"
+                  >
+                    {workspace.configured_sizes.map((size) => {
+                      const selected = size.size_id === resolvedSelectedSizeId
 
-                          return (
-                            <tr
-                              key={size.size_id}
-                              className={cn(
-                                selected && "bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_72%,var(--ops-surface))]"
-                              )}
-                            >
-                              <td className="px-4 py-[var(--ops-row-py)] align-top">
-                                <p className="text-sm font-semibold text-[var(--ops-text)]">
-                                  {size.code}
-                                </p>
-                                <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">
-                                  {size.name || "Sin nombre"}
-                                </p>
-                              </td>
-                              <td className="px-4 py-[var(--ops-row-py)]">
-                                {size.has_current_retail_price && size.current_retail_price !== null ? (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="rounded-lg min-w-[120px]"
-                                    onClick={() => handleSelectPriceLane(size.size_id, "retail")}
-                                  >
-                                    S/. {size.current_retail_price.toFixed(2)}
-                                    <PencilLine className="h-3.5 w-3.5" />
-                                  </Button>
-                                ) : (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="rounded-lg border-dashed text-[var(--ops-text-muted)] opacity-80 min-w-[120px]"
-                                    onClick={() => handleSelectPriceLane(size.size_id, "retail")}
-                                  >
-                                    Sin precio
-                                    <Plus className="h-3.5 w-3.5" />
-                                  </Button>
-                                )}
-                              </td>
-                              <td className="px-4 py-[var(--ops-row-py)]">
-                                {size.has_current_wholesale_price && size.current_wholesale_price !== null ? (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="rounded-lg min-w-[120px]"
-                                    onClick={() => handleSelectPriceLane(size.size_id, "wholesale")}
-                                  >
-                                    S/. {size.current_wholesale_price.toFixed(2)}
-                                    <PencilLine className="h-3.5 w-3.5" />
-                                  </Button>
-                                ) : (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="rounded-lg border-dashed text-[var(--ops-text-muted)] opacity-80 min-w-[120px]"
-                                    onClick={() => handleSelectPriceLane(size.size_id, "wholesale")}
-                                  >
-                                    Sin precio
-                                    <Plus className="h-3.5 w-3.5" />
-                                  </Button>
-                                )}
-                              </td>
-                              <td className="px-4 py-[var(--ops-row-py)]">
-                                {size.has_current_retail_price && size.has_current_wholesale_price ? (
-                                  <OpsStatusBadge tone="success">Completo</OpsStatusBadge>
-                                ) : !size.has_current_retail_price && !size.has_current_wholesale_price ? (
-                                  <OpsStatusBadge tone="danger">Faltan precios</OpsStatusBadge>
-                                ) : !size.has_current_retail_price ? (
-                                  <OpsStatusBadge tone="warning">Falta retail</OpsStatusBadge>
-                                ) : (
-                                  <OpsStatusBadge tone="warning">Falta mayorista</OpsStatusBadge>
-                                )}
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </OpsTableWrap>
+                      return (
+                        <tr
+                          key={size.size_id}
+                          className={cn(
+                            selected && "bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_72%,var(--ops-surface))]"
+                          )}
+                        >
+                          <td className="px-4 py-[var(--ops-row-py)] align-top">
+                            <p className="text-sm font-semibold text-[var(--ops-text)]">
+                              {size.code}
+                            </p>
+                            <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">
+                              {size.name || "Sin nombre"}
+                            </p>
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            {size.has_current_retail_price && size.current_retail_price !== null ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="rounded-lg min-w-[120px]"
+                                onClick={() => handleSelectPriceLane(size.size_id, "retail")}
+                              >
+                                S/. {size.current_retail_price.toFixed(2)}
+                                <PencilLine className="h-3.5 w-3.5" />
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="rounded-lg border-dashed text-[var(--ops-text-muted)] opacity-80 min-w-[120px]"
+                                onClick={() => handleSelectPriceLane(size.size_id, "retail")}
+                              >
+                                Sin precio
+                                <Plus className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            {size.has_current_wholesale_price && size.current_wholesale_price !== null ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="rounded-lg min-w-[120px]"
+                                onClick={() => handleSelectPriceLane(size.size_id, "wholesale")}
+                              >
+                                S/. {size.current_wholesale_price.toFixed(2)}
+                                <PencilLine className="h-3.5 w-3.5" />
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="rounded-lg border-dashed text-[var(--ops-text-muted)] opacity-80 min-w-[120px]"
+                                onClick={() => handleSelectPriceLane(size.size_id, "wholesale")}
+                              >
+                                Sin precio
+                                <Plus className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            {size.has_current_retail_price && size.has_current_wholesale_price ? (
+                              <OpsStatusBadge tone="success">Completo</OpsStatusBadge>
+                            ) : !size.has_current_retail_price && !size.has_current_wholesale_price ? (
+                              <OpsStatusBadge tone="danger">Faltan precios</OpsStatusBadge>
+                            ) : !size.has_current_retail_price ? (
+                              <OpsStatusBadge tone="warning">Falta retail</OpsStatusBadge>
+                            ) : (
+                              <OpsStatusBadge tone="warning">Falta mayorista</OpsStatusBadge>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </OpsDataTable>
                 </div>
 
                 <aside className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-5">
@@ -581,5 +579,6 @@ export function PricesWorkspacePage() {
         </div>
       )}
     </TooltipProvider>
+    </OpsPageShell>
   )
 }

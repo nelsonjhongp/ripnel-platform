@@ -4,8 +4,9 @@ import { useCallback, useMemo, useState } from "react"
 import { LoaderCircle, RefreshCw, Save } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DateFilterPicker } from "@/components/ui/date-filter-picker"
-import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group"
-import { OpsSectionDivider, OpsTableBlock, OpsTableWrap } from "@/components/ui/ops-page-shell"
+import { OpsMetricPill } from "@/components/ui/ops-metric-pill"
+import { OpsPageShell, OpsSectionDivider, OpsTableBlock } from "@/components/ui/ops-page-shell"
+import { OpsDataTable } from "@/components/ui/ops-data-table"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
@@ -103,8 +104,9 @@ export function PricingRulesPage() {
   }
 
   return (
-    <TooltipProvider delayDuration={120}>
-      <PosHeader
+    <OpsPageShell width="wide">
+      <TooltipProvider delayDuration={120}>
+        <PosHeader
         eyebrow="Precios"
         title="Regla mayorista"
         actions={
@@ -222,65 +224,46 @@ export function PricingRulesPage() {
           </section>
 
           <OpsTableBlock>
-            <OpsTableWrap minWidth="720px">
-              <table className="w-full border-collapse">
-                <thead className="bg-[var(--ops-surface-muted)]">
-                  <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                    <th className="px-4 py-3">Regla</th>
-                    <th className="px-4 py-3">Minimo</th>
-                    <th className="px-4 py-3">Vigencia</th>
-                    <th className="px-4 py-3">Estado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                  {loading ? (
-                    <tr>
-                      <td
-                        colSpan={4}
-                        className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
-                      >
-                        Cargando reglas...
-                      </td>
-                    </tr>
-                  ) : rules.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={4}
-                        className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
-                      >
-                        No hay reglas registradas.
-                      </td>
-                    </tr>
-                  ) : (
-                    rules.map((rule) => (
-                      <tr
-                        key={rule.rule_id}
-                        className="transition hover:bg-[var(--ops-surface-muted)]"
-                      >
-                        <td className="px-4 py-[var(--ops-row-py)] align-top text-sm font-semibold text-[var(--ops-text)]">
-                          {rule.rule_type}
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top text-sm text-[var(--ops-text)]">
-                          {rule.min_qty}
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top text-sm text-[var(--ops-text-muted)]">
-                          {formatDate(rule.valid_from)} -{" "}
-                          {rule.valid_to ? formatDate(rule.valid_to) : "Sin fin"}
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)] align-top">
-                          <OpsStatusBadge tone={rule.active ? "success" : "neutral"}>
-                            {rule.active ? "Activa" : "Inactiva"}
-                          </OpsStatusBadge>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </OpsTableWrap>
+            <OpsDataTable
+              columns={[
+                { key: "regla", header: "Regla" },
+                { key: "minimo", header: "Minimo" },
+                { key: "vigencia", header: "Vigencia" },
+                { key: "estado", header: "Estado" },
+              ]}
+              minWidth="720px"
+              loading={loading}
+              loadingMessage="Cargando reglas..."
+              emptyMessage="No hay reglas registradas."
+              isEmpty={!loading && rules.length === 0}
+            >
+              {rules.map((rule) => (
+                <tr
+                  key={rule.rule_id}
+                  className="transition hover:bg-[var(--ops-surface-muted)]"
+                >
+                  <td className="px-4 py-[var(--ops-row-py)] align-top text-sm font-semibold text-[var(--ops-text)]">
+                    {rule.rule_type}
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] align-top text-sm text-[var(--ops-text)]">
+                    {rule.min_qty}
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] align-top text-sm text-[var(--ops-text-muted)]">
+                    {formatDate(rule.valid_from)} -{" "}
+                    {rule.valid_to ? formatDate(rule.valid_to) : "Sin fin"}
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] align-top">
+                    <OpsStatusBadge tone={rule.active ? "success" : "neutral"}>
+                      {rule.active ? "Activa" : "Inactiva"}
+                    </OpsStatusBadge>
+                  </td>
+                </tr>
+              ))}
+            </OpsDataTable>
           </OpsTableBlock>
         </div>
       </OpsSectionDivider>
     </TooltipProvider>
+    </OpsPageShell>
   )
 }

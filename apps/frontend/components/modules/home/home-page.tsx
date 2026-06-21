@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import {
   ArrowLeftRight,
   BarChart3,
+  ChevronDown,
   CircleAlert,
   ClipboardList,
   Info,
@@ -28,6 +29,10 @@ import { OpsActionTile } from "@/components/ui/ops-action-tile";
 import { OpsAttentionRow } from "@/components/ui/ops-attention-row";
 import { OpsEmptyState } from "@/components/ui/ops-empty-state";
 import { OpsMetricCard } from "@/components/ui/ops-metric-card";
+import { OpsPageShell } from "@/components/ui/ops-page-shell";
+import { OpsMetricStripItem } from "@/components/ui/ops-metric-strip-item";
+import { OpsPendingRow } from "@/components/ui/ops-pending-row";
+import { OpsSummaryBand } from "@/components/ui/ops-summary-band";
 import type { HomeOverview } from "@/components/home/home-types";
 import { useApiGet } from "@/hooks/use-api-get";
 import { apiFetch } from "@/lib/api";
@@ -209,6 +214,31 @@ export default function InicioPage() {
     transferSection?.visible ||
     adminSection?.visible;
 
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("ripnel-home-collapsed");
+      if (raw) setCollapsed(JSON.parse(raw));
+    } catch { /* ignore */ }
+  }, []);
+
+  const toggleSection = useCallback((key: string) => {
+    setCollapsed((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      try { localStorage.setItem("ripnel-home-collapsed", JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+
+  const sectionChevron = (key: string) => (
+    <ChevronDown
+      className={`ml-auto h-4 w-4 text-[var(--ops-text-muted)] shrink-0 transition-transform ${
+        collapsed[key] ? "-rotate-90" : ""
+      }`}
+    />
+  );
+
   if ((loading || authLoading) && !overview) {
     return (
       <LoadingPage
@@ -232,8 +262,7 @@ export default function InicioPage() {
   }
 
   return (
-    <section className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
-      <div className="mx-auto max-w-[1180px] space-y-6">
+    <OpsPageShell width="wide">
         <HomeHeader
           eyebrow="Inicio"
           title="Inicio operativo"
@@ -243,13 +272,19 @@ export default function InicioPage() {
 
         {overview.priorities.length > 0 && (
           <section className="space-y-3">
-            <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => toggleSection("priorities")}
+              className="flex w-full items-center gap-2 text-left"
+            >
               <CircleAlert className="h-4 w-4 text-[var(--ripnel-accent)]" />
               <h2 className="text-base font-semibold text-[var(--ops-text)]">
                 Pendientes de hoy
               </h2>
-            </div>
+              {sectionChevron("priorities")}
+            </button>
 
+            {!collapsed.priorities ? (
             <div className="overflow-hidden rounded-xl border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_30%,var(--ops-surface))]">
               {overview.priorities.map((item) => (
                 <div
@@ -275,6 +310,7 @@ export default function InicioPage() {
                 </div>
               ))}
             </div>
+            ) : null}
           </section>
         )}
 
@@ -372,11 +408,18 @@ export default function InicioPage() {
             {personalSales?.visible ? (
               <section className="flex-1 min-w-0 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <ShoppingCart className="h-4 w-4 text-[var(--ripnel-accent)]" />
-                    <h2 className="text-base font-semibold text-[var(--ops-text)]">
-                      Mi actividad comercial
-                    </h2>
+                  <div className="flex flex-1 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleSection("personal")}
+                      className="flex flex-1 items-center gap-2 text-left"
+                    >
+                      <ShoppingCart className="h-4 w-4 text-[var(--ripnel-accent)]" />
+                      <h2 className="text-base font-semibold text-[var(--ops-text)]">
+                        Mi actividad comercial
+                      </h2>
+                      {sectionChevron("personal")}
+                    </button>
                   </div>
                   <Link
                     href={appRoutes.transactionHistory}
@@ -386,6 +429,7 @@ export default function InicioPage() {
                   </Link>
                 </div>
 
+                {!collapsed.personal ? (
                 <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4">
                   <div className="grid gap-2 sm:grid-cols-3">
                     <OpsMetricCard
@@ -449,6 +493,7 @@ export default function InicioPage() {
                     )}
                   </div>
                 </div>
+                ) : null}
               </section>
             ) : null}
 
@@ -544,11 +589,18 @@ export default function InicioPage() {
             {adminSection?.visible && (
               <section className="flex-1 min-w-0 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="h-4 w-4 text-[var(--ripnel-accent)]" />
-                    <h2 className="text-base font-semibold text-[var(--ops-text)]">
-                      Vision gerencial
-                    </h2>
+                  <div className="flex flex-1 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleSection("admin")}
+                      className="flex flex-1 items-center gap-2 text-left"
+                    >
+                      <ShieldCheck className="h-4 w-4 text-[var(--ripnel-accent)]" />
+                      <h2 className="text-base font-semibold text-[var(--ops-text)]">
+                        Vision gerencial
+                      </h2>
+                      {sectionChevron("admin")}
+                    </button>
                   </div>
                   <Link
                     href={appRoutes.dashboard}
@@ -558,40 +610,51 @@ export default function InicioPage() {
                   </Link>
                 </div>
 
-                <div className="grid gap-2 sm:grid-cols-3">
-                  <OpsMetricCard
-                    icon={<Users className="h-4 w-4" />}
-                    label="Usuarios activos"
-                    value={adminSection.active_user_count}
-                    detail={`${adminSection.active_location_count} sede(s)`}
-                    tone="accent"
-                  />
-                  <OpsMetricCard
-                    icon={<Store className="h-4 w-4" />}
-                    label="Sedes asignadas"
-                    value={adminSection.active_location_count}
-                    detail="Activas"
-                    tone="info"
-                  />
-                  <OpsMetricCard
-                    icon={<ClipboardList className="h-4 w-4" />}
-                    label="Solicitudes abiertas"
-                    value={adminSection.pending_requests_count}
-                    detail="Red asignada"
-                    tone="success"
-                  />
-                </div>
+                {!collapsed.admin ? (
+                <OpsSummaryBand
+                  items={[
+                    {
+                      icon: <Users className="h-4 w-4" />,
+                      label: "Usuarios activos",
+                      value: adminSection.active_user_count,
+                      meta: `${adminSection.active_location_count} sede(s)`,
+                      tone: "accent",
+                    },
+                    {
+                      icon: <Store className="h-4 w-4" />,
+                      label: "Sedes asignadas",
+                      value: adminSection.active_location_count,
+                      meta: "Activas",
+                      tone: "info",
+                    },
+                    {
+                      icon: <ClipboardList className="h-4 w-4" />,
+                      label: "Solicitudes abiertas",
+                      value: adminSection.pending_requests_count,
+                      meta: "Red asignada",
+                      tone: "success",
+                    },
+                  ]}
+                />
+                ) : null}
               </section>
             )}
 
             {inventorySection?.visible && (
               <section className="flex-1 min-w-0 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <PackageSearch className="h-4 w-4 text-[var(--ripnel-accent)]" />
-                    <h2 className="text-base font-semibold text-[var(--ops-text)]">
-                      Stock sensible
-                    </h2>
+                  <div className="flex flex-1 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleSection("inventory")}
+                      className="flex flex-1 items-center gap-2 text-left"
+                    >
+                      <PackageSearch className="h-4 w-4 text-[var(--ripnel-accent)]" />
+                      <h2 className="text-base font-semibold text-[var(--ops-text)]">
+                        Stock sensible
+                      </h2>
+                      {sectionChevron("inventory")}
+                    </button>
                   </div>
                   <Link
                     href={`${appRoutes.inventory}?status=con-alertas`}
@@ -601,12 +664,14 @@ export default function InicioPage() {
                   </Link>
                 </div>
 
+                {!collapsed.inventory ? (
                 <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_30%,var(--ops-surface))]">
                   <HomeCriticalStockTable
                     items={inventorySection.critical_variants}
                     lowStockThreshold={inventorySection.low_stock_threshold}
                   />
                 </div>
+                ) : null}
               </section>
             )}
           </div>
@@ -647,8 +712,7 @@ export default function InicioPage() {
             />
           </div>
         )}
-      </div>
-    </section>
+    </OpsPageShell>
   );
 }
 

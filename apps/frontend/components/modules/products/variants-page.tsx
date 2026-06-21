@@ -24,17 +24,15 @@ import { ApiEnvelope, apiFetch, unwrapApiData } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/date-utils";
 import { Button } from "@/components/ui/button";
-import { OpsSelect } from "@/components/ui/ops-selection";
-import { OpsEmptyState } from "@/components/ui/ops-empty-state";
-import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
+import { FilterDropdown } from "@/components/ui/filter-dropdown";
+import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
 import {
   OpsFiltersRow,
   OpsPageShell,
   OpsSearchField,
   OpsSectionDivider,
-  OpsTableFooter,
-  OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
+import { OpsDataTable } from "@/components/ui/ops-data-table";
 import { Pagination } from "@/components/ui/pagination";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
@@ -667,114 +665,100 @@ export function VariantsPage({
                   </Tooltip>
                 </OpsFiltersRow>
 
-                <OpsTableWrap minWidth="1080px">
-                    <table className="w-full border-collapse">
-                      <thead className="bg-[var(--ops-surface-muted)]">
-                        <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                          <th className="px-4 py-3">Style</th>
-                          <th className="px-4 py-3">Tipo</th>
-                          <th className="px-4 py-3">Tela</th>
-                          <th className="px-4 py-3">Target</th>
-                          <th className="px-4 py-3">Config.</th>
-                          <th className="px-4 py-3">Cobertura</th>
-                          <th className="px-4 py-3">Estado</th>
-                          <th className="px-4 py-3 text-right">Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                        {loading ? (
-                          <tr>
-                            <td colSpan={8} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                              <LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />
-                              Cargando styles…
-                            </td>
-                          </tr>
-                        ) : paginatedStyles.length === 0 ? (
-                          <tr>
-                            <td colSpan={8} className="px-4 py-10">
-                              <OpsEmptyState variant="compact" description="No hay styles para este filtro." />
-                            </td>
-                          </tr>
-                        ) : (
-                          paginatedStyles.map((style) => (
-                            <tr
-                              key={style.style_id}
-                              className={cn(
-                                "transition hover:bg-[var(--ops-surface-muted)]",
-                                !style.active && "opacity-75"
-                              )}
-                            >
-                              <td className="px-4 py-[var(--ops-row-py)]">
-                                <p className="truncate max-w-[200px] text-sm font-semibold text-[var(--ops-text)]">
-                                  {style.name}
-                                </p>
-                                <div className="mt-1 flex items-center gap-2">
-                                  <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--ripnel-accent-hover)]">
-                                    {style.style_code || "Sin codigo"}
-                                  </span>
-                                  <span className="text-[11px] text-[var(--ops-text-muted)]">
-                                    {formatDate(style.created_at)}
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{style.garment_type_name}</td>
-                              <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{style.fabric_name || "-"}</td>
-                              <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{style.target_name || "-"}</td>
-                              <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
-                                <p>{style.configured_size_count} tallas</p>
-                                <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">
-                                  {style.configured_color_count} colores
-                                </p>
-                              </td>
-                              <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
-                                <p>
-                                  {style.variant_count}/{style.expected_variant_count}
-                                </p>
-                                <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">
-                                  retail {style.retail_sizes_covered_count}/{style.configured_size_count}
-                                </p>
-                              </td>
-                              <td className="px-4 py-[var(--ops-row-py)]">
-                                <OpsStatusBadge tone={variantStatusTone(style.status)}>
-                                  {getStatusLabel(style.status)}
-                                </OpsStatusBadge>
-                              </td>
-                              <td className="px-4 py-[var(--ops-row-py)] text-right">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="rounded-lg px-3"
-                                  onClick={() => {
-                                    handleSelectStyle(style.style_id);
-                                    router.push(`/productos/variantes?style_id=${encodeURIComponent(style.style_id)}`);
-                                  }}
-                                >
-                                  Configurar
-                                </Button>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                </OpsTableWrap>
-
-                {!loading ? (
-                  <OpsTableFooter>
-                    <span className="ops-secondary-text text-[var(--ops-text-muted)]">
-                      {filteredStyles.length === 0
-                        ? "0 resultados"
-                        : `${styleFirstVisible}-${styleLastVisible} de ${filteredStyles.length}`}
-                    </span>
-                    <Pagination
-                      page={safeStylePage}
-                      totalPages={styleTotalPages}
-                      onPageChange={setStylePage}
-                      className="self-end md:self-auto"
-                    />
-                  </OpsTableFooter>
-                ) : null}
+                <OpsDataTable
+                  columns={[
+                    { key: "style", header: "Style" },
+                    { key: "tipo", header: "Tipo" },
+                    { key: "tela", header: "Tela" },
+                    { key: "target", header: "Target" },
+                    { key: "config", header: "Config." },
+                    { key: "cobertura", header: "Cobertura" },
+                    { key: "estado", header: "Estado" },
+                    { key: "acciones", header: "Acciones", className: "text-right" },
+                  ]}
+                  minWidth="1080px"
+                  loading={loading}
+                  loadingMessage="Cargando styles…"
+                  emptyMessage="No hay styles para este filtro."
+                  isEmpty={!loading && paginatedStyles.length === 0}
+                  footer={
+                    !loading ? (
+                      <>
+                        <span className="ops-secondary-text text-[var(--ops-text-muted)]">
+                          {filteredStyles.length === 0
+                            ? "0 resultados"
+                            : `${styleFirstVisible}-${styleLastVisible} de ${filteredStyles.length}`}
+                        </span>
+                        <Pagination
+                          page={safeStylePage}
+                          totalPages={styleTotalPages}
+                          onPageChange={setStylePage}
+                          className="self-end md:self-auto"
+                        />
+                      </>
+                    ) : null
+                  }
+                >
+                  {paginatedStyles.map((style) => (
+                    <tr
+                      key={style.style_id}
+                      className={cn(
+                        "transition hover:bg-[var(--ops-surface-muted)]",
+                        !style.active && "opacity-75"
+                      )}
+                    >
+                      <td className="px-4 py-[var(--ops-row-py)]">
+                        <p className="truncate max-w-[200px] text-sm font-semibold text-[var(--ops-text)]">
+                          {style.name}
+                        </p>
+                        <div className="mt-1 flex items-center gap-2">
+                          <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--ripnel-accent-hover)]">
+                            {style.style_code || "Sin codigo"}
+                          </span>
+                          <span className="text-[11px] text-[var(--ops-text-muted)]">
+                            {formatDate(style.created_at)}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{style.garment_type_name}</td>
+                      <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{style.fabric_name || "-"}</td>
+                      <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{style.target_name || "-"}</td>
+                      <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                        <p>{style.configured_size_count} tallas</p>
+                        <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">
+                          {style.configured_color_count} colores
+                        </p>
+                      </td>
+                      <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                        <p>
+                          {style.variant_count}/{style.expected_variant_count}
+                        </p>
+                        <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">
+                          retail {style.retail_sizes_covered_count}/{style.configured_size_count}
+                        </p>
+                      </td>
+                      <td className="px-4 py-[var(--ops-row-py)]">
+                        <OpsStatusBadge tone={variantStatusTone(style.status)}>
+                          {getStatusLabel(style.status)}
+                        </OpsStatusBadge>
+                      </td>
+                      <td className="px-4 py-[var(--ops-row-py)] text-right">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="rounded-lg px-3"
+                          onClick={() => {
+                            handleSelectStyle(style.style_id);
+                            router.push(`/productos/variantes?style_id=${encodeURIComponent(style.style_id)}`);
+                          }}
+                        >
+                          Configurar
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </OpsDataTable>
               </OpsSectionDivider>
             ) : null}
 
@@ -1092,94 +1076,85 @@ export function VariantsPage({
                     </Tooltip>
                   </OpsFiltersRow>
 
-                  <OpsTableWrap minWidth="1080px">
-                      <table className="w-full border-collapse">
-                        <thead className="bg-[var(--ops-surface-muted)]">
-                          <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                            <th className="px-4 py-3">Variante</th>
-                            <th className="px-4 py-3">Detalle</th>
-                            <th className="px-4 py-3">SKU</th>
-                            <th className="px-4 py-3">Barcode</th>
-                            <th className="px-4 py-3">Estado</th>
-                            <th className="px-4 py-3 text-right">Acciones</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                          {paginatedVariants.length === 0 ? (
-                            <tr>
-                              <td colSpan={6} className="px-4 py-10">
-                                <OpsEmptyState variant="compact" description="No hay variantes para este filtro." />
-                              </td>
-                            </tr>
-                          ) : (
-                            paginatedVariants.map((variant) => (
-                              <tr
-                                key={variant.variant_id}
-                                className={cn(
-                                  "transition hover:bg-[var(--ops-surface-muted)]",
-                                  !variant.active && "opacity-70"
-                                )}
-                              >
-                                <td className="px-4 py-[var(--ops-row-py)]">
-                                  <div className="flex items-center gap-2">
-                                    <Boxes className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
-                                    <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                                      {variant.size_code} / {variant.color_code}
-                                    </p>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
-                                  <p>{variant.size_name}</p>
-                                  <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">
-                                    {variant.color_name}
-                                  </p>
-                                </td>
-                                <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{variant.sku}</td>
-                                <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{variant.barcode || "Pendiente"}</td>
-                                <td className="px-4 py-[var(--ops-row-py)]">
-                                  <OpsStatusBadge tone={variant.active ? "success" : "neutral"}>
-                                    {variant.active ? "Activa" : "Inactiva"}
-                                  </OpsStatusBadge>
-                                </td>
-                                <td className="px-4 py-[var(--ops-row-py)] text-right">
-                                  <AdminRowActionsMenu
-                                    ariaLabel={`Acciones para ${variant.sku}`}
-                                    items={[
-                                      {
-                                        label: variant.active ? "Inactivar" : "Activar",
-                                        icon:
-                                          togglingVariantId === variant.variant_id ? (
-                                            <LoaderCircle className="h-4 w-4 animate-spin" />
-                                          ) : (
-                                            <Power className="h-4 w-4" />
-                                          ),
-                                        tone: variant.active ? "danger" : "neutral",
-                                        disabled: togglingVariantId === variant.variant_id,
-                                        onSelect: () => setPendingStatusVariant(variant),
-                                      },
-                                    ]}
-                                  />
-                                </td>
-                              </tr>
-                            ))
-                          )}
-                        </tbody>
-                      </table>
-                  </OpsTableWrap>
-
-                  <OpsTableFooter>
-                    <span className="ops-secondary-text text-[var(--ops-text-muted)]">
-                      {filteredVariants.length === 0
-                        ? "0 resultados"
-                        : `${variantFirstVisible}-${variantLastVisible} de ${filteredVariants.length}`}
-                    </span>
-                    <Pagination
-                      page={safeVariantPage}
-                      totalPages={variantTotalPages}
-                      onPageChange={setVariantPage}
-                      className="self-end md:self-auto"
-                    />
-                  </OpsTableFooter>
+                  <OpsDataTable
+                    columns={[
+                      { key: "variante", header: "Variante" },
+                      { key: "detalle", header: "Detalle" },
+                      { key: "sku", header: "SKU" },
+                      { key: "barcode", header: "Barcode" },
+                      { key: "estado", header: "Estado" },
+                      { key: "acciones", header: "Acciones", className: "text-right" },
+                    ]}
+                    minWidth="1080px"
+                    emptyMessage="No hay variantes para este filtro."
+                    isEmpty={paginatedVariants.length === 0}
+                    footer={
+                      <>
+                        <span className="ops-secondary-text text-[var(--ops-text-muted)]">
+                          {filteredVariants.length === 0
+                            ? "0 resultados"
+                            : `${variantFirstVisible}-${variantLastVisible} de ${filteredVariants.length}`}
+                        </span>
+                        <Pagination
+                          page={safeVariantPage}
+                          totalPages={variantTotalPages}
+                          onPageChange={setVariantPage}
+                          className="self-end md:self-auto"
+                        />
+                      </>
+                    }
+                  >
+                    {paginatedVariants.map((variant) => (
+                      <tr
+                        key={variant.variant_id}
+                        className={cn(
+                          "transition hover:bg-[var(--ops-surface-muted)]",
+                          !variant.active && "opacity-70"
+                        )}
+                      >
+                        <td className="px-4 py-[var(--ops-row-py)]">
+                          <div className="flex items-center gap-2">
+                            <Boxes className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
+                            <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
+                              {variant.size_code} / {variant.color_code}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                          <p>{variant.size_name}</p>
+                          <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">
+                            {variant.color_name}
+                          </p>
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{variant.sku}</td>
+                        <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{variant.barcode || "Pendiente"}</td>
+                        <td className="px-4 py-[var(--ops-row-py)]">
+                          <OpsStatusBadge tone={variant.active ? "success" : "neutral"}>
+                            {variant.active ? "Activa" : "Inactiva"}
+                          </OpsStatusBadge>
+                        </td>
+                        <td className="px-4 py-[var(--ops-row-py)] text-right">
+                          <AdminRowActionsMenu
+                            ariaLabel={`Acciones para ${variant.sku}`}
+                            items={[
+                              {
+                                label: variant.active ? "Inactivar" : "Activar",
+                                icon:
+                                  togglingVariantId === variant.variant_id ? (
+                                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Power className="h-4 w-4" />
+                                  ),
+                                tone: variant.active ? "danger" : "neutral",
+                                disabled: togglingVariantId === variant.variant_id,
+                                onSelect: () => setPendingStatusVariant(variant),
+                              },
+                            ]}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </OpsDataTable>
                 </div>
                   </div>
                 ) : (

@@ -15,7 +15,7 @@ import {
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { InlineStatusCard } from "@/components/feedback/status-page";
-import { LoadingPage } from "@/components/feedback/status-page";
+import { OpsPageShell } from "@/components/ui/ops-page-shell";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { OpsPageShell } from "@/components/ui/ops-page-shell";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
@@ -114,12 +114,12 @@ export default function CajaPage() {
       <ErrorBoundary>
         <PermissionGuard anyPermissions={["cash.view", "cash.operate"]}>
           <OpsPageShell>
-            <InlineStatusCard
-              title="Sin sede asignada"
-              description="Tu usuario no tiene una sede default configurada. Contacta a un administrador antes de aperturar caja."
-              tone="warning"
-              variant="ops"
-            />
+              <InlineStatusCard
+                title="Sin sede asignada"
+                description="Tu usuario no tiene una sede default configurada. Contacta a un administrador antes de aperturar caja."
+                tone="warning"
+                variant="ops"
+              />
           </OpsPageShell>
         </PermissionGuard>
       </ErrorBoundary>
@@ -242,13 +242,27 @@ export default function CajaPage() {
     <ErrorBoundary>
       <PermissionGuard anyPermissions={["cash.view", "cash.operate"]}>
         <TooltipProvider delayDuration={120}>
-          <OpsPageShell>
-            <PosHeader
-              eyebrow="Caja"
-              title="Caja del día"
-              meta={cashStatusMeta}
-              actions={headerActions}
-            />
+          <OpsPageShell width="wide" className="!max-w-5xl">
+              <header className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
+                <p className="text-xs uppercase tracking-wide text-[var(--ripnel-accent-hover)]">
+                  Operaciones de caja
+                </p>
+                <h1 className="mt-1 text-2xl font-semibold text-[var(--ops-text)] md:text-3xl">
+                  Caja del día
+                </h1>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-[var(--ops-text-muted)]">
+                  <span>{defaultLocation.name}</span>
+                  {businessDate ? (
+                    <>
+                      <span className="text-[var(--ops-border-soft)]">•</span>
+                      <span className="font-medium text-[var(--ops-text)]">
+                        {formatBusinessDate(businessDate)}
+                      </span>
+                      <HelpTooltip content="La fecha operativa corresponde al día de trabajo de la sede actual en horario de Lima." />
+                    </>
+                  ) : null}
+                </div>
+              </header>
 
             {(error || actionError) ? (
               <InlineStatusCard
@@ -268,36 +282,263 @@ export default function CajaPage() {
               />
             ) : null}
 
-            {loading ? (
-              <LoadingPage
-                title="Cargando caja"
-                description="Consultando el estado de la caja actual para tu sede operativa."
-                variant="ops"
-              />
-            ) : (
-              <>
-                {cashStatusBanner}
+              {loading ? (
+                <div className="flex items-center justify-center py-16 text-[var(--ops-text-muted)]">
+                  <RefreshCw className="h-5 w-5 animate-spin" />
+                  <span className="ml-2 text-sm">Cargando caja...</span>
+                </div>
+              ) : (
+                <>
+                  <article
+                    className={`sales-panel rounded-lg p-5 shadow-sm md:p-6 ${
+                      isOpen
+                        ? "border-[var(--ops-tone-success-border)] bg-[var(--ops-tone-success-bg)]"
+                        : isClosed
+                          ? "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)]"
+                          : "border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)]"
+                    }`}
+                  >
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div className="flex items-center gap-3">
+                        {isOpen ? (
+                          <CheckCircle2 className="h-6 w-6 text-[var(--ops-tone-success-text)]" />
+                        ) : isClosed ? (
+                          <X className="h-6 w-6 text-slate-500" />
+                        ) : (
+                          <Clock3 className="h-6 w-6 text-[var(--ops-tone-warning-text)]" />
+                        )}
 
-                {summary && summaryMetricItems ? (
-                  <>
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      {summaryMetricItems.map((item) => (
-                        <OpsMetricCard
-                          key={item.key}
-                          icon={item.icon}
-                          label={item.label}
-                          value={item.value}
-                          tone={item.tone}
-                          className="px-3 py-3.5"
-                        />
-                      ))}
+                        <div>
+                          <p
+                            className={`text-lg font-semibold ${
+                              isOpen
+? "text-[var(--ops-tone-success-text)]"
+                              : isClosed
+                                  ? "text-[var(--ops-text)]"
+                                  : "text-[var(--ops-tone-warning-text)]"
+                            }`}
+                          >
+                            {isOpen
+                              ? "Caja operativa abierta"
+                              : isClosed
+                                ? "Caja operativa cerrada"
+                                : "Aún no se abrió caja"}
+                          </p>
+
+                          {isOpen && current?.closing?.opened_by_name ? (
+                            <p className="text-sm text-[var(--ops-tone-success-text)]">
+                              Aperturada por{" "}
+                              <span className="font-medium">
+                                {current.closing.opened_by_name}
+                              </span>
+                            </p>
+                          ) : null}
+
+                          {isClosed && current?.closing?.closed_by_name ? (
+                            <p className="text-sm text-[var(--ops-text-muted)]">
+                              Cerrada por{" "}
+                              <span className="font-medium">
+                                {current.closing.closed_by_name}
+                              </span>
+                            </p>
+                          ) : null}
+
+                          {hasNoClosing ? (
+                            <p className="text-sm text-[var(--ops-tone-warning-text)]">
+                              Abre caja para habilitar ventas en esta sede.
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {hasNoClosing ? (
+                          <button
+                            onClick={handleOpen}
+                            disabled={actionLoading || !canOperateCash}
+                            className="rounded-xl bg-[var(--ops-tone-success-text)] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 disabled:opacity-60"
+                          >
+                            {actionLoading ? "Abriendo..." : "Abrir caja"}
+                          </button>
+                        ) : null}
+
+                        {isOpen ? (
+                          <button
+                            onClick={() => setShowCloseConfirm(true)}
+                            disabled={actionLoading || !canOperateCash}
+                            className="rounded-xl bg-[var(--ops-text)] px-4 py-2 text-sm font-semibold text-[var(--ops-surface)] shadow-sm transition hover:opacity-90 disabled:opacity-60"
+                          >
+                            Cerrar caja
+                          </button>
+                        ) : null}
+
+                        <button
+                          onClick={refetch}
+                          disabled={loading || actionLoading}
+                          className="sales-field sales-field-interactive rounded-xl px-3 py-2 text-[var(--ops-text-muted)] disabled:opacity-60"
+                          title="Actualizar"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
 
-                    <OpsPanelMuted className="mt-4">
-                      <p className="text-xs uppercase tracking-wide text-[var(--ops-text-muted)]">
-                        Medios de pago
-                      </p>
-                      <div className="mt-3 space-y-1.5">
+                  {summary ? (
+                    <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
+                      <article className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs uppercase tracking-wide text-[var(--ops-text-muted)]">
+                                Total del día
+                              </p>
+                              <HelpTooltip content="Suma las ventas confirmadas de la sede en la fecha operativa actual." />
+                            </div>
+                            <p className="mt-2 text-4xl font-bold text-[var(--ops-text)]">
+                              {formatAmount(summary.grand_total)}
+                            </p>
+                          </div>
+
+                          <div className="sales-chip sales-chip-accent rounded-xl px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <p className="text-[11px] uppercase tracking-wide">
+                                Ventas confirmadas
+                              </p>
+                              <HelpTooltip content="Cantidad de ventas confirmadas para la sede actual en esta fecha operativa." />
+                            </div>
+                            <p className="mt-1 text-2xl font-bold">
+                              {summary.sale_count}
+                            </p>
+                          </div>
+                        </div>
+                      </article>
+
+                      <Collapsible className="sales-panel rounded-lg p-5 shadow-sm md:p-6">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs uppercase tracking-wide text-[var(--ops-text-muted)]">
+                                Pagos del sistema
+                              </p>
+                              <HelpTooltip content="Total de pagos registrados en el sistema para la fecha operativa actual." />
+                            </div>
+                            <p className="mt-1 text-2xl font-bold text-[var(--ops-text)]">
+                              {formatAmount(summary.consistency.payment_total)}
+                            </p>
+                          </div>
+
+                          <CollapsibleTrigger className="sales-field sales-field-interactive group inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[var(--ops-text)]">
+                            Ver medios de pago
+                            <ChevronDown className="h-4 w-4 transition group-data-[state=open]:rotate-180" />
+                          </CollapsibleTrigger>
+                        </div>
+
+                        <CollapsibleContent className="mt-4 space-y-2">
+                          {METHOD_CONFIG.map((method) => {
+                            const Icon = method.icon;
+                            const value = summary.by_method[method.key];
+
+                            return (
+                              <div
+                                key={method.key}
+                                className="sales-panel-muted flex items-center justify-between rounded-xl px-4 py-3"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Icon className="h-4 w-4 text-[var(--ops-text-muted)]" />
+                                  <span className="text-sm font-medium text-[var(--ops-text)]">
+                                    {method.label}
+                                  </span>
+                                </div>
+                                <span
+                                  className={`text-sm font-semibold ${method.valueClass}`}
+                                >
+                                  {formatAmount(value)}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </CollapsibleContent>
+                      </Collapsible>
+                    </div>
+                  ) : null}
+
+                  {summary ? (
+                    <article
+                      className={`sales-panel rounded-lg p-4 shadow-sm md:px-5 md:py-4 ${
+                        consistencyOk
+? "border-[var(--ops-tone-success-border)] bg-[var(--ops-tone-success-bg)]"
+                           : "border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)]"
+                      }`}
+                    >
+                      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p
+                              className={`text-xs uppercase tracking-wide ${
+                                consistencyOk
+                                  ? "text-[var(--ops-tone-success-text)]"
+                                  : "text-[var(--ops-tone-warning-text)]"
+                              }`}
+                            >
+                              {consistencyOk
+                                ? "Caja cuadra"
+                                : "Revisar diferencia"}
+                            </p>
+                            <HelpTooltip content="La diferencia compara ventas confirmadas contra pagos registrados en el sistema. No representa conteo físico." />
+                          </div>
+                        </div>
+
+                        <div className="grid gap-2 sm:grid-cols-3 md:min-w-[28rem]">
+                          <div className="sales-panel-muted rounded-xl px-4 py-3">
+                            <p className="text-[11px] uppercase tracking-wide text-[var(--ops-text-muted)]">
+                              Ventas
+                            </p>
+                            <p className="mt-1 text-lg font-semibold text-[var(--ops-text)]">
+                              {formatAmount(summary.grand_total)}
+                            </p>
+                          </div>
+                          <div className="sales-panel-muted rounded-xl px-4 py-3">
+                            <p className="text-[11px] uppercase tracking-wide text-[var(--ops-text-muted)]">
+                              Pagos
+                            </p>
+                            <p className="mt-1 text-lg font-semibold text-[var(--ops-text)]">
+                              {formatAmount(summary.consistency.payment_total)}
+                            </p>
+                          </div>
+                          <div className="sales-panel-muted rounded-xl px-4 py-3">
+                            <p className="text-[11px] uppercase tracking-wide text-[var(--ops-text-muted)]">
+                              Diferencia
+                            </p>
+                            <p
+                              className={`mt-1 text-lg font-semibold ${
+                                consistencyOk
+                                  ? "text-[var(--ops-tone-success-text)]"
+                                  : "text-[var(--ops-tone-warning-text)]"
+                              }`}
+                            >
+                              {formatAmount(summary.consistency.difference)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  ) : null}
+                </>
+              )}
+
+              {showCloseConfirm && canOperateCash ? (
+                <div className="ops-overlay-backdrop fixed inset-0 z-50 flex items-center justify-center px-4">
+                  <div className="ops-overlay-panel w-full max-w-md rounded-2xl p-6">
+                    <h2 className="text-lg font-semibold text-[var(--ops-text)]">
+                      Confirmar cierre de caja
+                    </h2>
+                    <p className="mt-1 text-sm text-[var(--ops-text-muted)]">
+                      Se consolidarán los pagos registrados y ventas confirmadas
+                      de la fecha operativa actual para esta sede.
+                    </p>
+
+                    {summary ? (
+                      <div className="sales-panel-muted mt-4 space-y-1 rounded-xl p-4">
                         {METHOD_CONFIG.map((method) => (
                             <OpsMetricRow
                               key={method.key}
@@ -383,8 +624,7 @@ export default function CajaPage() {
                     className="sales-field w-full rounded-lg px-3 py-2 text-sm outline-none transition focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_72%,transparent)]"
                   />
                 </div>
-              </div>
-            </OpsDialog>
+              ) : null}
           </OpsPageShell>
         </TooltipProvider>
       </PermissionGuard>

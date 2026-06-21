@@ -21,11 +21,6 @@ import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
 import { OpsPageShell } from "@/components/ui/ops-page-shell";
-import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
-import { OpsPanel, OpsPanelMuted } from "@/components/ui/ops-panel";
-import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
-import { OpsMetricRow } from "@/components/ui/ops-metric-row";
-import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
 import {
   CashClosingDetail,
@@ -104,9 +99,11 @@ export default function CashHistoryDetailPage({
   return (
     <PermissionGuard anyPermissions={["cash.view", "cash.operate"]}>
       <TooltipProvider delayDuration={120}>
-        <OpsPageShell width="wide">
-          <Button variant="outline" size="sm" className="rounded-lg gap-2" asChild>
-            <Link href="/caja/historial">
+        <OpsPageShell width="wide" className="space-y-5">
+            <Link
+              href="/caja/historial"
+              className="sales-field sales-field-interactive inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--ops-text)] shadow-sm"
+            >
               <ArrowLeft className="h-4 w-4" />
               Volver al historial
             </Link>
@@ -223,8 +220,7 @@ export default function CashHistoryDetailPage({
                   tone={closing.sales_summary.consistency.is_consistent ? undefined : "warning"}
                 />
               </div>
-            </OpsPanel>
-          </div>
+            </article>
         </OpsPageShell>
       </TooltipProvider>
     </PermissionGuard>

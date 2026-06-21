@@ -23,6 +23,7 @@ import {
   InlineStatusCard,
   ProtectedLoadingPage,
 } from "@/components/feedback/status-page"
+import { AdminConfirmModal } from "@/components/admin/admin-ui"
 import { Button } from "@/components/ui/button"
 import { OpsDialog } from "@/components/ui/ops-dialog"
 import { OpsFormField } from "@/components/ui/ops-form-field"
@@ -365,17 +366,9 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
     }
   }
 
-  function initiateCancel(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-
+  async function handleCancelConfirm() {
     if (!saleId) return
     if (!cancelReason.trim()) return
-
-    setCancelConfirmOpen(true)
-  }
-
-  async function executeCancellation() {
-    if (!saleId) return
 
     setActionError(null)
     setActionSuccess(null)
@@ -394,6 +387,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
       setActionSuccess("La venta quedó anulada y la trazabilidad interna fue registrada.")
       setCancelReason("")
       setCancelNotes("")
+      setCancelConfirmOpen(false)
     } catch (submitError) {
       setActionError(formatApiFetchError(submitError, "La operación no se pudo completar."))
     } finally {
@@ -887,7 +881,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
               ) : null}
 
               {has("sales.postsale.cancel") ? (
-                <form onSubmit={initiateCancel} className={sectionClass}>
+                <div className={sectionClass}>
                   <div className="mb-4 flex items-center gap-2">
                     <Undo2 className="h-4 w-4 text-[var(--ops-text-muted)]" />
                     <h2 className="text-lg font-semibold text-[var(--ops-text)]">Anulación total</h2>
@@ -920,11 +914,12 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                       </OpsFormField>
 
                       <Button
-                        type="submit"
+                        type="button"
                         variant="accent"
                         size="lg"
                         className="rounded-lg px-4"
                         disabled={cancelSubmitting || !cancelReason.trim()}
+                        onClick={() => setCancelConfirmOpen(true)}
                       >
                         <Undo2 className="h-4 w-4" />
                         {cancelSubmitting ? "Anulando venta..." : "Anular venta"}
@@ -935,7 +930,18 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                       {context.availability.cancel.reasons.join(" ")}
                     </p>
                   )}
-                </form>
+
+                  <AdminConfirmModal
+                    open={cancelConfirmOpen}
+                    title="Anular venta"
+                    description="¿Confirmas que deseas anular esta venta? Esta acción es irreversible."
+                    confirmLabel="Sí, anular venta"
+                    confirmTone="danger"
+                    busy={cancelSubmitting}
+                    onCancel={() => setCancelConfirmOpen(false)}
+                    onConfirm={() => void handleCancelConfirm()}
+                  />
+                </div>
               ) : null}
 
               {context.sale.notes ? (

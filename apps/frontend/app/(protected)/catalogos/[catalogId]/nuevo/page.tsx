@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { CatalogFormPage } from "@/components/modules/catalogs/catalog-form-page";
 import { catalogPageBySlug, getCatalogRoute } from "@/lib/product-master-metadata";
 
@@ -15,12 +16,14 @@ export default async function NewCatalogItemPage({
   }
 
   return (
-    <CatalogFormPage
-      catalogLabel={page.label}
-      catalogRoute={getCatalogRoute(page.slug)}
-      endpoint={page.endpoint}
-      fields={page.fields}
-      duplicateStrategy={page.duplicateStrategy}
-    />
+    <PermissionGuard permission="catalogs.manage">
+      <CatalogFormPage
+        catalogLabel={page.label}
+        catalogRoute={getCatalogRoute(page.slug)}
+        endpoint={page.endpoint}
+        fields={page.fields}
+        duplicateStrategy={page.duplicateStrategy}
+      />
+    </PermissionGuard>
   );
 }

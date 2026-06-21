@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import { MapPin, PencilLine, Plus, Power, RefreshCw, RotateCcw } from "lucide-react";
 import { apiFetchData } from "@/lib/api";
+import { showSuccess } from "@/lib/toast";
 import { useApiGet } from "@/hooks/use-api-get";
 import { activeBadgeLabel } from "@/lib/badge-utils";
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
@@ -22,7 +23,8 @@ import {
   AdminRowActionsMenu,
   AdminSection,
 } from "@/components/admin/admin-ui";
-import { OpsSelect } from "@/components/ui/ops-selection";
+import { OpsMultiSelectMenu, OpsSelectionChip, OpsSelectMenu } from "@/components/ui/ops-selection";
+import { FilterDropdown } from "@/components/ui/filter-dropdown";
 import { OpsEmptyState } from "@/components/ui/ops-empty-state";
 import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import {
@@ -107,6 +109,16 @@ export default function UsuariosPage() {
   );
   const availableLocations = (locationsData || []).filter((location) => location.active);
 
+  const locationOptions = useMemo(
+    () =>
+      availableLocations.map((location) => ({
+        value: location.location_id,
+        label: location.name,
+        helper: [location.type, location.address].filter(Boolean).join(" · "),
+      })),
+    [availableLocations]
+  );
+
   const [userQuery, setUserQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
@@ -123,6 +135,26 @@ export default function UsuariosPage() {
   const [defaultLocationId, setDefaultLocationId] = useState<string | null>(null);
   const [loadingUserLocations, setLoadingUserLocations] = useState(false);
   const [savingUserLocations, setSavingUserLocations] = useState(false);
+
+  const selectedUserFormLocationOptions = useMemo(
+    () => locationOptions.filter((loc) => userForm.location_ids.includes(loc.value)),
+    [locationOptions, userForm.location_ids]
+  );
+
+  const defaultUserFormLocationOptions = useMemo(
+    () => selectedUserFormLocationOptions.map((loc) => ({ value: loc.value, label: loc.label })),
+    [selectedUserFormLocationOptions]
+  );
+
+  const selectedModalLocationOptions = useMemo(
+    () => locationOptions.filter((loc) => selectedLocationIds.includes(loc.value)),
+    [locationOptions, selectedLocationIds]
+  );
+
+  const defaultModalLocationOptions = useMemo(
+    () => selectedModalLocationOptions.map((loc) => ({ value: loc.value, label: loc.label })),
+    [selectedModalLocationOptions]
+  );
   const [userLocationsError, setUserLocationsError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -242,9 +274,9 @@ export default function UsuariosPage() {
         });
 
         if (createdUser.temporary_password) {
-          // TODO: Replace with toast notification in Phase 3
-          window.alert(
-            `Usuario creado.\nUsuario: ${createdUser.username}\nClave temporal: ${createdUser.temporary_password}\n\nEntrega esta clave al usuario para su primer ingreso.`
+          showSuccess(
+            "Usuario creado",
+            `Usuario: ${createdUser.username} — Clave temporal: ${createdUser.temporary_password}`
           );
         }
       }
@@ -673,54 +705,59 @@ export default function UsuariosPage() {
                           No hay sedes activas disponibles.
                         </div>
                       ) : (
-                        <div className="max-h-56 divide-y divide-[var(--ops-border-strong)] overflow-y-auto rounded-xl border border-[var(--ops-border-strong)]">
-                          {availableLocations.map((location) => {
-                            const checked = userForm.location_ids.includes(location.location_id);
-                            const isDefault = userForm.default_location_id === location.location_id;
+                        <div className="space-y-4">
+                          <AdminField label="Sedes asignadas">
+                            <div className="space-y-3">
+                              <OpsMultiSelectMenu
+                                selectedValues={userForm.location_ids}
+                                onToggle={toggleUserFormLocation}
+                                placeholder="Seleccionar sedes"
+                                options={locationOptions}
+                              />
 
-                            return (
-                              <div
-                                key={location.location_id}
-                                className="flex flex-col gap-2 px-3 py-3 md:flex-row md:items-center md:justify-between"
-                              >
-                                <label className="flex cursor-pointer items-start gap-3">
-                                  <input
-                                    type="checkbox"
-                                    checked={checked}
-                                    onChange={() => toggleUserFormLocation(location.location_id)}
-                                    className="mt-1 h-4 w-4 rounded border-[var(--ops-border-strong)]"
-                                  />
-                                  <span>
-                                    <span className="block text-sm font-medium text-[var(--ops-text)]">
-                                      {location.name}
-                                    </span>
-                                    <span className="block text-xs text-[var(--ops-text-muted)]">
-                                      {location.type}
-                                      {location.address ? ` - ${location.address}` : ""}
-                                    </span>
-                                  </span>
-                                </label>
+                              {selectedUserFormLocationOptions.length ? (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {selectedUserFormLocationOptions.map((loc) => (
+                                    <OpsSelectionChip
+                                      key={loc.value}
+                                      label={loc.label}
+                                      onRemove={() => toggleUserFormLocation(loc.value)}
+                                    />
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-[var(--ops-text-muted)]">
+                                  Selecciona al menos una sede para continuar.
+                                </p>
+                              )}
+                            </div>
+                          </AdminField>
 
-                                <label
-                                  className={`inline-flex cursor-pointer items-center gap-2 text-sm ${
-                                    checked ? "text-[var(--ops-text)]" : "text-[var(--ops-text-muted)]"
-                                  }`}
-                                >
-                                  <input
-                                    type="radio"
-                                    name="new-user-default-location"
-                                    checked={isDefault}
-                                    disabled={!checked}
-                                    onChange={() =>
-                                      chooseUserFormDefaultLocation(location.location_id)
-                                    }
-                                    className="h-4 w-4 border-[var(--ops-border-strong)] disabled:cursor-not-allowed"
-                                  />
-                                  Por defecto
-                                </label>
-                              </div>
-                            );
-                          })}
+                          <AdminField label="Sede por defecto">
+                            <div className="space-y-3">
+                              <OpsSelectMenu
+                                value={userForm.default_location_id}
+                                onValueChange={chooseUserFormDefaultLocation}
+                                placeholder={
+                                  selectedUserFormLocationOptions.length
+                                    ? "Seleccionar sede por defecto"
+                                    : "Selecciona una sede primero"
+                                }
+                                options={defaultUserFormLocationOptions}
+                                disabled={!selectedUserFormLocationOptions.length}
+                              />
+
+                              {userForm.default_location_id ? (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {defaultUserFormLocationOptions
+                                    .filter((loc) => loc.value === userForm.default_location_id)
+                                    .map((loc) => (
+                                      <OpsSelectionChip key={loc.value} label={loc.label} selected />
+                                    ))}
+                                </div>
+                              ) : null}
+                            </div>
+                          </AdminField>
                         </div>
                       )}
                     </AdminSection>
@@ -775,7 +812,7 @@ export default function UsuariosPage() {
                   </div>
                 )}
 
-                <div className="mt-6 overflow-hidden rounded-2xl border border-[var(--ops-border-strong)]">
+                <div className="mt-6 space-y-4">
                   {loadingUserLocations || loadingLocations ? (
                     <div className="px-4 py-6 text-sm text-[var(--ops-text-muted)]">Cargando sedes...</div>
                   ) : availableLocations.length === 0 ? (
@@ -783,51 +820,60 @@ export default function UsuariosPage() {
                       No hay sedes activas disponibles.
                     </div>
                   ) : (
-                    <div className="divide-y divide-[var(--ops-border-strong)]">
-                      {availableLocations.map((location) => {
-                        const checked = selectedLocationIds.includes(location.location_id);
-                        const isDefault = defaultLocationId === location.location_id;
+                    <>
+                      <AdminField label="Sedes asignadas">
+                        <div className="space-y-3">
+                          <OpsMultiSelectMenu
+                            selectedValues={selectedLocationIds}
+                            onToggle={toggleLocation}
+                            placeholder="Seleccionar sedes"
+                            options={locationOptions}
+                          />
 
-                        return (
-                          <div
-                            key={location.location_id}
-                            className="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between"
-                          >
-                            <label className="flex items-start gap-3">
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => toggleLocation(location.location_id)}
-                                className="mt-1 h-4 w-4 rounded border-[var(--ops-border-strong)]"
-                              />
-                              <span>
-                                <span className="block font-medium text-[var(--ops-text)]">
-                                  {location.name}
-                                </span>
-                                <span className="block text-sm text-[var(--ops-text-muted)]">
-                                  {location.type}
-                                  {location.address ? ` - ${location.address}` : ""}
-                                </span>
-                              </span>
-                            </label>
+                          {selectedModalLocationOptions.length ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              {selectedModalLocationOptions.map((loc) => (
+                                <OpsSelectionChip
+                                  key={loc.value}
+                                  label={loc.label}
+                                  onRemove={() => toggleLocation(loc.value)}
+                                />
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-[var(--ops-text-muted)]">
+                              Selecciona al menos una sede para continuar.
+                            </p>
+                          )}
+                        </div>
+                      </AdminField>
 
-                            <label
-                              className={`inline-flex items-center gap-2 text-sm ${checked ? "text-[var(--ops-text)]" : "text-[var(--ops-text-muted)]"}`}
-                            >
-                              <input
-                                type="radio"
-                                name="default-location"
-                                checked={isDefault}
-                                disabled={!checked}
-                                onChange={() => setDefaultLocationId(location.location_id)}
-                                className="h-4 w-4 border-[var(--ops-border-strong)]"
-                              />
-                              Sede por defecto
-                            </label>
-                          </div>
-                        );
-                      })}
-                    </div>
+                      <AdminField label="Sede por defecto">
+                        <div className="space-y-3">
+                          <OpsSelectMenu
+                            value={defaultLocationId ?? ""}
+                            onValueChange={(value) => setDefaultLocationId(value || null)}
+                            placeholder={
+                              selectedModalLocationOptions.length
+                                ? "Seleccionar sede por defecto"
+                                : "Selecciona una sede primero"
+                            }
+                            options={defaultModalLocationOptions}
+                            disabled={!selectedModalLocationOptions.length}
+                          />
+
+                          {defaultLocationId ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              {defaultModalLocationOptions
+                                .filter((loc) => loc.value === defaultLocationId)
+                                .map((loc) => (
+                                  <OpsSelectionChip key={loc.value} label={loc.label} selected />
+                                ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      </AdminField>
+                    </>
                   )}
                 </div>
             </AdminModalShell>

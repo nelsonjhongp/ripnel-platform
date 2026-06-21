@@ -1,3 +1,4 @@
+/** @deprecated Legacy route — redirects to /precios/crear. Remove after Q3 2026. */
 import { redirect } from "next/navigation";
 import { appRoutes } from "@/lib/routes";
 

@@ -1,4 +1,5 @@
 const express = require('express');
+const { requireAuth, requirePermission } = require('../../middlewares/auth');
 const {
   getLocations,
   postLocation,
@@ -6,6 +7,9 @@ const {
 } = require('./locations.controller');
 
 const router = express.Router();
+
+router.use(requireAuth);
+router.use(requirePermission('admin.manage'));
 
 router.get('/', getLocations);
 router.post('/', postLocation);
