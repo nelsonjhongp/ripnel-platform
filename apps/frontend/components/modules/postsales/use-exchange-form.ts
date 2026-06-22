@@ -33,12 +33,12 @@ export function useExchangeForm(saleId: string | null, refetch: () => void) {
     event.preventDefault()
 
     if (!saleId || !selectedSaleDetailId || !selectedReplacementVariantId) {
-      setError(PS.detail.exchangeBlockedMsg)
+      setError(PS.detail.alerts.exchangeBlockedMsg)
       return
     }
 
     if (!reason.trim()) {
-      setReasonError(PS.detail.reasonValidation)
+      setReasonError(PS.detail.alerts.reasonValidation)
       return
     }
 
@@ -58,10 +58,10 @@ export function useExchangeForm(saleId: string | null, refetch: () => void) {
       })
 
       refetch()
-      setSuccess(PS.detail.exchangeSuccess)
+      setSuccess(PS.detail.alerts.exchangeSuccess)
       resetForm()
     } catch (submitError) {
-      setError(explainApiError(submitError, PS.detail.operationFallback))
+      setError(explainApiError(submitError, PS.detail.alerts.operationFallback))
     } finally {
       setSubmitting(false)
     }
