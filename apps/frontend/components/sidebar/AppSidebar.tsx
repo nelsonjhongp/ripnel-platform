@@ -94,6 +94,7 @@ function SidebarLink({
       <SidebarMenuButton
         asChild
         isActive={active}
+        tooltip={label}
         className="relative h-10 gap-2.5 rounded-none px-3 text-sm font-medium transition-all duration-150 ease-out cursor-pointer data-[active=true]:font-semibold data-[active=true]:text-sidebar-primary data-[active=true]:bg-sidebar-accent data-[active=true]:shadow-[inset_3px_0_0_var(--sidebar-primary)]"
       >
         <Link href={href}>
@@ -193,7 +194,7 @@ function SidebarSubmenu({
 
   return (
     <div
-      className="relative overflow-visible"
+      className="relative overflow-visible group-data-[collapsible=icon]:hidden"
       style={
         {
           "--submenu-gutter-width": SUBMENU_GUTTER_WIDTH,
@@ -292,6 +293,7 @@ function SidebarGroupSection({
             <SidebarMenuItem>
               <CollapsibleTrigger asChild>
                 <SidebarMenuButton
+                  tooltip={title}
                   className={[
                     "h-10 gap-2.5 rounded-none px-3 text-sm font-medium transition-all duration-150 ease-out cursor-pointer",
                     sectionIsActive
@@ -331,7 +333,7 @@ function SidebarGroupSection({
 
 function SidebarSectionLabel({ label }: { label: string }) {
   return (
-    <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/45 select-none">
+    <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/45 select-none group-data-[collapsible=icon]:hidden">
       {label}
     </p>
   );
@@ -590,6 +592,7 @@ export function AppSidebar({
                 onClick={handleLogout}
                 className="h-10 gap-2.5 rounded-none px-3 text-sm font-medium text-sidebar-foreground/60 transition-all duration-150 ease-out cursor-pointer hover:bg-red-500/10 hover:text-red-500"
               >
+                <LogOut className="h-4 w-4" />
                 <span className="group-data-[collapsible=icon]:hidden">Cerrar sesión</span>
               </SidebarMenuButton>
             </SidebarMenuItem>

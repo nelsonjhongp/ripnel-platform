@@ -6,7 +6,7 @@ type StatusTone = "neutral" | "warning" | "danger";
 type StatusVariant = "default" | "ops";
 
 const panelClasses: Record<StatusVariant, string> = {
-  default: "border-slate-200 bg-white text-slate-900",
+  default: "border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900",
   ops: "border-[var(--ops-border-strong)] bg-[var(--ops-surface)] text-[var(--ops-text)]",
 };
 
