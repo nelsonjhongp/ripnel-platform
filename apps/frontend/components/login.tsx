@@ -75,15 +75,14 @@ export default function LoginRipnel() {
     <AuthShell footer="Creaciones Ripnel - Sistema ERP">
       <AuthCard
         logo={
-          <Image
-            src="/ripnel-logo.svg"
-            alt="Ripnel"
-            width={56}
-            height={56}
-            className="object-contain"
-            style={{ width: "auto", height: "auto" }}
-            priority
-          />
+            <Image
+              src="/ripnel-logo.svg"
+              alt="Ripnel"
+              width={48}
+              height={44}
+              className="object-contain"
+              priority
+            />
         }
         title="Inicio de sesión"
         subtitle="Accede al sistema de gestión operativa"

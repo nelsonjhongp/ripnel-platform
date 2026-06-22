@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { OpsDialog } from "@/components/ui/ops-dialog"
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import { formatMoney } from "@/lib/format-utils"
+import { INFO_BOX_XL } from "@/components/ui/ops-control-styles"
 
 type SaleReviewItem = {
   id: string
@@ -118,7 +119,7 @@ export function SaleReviewDialog({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2.5">
+        <div className={INFO_BOX_XL}>
           <SectionTitle icon={<UserRound className="h-4 w-4" />} title="Cliente" />
           <div className="mt-2">
             <p className="text-sm font-medium text-[var(--ops-text)]">{customerLabel}</p>
@@ -127,7 +128,7 @@ export function SaleReviewDialog({
             ) : null}
           </div>
         </div>
-        <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2.5">
+        <div className={INFO_BOX_XL}>
           <SectionTitle icon={<Receipt className="h-4 w-4" />} title="Comprobante" />
           <div className="mt-2">
             <p className="text-sm font-medium text-[var(--ops-text)]">{documentLabel}</p>
@@ -138,7 +139,7 @@ export function SaleReviewDialog({
         </div>
       </div>
 
-      <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2.5">
+      <div className={INFO_BOX_XL}>
         <SectionTitle icon={<ShoppingBasket className="h-4 w-4" />} title="Productos" />
         <div className="mt-2 space-y-1.5">
           {items.map((item) => (
@@ -157,7 +158,7 @@ export function SaleReviewDialog({
         </div>
       </div>
 
-      <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2.5">
+      <div className={INFO_BOX_XL}>
         <div className="flex items-start justify-between gap-3">
           <SectionTitle icon={<CreditCard className="h-4 w-4" />} title="Cobro" />
           <OpsStatusBadge tone="neutral" size="sm">
@@ -187,7 +188,7 @@ export function SaleReviewDialog({
         </div>
       </div>
 
-      <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2.5">
+      <div className={INFO_BOX_XL}>
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
           Totales
         </p>

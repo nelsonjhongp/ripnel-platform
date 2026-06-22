@@ -38,7 +38,7 @@ import {
   formatBusinessDate,
 } from "@/lib/cash";
 import { showSuccess, showError } from "@/lib/toast";
-import { explainApiError } from "@/components/modules/sales/pos/pos-utils";
+import { explainApiError } from "@/lib/error-utils";
 
 import { HelpTooltip } from "@/components/ui/help-tooltip";
 

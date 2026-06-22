@@ -10,7 +10,7 @@ import { PresetTextField } from "@/components/ui/preset-text-field"
 import { formatMoney, parseAmountInput, computeSaleDiscountAmount, round2 } from "../pos-utils"
 import { ADJUSTMENT_REASON_PRESETS } from "../pos-types"
 import type { SaleDiscountState, SalePreview } from "../pos-types"
-import { INPUT_CLASS } from "../pos-constants"
+import { INPUT_CLASS, SURFACE_MUTED_BG } from "../pos-constants"
 
 export function DiscountDialog({
   open,
@@ -202,7 +202,7 @@ export function DiscountDialog({
       </OpsFormField>
 
       {estimatedAmount > 0 ? (
-        <div className="rounded-lg border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-3 py-2 text-sm">
+        <div className={`rounded-lg border border-[var(--ops-border-strong)] ${SURFACE_MUTED_BG} px-3 py-2 text-sm`}>
           <div className="flex items-center justify-between gap-3">
             <span className="text-[var(--ops-text-muted)]">Descuento estimado</span>
             <span className="font-semibold text-[var(--ops-text)]">
