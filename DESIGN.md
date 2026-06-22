@@ -165,8 +165,41 @@ Reusable CSS class constants for info panels. Source of truth: `components/ui/op
 | `INFO_BOX_MUTED` | Same but `bg-[var(--ops-surface-muted)]` | Secondary info panels, cash context boxes |
 | `INFO_BOX_XL` | `rounded-xl` variant of `INFO_BOX` | Dialog sections, summary shortcuts |
 | `SURFACE_MUTED_BG` | Semitransparent muted background | Section backgrounds, discount estimates |
+| `ACCENT_HIGHLIGHT_PANEL` | `rounded-lg`, border accent 24%, bg accent-soft 78% | Total panels, key metric highlights |
+| `ACCENT_LABEL_TEXT` | Text color accent 78% over `ops-text` | Labels inside `ACCENT_HIGHLIGHT_PANEL` |
 
 Do not duplicate these as inline Tailwind strings. Import from `ops-control-styles.ts`.
+
+### Panel section component
+
+`OpsPanelSection` is the canonical component for titled info panels. It wraps `INFO_BOX` with standard section padding (`--ops-panel-padding`), an integrated title with optional icon, and an optional aside action. Source: `components/ui/ops-panel-section.tsx`.
+
+```tsx
+import { OpsPanelSection } from "@/components/ui/ops-panel-section"
+
+<OpsPanelSection title="Totales" icon={<ReceiptText />} aside={<Button />}>
+  <OpsMetricRow label="Subtotal" value={...} />
+</OpsPanelSection>
+
+<OpsPanelSection title="Anulacion" tone="danger">
+  <p>...</p>
+</OpsPanelSection>
+```
+
+| Prop | Type | Default | Use |
+|------|------|---------|-----|
+| `title` | `string` | required | Section heading (h2) |
+| `icon` | `ReactNode` | — | Icon left of title, uses `text-[var(--ripnel-accent)]` |
+| `aside` | `ReactNode` | — | Action pinned to the right of the title row |
+| `tone` | `"default" \| "danger"` | `"default"` | Semantic tone for the panel border/background |
+| `className` | `string` | — | Additional classes on the `<article>` |
+
+Rules:
+- The title and icon live **inside** the panel border, not outside.
+- Icon color uses `text-[var(--ripnel-accent)]` or `text-[var(--ripnel-accent-hover)]` for accent context.
+- `tone="danger"` swaps border to `--ops-tone-danger-border` and background to `--ops-tone-danger-bg`.
+- Panels stack vertically with `space-y-4` or `space-y-5` between them.
+- Do not recreate `SectionCard` locally in module pages.
 
 ### Dialog footer pattern
 
@@ -206,6 +239,7 @@ footer={
 | Full-page status | `StatusPage` wrappers | Hand-made 403/404/500 pages | `LoadingPage`, `ForbiddenPage`, `ErrorPage`, etc. | Do not create `OpsStatusPage` unless the existing base stops fitting |
 | Sales wizard | `SalesWizardRail` | Progress UI inside `PosHeader` | `SalesWizardRail` | Keep sales-specific until there is real usage outside POS |
 | CRUD form shell | `AdminFormPageShell` | Hand-made CRUD page layouts | `AdminFormPageShell` | Valid wrapper built from `OpsPageShell` + `PosHeader` |
+| Titled section panel | `OpsPanelSection` | Hand-made `<section>`+`<h2>`+`<article>` triplets | `OpsPanelSection` | Title, icon, and aside inside the panel border. Do not recreate `SectionCard` locally |
 
 ### Buttons
 
