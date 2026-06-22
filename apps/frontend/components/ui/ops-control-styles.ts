@@ -43,3 +43,11 @@ export const ACCENT_HIGHLIGHT_PANEL =
 /** Color de texto acento para labels dentro de paneles destacados */
 export const ACCENT_LABEL_TEXT =
   "text-[color:color-mix(in_srgb,var(--ripnel-accent)_78%,var(--ops-text))]"
+
+/** Tarjeta seleccionable en estado activo — borde y fondo acento */
+export const SELECTED_CARD =
+  "border-[color:color-mix(in_srgb,var(--ripnel-accent)_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_82%,var(--ops-surface))]"
+
+/** Tarjeta seleccionable en estado por defecto */
+export const CARD_BASE =
+  "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] hover:bg-[var(--ops-surface)]"
