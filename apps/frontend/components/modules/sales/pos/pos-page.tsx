@@ -34,7 +34,8 @@ import { CustomerDialog } from "./pos-dialogs/customer-dialog";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-import { INPUT_CLASS } from "./pos-constants";
+import { INPUT_CLASS, INFO_BOX_MUTED } from "./pos-constants";
+import { POS } from "./pos-messages";
 import { buildCashLabel, getPaymentMethodLabel } from "./pos-utils";
 import { usePosSale } from "./use-pos-sale";
 
@@ -165,9 +166,9 @@ export default function NuevaVentaPage() {
   const documentReviewLabel =
     activeDocumentOption?.label || "Comprobante pendiente"
   const documentReviewDetail =
-    selectedCustomerDocument || "Sin documento"
+    selectedCustomerDocument || POS.customer.noDocument
   const paymentReviewModeLabel =
-    paymentMode === "mixed" ? "Pago mixto" : "Pago único"
+    paymentMode === "mixed" ? POS.payment.mixed : POS.payment.single
   const paymentReviewItems =
     paymentMode === "mixed"
       ? mixedPaymentsPreview?.payments.map((payment, index) => ({
@@ -198,8 +199,8 @@ export default function NuevaVentaPage() {
         <TooltipProvider delayDuration={120}>
             <OpsPageShell width="wide" className="max-w-[1380px] space-y-4">
                 <PosHeader
-                  eyebrow="Punto de venta"
-                  title="Nueva venta"
+                  eyebrow={POS.header.eyebrow}
+                  title={POS.header.title}
                   meta={
                     <>
                       <OpsStatusBadge
@@ -208,8 +209,8 @@ export default function NuevaVentaPage() {
                         icon={<MapPin className="text-[var(--ripnel-accent)]" />}
                       >
                         {locationsLoading
-                          ? "Cargando sede…"
-                          : defaultLocation?.name || "Sin sede asignada"}
+                          ? POS.cash.loadingLocation
+                          : defaultLocation?.name || POS.cash.noLocation}
                       </OpsStatusBadge>
                       <OpsStatusBadge
                         tone={
@@ -229,9 +230,9 @@ export default function NuevaVentaPage() {
                         }
                       >
                         {posContextLoading
-                          ? "Validando caja"
+                          ? POS.cash.validating
                           : cashReady
-                            ? "Caja abierta"
+                            ? POS.cash.open
                             : buildCashLabel(cashStatus)}
                       </OpsStatusBadge>
                     </>
@@ -245,7 +246,7 @@ export default function NuevaVentaPage() {
                         onClick={() => setClearSaleDialogOpen(true)}
                         className="rounded-lg"
                       >
-                        Limpiar venta
+                        {POS.summary.clearButton}
                       </Button>
                     ) : null
                   }
@@ -253,8 +254,8 @@ export default function NuevaVentaPage() {
 
                 {!defaultLocation?.location_id && !locationsLoading ? (
                   <InlineStatusCard
-                    title="No hay sede operativa activa"
-                    description="Debes tener una sede default asignada para registrar ventas. Configurala desde tu cuenta o solicita apoyo al administrador."
+                    title={POS.cash.noLocationActive}
+                    description={POS.cash.noLocationDesc}
                     tone="warning"
                     variant="ops"
                     icon={<MapPin className="h-5 w-5" />}
@@ -272,7 +273,7 @@ export default function NuevaVentaPage() {
                           Venta confirmada: {confirmedSale.sale_number}
                         </p>
                         <p className="text-xs text-[var(--ops-text-muted)]">
-                          La venta ya está cerrada. Puedes reabrir el resumen o iniciar otra venta.
+                          {POS.summary.confirmedBanner}
                         </p>
                       </div>
                     </div>
@@ -285,7 +286,7 @@ export default function NuevaVentaPage() {
                         onClick={() => setSaleConfirmationOpen(true)}
                         className="rounded-lg"
                       >
-                        Reabrir resumen
+                        {POS.summary.reopenButton}
                       </Button>
                       <Button
                         type="button"
@@ -294,7 +295,7 @@ export default function NuevaVentaPage() {
                         onClick={startNextSale}
                         className="rounded-lg"
                       >
-                        Nueva venta
+                        {POS.summary.newSaleButton}
                       </Button>
                     </div>
                   </div>
@@ -302,7 +303,7 @@ export default function NuevaVentaPage() {
 
                 {posContextError ? (
                   <InlineStatusCard
-                    title="No pudimos validar el contexto de venta"
+                    title={POS.error.contextTitle}
                     description={posContextError}
                     tone="warning"
                     variant="ops"
@@ -315,9 +316,9 @@ export default function NuevaVentaPage() {
                       <OpsActionBanner
                         icon={CircleAlert}
                         tone="warning"
-                        title="Aún no se abrió caja"
+                        title={POS.cash.missing}
                         description={posContext.cash?.message || "Abre caja para habilitar ventas en esta sede."}
-                        actionLabel="Abrir caja"
+                        actionLabel={POS.cash.openTitle}
                         actionTone="accent"
                         onAction={() => setCashOpenDialogOpen(true)}
                         loading={openingCash}
@@ -326,7 +327,7 @@ export default function NuevaVentaPage() {
                       <OpsActionBanner
                         icon={CircleAlert}
                         tone="warning"
-                        title="Aún no se abrió caja"
+                        title={POS.cash.missing}
                         description="Coordina con caja o con un administrador para habilitar la venta."
                       />
                     )
@@ -334,7 +335,7 @@ export default function NuevaVentaPage() {
                     <OpsActionBanner
                       icon={Clock3}
                       tone="danger"
-                      title="Caja cerrada"
+                      title={POS.cash.closed}
                       description={posContext.cash?.message || "La caja operativa de hoy ya fue cerrada para esta sede."}
                       {...(canReopenCash
                         ? {
@@ -540,8 +541,8 @@ export default function NuevaVentaPage() {
         <OpsDialog
           open={clearSaleDialogOpen}
           onOpenChange={setClearSaleDialogOpen}
-          title="Limpiar venta actual"
-          description="Se quitarán productos, cliente, comprobante, cobro y descuento no confirmados."
+          title={POS.summary.clearTitle}
+          description={POS.summary.clearDesc}
           size="sm"
           bodyClassName="space-y-3"
           footer={
@@ -553,7 +554,7 @@ export default function NuevaVentaPage() {
                 className="rounded-lg px-4"
                 onClick={() => setClearSaleDialogOpen(false)}
               >
-                Cancelar
+                {POS.summary.cancel}
               </Button>
               <Button
                 type="button"
@@ -566,21 +567,21 @@ export default function NuevaVentaPage() {
                   productSearchInputRef.current?.focus()
                 }}
               >
-                Limpiar venta
+                {POS.summary.clearButton}
               </Button>
             </div>
           }
         >
           <p className="text-sm text-[var(--ops-text-muted)]">
-            Úsalo cuando quieras reiniciar la venta sin cerrar el flujo actual.
+            {POS.summary.clearHint}
           </p>
         </OpsDialog>
 
         <OpsDialog
           open={cashOpenDialogOpen}
           onOpenChange={setCashOpenDialogOpen}
-          title="Abrir caja"
-          description={defaultLocation?.name ? `Iniciar sesión de caja en ${defaultLocation.name}` : undefined}
+          title={POS.cash.openTitle}
+          description={defaultLocation?.name ? `Iniciar sesion de caja en ${defaultLocation.name}` : undefined}
           size="sm"
           bodyClassName="space-y-4"
           footer={
@@ -595,7 +596,7 @@ export default function NuevaVentaPage() {
           }
         >
           <div className="space-y-4">
-            <div className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-3 py-2.5">
+            <div className={INFO_BOX_MUTED}>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-xs text-[var(--ops-text-muted)]">Sede</span>
                 <span className="text-sm font-medium text-[var(--ops-text)]">{defaultLocation?.name || "—"}</span>
@@ -616,8 +617,8 @@ export default function NuevaVentaPage() {
         <OpsDialog
           open={reopenCashDialogOpen}
           onOpenChange={setReopenCashDialogOpen}
-          title="Reabrir caja"
-          description={defaultLocation?.name ? `Reabrir la sesión de caja cerrada en ${defaultLocation.name}` : undefined}
+          title={POS.cash.reopenTitle}
+          description={defaultLocation?.name ? `Reabrir la sesion de caja cerrada en ${defaultLocation.name}` : undefined}
           size="sm"
           bodyClassName="space-y-4"
           footer={
@@ -632,7 +633,7 @@ export default function NuevaVentaPage() {
           }
         >
           <div className="space-y-4">
-            <div className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-3 py-2.5">
+            <div className={INFO_BOX_MUTED}>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-xs text-[var(--ops-text-muted)]">Sede</span>
                 <span className="text-sm font-medium text-[var(--ops-text)]">{defaultLocation?.name || "—"}</span>

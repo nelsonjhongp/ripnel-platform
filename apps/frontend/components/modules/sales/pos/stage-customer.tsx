@@ -13,6 +13,8 @@ import { StageSection } from "./stage-section"
 import { renderDocumentIcon } from "./pos-icons"
 import type { CustomerStageProps } from "./pos-stage-props"
 import { DOC_TYPES } from "./pos-types"
+import { INFO_BOX } from "./pos-constants"
+import { POS } from "./pos-messages"
 import {
   buildCustomerDisplayName,
   buildCustomerDocument,
@@ -52,7 +54,7 @@ export function CustomerStage(props: CustomerStageProps) {
     if (selectedCustomer && !customerPickerOpen && !customerQuery) {
       return selectedCustomerName
     }
-    return "Buscar por nombre, documento o código"
+    return POS.customer.searchPlaceholder
   }, [selectedCustomer, customerPickerOpen, customerQuery, selectedCustomerName])
 
   const documentOptions = useMemo<OpsOption[]>(
@@ -78,7 +80,7 @@ export function CustomerStage(props: CustomerStageProps) {
     >
       <OpsStepSectionHeading
         step={2}
-        title="Cliente y comprobante"
+        title={POS.stage.customer}
         meta={
           <Button
             type="button"
@@ -88,7 +90,7 @@ export function CustomerStage(props: CustomerStageProps) {
             className="rounded-lg px-4"
           >
             <UserPlus className="h-4 w-4" />
-            Crear cliente
+            {POS.customer.createButton}
           </Button>
         }
       />
@@ -112,7 +114,7 @@ export function CustomerStage(props: CustomerStageProps) {
               loadingMessage="Buscando clientes…"
               emptyMessage={
                 customerResults.length === 0 && customerQuery.trim()
-                  ? "No encontramos coincidencias. Puedes crear el cliente y seguir con la venta."
+                  ? POS.customer.noMatchMessage
                   : ""
               }
               maxVisibleItems={6}
@@ -176,9 +178,9 @@ export function CustomerStage(props: CustomerStageProps) {
         </div>
 
         {!selectedCustomer ? (
-          <OpsHint>Asigna un cliente o crealo con el boton antes de continuar.</OpsHint>
+          <OpsHint>{POS.customer.assignHint}</OpsHint>
         ) : (
-          <div className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2.5">
+          <div className={INFO_BOX}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
@@ -196,7 +198,7 @@ export function CustomerStage(props: CustomerStageProps) {
                   size="icon-xs"
                   onClick={() => openCustomerDialog("edit")}
                   className="rounded-lg text-[var(--ops-text-muted)] hover:text-[var(--ops-text)]"
-                  aria-label="Editar cliente"
+                  aria-label={POS.customer.editAria}
                 >
                   <PencilLine className="h-3.5 w-3.5" />
                 </Button>

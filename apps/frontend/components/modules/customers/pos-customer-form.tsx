@@ -3,9 +3,8 @@
 import { OpsFormField } from "@/components/ui/ops-form-field"
 import { OpsSelect, type OpsOption } from "@/components/ui/ops-selection"
 import { OpsSegmentedControl } from "@/components/ui/ops-segmented-control"
+import { opsInputCompact } from "@/components/ui/ops-control-styles"
 import type { CustomerFormErrors, CustomerFormState } from "@/components/modules/sales/pos/pos-types"
-
-const INPUT_CLASS = "sales-field h-9 w-full rounded-lg px-3 py-2 text-sm"
 
 export const POS_CUSTOMER_DOCUMENT_OPTIONS: OpsOption[] = [
   { value: "dni", label: "DNI" },
@@ -143,7 +142,7 @@ export function PosCustomerForm({
                 value={form.document_number}
                 onChange={(event) => updateDocumentNumber(event.target.value)}
                 maxLength={11}
-                className={INPUT_CLASS}
+                className={opsInputCompact}
               />
             </div>
           </OpsFormField>
@@ -154,7 +153,7 @@ export function PosCustomerForm({
               autoComplete="organization"
               value={form.business_name}
               onChange={(event) => patch({ business_name: event.target.value })}
-              className={INPUT_CLASS}
+              className={opsInputCompact}
             />
           </OpsFormField>
           <OpsFormField label="Direccion fiscal" required error={errors?.address} density="compact">
@@ -164,7 +163,7 @@ export function PosCustomerForm({
               autoComplete="street-address"
               value={form.address}
               onChange={(event) => patch({ address: event.target.value })}
-              className={INPUT_CLASS}
+              className={opsInputCompact}
             />
           </OpsFormField>
           <OpsFormField label="Nombre comercial" density="compact">
@@ -174,7 +173,7 @@ export function PosCustomerForm({
               autoComplete="off"
               value={form.commercial_name}
               onChange={(event) => patch({ commercial_name: event.target.value })}
-              className={INPUT_CLASS}
+              className={opsInputCompact}
             />
           </OpsFormField>
         </div>
@@ -213,7 +212,7 @@ export function PosCustomerForm({
                 disabled={form.document_type === "none"}
                 maxLength={documentMaxLength || 15}
                 placeholder={form.document_type === "none" ? "Sin documento" : "Numero"}
-                className={INPUT_CLASS}
+                className={opsInputCompact}
               />
             </div>
           </OpsFormField>
@@ -224,7 +223,7 @@ export function PosCustomerForm({
               autoComplete="name"
               value={form.full_name}
               onChange={(event) => patch({ full_name: event.target.value })}
-              className={INPUT_CLASS}
+              className={opsInputCompact}
             />
           </OpsFormField>
         </div>
@@ -239,7 +238,7 @@ export function PosCustomerForm({
             autoComplete="tel"
             value={form.phone}
             onChange={(event) => patch({ phone: event.target.value })}
-            className={INPUT_CLASS}
+            className={opsInputCompact}
           />
         </OpsFormField>
         <OpsFormField label="Email" density="compact">
@@ -251,7 +250,7 @@ export function PosCustomerForm({
             spellCheck={false}
             value={form.email}
             onChange={(event) => patch({ email: event.target.value })}
-            className={INPUT_CLASS}
+            className={opsInputCompact}
           />
         </OpsFormField>
       </div>

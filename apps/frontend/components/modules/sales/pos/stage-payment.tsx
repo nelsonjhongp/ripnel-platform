@@ -12,6 +12,7 @@ import { formatMoney } from "@/lib/format-utils"
 
 import { renderPaymentMethodIcon } from "./pos-icons"
 import { StageSection } from "./stage-section"
+import { POS } from "./pos-messages"
 import type { PaymentStageProps } from "./pos-stage-props"
 import { PAYMENT_METHODS } from "./pos-types"
 import { getPaymentReferenceMeta, parseAmountInput } from "./pos-utils"
@@ -107,8 +108,8 @@ export function PaymentStage(props: PaymentStageProps) {
     (hasMixedInvalidAmount || hasMixedInvalidMethod || hasMixedOverflow)
   const discountLabel =
     totals.saleDiscountAmount > 0
-      ? `S/. ${formatMoney(totals.saleDiscountAmount)} aplicado`
-      : "Sin descuento"
+      ? `S/. ${formatMoney(totals.saleDiscountAmount)} ${POS.payment.applied}`
+      : POS.payment.noDiscount
 
   useEffect(() => {
     if (paymentMode === "mixed" && paymentSectionRef?.current) {
@@ -125,9 +126,9 @@ export function PaymentStage(props: PaymentStageProps) {
       >
         <OpsStepSectionHeading
           step={3}
-          title="Cobro"
+          title={POS.stage.payment}
         />
-        <OpsHint>Se activará al agregar productos a la venta.</OpsHint>
+        <OpsHint>{POS.payment.inactiveHint}</OpsHint>
       </StageSection>
     )
   }
@@ -141,12 +142,12 @@ export function PaymentStage(props: PaymentStageProps) {
     >
       <OpsStepSectionHeading
         step={3}
-        title="Cobro"
+        title={POS.stage.payment}
         meta={
           <OpsSegmentedControl
             options={[
-              { value: "single" as const, label: "Pago único" },
-              { value: "mixed" as const, label: "Pago mixto" },
+              { value: "single" as const, label: POS.payment.single },
+              { value: "mixed" as const, label: POS.payment.mixed },
             ]}
             value={paymentMode}
             onChange={(mode) => setPaymentModeWithDefaults(mode as "single" | "mixed")}
@@ -161,9 +162,9 @@ export function PaymentStage(props: PaymentStageProps) {
         {paymentMode === "single" ? (
           <>
             <div className="hidden gap-2 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Método</span>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Total</span>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Referencia</span>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">{POS.payment.method}</span>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">{POS.payment.total}</span>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">{POS.payment.reference}</span>
             </div>
             <SinglePaymentLine
               method={paymentMethod}
@@ -176,9 +177,9 @@ export function PaymentStage(props: PaymentStageProps) {
         ) : (
           <div className="space-y-3">
             <div className="hidden gap-2 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Método</span>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Monto</span>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">Referencia</span>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">{POS.payment.method}</span>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">{POS.payment.amount}</span>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">{POS.payment.reference}</span>
               <span aria-hidden="true" />
             </div>
             {mixedPayments.map((payment) => (
@@ -217,14 +218,14 @@ export function PaymentStage(props: PaymentStageProps) {
               className="w-full rounded-lg border-dashed"
             >
               <Plus className="h-3.5 w-3.5" />
-              Agregar método de pago
+              {POS.payment.addMethod}
             </Button>
           </div>
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--ops-border-strong)] pt-3">
           <div>
-            <p className="text-sm font-semibold text-[var(--ops-text)]">Descuento</p>
+            <p className="text-sm font-semibold text-[var(--ops-text)]">{POS.payment.discount}</p>
             <p className="text-xs text-[var(--ops-text-muted)]">{discountLabel}</p>
           </div>
           <Button
@@ -234,21 +235,21 @@ export function PaymentStage(props: PaymentStageProps) {
             onClick={openDiscountModal}
             className="rounded-lg"
           >
-            {totals.saleDiscountAmount > 0 ? "Editar" : "Aplicar"}
+            {totals.saleDiscountAmount > 0 ? POS.payment.editButton : POS.payment.applyButton}
           </Button>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--ops-border-strong)] pt-3 text-xs">
           <span className="text-[var(--ops-text-muted)]">
-            Asignado: S/. {formatMoney(paymentMode === "mixed" ? assignedAmount : totals.total)}
+            {POS.payment.assigned}: S/. {formatMoney(paymentMode === "mixed" ? assignedAmount : totals.total)}
           </span>
           <span className="text-[var(--ops-text-muted)]">
             {paymentMode === "mixed" && Math.abs(pendingAmount) > PAYMENT_TOLERANCE
-              ? `Falta: S/. ${formatMoney(Math.max(pendingAmount, 0))}`
-              : "Completo"}
+              ? `${POS.payment.missing}: S/. ${formatMoney(Math.max(pendingAmount, 0))}`
+              : POS.payment.complete}
           </span>
           <span className="font-semibold text-[var(--ops-text)]">
-            Total: S/. {formatMoney(totals.total)}
+            {POS.payment.total}: S/. {formatMoney(totals.total)}
           </span>
         </div>
       </div>
@@ -273,12 +274,12 @@ function SinglePaymentLine({
   return (
     <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] sm:items-center">
       <div className="space-y-1">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)] sm:hidden">Método</span>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)] sm:hidden">{POS.payment.method}</span>
         <OpsSelect
           className="h-9 rounded-lg px-2.5"
           value={method}
           onValueChange={onMethodChange}
-          placeholder="Selecciona"
+          placeholder={POS.payment.selectMethod}
           options={PAYMENT_OPTIONS}
           triggerContent={(option) => (
             <span className="flex min-w-0 items-center gap-2">
@@ -291,14 +292,14 @@ function SinglePaymentLine({
         />
       </div>
       <div className="space-y-1">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)] sm:hidden">Total</span>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)] sm:hidden">{POS.payment.total}</span>
         <div className={`${INPUT_CLASS} flex items-center justify-end gap-1 font-semibold text-[var(--ops-text)]`}>
           <span className="text-[var(--ops-text-muted)]">S/.</span>
           {formatMoney(total)}
         </div>
       </div>
       <div className="space-y-1">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)] sm:hidden">Referencia</span>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)] sm:hidden">{POS.payment.reference}</span>
         <input
           type="text"
           autoComplete="off"
@@ -337,7 +338,7 @@ function PaymentLine({
     <div className="grid gap-2 rounded-lg border border-[color:color-mix(in_srgb,var(--ops-border-strong)_72%,transparent)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_28%,var(--ops-surface))] p-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0">
       <div className="space-y-1">
         <div className="flex items-center justify-between gap-2 sm:block">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)] sm:hidden">Método</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)] sm:hidden">{POS.payment.method}</span>
           <span className="inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--ops-text-muted)] sm:hidden">
             Pago
           </span>
@@ -346,7 +347,7 @@ function PaymentLine({
           className="h-9 rounded-lg px-2.5"
           value={method}
           onValueChange={onMethodChange}
-          placeholder="Selecciona"
+          placeholder={POS.payment.selectMethod}
           options={PAYMENT_OPTIONS}
           triggerContent={(option) => (
             <span className="flex min-w-0 items-center gap-2">
@@ -359,7 +360,7 @@ function PaymentLine({
         />
       </div>
       <div className="space-y-1">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)] sm:hidden">Monto</span>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)] sm:hidden">{POS.payment.amount}</span>
         <div className={`${INPUT_CLASS} flex items-center gap-1 text-right`}>
           <span className="text-[var(--ops-text-muted)] shrink-0">S/.</span>
           <input
@@ -375,7 +376,7 @@ function PaymentLine({
         </div>
       </div>
       <div className="space-y-1">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)] sm:hidden">Referencia</span>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)] sm:hidden">{POS.payment.reference}</span>
         <input
           type="text"
           autoComplete="off"

@@ -48,9 +48,10 @@ import { OpsSelect, type OpsOption } from "@/components/ui/ops-selection";
 import { Pagination } from "@/components/ui/pagination";
 import { Button } from "@/components/ui/button";
 import { OpsDialog } from "@/components/ui/ops-dialog";
-import { OpsFormField } from "@/components/ui/ops-form-field";
+import { OpsFormField } from "@/components/ui/ops-form-field"
+import { opsInputCompact } from "@/components/ui/ops-control-styles";
 import { AdminActionButton } from "@/components/admin/admin-ui";
-import { ApiError, apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import {
   CashAdminSessionsResponse,
   CashAdminSummaryResponse,
@@ -61,7 +62,7 @@ import {
 import { formatDateTime } from "@/lib/date-utils";
 
 import { CashStatusBadge } from "./cash-status-badge";
-import { explainApiError } from "@/components/modules/sales/pos/pos-utils";
+import { explainApiError } from "@/lib/error-utils";
 import { showError } from "@/lib/toast";
 
 const PAGE_SIZE = 20;
@@ -686,7 +687,7 @@ export default function CashControlPage() {
             value={reopenNotes}
             onChange={(event) => setReopenNotes(event.target.value)}
             placeholder="Ej. Error en cierre, venta pendiente de registrar..."
-            className="sales-field h-9 w-full rounded-lg px-3 py-2 text-sm"
+            className={opsInputCompact}
           />
         </OpsFormField>
         <p className="text-sm text-[var(--ops-text-muted)]">
