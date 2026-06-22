@@ -480,15 +480,14 @@ export function AppSidebar({
       >
         <SidebarHeader className="border-b border-sidebar-border px-3 pb-3 pt-4">
           <Link href={appRoutes.home} className="flex items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full ring-1 ring-sidebar-border">
-              <Image
-                src="/ripnel-logo.svg"
-                alt="Ripnel"
-                width={40}
-                height={40}
-                className="h-10 w-10 object-cover"
-                style={{ width: "auto", height: "auto" }}
-              />
+              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full ring-1 ring-sidebar-border">
+                <Image
+                  src="/ripnel-logo.svg"
+                  alt="Ripnel"
+                  width={36}
+                  height={33}
+                  className="object-contain"
+                />
             </div>
             <div className="min-w-0 group-data-[collapsible=icon]:hidden">
               <p className="truncate text-base font-semibold leading-5 text-sidebar-foreground">
