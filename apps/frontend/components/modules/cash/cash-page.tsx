@@ -143,7 +143,7 @@ export default function CajaPage() {
     <div className="flex flex-wrap items-center gap-2">
       {isOpen ? (
         <Button variant="outline" size="sm" className="rounded-lg gap-2" asChild>
-          <Link href="/ventas">Ir a venta</Link>
+          <Link href="/ventas/nueva">Ir a venta</Link>
         </Button>
       ) : null}
       <Button variant="outline" size="sm" className="rounded-lg gap-2" asChild>

@@ -102,17 +102,17 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/purchase-system",
-        destination: "/ventas",
+        destination: "/ventas/nueva",
         permanent: false,
       },
       {
         source: "/purchase-system/checkout",
-        destination: "/ventas",
+        destination: "/ventas/nueva",
         permanent: false,
       },
       {
         source: "/purchase-system/checkout-payment",
-        destination: "/ventas",
+        destination: "/ventas/nueva",
         permanent: false,
       },
       {
@@ -123,6 +123,11 @@ const nextConfig: NextConfig = {
       {
         source: "/transaction-history",
         destination: "/ventas/historial",
+        permanent: false,
+      },
+      {
+        source: "/ventas",
+        destination: "/ventas/nueva",
         permanent: false,
       },
       {

@@ -219,7 +219,7 @@ function buildHero({
       tone: "default",
       cta: {
         label: "Nueva venta",
-        href: "/ventas",
+        href: "/ventas/nueva",
       },
     };
   }
@@ -247,7 +247,7 @@ function buildQuickActions({
     actions.push({
       key: "new-sale",
       label: "Nueva venta",
-      href: "/ventas",
+      href: "/ventas/nueva",
       description: "Registrar una venta desde la sede activa.",
       tone: "primary",
     });
