@@ -111,8 +111,10 @@ All reusable CSS class constants live in `components/ui/ops-control-styles.ts`. 
 | `INFO_BOX_MUTED` | Muted info panel |
 | `INFO_BOX_XL` | Rounded-xl panel variant |
 | `SURFACE_MUTED_BG` | Semitransparent muted background |
+| `SELECTED_CARD` | Active state for selectable cards (accent border + bg) |
+| `CARD_BASE` | Default state for selectable cards |
 
-Module-specific constants can re-export from `ops-control-styles.ts` (see `pos-constants.ts`).
+Module-specific constants can re-export from `ops-control-styles.ts` (see `pos-constants.ts`, `postsales-constants.ts`).
 
 ### Inputs
 
@@ -271,6 +273,22 @@ Reference: `__tests__/pos-utils.test.ts` — 71 tests covering pricing, validati
 
 - `GET /health`
 
+### Frontend route summary (provisional)
+
+| Modulo | Ruta | API base |
+|---|---|---|
+| Inicio | `/inicio` | `GET /api/home/overview` |
+| Dashboard | `/panel` | `GET /api/dashboard/*` |
+| POS | `/ventas/nueva` | `GET/POST /api/sales/*` |
+| Historial ventas | `/ventas/historial` | `GET /api/sales` |
+| Detalle venta | `/ventas/[saleId]` | `GET /api/sales/[saleId]` |
+| Postventa | `/postventa` | `GET/POST/PATCH /api/postsales/*` |
+| Detalle postventa | `/postventa/[saleId]` | `GET /api/postsales/[saleId]` |
+| Caja | `/caja` | `GET/POST/PATCH /api/cash/*` |
+| Redirecciones legacy | `/purchase-system`, `/transaction-history`, etc. | → rutas nuevas via `next.config.ts` |
+
+> **Nota provisional:** Las rutas anteriores (`/ventas`, `/purchase-system`, `/transaction-history`) redirigen a las nuevas via rewrite en `next.config.ts`. Eliminar los redirects cuando los bookmarks y accesos directos esten migrados.
+
 Current mounted route groups in backend:
 
 - `GET /health`
@@ -308,9 +326,10 @@ Current mounted route groups in backend:
 - Inventory
 - Kardex
 - Transferencias
-- Ventas (`purchase-system`): full POS flow with customer picker, variant search, mixed payments, discounts, document types, cash validation
-- Historial de ventas (`transaction-history`): sales list with real backend integration
-- Postventa: exchanges and cancellations
+- Ventas (POS): `/ventas/nueva` — full POS flow with customer picker, variant search, mixed payments, discounts, document types, cash validation
+- Historial de ventas: `/ventas/historial` — sales list with real backend integration
+- Detalle de venta: `/ventas/[saleId]` — sale detail with receipt PDF, payments, totals
+- Postventa: `/postventa` — exchanges and cancellations (en revision: dialogs extraidos a componentes propios, pendiente consolidar UI final)
 - Caja: cash register open, close, history, and admin control
 - BI: business intelligence with native charts
 - Account: user security, appearance, and operation settings
