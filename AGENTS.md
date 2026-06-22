@@ -93,7 +93,170 @@ When designing or reviewing UI, ensure alignment with:
 - For account, preferences, and settings pages, prefer narrower content widths and continuous section stacks over dashboard-like grids of unrelated cards.
 - Interactive controls such as `select`, segmented options, and icon actions must show clear affordance through cursor, hover, and focus states.
 
-## Backend conventions
+## Frontend component patterns (proven)
+
+These patterns have been validated in production across multiple modules (POS, cash, postsales, admin, transfers). New modules should follow them.
+
+### UI constants — single source of truth
+
+All reusable CSS class constants live in `components/ui/ops-control-styles.ts`. Do not duplicate these as inline strings in component files.
+
+| Constant | Usage |
+|---|---|
+| `opsControlClassName` | Default input styling |
+| `opsInputCompact` | Compact input (`h-9`) for dense forms |
+| `opsSelectTriggerClassName` | Select/dropdown trigger |
+| `opsFieldLabelClassName` | Uppercase field label |
+| `INFO_BOX` | Standard info panel (`rounded-lg`, surface bg, compact padding) |
+| `INFO_BOX_MUTED` | Muted info panel |
+| `INFO_BOX_XL` | Rounded-xl panel variant |
+| `SURFACE_MUTED_BG` | Semitransparent muted background |
+
+Module-specific constants can re-export from `ops-control-styles.ts` (see `pos-constants.ts`).
+
+### Inputs
+
+- Forms: use `opsInputCompact` for compact fields, `opsControlClassName` for default height
+- Always wrap raw inputs in `OpsFormField` for label, required asterisk, and error display
+- Never use raw `<select>` — use `OpsSelect` with `OpsOption[]`
+- For search/autocomplete: use `SearchablePicker` with `density="compact"` in operational views
+
+### Dialogs
+
+- Use `OpsDialog` for all modals
+- Footer pattern: `flex flex-col-reverse gap-2 sm:flex-row sm:justify-end`
+- Cancel button: `Button variant="outline"` on the left
+- Confirm button: `Button variant="accent"` on the right
+- Destructive actions: `Button variant="destructive"` on the right
+
+### Buttons
+
+- Primary actions: `variant="accent"`
+- Secondary/cancel: `variant="outline"`
+- Icon-only: `variant="ghost" size="icon-xs"`
+- Binary toggles: use `OpsSegmentedControl` with `variant="switch" tone="accent"`, not two separate buttons
+
+### Dropdowns and toggles
+
+- `OpsSelect` for dropdown selections — never raw `<select>`
+- `OpsSegmentedControl` with `variant="switch" tone="accent"` for binary toggles
+- `SearchablePicker` for typeahead search (products, customers)
+
+### Hooks
+
+Compose complex state with focused sub-hooks + an orchestrator:
+
+```
+useModulePage()
+  ├─ useSubDomainA()
+  ├─ useSubDomainB()
+  └─ useSubDomainC()
+```
+
+The orchestrator handles cross-cutting derived state (e.g., `totals` computed from cart + documentType + pricing) and cross-cutting actions (e.g., `confirmSale`). Sub-hooks own their state, effects, and simple actions.
+
+Reference: `use-pos-sale.ts` (orchestrator) + `use-cart.ts`, `use-cash-context.ts`, `use-customer-search.ts`, `use-payment-state.ts`, `use-product-search.ts`.
+
+### Messages
+
+Centralize UI strings in `<module>-messages.ts` under namespaced keys:
+
+```ts
+export const MODULE = {
+  section: { title: "...", hint: "..." },
+  error: { saveError: "...", fieldError: "..." },
+} as const
+```
+
+Reference: `pos-messages.ts` with namespaces `POS.header`, `POS.stage`, `POS.cash`, etc.
+
+### Error utilities
+
+`explainApiError` is in `lib/error-utils.ts`. Use it to convert API errors (403, 409, 400, 401) to user-facing messages. Do not duplicate error-to-message logic per module.
+
+## Validation patterns
+
+These patterns ensure consistent error feedback across all forms and dialogs.
+
+### Required fields
+
+- Use `required` prop on `OpsFormField` — renders a red asterisk (`*`) after the label
+- Asterisk color: `text-[var(--ops-tone-danger-text)]`
+
+### Error display
+
+`OpsFormField` handles three visual channels simultaneously when `error` is set:
+1. **Label turns red** — `text-[var(--ops-tone-danger-text)]`
+2. **Input gets red border** — via `data-field-error="true"` + CSS rule in `globals.css`
+3. **Error message below** — `<p role="alert" class="text-[11px] font-medium text-[var(--ops-tone-danger-text)]">`
+
+`OpsSelect` also supports an `error` prop for red border on the trigger button.
+
+### Error clearing
+
+Errors must clear when the user starts editing the field:
+```tsx
+onChange={(value) => {
+  setField(value)
+  setFieldError(null)  // clear on every keystroke
+}}
+```
+
+In dialogs, reset all errors when the dialog opens (`useEffect` on `open`).
+
+### Validation flow
+
+Validate on submit, one error at a time via sequential early return:
+```tsx
+function apply() {
+  if (!value.trim()) { setValueError("..."); return }
+  if (!reason.trim()) { setReasonError("..."); return }
+  // proceed
+}
+```
+
+### Loading states
+
+Use `LoaderCircle` from `lucide-react` with `animate-spin`:
+```tsx
+{loading ? (
+  <span className="inline-flex items-center gap-2">
+    <LoaderCircle className="h-4 w-4 animate-spin" />
+    Guardando...
+  </span>
+) : "Guardar"}
+```
+Button should be `disabled` while loading.
+
+## Testing
+
+Framework: Playwright (`@playwright/test` v1.60+).
+
+Setup: `apps/frontend/playwright.config.ts` — unit tests in `__tests__/`, match `*.test.ts`.
+
+Commands:
+```
+npm run test         # npx playwright test
+npm run test:watch   # npx playwright test --watch
+```
+
+Pattern for unit tests on pure utilities:
+```ts
+import { test, expect } from "@playwright/test"
+import { myFunction } from "../path/to/module"
+
+test.describe("myFunction", () => {
+  test("handles normal input", () => {
+    expect(myFunction(validInput)).toBe(expectedOutput)
+  })
+
+  test("handles edge case", () => {
+    expect(myFunction(null)).toBeNull()
+  })
+})
+```
+
+Reference: `__tests__/pos-utils.test.ts` — 71 tests covering pricing, validation, search, summary derivation.
 
 - `src/config`: env and config
 - `src/middlewares`: express middleware

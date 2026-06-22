@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactNode } from "react"
-import { AlertTriangle, CheckCircle2, EllipsisVertical, Info, X } from "lucide-react"
+import { AlertTriangle, CheckCircle2, EllipsisVertical, Info } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { OpsDialogPanel } from "@/components/ui/ops-dialog"
 import { Input } from "@/components/ui/input"
-import { opsControlClassName } from "@/components/ui/ops-control-styles"
+import { opsControlClassName, INFO_BOX } from "@/components/ui/ops-control-styles"
 import { cn } from "@/lib/utils"
 
 const adminControlClass = `${opsControlClassName} focus:border-[var(--ripnel-accent)] focus:ring-2 focus:ring-[var(--ripnel-accent-soft)]`
@@ -39,7 +39,7 @@ export function AdminInlineMessage({
   return (
     <div
       role={tone === "danger" ? "alert" : "status"}
-      className="flex items-start gap-2.5 rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2.5 text-sm text-[var(--ops-text-muted)] shadow-sm"
+      className={`${INFO_BOX} flex items-start gap-2.5 text-sm text-[var(--ops-text-muted)] shadow-sm`}
     >
       {resolvedIcon ? (
         <span className={cn("mt-0.5 shrink-0", toneClass)}>{resolvedIcon}</span>

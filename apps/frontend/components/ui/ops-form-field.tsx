@@ -82,6 +82,11 @@ export function OpsFormField({
   )
 }
 
+/**
+ * Utility: agrega clases de error a un input custom cuando el wrapper
+ * OpsFormField tiene el atributo data-field-error="true".
+ * Usar en wrappers de input propios que necesiten responder al estado de error.
+ */
 export function opsFormFieldErrorInputClass(baseClass: string): string {
   return cn(
     baseClass,
