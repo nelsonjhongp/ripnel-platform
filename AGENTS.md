@@ -337,6 +337,103 @@ For sales, the current MVP direction is:
 - a confirmed sale should impact `sales`, `sales_details`, `sales_payments` and `stock_movements`;
 - history and sale detail are follow-up work after the base registration flow is stable.
 
+## Detail page patterns (proven)
+
+These patterns were validated on `sale-detail-page.tsx` (`ventas/[saleId]`) and `postsale-detail-page.tsx` (`postventa/[saleId]`). New detail pages must follow them.
+
+### Visual composition
+
+```
+OpsPageShell (width="wide")
+  PosHeader (eyebrow + title + meta + actions)
+  Info panel (INFO_BOX_XL + ACCENT_HIGHLIGHT_PANEL for total)
+  Grid: main (OpsPanelSection) + sidebar (OpsPanelSection × N)
+  ReceiptOptionsModal (conditional)
+```
+
+### PosHeader rules
+
+- **Badge goes in `meta`, never inside `title`/`h1`.** `title` is a clean string or simple `ReactNode`. Status badge, location chip, and similar metadata use the `meta` prop.
+- `actions` include back button, preview/download buttons, dropdown overflow. Back button must be inside `actions`, not a separate div above `PosHeader`.
+
+### OpsPanelSection: title inside the border
+
+All three sections (Products, Totals, Payments) must use `OpsPanelSection` — title and icon live **inside** the panel border, not as a raw `<h2>` outside. Never recreate `<section>+<h2>+<article>` locally.
+
+### Table inside a rounded panel
+
+When a full-width table lives inside `OpsPanelSection` (which has `rounded-xl`), use the proven pattern from `stage-products.tsx`:
+
+```tsx
+<OpsPanelSection title="Productos" icon={<Package />}>
+  <div className={`-mx-[var(--ops-panel-padding)] overflow-hidden rounded-b-xl ${hasContent ? "-mb-[var(--ops-panel-padding)]" : ""}`}>
+    <div className="overflow-x-auto">
+      <table>...</table>
+    </div>
+  </div>
+</OpsPanelSection>
+```
+
+`overflow-hidden` + `rounded-b-xl` clips the table's white background to the panel's rounded bottom corners. Without this, the table background bleeds over the rounded border.
+
+### Document-type routing for PDFs
+
+```ts
+const isProforma = sale.document_type === "proforma"
+const isInvoice = sale.document_type === "boleta" || sale.document_type === "factura"
+
+// boleta/factura → /api/sales/{id}/pdf + ReceiptOptionsModal
+// proforma       → /api/sales/{id}/proforma-pdf  (no download modal)
+// none           → hide PDF buttons entirely
+```
+
+### Modal standards (all detail pages)
+
+- Every modal must use the canonical footer from DESIGN.md: `flex flex-col-reverse gap-2 sm:flex-row sm:justify-end` with `Button variant="outline"` for close/cancel.
+- Modal strings must live in a module-specific messages file (e.g. `receipt-messages.ts`), never hardcoded as string literals.
+- `OpsStatusBadge` icon must use the `icon` prop, not be passed as a child.
+
+### Conditional metrics
+
+Rows like IGV and discount must be hidden when their value is 0 — same guard pattern:
+```tsx
+{discountAmount > 0 ? <OpsMetricRow label={...} value={...} tone="warning" /> : null}
+{Number(tax_amount) !== 0 ? <OpsMetricRow label={...} value={...} /> : null}
+```
+
+### Message organization (detail pages)
+
+```ts
+// sales-history-messages.ts
+export const SH = {
+  detail: { eyebrow, loading, error, back, preview, download, totalHeader,
+            products, totals, payments, subtotal, discount, tax, ... },
+  table: { columns: { sale, variant, quantity, unitPrice, lineTotal, ... } },
+}
+
+// receipt-messages.ts
+export const RC = {
+  dialog: { title, description, close, footerNote },
+  options: { ticket80, ticket58, pdfTicket, pdfA4 },
+  preview: { label, description },
+  badge: { comingSoon },
+}
+```
+
+- `SH.table.columns` must define every column header used in detail tables.
+- `SH.detail` must define every fallback string (e.g. `fallbackSize: "ST"`, `fallbackColor: "Unico"`, `fallbackDash: "-"`, `unknownStatus: "Desconocido"`).
+- Zero hardcoded user-facing strings in component files.
+
+### Anti-patterns (do NOT do)
+
+- Badge inside `<h1>` / `PosHeader.title`
+- `color-mix()` inline in component files — extract to `ops-control-styles.ts`
+- `<section>+<h2>+<article>` — use `OpsPanelSection`
+- `<p>` as modal footer — use canonical `outline` + `accent` buttons
+- IGV row always visible (even when 0)
+- PDF preview button always pointing to `/api/sales/{id}/pdf` regardless of document type
+- Modal strings hardcoded as literals
+
 ## Environment
 
 Backend:
