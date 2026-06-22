@@ -1,14 +1,11 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import {
   CheckCircle2,
   CircleAlert,
-  Eye,
-  ReceiptText,
   RotateCcw,
-  Wallet,
   XCircle,
 } from "lucide-react"
 
@@ -30,50 +27,23 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { apiFetch } from "@/lib/api"
-import { explainApiError } from "@/lib/error-utils"
+import { formatDateTime } from "@/lib/date-utils"
+import { formatCurrency } from "@/lib/format-utils"
+import { useApiGet } from "@/hooks/use-api-get"
+import { useDebounce } from "@/hooks/use-debounce"
 import { usePagination } from "@/hooks/use-pagination"
 import { appRoutes, buildSaleDetailRoute } from "@/lib/routes"
 import type { EligibleSale } from "@/types/postsales"
 import { PS } from "./postsales-messages"
-import { PS_TABLE_COLUMNS } from "./postsales-constants"
+import {
+  PS_TABLE_COLUMNS,
+  STATUS_OPTIONS,
+  STATUS_TONES,
+  STATUS_LABELS,
+  PAGE_SIZE,
+} from "./postsales-constants"
 
-const STATUS_OPTIONS = [
-  { value: "all", label: "Todas" },
-  { value: "confirmed", label: "Confirmadas" },
-  { value: "cancelled", label: "Anuladas" },
-  { value: "draft", label: "Borradores" },
-] as const
-
-const STATUS_TONES: Record<string, "success" | "danger" | "warning" | "neutral"> = {
-  confirmed: "success",
-  cancelled: "danger",
-  draft: "warning",
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  confirmed: "Confirmada",
-  cancelled: "Anulada",
-  draft: "Borrador",
-}
-
-const CASH_TONES: Record<string, "success" | "danger" | "warning" | "neutral"> = {
-  open: "success",
-  closed: "danger",
-  missing: "warning",
-}
-
-const CASH_LABELS: Record<string, string> = {
-  open: "Caja abierta",
-  closed: "Caja cerrada",
-  missing: "Sin caja",
-}
-
-function formatDateLabel(value: string | null, fallback: string) {
-  return new Date(value || fallback).toLocaleString("es-PE", {
-    dateStyle: "short",
-    timeStyle: "short",
-  })
-}
+const todayStr = new Date().toISOString().slice(0, 10)
 
 function SaleActions({
   saleId,
@@ -84,25 +54,12 @@ function SaleActions({
 }) {
   return (
     <div className="flex items-center justify-end gap-1.5">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button asChild variant="outline" size="icon-sm" className="rounded-lg" aria-label={PS.actions.viewDetail}>
-            <Link href={`/postventa/${saleId}`}>
-              <Eye className="h-4 w-4" />
-            </Link>
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="top" sideOffset={8}>
-          {PS.actions.viewDetail}
-        </TooltipContent>
-      </Tooltip>
-
       {canOpenSale ? (
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button asChild variant="outline" size="icon-sm" className="rounded-lg" aria-label={PS.actions.viewSale}>
-              <Link href={buildSaleDetailRoute(saleId)}>
-                <ReceiptText className="h-4 w-4" />
+            <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
+              <Link href={buildSaleDetailRoute(saleId)} aria-label={PS.actions.viewSale}>
+                {PS.actions.viewSale}
               </Link>
             </Button>
           </TooltipTrigger>
@@ -121,54 +78,30 @@ function SaleActions({
 
 export default function PostsalePage() {
   const { has } = useAuth()
-  const [sales, setSales] = useState<EligibleSale[]>([])
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState("confirmed")
   const [dateFrom, setDateFrom] = useState("")
-  const [dateTo, setDateTo] = useState("")
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [dateTo, setDateTo] = useState(todayStr)
+  const debouncedSearch = useDebounce(search, 300)
 
-  useEffect(() => {
-    let active = true
-    const controller = new AbortController()
+  const { data, loading, error } = useApiGet<EligibleSale[]>(
+    (signal) => {
+      const params = new URLSearchParams()
+      if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim())
+      if (status !== "all") params.set("status", status)
+      if (dateFrom) params.set("date_from", dateFrom)
+      if (dateTo) params.set("date_to", dateTo)
 
-    const timeoutId = window.setTimeout(async () => {
-      setLoading(true)
-      setError(null)
+      const path = params.toString()
+        ? `/api/postsales/eligible?${params.toString()}`
+        : "/api/postsales/eligible"
 
-      try {
-        const params = new URLSearchParams()
-        if (search.trim()) params.set("q", search.trim())
-        if (status !== "all") params.set("status", status)
-        if (dateFrom) params.set("date_from", dateFrom)
-        if (dateTo) params.set("date_to", dateTo)
+      return apiFetch<EligibleSale[]>(path, { cache: "no-store", signal })
+    },
+    [dateFrom, dateTo, debouncedSearch, status],
+  )
 
-        const path = params.toString()
-          ? `/api/postsales/eligible?${params.toString()}`
-          : "/api/postsales/eligible"
-
-        const data = await apiFetch<EligibleSale[]>(path, {
-          signal: controller.signal,
-          cache: "no-store",
-        })
-
-        if (active) setSales(Array.isArray(data) ? data : [])
-      } catch (loadError) {
-        if (!active || controller.signal.aborted) return
-        setSales([])
-        setError(explainApiError(loadError, PS.table.error))
-      } finally {
-        if (active) setLoading(false)
-      }
-    }, 250)
-
-    return () => {
-      active = false
-      controller.abort()
-      window.clearTimeout(timeoutId)
-    }
-  }, [dateFrom, dateTo, search, status])
+  const sales: EligibleSale[] = Array.isArray(data) ? data : []
 
   const stats = useMemo(() => {
     const exchangeReady = sales.filter((s) => s.availability.exchange.allowed).length
@@ -180,16 +113,16 @@ export default function PostsalePage() {
     }
   }, [sales])
 
-  const { paginatedItems: paginatedSales, totalPages, safePage, firstVisible, lastVisible, setPage } = usePagination(sales)
+  const { paginatedItems: paginatedSales, totalPages, safePage, firstVisible, lastVisible, setPage } = usePagination(sales, PAGE_SIZE)
 
   const hasActiveFilters =
-    Boolean(search.trim()) || status !== "confirmed" || Boolean(dateFrom) || Boolean(dateTo)
+    Boolean(search.trim()) || status !== "confirmed" || Boolean(dateFrom) || dateTo !== todayStr
 
   function clearFilters() {
     setSearch("")
     setStatus("confirmed")
     setDateFrom("")
-    setDateTo("")
+    setDateTo(todayStr)
     setPage(1)
   }
 
@@ -300,7 +233,7 @@ export default function PostsalePage() {
                   sales.length > 0 ? (
                     <>
                       <span className="text-sm text-[var(--ops-text-muted)]">
-                        {firstVisible}-{lastVisible} de {sales.length}
+                        {firstVisible}-{lastVisible} {PS.table.ofTotal} {sales.length}
                       </span>
                       <Pagination
                         page={safePage}
@@ -326,17 +259,17 @@ export default function PostsalePage() {
                     </td>
 
                     <td className="px-4 py-[var(--ops-row-py)] text-xs leading-5 text-[var(--ops-text-muted)]">
-                      <p>{formatDateLabel(sale.confirmed_at, sale.created_at)}</p>
-                      <p className="mt-1 uppercase tracking-[0.12em]">{sale.business_date}</p>
+                      {formatDateTime(sale.confirmed_at, sale.created_at)}
                     </td>
 
                     <td className="px-4 py-[var(--ops-row-py)]">
                       <p className="text-sm font-medium leading-5 text-[var(--ops-text)]">
                         {sale.customer_name_text || PS.table.genericCustomer}
                       </p>
-                      <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
-                        {sale.seller_name}
-                      </p>
+                    </td>
+
+                    <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                      {sale.seller_name}
                     </td>
 
                     <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
@@ -344,33 +277,25 @@ export default function PostsalePage() {
                     </td>
 
                     <td className="px-4 py-[var(--ops-row-py)]">
-                      <div className="flex flex-wrap gap-1.5">
-                        <OpsStatusBadge
-                          tone={STATUS_TONES[sale.status] || "neutral"}
-                          icon={
-                            sale.status === "confirmed" ? (
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                            ) : sale.status === "cancelled" ? (
-                              <XCircle className="h-3.5 w-3.5" />
-                            ) : (
-                              <CircleAlert className="h-3.5 w-3.5" />
-                            )
-                          }
-                        >
-                          {STATUS_LABELS[sale.status] || sale.status}
-                        </OpsStatusBadge>
-                        <OpsStatusBadge
-                          tone={CASH_TONES[sale.cash_status] || "neutral"}
-                          icon={<Wallet className="h-3.5 w-3.5" />}
-                        >
-                          {CASH_LABELS[sale.cash_status] || CASH_LABELS.missing}
-                        </OpsStatusBadge>
-                      </div>
+                      <OpsStatusBadge
+                        tone={STATUS_TONES[sale.status] || "neutral"}
+                        icon={
+                          sale.status === "confirmed" ? (
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                          ) : sale.status === "cancelled" ? (
+                            <XCircle className="h-3.5 w-3.5" />
+                          ) : (
+                            <CircleAlert className="h-3.5 w-3.5" />
+                          )
+                        }
+                      >
+                        {STATUS_LABELS[sale.status] || sale.status}
+                      </OpsStatusBadge>
                     </td>
 
                     <td className="px-4 py-[var(--ops-row-py)]">
                       <p className="text-sm font-semibold text-[var(--ops-text)]">
-                        S/. {Number(sale.total_amount || 0).toFixed(2)}
+                        {formatCurrency(Number(sale.total_amount || 0))}
                       </p>
                       <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
                         {sale.currency}
@@ -378,16 +303,24 @@ export default function PostsalePage() {
                     </td>
 
                     <td className="px-4 py-[var(--ops-row-py)]">
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex gap-1">
                         <OpsStatusBadge
-                          tone={sale.availability.exchange.allowed ? "success" : "neutral"}
+                          size="xs"
+                          tone={sale.availability.exchange.allowed ? "accent" : "neutral"}
+                          className="whitespace-nowrap"
                         >
-                          {sale.availability.exchange.allowed ? "Cambio ok" : "Cambio bloqueado"}
+                          {sale.availability.exchange.allowed
+                            ? PS.table.postsaleBadges.exchangeOk
+                            : PS.table.postsaleBadges.exchangeBlocked}
                         </OpsStatusBadge>
                         <OpsStatusBadge
-                          tone={sale.availability.cancel.allowed ? "warning" : "neutral"}
+                          size="xs"
+                          tone={sale.availability.cancel.allowed ? "accent" : "neutral"}
+                          className="whitespace-nowrap"
                         >
-                          {sale.availability.cancel.allowed ? "Anulacion ok" : "Anulacion bloqueada"}
+                          {sale.availability.cancel.allowed
+                            ? PS.table.postsaleBadges.cancelOk
+                            : PS.table.postsaleBadges.cancelBlocked}
                         </OpsStatusBadge>
                       </div>
                     </td>

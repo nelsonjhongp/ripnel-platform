@@ -25,7 +25,7 @@ export function useCancelForm(saleId: string | null, refetch: () => void) {
     event.preventDefault()
     if (!saleId) return
     if (!reason.trim()) {
-      setReasonError(PS.detail.reasonValidation)
+      setReasonError(PS.detail.alerts.reasonValidation)
       return
     }
     setReasonError(null)
@@ -46,10 +46,10 @@ export function useCancelForm(saleId: string | null, refetch: () => void) {
       })
 
       refetch()
-      setSuccess(PS.detail.cancelSuccess)
+      setSuccess(PS.detail.alerts.cancelSuccess)
       resetForm()
     } catch (submitError) {
-      setError(explainApiError(submitError, PS.detail.operationFallback))
+      setError(explainApiError(submitError, PS.detail.alerts.operationFallback))
     } finally {
       setSubmitting(false)
     }
