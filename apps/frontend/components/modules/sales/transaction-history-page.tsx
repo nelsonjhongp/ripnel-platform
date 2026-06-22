@@ -23,7 +23,7 @@ import { OpsPageShell, OpsSearchField, OpsTableBlock, OpsFiltersRow } from "@/co
 import { formatDateTime } from "@/lib/date-utils"
 import { formatCurrency } from "@/lib/format-utils"
 import { apiFetch } from "@/lib/api"
-import { buildSaleDetailRoute } from "@/lib/routes"
+import { buildSaleDetailRoute, appRoutes } from "@/lib/routes"
 import { useApiGet } from "@/hooks/use-api-get"
 import { useDebounce } from "@/hooks/use-debounce"
 import { SALE_STATUS_META, SALE_STATUS_TONES, type SalesPageResponse } from "@/types/sales"
@@ -270,7 +270,7 @@ export default function TransactionHistoryPage() {
                           </Button>
                         ) : sale.status === "draft" ? (
                           <Button asChild variant="warning" size="sm" className="rounded-lg px-3">
-                            <Link href="/ventas">{SH.actions.continueSale}</Link>
+                            <Link href={appRoutes.purchaseSystem}>{SH.actions.continueSale}</Link>
                           </Button>
                         ) : (
                           <span className="inline-block h-7 w-[5.25rem]" aria-hidden="true" />

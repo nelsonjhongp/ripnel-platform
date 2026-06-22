@@ -114,7 +114,7 @@ npm run dev:frontend   # http://localhost:3000
 | --- | --- | --- |
 | Inicio | `/` | `GET /api/home/overview` |
 | Dashboard | `/dashboard` | `GET /api/dashboard/*` |
-| Ventas (POS) | `/ventas` | `GET/POST /api/sales/*` |
+| Ventas (POS) | `/ventas/nueva` | `GET/POST /api/sales/*` |
 | Historial de Ventas | `/historial-ventas` | `GET /api/sales` |
 | Postventa | `/postventa` | `GET/POST/PATCH /api/postsales/*` |
 | Caja | `/caja` | `GET/POST/PATCH /api/cash/*` |

@@ -13,7 +13,7 @@ import {
   SIDEBAR_NAV_ROW_HEIGHT,
   SIDEBAR_POPOVER_LINK_CLASS,
 } from "./sidebar-styles";
-import { resolveActiveItemIndex, isRouteActive } from "./sidebar-utils";
+import { resolveActiveItemIndex } from "./sidebar-utils";
 
 type SidebarNavRailListMode = "inline" | "flyout";
 
@@ -76,11 +76,7 @@ export function SidebarNavRailList({
             key={item.url}
             href={item.url}
             label={item.title}
-            active={
-              mode === "inline"
-                ? index === activeIndex
-                : isRouteActive(pathname, item.url)
-            }
+            active={index === activeIndex}
             mode={mode}
             variablePrefix={variablePrefix}
             onNavigate={onNavigate}

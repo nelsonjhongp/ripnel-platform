@@ -53,14 +53,14 @@ Rutas canonicas normalizadas:
 - `/cuenta` y `/cuenta/seguridad`.
 - `/panel`.
 - `/inventario` y `/inventario/ajustes`.
-- `/ventas`, `/ventas/historial` y `/ventas/[saleId]`.
+- `/ventas/nueva`, `/ventas/historial` y `/ventas/[saleId]`.
 
 Rutas legacy actuales:
 
 - `/account`, `/account-mockup`, `/account/seguridad`, `/account/apariencia` y `/account/operacion` redirigen a `/cuenta`.
 - `/dashboard` redirige a `/panel`.
 - `/inventory`, `/inventory/ajustes` y `/inventory/ajustes/nuevo` redirigen a `/inventario`.
-- `/purchase-system`, `/purchase-system/[saleId]`, `/purchase-system/checkout` y `/purchase-system/checkout-payment` redirigen a `/ventas`.
+- `/purchase-system`, `/purchase-system/[saleId]`, `/purchase-system/checkout` y `/purchase-system/checkout-payment` redirigen a `/ventas/nueva`.
 - `/transaction-history` redirige a `/ventas/historial`.
 - `/administracion/roles&usuarios` redirige a `/administracion/usuarios`.
 - `/clientes/dashboards` redirige a `/bi?view=clientes`.
