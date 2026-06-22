@@ -4,7 +4,9 @@ import type { ReactNode } from "react"
 import { Clock, Eye, FileText, Printer, ReceiptText, Smartphone } from "lucide-react"
 import { OpsDialog } from "@/components/ui/ops-dialog"
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
+import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { RC } from "./receipt-messages"
 
 type ReceiptFormat = "ticket-80mm" | "ticket-58mm" | "pdf-a4" | "pdf-ticket" | "preview"
 
@@ -19,29 +21,29 @@ type ReceiptOption = {
 const RECEIPT_OPTIONS: ReceiptOption[] = [
   {
     id: "ticket-80mm",
-    label: "Ticket 80mm",
-    description: "Para impresoras térmicas estándar de mostrador",
+    label: RC.options.ticket80.label,
+    description: RC.options.ticket80.description,
     icon: <Printer className="h-4 w-4" />,
     available: false,
   },
   {
     id: "ticket-58mm",
-    label: "Ticket 58mm",
-    description: "Para impresoras portátiles y móviles",
+    label: RC.options.ticket58.label,
+    description: RC.options.ticket58.description,
     icon: <Smartphone className="h-4 w-4" />,
     available: false,
   },
   {
     id: "pdf-ticket",
-    label: "PDF formato ticket",
-    description: "Archivo PDF con diseño de ticket térmico",
+    label: RC.options.pdfTicket.label,
+    description: RC.options.pdfTicket.description,
     icon: <ReceiptText className="h-4 w-4" />,
     available: false,
   },
   {
     id: "pdf-a4",
-    label: "PDF A4 / Carta",
-    description: "Para impresión en hoja estándar de oficina",
+    label: RC.options.pdfA4.label,
+    description: RC.options.pdfA4.description,
     icon: <FileText className="h-4 w-4" />,
     available: true,
   },
@@ -68,14 +70,22 @@ export function ReceiptOptionsModal({
           onClose()
         }
       }}
-      title="Descargar comprobante"
-      description="Selecciona el formato de salida del documento."
+      title={RC.dialog.title}
+      description={RC.dialog.description}
       size="sm"
       bodyClassName="max-h-[70vh] space-y-4"
       footer={
-        <p className="text-xs text-[var(--ops-text-muted)]">
-          Los formatos de ticket estarán disponibles próximamente. El PDF A4 ya se encuentra operativo.
-        </p>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="rounded-lg px-4"
+            onClick={onClose}
+          >
+            {RC.dialog.close}
+          </Button>
+        </div>
       }
     >
           {RECEIPT_OPTIONS.map((option) => (
@@ -101,12 +111,11 @@ export function ReceiptOptionsModal({
                 {option.icon}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-[var(--ops-text)]">{option.label}</span>
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className="truncate text-sm font-semibold text-[var(--ops-text)]">{option.label}</span>
                   {!option.available ? (
-                    <OpsStatusBadge tone="warning" size="xs">
-                      <Clock className="h-2.5 w-2.5" />
-                      Próximamente
+                    <OpsStatusBadge tone="warning" size="sm" icon={<Clock className="h-3.5 w-3.5" />} className="shrink-0">
+                      {RC.badge.comingSoon}
                     </OpsStatusBadge>
                   ) : null}
                 </span>
@@ -128,13 +137,17 @@ export function ReceiptOptionsModal({
                 <Eye className="h-4 w-4" />
               </span>
               <span className="min-w-0">
-                <span className="block text-sm font-semibold text-[var(--ops-text)]">Vista previa</span>
+                <span className="block text-sm font-semibold text-[var(--ops-text)]">{RC.preview.label}</span>
                 <span className="mt-0.5 block text-xs text-[var(--ops-text-muted)]">
-                  Previsualizar el comprobante antes de descargar.
+                  {RC.preview.description}
                 </span>
               </span>
             </button>
           </div>
+
+          <p className="text-xs text-[var(--ops-text-muted)]">
+            {RC.dialog.footerNote}
+          </p>
     </OpsDialog>
   )
 }

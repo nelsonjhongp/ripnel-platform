@@ -17,7 +17,7 @@ import { PermissionGuard } from "@/components/auth/PermissionGuard"
 import { Button } from "@/components/ui/button"
 import { DateFilterPicker } from "@/components/ui/date-filter-picker"
 import { OpsSelect } from "@/components/ui/ops-selection"
-import { OpsDataTable, type OpsDataTableColumn } from "@/components/ui/ops-data-table"
+import { OpsDataTable } from "@/components/ui/ops-data-table"
 import { OpsPageShell, OpsSearchField, OpsTableBlock, OpsFiltersRow } from "@/components/ui/ops-page-shell"
 import { Pagination } from "@/components/ui/pagination"
 import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group"
@@ -29,28 +29,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { formatApiFetchError, apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api"
+import { explainApiError } from "@/lib/error-utils"
 import { usePagination } from "@/hooks/use-pagination"
 import { appRoutes, buildSaleDetailRoute } from "@/lib/routes"
-import { type PostsaleAvailability } from "@/types/postsales"
-
-type EligibleSale = {
-  sale_id: string
-  sale_number: string | null
-  status: string
-  document_type: string
-  customer_name_text: string | null
-  total_amount: number
-  currency: string
-  seller_name: string
-  location_name: string
-  confirmed_at: string | null
-  created_at: string
-  business_date: string
-  cash_status: "open" | "closed" | "missing"
-  confirmed_exchange_count: number
-  availability: PostsaleAvailability
-}
+import type { EligibleSale } from "@/types/postsales"
+import { PS } from "./postsales-messages"
+import { PS_TABLE_COLUMNS } from "./postsales-constants"
 
 const STATUS_OPTIONS = [
   { value: "all", label: "Todas" },
@@ -83,17 +68,6 @@ const CASH_LABELS: Record<string, string> = {
   missing: "Sin caja",
 }
 
-const COLUMNS: OpsDataTableColumn[] = [
-  { key: "sale", header: "Venta" },
-  { key: "date", header: "Fecha" },
-  { key: "customer", header: "Cliente" },
-  { key: "location", header: "Sede" },
-  { key: "status", header: "Estado" },
-  { key: "total", header: "Total" },
-  { key: "postsale", header: "Postventa" },
-  { key: "actions", header: "", className: "text-right" },
-]
-
 function formatDateLabel(value: string | null, fallback: string) {
   return new Date(value || fallback).toLocaleString("es-PE", {
     dateStyle: "short",
@@ -112,34 +86,34 @@ function SaleActions({
     <div className="flex items-center justify-end gap-1.5">
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button asChild variant="outline" size="icon-sm" className="rounded-lg" aria-label="Ver detalle">
+          <Button asChild variant="outline" size="icon-sm" className="rounded-lg" aria-label={PS.actions.viewDetail}>
             <Link href={`/postventa/${saleId}`}>
               <Eye className="h-4 w-4" />
             </Link>
           </Button>
         </TooltipTrigger>
         <TooltipContent side="top" sideOffset={8}>
-          Ver detalle
+          {PS.actions.viewDetail}
         </TooltipContent>
       </Tooltip>
 
       {canOpenSale ? (
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button asChild variant="outline" size="icon-sm" className="rounded-lg" aria-label="Ver venta">
+            <Button asChild variant="outline" size="icon-sm" className="rounded-lg" aria-label={PS.actions.viewSale}>
               <Link href={buildSaleDetailRoute(saleId)}>
                 <ReceiptText className="h-4 w-4" />
               </Link>
             </Button>
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={8}>
-            Ver venta
+            {PS.actions.viewSale}
           </TooltipContent>
         </Tooltip>
       ) : null}
 
       <Button asChild variant="accent" size="sm" className="rounded-lg px-3">
-        <Link href={`/postventa/${saleId}`}>Abrir</Link>
+        <Link href={`/postventa/${saleId}`}>{PS.actions.open}</Link>
       </Button>
     </div>
   )
@@ -159,59 +133,46 @@ export default function PostsalePage() {
     let active = true
     const controller = new AbortController()
 
-    const timeoutWrapper = Promise.resolve().then(() => {
-      const timeoutId = window.setTimeout(async () => {
-        setLoading(true)
-        setError(null)
+    const timeoutId = window.setTimeout(async () => {
+      setLoading(true)
+      setError(null)
 
-        try {
-          const params = new URLSearchParams()
-          if (search.trim()) params.set("q", search.trim())
-          if (status !== "all") params.set("status", status)
-          if (dateFrom) params.set("date_from", dateFrom)
-          if (dateTo) params.set("date_to", dateTo)
+      try {
+        const params = new URLSearchParams()
+        if (search.trim()) params.set("q", search.trim())
+        if (status !== "all") params.set("status", status)
+        if (dateFrom) params.set("date_from", dateFrom)
+        if (dateTo) params.set("date_to", dateTo)
 
-          const path = params.toString()
-            ? `/api/postsales/eligible?${params.toString()}`
-            : "/api/postsales/eligible"
+        const path = params.toString()
+          ? `/api/postsales/eligible?${params.toString()}`
+          : "/api/postsales/eligible"
 
-          const data = await apiFetch<EligibleSale[]>(path, {
-            signal: controller.signal,
-            cache: "no-store",
-          })
+        const data = await apiFetch<EligibleSale[]>(path, {
+          signal: controller.signal,
+          cache: "no-store",
+        })
 
-          if (active) {
-            setSales(Array.isArray(data) ? data : [])
-          }
-        } catch (loadError) {
-          if (!active || controller.signal.aborted) {
-            return
-          }
-
-          setSales([])
-          setError(formatApiFetchError(loadError, "No se pudo cargar la cola operativa de postventa."))
-        } finally {
-          if (active) {
-            setLoading(false)
-          }
-        }
-      }, 250)
-
-      return timeoutId
-    })
+        if (active) setSales(Array.isArray(data) ? data : [])
+      } catch (loadError) {
+        if (!active || controller.signal.aborted) return
+        setSales([])
+        setError(explainApiError(loadError, PS.table.error))
+      } finally {
+        if (active) setLoading(false)
+      }
+    }, 250)
 
     return () => {
       active = false
       controller.abort()
-      timeoutWrapper.then((id) => {
-        if (typeof id === "number") window.clearTimeout(id)
-      })
+      window.clearTimeout(timeoutId)
     }
   }, [dateFrom, dateTo, search, status])
 
   const stats = useMemo(() => {
-    const exchangeReady = sales.filter((sale) => sale.availability.exchange.allowed).length
-    const cancelReady = sales.filter((sale) => sale.availability.cancel.allowed).length
+    const exchangeReady = sales.filter((s) => s.availability.exchange.allowed).length
+    const cancelReady = sales.filter((s) => s.availability.cancel.allowed).length
     return {
       count: sales.length,
       exchangeReady,
@@ -235,19 +196,18 @@ export default function PostsalePage() {
   return (
     <PermissionGuard permission="sales.postsale.view">
       <TooltipProvider delayDuration={120}>
-        <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
-          <div className="mx-auto max-w-[1180px] space-y-4">
+        <OpsPageShell width="wide">
             <PosHeader
-              eyebrow="Postventa"
-              title="Postventa controlada"
+              eyebrow={PS.header.eyebrow}
+              title={PS.header.title}
               actions={
                 <>
                   <Button asChild variant="outline" size="sm" className="rounded-lg">
-                    <Link href={appRoutes.transactionHistory}>Historial</Link>
+                    <Link href={appRoutes.transactionHistory}>{PS.actions.history}</Link>
                   </Button>
                   {has("sales.pos") ? (
                     <Button asChild variant="accent" size="sm" className="rounded-lg">
-                      <Link href={appRoutes.purchaseSystem}>Nueva venta</Link>
+                      <Link href={appRoutes.purchaseSystem}>{PS.actions.newSale}</Link>
                     </Button>
                   ) : null}
                 </>
@@ -255,25 +215,27 @@ export default function PostsalePage() {
             />
 
             <OpsMetricInlineGroup items={[
-              { label: "Evaluadas", value: stats.count },
-              { label: "Cambio habilitado", value: stats.exchangeReady, tone: "accent" },
-              { label: "Anulación habilitada", value: stats.cancelReady, tone: "warning" },
+              { label: PS.kpis.evaluated, value: stats.count },
+              { label: PS.kpis.exchangeReady, value: stats.exchangeReady, tone: "accent" },
+              { label: PS.kpis.cancelReady, value: stats.cancelReady, tone: "warning" },
             ]} />
 
             <OpsTableBlock className="border-t border-[var(--ops-border-strong)] pt-4">
-              <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_0.84fr_0.84fr_auto]">
+              <OpsFiltersRow className="lg:grid-cols-[minmax(0,1fr)_0.85fr_0.95fr_0.95fr_auto]">
                 <OpsSearchField
+                  label={PS.filters.searchLabel}
                   value={search}
                   onChange={(value) => {
                     setSearch(value)
                     setPage(1)
                   }}
-                  placeholder="Buscar por nro. venta o cliente"
-                  ariaLabel="Buscar ventas elegibles"
+                  placeholder={PS.filters.searchPlaceholder}
+                  ariaLabel={PS.filters.searchAria}
+                  density="compact"
                 />
 
                 <OpsSelect
-                  label="Estado"
+                  label={PS.filters.statusLabel}
                   value={status}
                   options={STATUS_OPTIONS}
                   onChange={(value) => {
@@ -283,25 +245,27 @@ export default function PostsalePage() {
                 />
 
                 <DateFilterPicker
-                  label="Fecha desde"
+                  label={PS.filters.dateFrom}
                   value={dateFrom}
                   onChange={(value) => {
                     setDateFrom(value)
                     setPage(1)
                   }}
-                  ariaLabel="Fecha desde"
+                  ariaLabel={PS.filters.dateFromAria}
                   max={dateTo || undefined}
+                  density="compact"
                 />
 
                 <DateFilterPicker
-                  label="Fecha hasta"
+                  label={PS.filters.dateTo}
                   value={dateTo}
                   onChange={(value) => {
                     setDateTo(value)
                     setPage(1)
                   }}
-                  ariaLabel="Fecha hasta"
+                  ariaLabel={PS.filters.dateToAria}
                   min={dateFrom || undefined}
+                  density="compact"
                 />
 
                 <Tooltip>
@@ -312,25 +276,25 @@ export default function PostsalePage() {
                       variant="outline"
                       size="icon-sm"
                       className="h-10 w-10 rounded-lg"
-                      aria-label="Limpiar filtros"
+                      aria-label={PS.filters.clear}
                     >
                       <RotateCcw className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="top" sideOffset={8}>
-                    Limpiar filtros
+                    {PS.filters.clear}
                   </TooltipContent>
                 </Tooltip>
               </OpsFiltersRow>
 
               <OpsDataTable
-                columns={COLUMNS}
+                columns={PS_TABLE_COLUMNS}
                 minWidth="1080px"
                 loading={loading}
-                loadingMessage="Cargando ventas elegibles..."
+                loadingMessage={PS.table.loading}
                 error={error}
-                errorTitle="No pudimos cargar la cola de postventa"
-                emptyMessage="No se encontraron ventas para los filtros aplicados."
+                errorTitle={PS.table.error}
+                emptyMessage={PS.table.empty}
                 isEmpty={paginatedSales.length === 0}
                 footer={
                   sales.length > 0 ? (
@@ -346,7 +310,7 @@ export default function PostsalePage() {
                       />
                     </>
                   ) : (
-                    <span className="text-sm text-[var(--ops-text-muted)]">0 resultados</span>
+                    <span className="text-sm text-[var(--ops-text-muted)]">{PS.table.zero}</span>
                   )
                 }
               >
@@ -354,7 +318,7 @@ export default function PostsalePage() {
                   <tr key={sale.sale_id} className="transition hover:bg-[var(--ops-surface-muted)]">
                     <td className="px-4 py-[var(--ops-row-py)]">
                       <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                        {sale.sale_number || "Sin correlativo"}
+                        {sale.sale_number || PS.table.noCorrelative}
                       </p>
                       <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                         {sale.document_type}
@@ -368,7 +332,7 @@ export default function PostsalePage() {
 
                     <td className="px-4 py-[var(--ops-row-py)]">
                       <p className="text-sm font-medium leading-5 text-[var(--ops-text)]">
-                        {sale.customer_name_text || "Cliente general"}
+                        {sale.customer_name_text || PS.table.genericCustomer}
                       </p>
                       <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
                         {sale.seller_name}
@@ -416,22 +380,14 @@ export default function PostsalePage() {
                     <td className="px-4 py-[var(--ops-row-py)]">
                       <div className="flex flex-wrap gap-1.5">
                         <OpsStatusBadge
-                          tone={
-                            sale.availability.exchange.allowed
-                              ? "success"
-                              : "neutral"
-                          }
+                          tone={sale.availability.exchange.allowed ? "success" : "neutral"}
                         >
                           {sale.availability.exchange.allowed ? "Cambio ok" : "Cambio bloqueado"}
                         </OpsStatusBadge>
                         <OpsStatusBadge
-                          tone={
-                            sale.availability.cancel.allowed
-                              ? "warning"
-                              : "neutral"
-                          }
+                          tone={sale.availability.cancel.allowed ? "warning" : "neutral"}
                         >
-                          {sale.availability.cancel.allowed ? "Anulación ok" : "Anulación bloqueada"}
+                          {sale.availability.cancel.allowed ? "Anulacion ok" : "Anulacion bloqueada"}
                         </OpsStatusBadge>
                       </div>
                     </td>
@@ -443,8 +399,7 @@ export default function PostsalePage() {
                 ))}
               </OpsDataTable>
             </OpsTableBlock>
-          </div>
-        </section>
+        </OpsPageShell>
       </TooltipProvider>
     </PermissionGuard>
   )
