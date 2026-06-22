@@ -29,6 +29,7 @@ import { OpsFormField } from "@/components/ui/ops-form-field"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { ReceiptOptionsModal } from "@/components/ui/purchase-system/ReceiptOptionsModal"
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
+import { INFO_BOX } from "@/components/ui/ops-control-styles"
 import { formatApiFetchError, apiFetch, apiFetchData } from "@/lib/api"
 import { buildSaleDetailRoute } from "@/lib/routes"
 import { cn } from "@/lib/utils"
@@ -584,7 +585,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                           {exchange.lines.map((line) => (
                             <div
                               key={line.exchange_line_id}
-                              className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2.5"
+                              className={INFO_BOX}
                             >
                               <p className="text-sm font-semibold text-[var(--ops-text)]">
                                 {line.direction === "IN" ? "Ingreso" : "Salida"} • {line.style_name}
@@ -963,7 +964,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
           description="¿Confirmas que deseas anular esta venta? Esta acción es irreversible."
           size="sm"
           footer={
-            <>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button variant="outline" onClick={() => setCancelConfirmOpen(false)} className="rounded-lg">
                 Cancelar
               </Button>
@@ -978,7 +979,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
               >
                 {cancelSubmitting ? "Anulando..." : "Anular venta"}
               </Button>
-            </>
+            </div>
           }
         >
           <></>
