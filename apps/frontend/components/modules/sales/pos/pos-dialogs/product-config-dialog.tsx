@@ -9,6 +9,7 @@ import { OpsSelect, type OpsOption } from "@/components/ui/ops-selection"
 import { OpsQuantityStepper } from "@/components/ui/ops-quantity-stepper"
 import { formatMoney } from "@/lib/format-utils"
 import type { EffectivePriceMode, SaleVariant, SearchableStyle } from "../pos-types"
+import { INFO_BOX } from "../pos-constants"
 import { findVariantByAttributes, getVariantOptionValues } from "../pos-utils"
 
 const PANEL_LABEL = "text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)] w-[52px] shrink-0"
@@ -285,7 +286,7 @@ export function ProductConfigDialog({
         />
       </div>
 
-      <div className="space-y-1.5 rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2.5">
+      <div className={`space-y-1.5 ${INFO_BOX}`}>
         {panelRow(
           "Talla",
           sizeLabel ? (

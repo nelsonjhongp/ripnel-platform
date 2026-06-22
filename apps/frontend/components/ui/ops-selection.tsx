@@ -83,6 +83,7 @@ export function OpsSelect({
   triggerContent,
   className,
   triggerClassName,
+  error,
 }: {
   value: string
   onValueChange?: (value: string) => void
@@ -96,6 +97,7 @@ export function OpsSelect({
   triggerContent?: (option: OpsOption | null) => ReactNode
   className?: string
   triggerClassName?: string
+  error?: string | null
 }) {
   const handleChange = onValueChange || onChange || (() => {})
   const selectedOption = options.find((option) => option.value === value) || null
@@ -110,6 +112,7 @@ export function OpsSelect({
           opsSelectTriggerClassName,
           inlineLabel && label ? "justify-between gap-3" : "",
           !label ? className : triggerClassName,
+          error ? "border-[var(--ops-tone-danger-border)]" : "",
         )}
       >
         {inlineLabel && label ? (

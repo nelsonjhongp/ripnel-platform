@@ -15,3 +15,23 @@ export const opsSelectOptionClassName =
 
 export const opsFieldLabelClassName =
   "block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]"
+
+/** Input compacto h-9 para formularios operativos (usa .sales-field de globals.css) */
+export const opsInputCompact =
+  "sales-field h-9 w-full rounded-lg px-3 py-2 text-sm"
+
+/** Panel informativo standard: borde, fondo surface, padding compacto */
+export const INFO_BOX =
+  "rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2.5"
+
+/** Panel informativo con fondo muted */
+export const INFO_BOX_MUTED =
+  "rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-3 py-2.5"
+
+/** Panel informativo con esquinas mas redondeadas (xl) */
+export const INFO_BOX_XL =
+  "rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2.5"
+
+/** Fondo muted semitransparente para secciones secundarias */
+export const SURFACE_MUTED_BG =
+  "bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_82%,var(--ops-surface))]"

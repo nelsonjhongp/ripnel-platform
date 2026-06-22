@@ -166,6 +166,7 @@ export function PresetTextField({
             onValueChange={handlePresetChange}
             placeholder={placeholder}
             options={presetOptions}
+            error={error}
           />
         ) : (
           <>

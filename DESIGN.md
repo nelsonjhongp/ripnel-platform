@@ -155,6 +155,37 @@ Base unit: 4px
 - **Selection**: prefer `OpsSelectMenu`, `OpsMultiSelectMenu`, and `SearchablePicker`. `FilterDropdown` and `AdminSelect` should visually converge to the same shared control base.
 - **Progress**: prefer `SalesWizardRail` for multistep operational flows. `Stepper` remains for compact form progress. `PosHeader` should not be treated as the canonical progress component.
 
+### Panel patterns
+
+Reusable CSS class constants for info panels. Source of truth: `components/ui/ops-control-styles.ts`.
+
+| Constant | Visual | Use |
+|---|---|---|
+| `INFO_BOX` | `rounded-lg` border, `bg-[var(--ops-surface)]`, compact padding | Standard info panel, customer cards, exchange lines |
+| `INFO_BOX_MUTED` | Same but `bg-[var(--ops-surface-muted)]` | Secondary info panels, cash context boxes |
+| `INFO_BOX_XL` | `rounded-xl` variant of `INFO_BOX` | Dialog sections, summary shortcuts |
+| `SURFACE_MUTED_BG` | Semitransparent muted background | Section backgrounds, discount estimates |
+
+Do not duplicate these as inline Tailwind strings. Import from `ops-control-styles.ts`.
+
+### Dialog footer pattern
+
+All `OpsDialog` instances must use the canonical footer wrapper:
+
+```tsx
+footer={
+  <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+    <Button variant="outline" ...>Cancelar</Button>
+    <Button variant="accent" ...>Confirmar</Button>
+  </div>
+}
+```
+
+- Cancel/back: `variant="outline"` on the left
+- Primary action: `variant="accent"` on the right
+- Destructive: `variant="destructive"` on the right
+- 3-button variants: use `sm:justify-between` with ghost action on left
+
 ### Usage Matrix
 
 | Need | Use | Do not use in new code | Replacement | Notes |
