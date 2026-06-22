@@ -8,7 +8,7 @@ import { OpsFormField } from "@/components/ui/ops-form-field"
 import { PresetTextField } from "@/components/ui/preset-text-field"
 import { ADJUSTMENT_REASON_PRESETS } from "../pos-types"
 import type { CartItem, PreviewItem } from "../pos-types"
-import { INPUT_CLASS } from "../pos-constants"
+import { INPUT_CLASS, INFO_BOX_MUTED } from "../pos-constants"
 import { formatMoney, parseAmountInput, trimOrNull } from "../pos-utils"
 
 export function PriceAdjustmentDialog({
@@ -100,7 +100,7 @@ export function PriceAdjustmentDialog({
         </div>
       }
     >
-      <div className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-3 py-2.5 text-sm">
+      <div className={`${INFO_BOX_MUTED} text-sm`}>
         <div className="flex justify-between gap-3">
           <span className="text-[var(--ops-text-muted)]">Precio lista</span>
           <span className="font-semibold text-[var(--ops-text)]">

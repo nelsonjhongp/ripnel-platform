@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils"
 import { formatMoney } from "@/lib/format-utils"
 
 import { StageSection } from "./stage-section"
+import { POS } from "./pos-messages"
 import type { ProductStageProps } from "./pos-stage-props"
 
 // NOTE: OpsDataTable is intentionally not used here.
@@ -47,7 +48,7 @@ export function ProductStage(props: ProductStageProps) {
   } = props
 
   const productInputValue = query
-  const productInputPlaceholder = "Buscar por producto, SKU o escanear código"
+  const productInputPlaceholder = POS.product.searchPlaceholder
 
   const tableScrollRef = useRef<HTMLDivElement>(null)
   const prevCartLengthRef = useRef(cart.length)
@@ -71,7 +72,7 @@ export function ProductStage(props: ProductStageProps) {
     >
       <OpsStepSectionHeading
         step={1}
-        title="Productos"
+        title={POS.stage.products}
         meta={(() => {
           const effectiveMode = totals.priceMode
           const isManual = pricingModeOverride !== "auto"
@@ -143,11 +144,11 @@ export function ProductStage(props: ProductStageProps) {
         onOpenChange={setProductPickerOpen}
         items={searchableStyles}
         loading={loadingVariants}
-        loadingMessage="Buscando productos…"
+        loadingMessage={POS.product.loadingMessage}
         emptyMessage={
           !defaultLocation
-            ? "Configura tu sede primero para ver productos."
-            : "No encontramos coincidencias para esta búsqueda."
+            ? POS.product.noLocationMessage
+            : POS.product.noMatchMessage
         }
         maxVisibleItems={6}
         highlightedIndex={highlightedProductIndex}
@@ -198,7 +199,7 @@ export function ProductStage(props: ProductStageProps) {
         }`}
       >
         {cart.length === 0 ? (
-          <OpsHint className="mx-4 sm:mx-5 py-3">Aún no hay productos agregados a la venta.</OpsHint>
+          <OpsHint className="mx-4 sm:mx-5 py-3">{POS.product.emptyCart}</OpsHint>
         ) : (
           <div ref={tableScrollRef} className="max-h-[220px] overflow-auto ops-minimal-scrollbar">
             <div className="min-w-[760px] border-b border-[var(--ops-border-strong)]">
