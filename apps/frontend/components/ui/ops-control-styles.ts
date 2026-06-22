@@ -35,3 +35,11 @@ export const INFO_BOX_XL =
 /** Fondo muted semitransparente para secciones secundarias */
 export const SURFACE_MUTED_BG =
   "bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_82%,var(--ops-surface))]"
+
+/** Panel destacado con borde y fondo en tono acento — para totales */
+export const ACCENT_HIGHLIGHT_PANEL =
+  "rounded-lg border border-[color:color-mix(in_srgb,var(--ripnel-accent)_24%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_78%,var(--ops-surface))]"
+
+/** Color de texto acento para labels dentro de paneles destacados */
+export const ACCENT_LABEL_TEXT =
+  "text-[color:color-mix(in_srgb,var(--ripnel-accent)_78%,var(--ops-text))]"
