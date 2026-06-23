@@ -19,13 +19,14 @@ import { SummaryStage } from "./stage-summary";
 import { PermissionGuard } from "@/components/auth/PermissionGuard";
 import { InlineStatusCard } from "@/components/feedback/status-page";
 import { OpsActionBanner } from "@/components/ui/ops-action-banner";
-import { OpsDialog } from "@/components/ui/ops-dialog";
-import { OpsFormField } from "@/components/ui/ops-form-field";
 import { OpsPageShell } from "@/components/ui/ops-page-shell";
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { SaleReviewDialog } from "@/components/ui/purchase-system/sale-review-dialog";
 import { SaleConfirmationDialog } from "@/components/ui/purchase-system/sale-confirmation-dialog";
+import { CashOpenDialog } from "./pos-dialogs/cash-open-dialog";
+import { CashReopenDialog } from "./pos-dialogs/cash-reopen-dialog";
+import { ClearSaleDialog } from "./pos-dialogs/clear-sale-dialog";
 import { RemoveItemDialog } from "./pos-dialogs/remove-item-dialog";
 import { PriceAdjustmentDialog } from "./pos-dialogs/price-adjustment-dialog";
 import { DiscountDialog } from "./pos-dialogs/discount-dialog";
@@ -34,7 +35,6 @@ import { CustomerDialog } from "./pos-dialogs/customer-dialog";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-import { INPUT_CLASS, INFO_BOX_MUTED } from "./pos-constants";
 import { POS } from "./pos-messages";
 import { buildCashLabel, getPaymentMethodLabel } from "./pos-utils";
 import { usePosSale } from "./use-pos-sale";
@@ -44,11 +44,13 @@ export default function NuevaVentaPage() {
     defaultLocation,
     locationsLoading,
     has,
-    customerSectionRef,
-    productSectionRef,
-    paymentSectionRef,
-    productSearchInputRef,
-    customerSearchInputRef,
+    refs: {
+      customerSectionRef,
+      productSectionRef,
+      paymentSectionRef,
+      productSearchInputRef,
+      customerSearchInputRef,
+    },
     query,
     setQuery,
     loadingVariants,
@@ -119,7 +121,7 @@ export default function NuevaVentaPage() {
     cashStatus,
     canOpenCashModule,
     canReopenCash,
-    summaryStatusMessage,
+    derivedSummary,
     submitDisabled,
     hasDraftSale,
     cartCount,
@@ -164,7 +166,7 @@ export default function NuevaVentaPage() {
   } = usePosSale();
   const [clearSaleDialogOpen, setClearSaleDialogOpen] = useState(false)
   const documentReviewLabel =
-    activeDocumentOption?.label || "Comprobante pendiente"
+    activeDocumentOption?.label || POS.summary.pendingDocument
   const documentReviewDetail =
     selectedCustomerDocument || POS.customer.noDocument
   const paymentReviewModeLabel =
@@ -270,7 +272,7 @@ export default function NuevaVentaPage() {
                       </span>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                          Venta confirmada: {confirmedSale.sale_number}
+                          {POS.summary.confirmedPrefix}: {confirmedSale.sale_number}
                         </p>
                         <p className="text-xs text-[var(--ops-text-muted)]">
                           {POS.summary.confirmedBanner}
@@ -317,7 +319,7 @@ export default function NuevaVentaPage() {
                         icon={CircleAlert}
                         tone="warning"
                         title={POS.cash.missing}
-                        description={posContext.cash?.message || "Abre caja para habilitar ventas en esta sede."}
+                        description={posContext.cash?.message || POS.cash.missingOpenDesc}
                         actionLabel={POS.cash.openTitle}
                         actionTone="accent"
                         onAction={() => setCashOpenDialogOpen(true)}
@@ -328,7 +330,7 @@ export default function NuevaVentaPage() {
                         icon={CircleAlert}
                         tone="warning"
                         title={POS.cash.missing}
-                        description="Coordina con caja o con un administrador para habilitar la venta."
+                        description={POS.cash.missingNoPermissionDesc}
                       />
                     )
                   ) : (
@@ -336,10 +338,10 @@ export default function NuevaVentaPage() {
                       icon={Clock3}
                       tone="danger"
                       title={POS.cash.closed}
-                      description={posContext.cash?.message || "La caja operativa de hoy ya fue cerrada para esta sede."}
+                      description={posContext.cash?.message || POS.cash.closedDesc}
                       {...(canReopenCash
                         ? {
-                            actionLabel: "Reabrir caja",
+                            actionLabel: POS.cash.reopenTitle,
                             actionTone: "accent" as const,
                             onAction: () => {
                               setReopenNotes("")
@@ -354,7 +356,6 @@ export default function NuevaVentaPage() {
                 <section className="grid gap-5 xl:grid-cols-[minmax(0,1.72fr)_minmax(360px,400px)]">
                     <div className="space-y-4">
                       <ProductStage
-                        active={true}
                         pulseStage={pulseStage}
                         query={query}
                         setQuery={setQuery}
@@ -380,11 +381,9 @@ export default function NuevaVentaPage() {
                         productSectionRef={productSectionRef}
                         pricingModeOverride={pricingModeOverride}
                         setPricingModeOverride={setPricingModeOverride}
-                        onActivate={() => {}}
                       />
 
                       <CustomerStage
-                        active={true}
                         pulseStage={pulseStage}
                         documentType={documentType}
                         setDocumentType={setDocumentType}
@@ -407,11 +406,9 @@ export default function NuevaVentaPage() {
                         openCustomerDialog={openCustomerDialog}
                         customerSearchInputRef={customerSearchInputRef}
                         customerSectionRef={customerSectionRef}
-                        onActivate={() => {}}
                       />
 
                       <PaymentStage
-                        active={true}
                         pulseStage={pulseStage}
                         cartCount={cartCount}
                         totals={totals}
@@ -427,7 +424,6 @@ export default function NuevaVentaPage() {
                         updateMixedPaymentDraft={updateMixedPaymentDraft}
                         addMixedPaymentDraft={addMixedPaymentDraft}
                         removeMixedPaymentDraft={removeMixedPaymentDraft}
-                        onActivate={() => {}}
                         paymentSectionRef={paymentSectionRef}
                       />
                     </div>
@@ -447,7 +443,6 @@ export default function NuevaVentaPage() {
                       mixedPayments={mixedPayments}
                       cashReady={cashReady}
                       cashStatus={cashStatus}
-                      summaryStatusMessage={summaryStatusMessage}
                       submitDisabled={submitDisabled}
                       submitting={submitting}
                       error={error}
@@ -462,8 +457,8 @@ export default function NuevaVentaPage() {
               onClose={closeSaleReview}
               onConfirm={confirmSale}
               confirming={submitting}
-              customerLabel={selectedCustomerName || "Cliente pendiente"}
-              customerDetail={selectedCustomerDocument || "Sin documento"}
+              customerLabel={selectedCustomerName || POS.summary.pendingCustomer}
+              customerDetail={selectedCustomerDocument || POS.customer.noDocument}
               documentLabel={documentReviewLabel}
               documentDetail={documentReviewDetail}
               paymentModeLabel={paymentReviewModeLabel}
@@ -538,126 +533,35 @@ export default function NuevaVentaPage() {
           onConfirm={confirmRemoveFromCart}
         />
 
-        <OpsDialog
+        <ClearSaleDialog
           open={clearSaleDialogOpen}
           onOpenChange={setClearSaleDialogOpen}
-          title={POS.summary.clearTitle}
-          description={POS.summary.clearDesc}
-          size="sm"
-          bodyClassName="space-y-3"
-          footer={
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="rounded-lg px-4"
-                onClick={() => setClearSaleDialogOpen(false)}
-              >
-                {POS.summary.cancel}
-              </Button>
-              <Button
-                type="button"
-                variant="accent"
-                size="sm"
-                className="rounded-lg px-4"
-                onClick={() => {
-                  resetSaleDraft()
-                  setClearSaleDialogOpen(false)
-                  productSearchInputRef.current?.focus()
-                }}
-              >
-                {POS.summary.clearButton}
-              </Button>
-            </div>
-          }
-        >
-          <p className="text-sm text-[var(--ops-text-muted)]">
-            {POS.summary.clearHint}
-          </p>
-        </OpsDialog>
+          onConfirm={() => {
+            resetSaleDraft()
+            setClearSaleDialogOpen(false)
+            productSearchInputRef.current?.focus()
+          }}
+        />
 
-        <OpsDialog
+        <CashOpenDialog
           open={cashOpenDialogOpen}
           onOpenChange={setCashOpenDialogOpen}
-          title={POS.cash.openTitle}
-          description={defaultLocation?.name ? `Iniciar sesion de caja en ${defaultLocation.name}` : undefined}
-          size="sm"
-          bodyClassName="space-y-4"
-          footer={
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button type="button" variant="outline" size="sm" className="rounded-lg px-4" onClick={() => setCashOpenDialogOpen(false)} disabled={openingCash}>
-                Cancelar
-              </Button>
-              <Button type="button" variant="accent" size="sm" className="rounded-lg px-4" onClick={handleOpenCash} disabled={openingCash}>
-                {openingCash ? "Abriendo..." : "Abrir caja"}
-              </Button>
-            </div>
-          }
-        >
-          <div className="space-y-4">
-            <div className={INFO_BOX_MUTED}>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-xs text-[var(--ops-text-muted)]">Sede</span>
-                <span className="text-sm font-medium text-[var(--ops-text)]">{defaultLocation?.name || "—"}</span>
-              </div>
-              {posContext?.business_date ? (
-                <div className="mt-1 flex items-center justify-between gap-3">
-                  <span className="text-xs text-[var(--ops-text-muted)]">Fecha operativa</span>
-                  <span className="text-sm font-medium text-[var(--ops-text)]">{posContext.business_date}</span>
-                </div>
-              ) : null}
-            </div>
-            <p className="text-sm text-[var(--ops-text-muted)]">
-              Al abrir caja se habilita el registro de ventas en esta sede para la fecha actual. Podes cerrarla cuando termines la jornada.
-            </p>
-          </div>
-        </OpsDialog>
+          location={defaultLocation}
+          posContext={posContext}
+          opening={openingCash}
+          onConfirm={handleOpenCash}
+        />
 
-        <OpsDialog
+        <CashReopenDialog
           open={reopenCashDialogOpen}
           onOpenChange={setReopenCashDialogOpen}
-          title={POS.cash.reopenTitle}
-          description={defaultLocation?.name ? `Reabrir la sesion de caja cerrada en ${defaultLocation.name}` : undefined}
-          size="sm"
-          bodyClassName="space-y-4"
-          footer={
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <Button type="button" variant="outline" size="sm" className="rounded-lg px-4" onClick={() => setReopenCashDialogOpen(false)} disabled={reopeningCash}>
-                Cancelar
-              </Button>
-              <Button type="button" variant="accent" size="sm" className="rounded-lg px-4" onClick={handleReopenCash} disabled={reopeningCash || !reopenNotes.trim()}>
-                {reopeningCash ? "Reabriendo..." : "Reabrir caja"}
-              </Button>
-            </div>
-          }
-        >
-          <div className="space-y-4">
-            <div className={INFO_BOX_MUTED}>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-xs text-[var(--ops-text-muted)]">Sede</span>
-                <span className="text-sm font-medium text-[var(--ops-text)]">{defaultLocation?.name || "—"}</span>
-              </div>
-              {posContext?.business_date ? (
-                <div className="mt-1 flex items-center justify-between gap-3">
-                  <span className="text-xs text-[var(--ops-text-muted)]">Fecha operativa</span>
-                  <span className="text-sm font-medium text-[var(--ops-text)]">{posContext.business_date}</span>
-                </div>
-              ) : null}
-            </div>
-            <OpsFormField label="Motivo de reapertura" required density="compact">
-              <input
-                value={reopenNotes}
-                onChange={(event) => setReopenNotes(event.target.value)}
-                placeholder="Ej. Error en cierre, venta pendiente de registrar..."
-                className={INPUT_CLASS}
-              />
-            </OpsFormField>
-            <p className="text-sm text-[var(--ops-text-muted)]">
-              Al reabrir la caja se volverá a habilitar el registro de ventas en esta sede para la fecha actual. Esta acción quedará registrada en el historial de caja.
-            </p>
-          </div>
-        </OpsDialog>
+          location={defaultLocation}
+          posContext={posContext}
+          notes={reopenNotes}
+          setNotes={setReopenNotes}
+          reopening={reopeningCash}
+          onConfirm={handleReopenCash}
+        />
       </PermissionGuard>
     </ErrorBoundary>
   );

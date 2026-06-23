@@ -1,4 +1,8 @@
 export const POS = {
+  detailFallback: {
+    dash: "-",
+  },
+
   header: {
     eyebrow: "Punto de venta",
     title: "Nueva venta",
@@ -20,9 +24,31 @@ export const POS = {
     noLocation: "Sin sede asignada",
     openTitle: "Abrir caja",
     reopenTitle: "Reabrir caja",
+    openDesc: "Iniciar sesion de caja en {location}",
+    reopenDesc: "Reabrir la sesion de caja cerrada en {location}",
+    openLoading: "Abriendo...",
+    reopenLoading: "Reabriendo...",
+    cancel: "Cancelar",
+    location: "Sede",
+    businessDate: "Fecha operativa",
+    missingOpenDesc: "Abre caja para habilitar ventas en esta sede.",
+    missingNoPermissionDesc: "Coordina con caja o con un administrador para habilitar la venta.",
+    closedDesc: "La caja operativa de hoy ya fue cerrada para esta sede.",
+    reopenReason: "Motivo de reapertura",
+    reopenReasonPlaceholder: "Ej. Error en cierre, venta pendiente de registrar...",
+    openHint:
+      "Al abrir caja se habilita el registro de ventas en esta sede para la fecha actual. Puedes cerrarla cuando termines la jornada.",
+    reopenHint:
+      "Al reabrir la caja se volvera a habilitar el registro de ventas en esta sede para la fecha actual. Esta accion quedara registrada en el historial de caja.",
     noLocationActive: "No hay sede operativa activa",
     noLocationDesc:
       "Debes tener una sede default asignada para registrar ventas. Configurala desde tu cuenta o solicita apoyo al administrador.",
+    openSuccessTitle: "Caja abierta",
+    openSuccessDesc: "Ventas habilitadas para la sede.",
+    openErrorTitle: "No se pudo abrir caja",
+    reopenSuccessTitle: "Caja reabierta",
+    reopenSuccessDesc: "Ventas habilitadas nuevamente.",
+    reopenErrorTitle: "No se pudo reabrir caja",
   },
 
   product: {
@@ -36,6 +62,7 @@ export const POS = {
 
   customer: {
     searchPlaceholder: "Buscar por nombre, documento o codigo",
+    loadingMessage: "Buscando clientes...",
     noMatchMessage:
       "No encontramos coincidencias. Puedes crear el cliente y seguir con la venta.",
     pending: "Pendiente",
@@ -46,11 +73,16 @@ export const POS = {
     editAria: "Editar cliente",
     editTitle: "Editar cliente",
     createTitle: "Crear cliente",
+    createDesc: "Registra un nuevo cliente para continuar con la venta.",
+    editDesc: "Edita los datos del cliente para esta venta.",
     saved: "Cliente guardado",
     savedDesc: "Datos actualizados para la venta.",
     saveError: "No se pudo guardar cliente",
     duplicateError: "Ya existe un cliente con este documento.",
     saveButton: "Guardar cliente",
+    validating: "Validando...",
+    saving: "Guardando...",
+    cancel: "Cancelar",
   },
 
   payment: {
@@ -75,6 +107,8 @@ export const POS = {
 
   summary: {
     products: "Productos",
+    documentShort: "Comprobante",
+    charge: "Cobro",
     noProducts: "Sin productos agregados",
     ready: "Listo",
     pending: "Pendiente",
@@ -83,7 +117,24 @@ export const POS = {
     finalizeButton: "Finalizar venta",
     reviewTitle: "Revisar venta",
     reviewDesc: "Ultima revision antes de registrar la operacion.",
+    reviewCustomer: "Cliente",
+    reviewDocument: "Comprobante",
+    reviewCharge: "Cobro",
+    reviewTotals: "Totales",
+    subtotalBase: "Subtotal base",
+    moneyPrefix: "S/.",
+    discountAbbr: "Desc.",
     confirmTitle: "Venta confirmada",
+    confirmInternalReceipt: "Comprobante interno",
+    confirmedPrefix: "Venta confirmada",
+    confirmFallbackCustomer: "Venta registrada correctamente",
+    confirmFallbackTotal: "La operacion quedo guardada.",
+    confirmItems: "Items",
+    print: "Imprimir",
+    detailButton: "Ver detalle",
+    noPostsalePermission: "Tu rol no tiene acceso directo a postventa desde esta confirmacion.",
+    pendingCustomer: "Cliente pendiente",
+    pendingDocument: "Comprobante pendiente",
     newSaleButton: "Nueva venta",
     clearTitle: "Limpiar venta actual",
     clearDesc:
@@ -112,13 +163,17 @@ export const POS = {
     percent: "Porcentaje",
     fixed: "Monto fijo",
     reason: "Motivo",
+    amount: "Monto",
     reasonPlaceholder: "Selecciona el motivo",
+    subtotalBase: "Subtotal base",
     valueError: "Ingresa un descuento valido.",
     percentError: "El porcentaje no puede superar 100%.",
     amountError: "El descuento no puede superar el subtotal base.",
     reasonError: "Ingresa el motivo del descuento.",
     remove: "Quitar descuento",
     apply: "Aplicar descuento",
+    cancel: "Cancelar",
+    estimatedPercentSuffix: "del subtotal",
   },
 
   priceAdjust: {
@@ -129,9 +184,14 @@ export const POS = {
     reasonError: "Ingresa el motivo del ajuste.",
     clear: "Limpiar ajuste",
     save: "Guardar ajuste",
+    cancel: "Cancelar",
+    reason: "Motivo",
+    reasonPlaceholder: "Selecciona el motivo",
   },
 
   productConfig: {
+    title: "Configurar producto",
+    description: "Selecciona talla y color para agregar el producto a la venta.",
     size: "Talla",
     color: "Color",
     stock: "Stock",
@@ -159,6 +219,7 @@ export const POS = {
   removeItem: {
     title: "Quitar producto",
     desc: "El producto se retirara del carrito de esta venta.",
+    cancel: "Cancelar",
     confirm: "Quitar",
   },
 
@@ -169,5 +230,73 @@ export const POS = {
     loadProducts: "No se pudieron cargar productos.",
     noPrice: "La variante no tiene precio vigente.",
     noStock: "La variante no tiene stock disponible.",
+  },
+
+  validation: {
+    mixedMinTwoPayments: "Distribuye el cobro en al menos dos pagos.",
+    mixedSelectMethod: "Selecciona el metodo en cada linea de pago.",
+    mixedReviewMethods: "Revisa los metodos del pago mixto.",
+    mixedReviewAmounts: "Revisa los montos del pago mixto.",
+    mixedShortfall: (diff: string) => `Faltan S/. ${diff} por asignar.`,
+    mixedExcess: (diff: string) => `El pago excede el total por S/. ${diff}.`,
+  },
+
+  summaryStatus: {
+    noLocation: "Asigna una sede operativa antes de vender.",
+    validating: "Validando sede y caja operativa...",
+    noCash: "La venta no se puede registrar hasta que se abra una caja",
+    noProducts: "Agrega al menos un producto.",
+    missingPrice: "Hay items sin precio vigente.",
+    noMethod: "Selecciona un metodo de pago.",
+    noCustomer: "Selecciona un cliente o crea uno con el boton.",
+    invalidCustomer: "Revisa cliente y comprobante.",
+    ready: "Venta lista para confirmar.",
+    totalZero: "El total final debe ser mayor a cero.",
+  },
+
+  summaryBadge: {
+    pending: "Pendiente",
+    ready: "Listo",
+    review: "Revisar",
+    noProducts: "Sin productos agregados",
+    noCustomer: "Sin cliente asignado",
+    selectDocument: "Selecciona el tipo de comprobante",
+    documentReady: "Listo para emitir comprobante",
+    customerInvalid: "El cliente no cumple los requisitos",
+    cashClosed: "Caja cerrada",
+    cashPending: "Caja pendiente",
+    noDocs: "Sin productos",
+    needProducts: "Falta agregar productos",
+    needCustomer: "Falta asignar cliente",
+    needDocument: "Falta seleccionar comprobante",
+    needPayment: "Falta seleccionar cobro",
+    reviewCustomerDoc: "Revisar cliente y comprobante",
+    reviewPayment: "Revisar cobro",
+    itemsMissingPrice: "Hay items sin precio",
+    readyToFinalize: "Listo para finalizar",
+    processing: "Procesando...",
+    missingComp: "Falta comprobante",
+    invalidClient: "Cliente no valido",
+    pricesPending: "Precios pendientes",
+    cashNotOpen: "Caja no abierta",
+    missingAmount: (amount: string) => `Faltan S/. ${amount}`,
+  },
+
+  toast: {
+    mixedResetTitle: "Cobro mixto reiniciado",
+    mixedResetDesc: "El total cambio. Reingresa los montos del pago mixto.",
+    saleConfirmError: "No se pudo confirmar la venta.",
+    cartNoPriceTitle: "No se pudo agregar producto",
+    cartNoPriceDesc: "La variante no tiene precio vigente.",
+    cartNoStockTitle: "No se pudo agregar producto",
+    cartNoStockDesc: "La variante no tiene stock disponible.",
+    cashContextError: "No se pudo validar la caja operativa.",
+    cashOpenRetry: "Intenta nuevamente.",
+  },
+
+  paymentLine: {
+    paymentNumber: "Pago",
+    paymentLabel: "Metodo",
+    linesOfPayment: (count: number) => `${count} lineas de pago`,
   },
 } as const

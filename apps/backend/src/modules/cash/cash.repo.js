@@ -50,7 +50,7 @@ function buildConsistencyJoins(alias = 'cc') {
         INNER JOIN sales s ON s.sale_id = sp.sale_id
         WHERE s.location_id = ${alias}.location_id
           AND s.status = 'confirmed'
-          AND DATE(s.confirmed_at AT TIME ZONE 'America/Lima') = ${alias}.business_date
+          AND DATE(sp.paid_at AT TIME ZONE 'America/Lima') = ${alias}.business_date
 
         UNION ALL
 
@@ -236,7 +236,7 @@ async function sumSalesPaymentsByLocationAndDate(locationId, businessDate) {
        INNER JOIN sales s ON s.sale_id = sp.sale_id
         WHERE s.location_id = $1
           AND s.status = 'confirmed'
-          AND DATE(COALESCE(s.confirmed_at, s.created_at) AT TIME ZONE 'America/Lima') = $2::date
+          AND DATE(sp.paid_at AT TIME ZONE 'America/Lima') = $2::date
 
        UNION ALL
 

@@ -174,12 +174,21 @@ async function findSaleDetailsBySaleId(saleId, executor = query) {
        s.code AS size_code,
        s.name AS size_name,
        c.code AS color_code,
-       c.name AS color_name
+       c.name AS color_name,
+       COALESCE(ex_qty.exchanged_qty, 0)::int AS exchanged_qty
      FROM sales_details sd
      INNER JOIN product_variants pv ON pv.variant_id = sd.variant_id
      INNER JOIN product_styles ps ON ps.style_id = pv.style_id
      INNER JOIN sizes s ON s.size_id = pv.size_id
      INNER JOIN colors c ON c.color_id = pv.color_id
+     LEFT JOIN LATERAL (
+       SELECT COALESCE(SUM(el.quantity), 0) AS exchanged_qty
+       FROM exchange_lines el
+       INNER JOIN exchanges e ON e.exchange_id = el.exchange_id
+       WHERE el.sale_detail_id = sd.sale_detail_id
+         AND el.direction = 'IN'
+         AND e.status = 'confirmed'
+     ) ex_qty ON TRUE
      WHERE sd.sale_id = $1
      ORDER BY sd.created_at ASC`,
     [saleId]
@@ -264,6 +273,11 @@ async function findExchangesBySaleId(saleId, executor = query) {
        e.status,
        e.reason,
        e.notes,
+       e.original_total,
+       e.replacement_total,
+       e.difference_amount,
+       e.settlement_type,
+       e.settlement_payment_id,
        e.created_by,
        e.confirmed_by,
        e.cancelled_by,
@@ -295,7 +309,14 @@ async function findExchangeLinesBySaleId(saleId, executor = query) {
        el.variant_id,
        el.quantity,
        el.unit_reference_price,
+       el.unit_price_list,
+       el.unit_price_final,
+       el.line_subtotal,
+       el.line_tax,
+       el.line_total,
+       el.price_source,
        el.notes,
+       el.sale_detail_id,
        pv.sku,
        pv.style_id,
        pv.size_id,
@@ -414,10 +435,14 @@ async function insertExchange(payload, executor = query) {
        status,
        reason,
        notes,
+       original_total,
+       replacement_total,
+       difference_amount,
+       settlement_type,
        created_by,
        confirmed_by,
        confirmed_at
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP)
      RETURNING
        exchange_id,
        exchange_number,
@@ -426,6 +451,11 @@ async function insertExchange(payload, executor = query) {
        status,
        reason,
        notes,
+       original_total,
+       replacement_total,
+       difference_amount,
+       settlement_type,
+       settlement_payment_id,
        created_by,
        confirmed_by,
        cancelled_by,
@@ -440,6 +470,10 @@ async function insertExchange(payload, executor = query) {
       payload.status,
       payload.reason,
       payload.notes,
+      payload.original_total ?? 0,
+      payload.replacement_total ?? 0,
+      payload.difference_amount ?? 0,
+      payload.settlement_type || 'none',
       payload.created_by,
       payload.confirmed_by,
     ]
@@ -456,8 +490,15 @@ async function insertExchangeLine(payload, executor = query) {
        variant_id,
        quantity,
        unit_reference_price,
-       notes
-     ) VALUES ($1, $2, $3, $4, $5, $6)
+       unit_price_list,
+       unit_price_final,
+       line_subtotal,
+       line_tax,
+       line_total,
+       price_source,
+       notes,
+       sale_detail_id
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
      RETURNING
        exchange_line_id,
        exchange_id,
@@ -465,15 +506,45 @@ async function insertExchangeLine(payload, executor = query) {
        variant_id,
        quantity,
        unit_reference_price,
-       notes`,
+       unit_price_list,
+       unit_price_final,
+       line_subtotal,
+       line_tax,
+       line_total,
+       price_source,
+       notes,
+       sale_detail_id`,
     [
       payload.exchange_id,
       payload.direction,
       payload.variant_id,
       payload.quantity,
       payload.unit_reference_price,
+      payload.unit_price_list ?? null,
+      payload.unit_price_final ?? null,
+      payload.line_subtotal ?? 0,
+      payload.line_tax ?? 0,
+      payload.line_total ?? 0,
+      payload.price_source || null,
       payload.notes,
+      payload.sale_detail_id || null,
     ]
+  );
+
+  return result.rows[0] || null;
+}
+
+async function updateExchangeSettlementPayment(exchangeId, paymentId, executor = query) {
+  const result = await executor(
+    `UPDATE exchanges
+     SET
+       settlement_payment_id = $2,
+       updated_at = CURRENT_TIMESTAMP
+     WHERE exchange_id = $1
+     RETURNING
+       exchange_id,
+       settlement_payment_id`,
+    [exchangeId, paymentId]
   );
 
   return result.rows[0] || null;
@@ -589,6 +660,7 @@ module.exports = {
   nextExchangeNumberInTx,
   insertExchange,
   insertExchangeLine,
+  updateExchangeSettlementPayment,
   cancelSaleInTx,
   insertSaleCancellation,
   insertPaymentReversal,

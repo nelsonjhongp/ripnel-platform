@@ -5,6 +5,7 @@ import { apiFetch } from "@/lib/api"
 import { showError, showSuccess } from "@/lib/toast"
 import type { PosContext } from "./pos-types"
 import { explainApiError } from "./pos-utils"
+import { POS } from "./pos-messages"
 
 export function useCashContext(
   locationId: string | undefined,
@@ -37,7 +38,7 @@ export function useCashContext(
     } catch (fetchError) {
       setPosContext(null)
       setPosContextError(
-        explainApiError(fetchError, "No se pudo validar la caja operativa."),
+        explainApiError(fetchError, POS.toast.cashContextError),
       )
     } finally {
       setPosContextLoading(false)
@@ -66,9 +67,9 @@ export function useCashContext(
       })
       setCashOpenDialogOpen(false)
       await refreshPosContext()
-      showSuccess("Caja abierta", "Ventas habilitadas para la sede.")
+      showSuccess(POS.cash.openSuccessTitle, POS.cash.openSuccessDesc)
     } catch (openError) {
-      showError("No se pudo abrir caja", explainApiError(openError, "Intenta nuevamente."))
+      showError(POS.cash.openErrorTitle, explainApiError(openError, POS.toast.cashOpenRetry))
     } finally {
       setOpeningCash(false)
     }
@@ -86,9 +87,9 @@ export function useCashContext(
       setReopenCashDialogOpen(false)
       setReopenNotes("")
       await refreshPosContext()
-      showSuccess("Caja reabierta", "Ventas habilitadas nuevamente.")
+      showSuccess(POS.cash.reopenSuccessTitle, POS.cash.reopenSuccessDesc)
     } catch (reopenError) {
-      showError("No se pudo reabrir caja", explainApiError(reopenError, "Intenta nuevamente."))
+      showError(POS.cash.reopenErrorTitle, explainApiError(reopenError, POS.toast.cashOpenRetry))
     } finally {
       setReopeningCash(false)
     }
