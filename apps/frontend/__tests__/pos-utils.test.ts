@@ -5,12 +5,24 @@ import {
   parseAmountInput,
   round2,
   formatMoney,
+  createPaymentDraft,
+  createDefaultMixedPayments,
+  getPaymentMethodLabel,
+  buildCashLabel,
+} from "../components/modules/sales/pos/pos-utils"
+import {
   groupVariantsByStyle,
   findVariantByAttributes,
   getVariantOptionValues,
   buildProductSearchResults,
+} from "../components/modules/sales/pos/pos-search-utils"
+import {
   computeSaleDiscountAmount,
   calculateSalePreview,
+  resolveEffectivePriceMode,
+  allocateDiscountAcrossItems,
+} from "../components/modules/sales/pos/pos-pricing-utils"
+import {
   isCustomerValidForDocumentType,
   getCustomerSearchFilter,
   filterCustomersByDocumentType,
@@ -20,14 +32,10 @@ import {
   buildCustomerFormFromCustomer,
   buildCustomerDisplayName,
   buildCustomerDocument,
-  createPaymentDraft,
-  createDefaultMixedPayments,
-  getPaymentMethodLabel,
-  buildCashLabel,
-  resolveEffectivePriceMode,
+} from "../components/modules/sales/pos/pos-customer-utils"
+import {
   deriveSummaryState,
-  allocateDiscountAcrossItems,
-} from "../components/modules/sales/pos/pos-utils"
+} from "../components/modules/sales/pos/pos-summary-utils"
 
 function makeVariant(overrides: Partial<SaleVariant> = {}): SaleVariant {
   return {
@@ -567,6 +575,73 @@ test.describe("deriveSummaryState", () => {
   test("returns warning when cash not ready", () => {
     const state = deriveSummaryState({ ...baseInput, cashReady: false, cashStatus: "closed" })
     expect(state.headerTone).toBe("danger")
+  })
+
+  test("returns ready for mixed payment with exact match", () => {
+    const state = deriveSummaryState({
+      ...baseInput,
+      documentType: "boleta",
+      activeDocumentOption: { label: "Boleta (DNI/CE)", value: "boleta" },
+      paymentMode: "mixed",
+      paymentMethod: "",
+      paymentSummaryLabel: "2 lineas de pago",
+      mixedPaymentsPreview: {
+        payments: [
+          { method: "cash", amount: 60, reference: null },
+          { method: "yape", amount: 40, reference: null },
+        ],
+        enteredTotal: 100,
+        difference: 0,
+        error: null,
+      },
+      mixedPayments: [
+        { id: "1", method: "cash", amount: "60", reference: "" },
+        { id: "2", method: "yape", amount: "40", reference: "" },
+      ],
+    })
+    expect(state.headerStatus).toBe("Listo para finalizar")
+    expect(state.paymentState).toBe("ready")
+  })
+
+  test("returns warning for mixed payment with excess", () => {
+    const state = deriveSummaryState({
+      ...baseInput,
+      paymentMode: "mixed",
+      paymentMethod: "",
+      paymentSummaryLabel: "2 lineas de pago",
+      mixedPaymentsPreview: {
+        payments: [
+          { method: "cash", amount: 60, reference: null },
+          { method: "yape", amount: 50, reference: null },
+        ],
+        enteredTotal: 110,
+        difference: -10,
+        error: "El pago excede el total por S/. 10.00",
+      },
+      mixedPayments: [
+        { id: "1", method: "cash", amount: "60", reference: "" },
+        { id: "2", method: "yape", amount: "50", reference: "" },
+      ],
+    })
+    expect(state.paymentState).toBe("warning")
+  })
+
+  test("returns ready for proforma with any customer", () => {
+    const state = deriveSummaryState({
+      ...baseInput,
+      documentType: "proforma",
+      activeDocumentOption: { label: "Proforma", value: "proforma" },
+      selectedCustomerName: "Cliente generico",
+      selectedCustomerDocument: "Sin documento",
+    })
+    expect(state.headerStatus).toBe("Listo para finalizar")
+    expect(state.documentBadge).toBe("Listo")
+  })
+
+  test("returns processing when submitting", () => {
+    const state = deriveSummaryState({ ...baseInput, submitting: true })
+    expect(state.headerStatus).toBe("Procesando...")
+    expect(state.headerTone).toBe("accent")
   })
 })
 

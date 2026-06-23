@@ -51,3 +51,23 @@ export const SELECTED_CARD =
 /** Tarjeta seleccionable en estado por defecto */
 export const CARD_BASE =
   "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] hover:bg-[var(--ops-surface)]"
+
+/** Borde con acento suave — hover de botones e inputs */
+export const ACCENT_HOVER_BORDER =
+  "[color:color-mix(in_srgb,var(--ripnel-accent)_24%,var(--ops-border-strong))]"
+
+/** Borde semitransparente para tarjetas de pago mixto */
+export const SUBTLE_BORDER =
+  "[color:color-mix(in_srgb,var(--ops-border-strong)_72%,transparent)]"
+
+/** Fondo muted muy sutil para lineas de pago mixto */
+export const SUBTLE_MUTED_SURFACE =
+  "[color:color-mix(in_srgb,var(--ops-surface-muted)_28%,var(--ops-surface))]"
+
+/** Fondo muted moderado para estados intermedios */
+export const MUTED_SURFACE_MIX =
+  "[color:color-mix(in_srgb,var(--ops-surface-muted)_58%,var(--ops-surface))]"
+
+/** Fondo con acento suave para paneles destacados secundarios */
+export const ACCENT_MUTED_BG =
+  "[color:color-mix(in_srgb,var(--ripnel-accent-soft)_68%,var(--ops-surface))]"

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo, useCallback } from "react"
+import { useState, useMemo } from "react"
 import {
   CheckCircle2,
   LoaderCircle,
@@ -10,17 +10,20 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { OpsDialog } from "@/components/ui/ops-dialog"
+import { opsInputCompact } from "@/components/ui/ops-control-styles"
 import { OpsFormField } from "@/components/ui/ops-form-field"
+import { OpsSelect, type OpsOption } from "@/components/ui/ops-selection"
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
+import { OpsQuantityStepper } from "@/components/ui/ops-quantity-stepper"
 import { PresetTextField } from "@/components/ui/preset-text-field"
-import { SearchablePicker } from "@/components/ui/searchable-picker"
-import { apiFetch } from "@/lib/api"
-import { explainApiError } from "@/lib/error-utils"
+import { ProductVariantPicker } from "@/components/shared/pickers/product-variant-picker"
 import { formatCurrency, round2 } from "@/lib/format-utils"
 import { cn } from "@/lib/utils"
-import type { PostsaleContext, SaleLine, SellableVariant } from "@/types/postsales"
+import type { PostsaleContext } from "@/types/postsales"
 import { PS } from "./postsales-messages"
 import { CARD_BASE, EXCHANGE_REASON_PRESETS, SELECTED_CARD } from "./postsales-constants"
+import { useReplacementSearch } from "./use-replacement-search"
+import { useExchangeForm } from "./use-exchange-form"
 
 interface ExchangeDialogProps {
   open: boolean
@@ -32,12 +35,19 @@ interface ExchangeDialogProps {
   onSuccess: () => void
 }
 
+const paymentMethodOptions: OpsOption[] = [
+  { value: "cash", label: PS.exchangeDialog.paymentMethods.cash },
+  { value: "yape", label: PS.exchangeDialog.paymentMethods.yape },
+  { value: "plin", label: PS.exchangeDialog.paymentMethods.plin },
+  { value: "transfer", label: PS.exchangeDialog.paymentMethods.transfer },
+]
+
 function computeCandidateTotal(
   candidate: { retail_price: number },
-  line: SaleLine,
+  effectiveQty: number,
   taxRate: number,
 ) {
-  const subtotal = round2(Number(candidate.retail_price || 0) * Number(line.quantity || 0))
+  const subtotal = round2(Number(candidate.retail_price || 0) * effectiveQty)
   const tax = round2(subtotal * Number(taxRate || 0))
   return round2(subtotal + tax)
 }
@@ -59,124 +69,85 @@ export default function ExchangeDialog({
     [sale.details, selectedLineId],
   )
 
-  const [search, setSearch] = useState("")
-  const [results, setResults] = useState<SellableVariant[]>([])
-  const [searchLoading, setSearchLoading] = useState(false)
-  const [searchError, setSearchError] = useState<string | null>(null)
-  const [selectedVariantId, setSelectedVariantId] = useState("")
-  const [pickerOpen, setPickerOpen] = useState(false)
-  const [highlightedIndex, setHighlightedIndex] = useState(0)
+  const lineQty = Number(selectedLine?.quantity || 0)
+  const exchangedQty = Number(selectedLine?.exchanged_qty || 0)
+  const remainingQty = Math.max(0, lineQty - exchangedQty)
 
-  const selectedReplacement = useMemo(
-    () => results.find((v) => v.variant_id === selectedVariantId) || null,
-    [results, selectedVariantId],
-  )
+  const [exchangeQty, setExchangeQty] = useState(1)
+  const [paymentMethod, setPaymentMethod] = useState("cash")
+  const [paymentReference, setPaymentReference] = useState("")
 
-  useEffect(() => {
-    if (!open) return
-    const trimmed = search.trim()
-    if (trimmed.length < 2) {
-      queueMicrotask(() => {
-        setResults([])
-        setSearchLoading(false)
-        setSearchError(null)
-      })
-      return
-    }
+  const {
+    replacementSearch: search,
+    setReplacementSearch: setSearch,
+    replacementResults: results,
+    replacementLoading: searchLoading,
+    replacementError: searchError,
+    replacementHasSearched: searchHasSearched,
+    selectedReplacementVariantId: selectedVariantId,
+    selectedReplacement,
+    replacementPickerOpen: pickerOpen,
+    setReplacementPickerOpen: setPickerOpen,
+    replacementHighlightedIndex: highlightedIndex,
+    setReplacementHighlightedIndex: setHighlightedIndex,
+    handleSelectReplacement,
+    clearReplacementSelection,
+  } = useReplacementSearch(context, isAllowed, open, selectedLine?.variant_id)
 
-    const controller = new AbortController()
-    let active = true
+  const {
+    reason,
+    setReason,
+    reasonError,
+    notes,
+    setNotes,
+    error: formError,
+    submitting,
+    handleSubmit: submitExchange,
+  } = useExchangeForm(() => {
+    onSuccess()
+  })
 
-    const timer = window.setTimeout(async () => {
-      setSearchLoading(true)
-      setSearchError(null)
-      try {
-        const params = new URLSearchParams({ q: trimmed })
-        const data = await apiFetch<SellableVariant[]>(
-          `/api/sales/sellable-variants?${params.toString()}`,
-          { cache: "no-store", signal: controller.signal },
-        )
-        if (active) setResults(Array.isArray(data) ? data : [])
-      } catch (e) {
-        if (!active || controller.signal.aborted) return
-        setResults([])
-        setSearchError(explainApiError(e, PS.exchangeDialog.noResults))
-      } finally {
-        if (active) setSearchLoading(false)
-      }
-    }, 250)
+  const replacementTotal = selectedLine && selectedReplacement
+    ? computeCandidateTotal(selectedReplacement, exchangeQty, context.sale.tax_rate)
+    : 0
 
-    return () => {
-      active = false
-      controller.abort()
-      window.clearTimeout(timer)
-    }
-  }, [search, open])
+  const originalExchangeTotal = selectedLine && lineQty > 0
+    ? round2(Number(selectedLine.line_total) * (exchangeQty / lineQty))
+    : 0
 
-  const handleReplacementSelect = useCallback(
-    (variant: SellableVariant) => {
-      setSelectedVariantId(variant.variant_id)
-      setSearch("")
-      setResults([])
-    },
-    [],
-  )
+  const differenceAmount = selectedLine && selectedReplacement
+    ? round2(replacementTotal - originalExchangeTotal)
+    : 0
 
-  const [reason, setReason] = useState("")
-  const [reasonError, setReasonError] = useState<string | null>(null)
-  const [notes, setNotes] = useState("")
-  const [submitting, setSubmitting] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
+  const valueMatches = selectedLine && selectedReplacement
+    ? Math.abs(differenceAmount) < 0.01
+    : true
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-
-    if (!selectedLineId || !selectedVariantId) {
-      setFormError(PS.exchangeDialog.blockValidation)
-      return
-    }
-
-    if (!reason.trim()) {
-      setReasonError(PS.detail.alerts.reasonValidation)
-      return
-    }
-
-    setFormError(null)
-    setReasonError(null)
-    setSubmitting(true)
-
-    try {
-      await apiFetch(`/api/postsales/${saleId}/exchanges`, {
-        method: "POST",
-        body: JSON.stringify({
-          sale_detail_id: selectedLineId,
-          replacement_variant_id: selectedVariantId,
-          reason,
-          notes,
-        }),
-      })
-      onSuccess()
-      onOpenChange(false)
-    } catch (e) {
-      setFormError(explainApiError(e, PS.exchangeDialog.errorFallback))
-    } finally {
-      setSubmitting(false)
-    }
-  }
+  const requiresCharge = Boolean(selectedLine && selectedReplacement && differenceAmount > 0)
+  const requiresRefundOrCredit = Boolean(selectedLine && selectedReplacement && differenceAmount < -0.01)
+  const sameVariantSelected = Boolean(selectedLine && selectedVariantId === selectedLine.variant_id)
 
   const canSubmit =
     Boolean(selectedLineId) &&
     Boolean(selectedVariantId) &&
     reason.trim().length > 0 &&
+    !sameVariantSelected &&
+    !requiresRefundOrCredit &&
+    (!requiresCharge || Boolean(paymentMethod)) &&
     !submitting
 
-  const replacementTotal = selectedLine && selectedReplacement
-    ? computeCandidateTotal(selectedReplacement, selectedLine, context.sale.tax_rate)
-    : 0
-
-  const valueMatches = selectedLine && selectedReplacement
-    ? round2(replacementTotal) === round2(selectedLine.line_total)
-    : true
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const ok = await submitExchange({
+      saleId,
+      saleDetailId: selectedLineId,
+      replacementVariantId: selectedVariantId,
+      quantity: exchangeQty,
+      paymentMethod: requiresCharge ? paymentMethod : undefined,
+      paymentReference: requiresCharge ? paymentReference : undefined,
+    })
+    if (ok) onOpenChange(false)
+  }
 
   return (
     <OpsDialog
@@ -192,6 +163,7 @@ export default function ExchangeDialog({
             onClick={() => onOpenChange(false)}
             disabled={submitting}
             className="rounded-lg"
+            size="sm"
           >
             {PS.exchangeDialog.close}
           </Button>
@@ -200,6 +172,7 @@ export default function ExchangeDialog({
             onClick={handleSubmit}
             disabled={!canSubmit}
             className="rounded-lg"
+            size="sm"
           >
             {submitting ? (
               <span className="inline-flex items-center gap-2">
@@ -239,18 +212,27 @@ export default function ExchangeDialog({
             {PS.exchangeDialog.stepLine}
           </p>
           <div className="space-y-2">
-            {sale.details.map((line) => (
+            {sale.details.map((line) => {
+              const lQty = Number(line.quantity || 0)
+              const lExchanged = Number(line.exchanged_qty || 0)
+              const lRemaining = Math.max(0, lQty - lExchanged)
+              const isExhausted = lRemaining <= 0
+              return (
               <button
                 key={line.sale_detail_id}
                 type="button"
+                disabled={isExhausted}
                 onClick={() => {
                   setSelectedLineId(line.sale_detail_id)
-                  setSelectedVariantId("")
-                  setSearch("")
-                  setResults([])
+                  const r = Math.max(1, lRemaining)
+                  setExchangeQty(r)
+                  setPaymentMethod("cash")
+                  setPaymentReference("")
+                  clearReplacementSelection()
                 }}
                 className={cn(
                   "block w-full cursor-pointer rounded-lg border px-3 py-3 text-left transition",
+                  isExhausted && "cursor-not-allowed opacity-50",
                   selectedLineId === line.sale_detail_id ? SELECTED_CARD : CARD_BASE,
                 )}
               >
@@ -268,23 +250,53 @@ export default function ExchangeDialog({
                       {formatCurrency(Number(line.line_total))}
                     </p>
                     <p className="mt-1 text-xs text-[var(--ops-text-muted)]">
-                      {line.quantity} und
+                      {lExchanged > 0
+                        ? `${lExchanged} de ${lQty} cambiadas`
+                        : `${lQty} und`}
                     </p>
+                    {isExhausted ? (
+                      <p className="mt-0.5 text-[10px] text-[var(--ops-tone-danger-text)]">
+                        Sin unidades disponibles
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               </button>
-            ))}
+              )
+            })}
           </div>
         </div>
 
         {selectedLine ? (
           <>
-            <SearchablePicker
+            <OpsFormField
+              label={PS.exchangeDialog.quantityLabel}
+              required
+              density="compact"
+            >
+              <div className="flex items-center gap-2">
+                <OpsQuantityStepper
+                  layout="horizontal"
+                  size="sm"
+                  value={exchangeQty}
+                  onIncrement={() =>
+                    setExchangeQty(Math.min(remainingQty, exchangeQty + 1))
+                  }
+                  onDecrement={() =>
+                    setExchangeQty(Math.max(1, exchangeQty - 1))
+                  }
+                  min={1}
+                  max={remainingQty}
+                />
+                <span className="shrink-0 text-xs text-[var(--ops-text-muted)]">
+                  {PS.exchangeDialog.remainingUnits} {remainingQty}
+                </span>
+              </div>
+            </OpsFormField>
+
+            <ProductVariantPicker
               value={search}
-              onChange={(v) => {
-                setSearch(v)
-                setHighlightedIndex(0)
-              }}
+              onChange={setSearch}
               placeholder={PS.exchangeDialog.searchPlaceholder}
               label={PS.exchangeDialog.searchLabel}
               items={results}
@@ -292,47 +304,35 @@ export default function ExchangeDialog({
               error={searchError}
               loadingMessage={PS.exchangeDialog.loading}
               emptyMessage={PS.exchangeDialog.noResults}
+              idleMessage={PS.exchangeDialog.searchIdle}
+              minQueryLength={2}
+              hasSearched={searchHasSearched}
               maxVisibleItems={6}
               highlightedIndex={highlightedIndex}
               onHighlightChange={setHighlightedIndex}
-              getItemKey={(v) => v.variant_id}
               selectedItemKey={selectedVariantId}
-              onSelect={handleReplacementSelect}
+              onSelect={handleSelectReplacement}
               open={pickerOpen}
               onOpenChange={setPickerOpen}
               openOnFocus
-              renderItem={(variant) => {
-                const total = computeCandidateTotal(variant, selectedLine, context.sale.tax_rate)
-                const matches = round2(total) === round2(selectedLine.line_total)
+              renderMeta={(variant) => {
+                const total = computeCandidateTotal(variant, exchangeQty, context.sale.tax_rate)
+                const originalTotal = lineQty > 0
+                  ? round2(Number(selectedLine.line_total) * (exchangeQty / lineQty))
+                  : 0
+                const diff = round2(total - originalTotal)
+                const matches = Math.abs(diff) < 0.01
                 return (
-                  <div className="flex w-full items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-[var(--ops-text)]">
-                        {variant.style_name}
-                      </p>
-                      <p className="mt-0.5 text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
-                        {variant.sku} &middot; {variant.size_code}/{variant.color_code}
-                      </p>
-                    </div>
-                    <div className="shrink-0 text-right text-xs">
-                      <p className="font-semibold text-[var(--ops-text)]">
-                        {formatCurrency(Number(variant.retail_price || 0))}
-                      </p>
-                      <p className="text-[var(--ops-text-muted)]">
-                        Stock {Number(variant.stock || 0)}
-                      </p>
-                      <div className="mt-0.5">
-                        <OpsStatusBadge size="xs" tone={matches ? "success" : "warning"}>
-                          {matches
-                            ? PS.exchangeDialog.sameValueBadge
-                            : formatCurrency(total)}
-                        </OpsStatusBadge>
-                      </div>
-                    </div>
-                  </div>
+                  <OpsStatusBadge
+                    size="xs"
+                    tone={matches ? "success" : diff > 0 ? "warning" : "danger"}
+                  >
+                    {matches
+                      ? PS.exchangeDialog.sameValueBadge
+                      : formatCurrency(diff)}
+                  </OpsStatusBadge>
                 )
               }}
-              density="compact"
             />
 
             {selectedReplacement ? (
@@ -344,20 +344,23 @@ export default function ExchangeDialog({
                       {PS.exchangeDialog.replacementSelected}
                     </p>
                     <div className="mt-2.5 space-y-2.5">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">
+                        {PS.exchangeDialog.priceTraceTitle}
+                      </p>
                       <div>
                         <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
-                          {PS.exchangeDialog.lineToReplace}
+                          {PS.exchangeDialog.returnsLabel}
                         </p>
                         <p className="text-sm font-medium text-[var(--ops-text)]">
-                          {selectedLine.style_name} &middot; {selectedLine.quantity} und
+                          {selectedLine.style_name} &middot; {exchangeQty} und
                         </p>
                         <p className="text-xs text-[var(--ops-text-muted)]">
-                          {formatCurrency(Number(selectedLine.line_total))}
+                          {formatCurrency(originalExchangeTotal)}
                         </p>
                       </div>
                       <div className="border-t border-[var(--ops-tone-success-border)] pt-2.5">
                         <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
-                          {PS.exchangeDialog.replacementVariant}
+                          {PS.exchangeDialog.deliversLabel}
                         </p>
                         <p className="text-sm font-medium text-[var(--ops-text)]">
                           {selectedReplacement.style_name} &middot; {selectedReplacement.sku}
@@ -369,17 +372,56 @@ export default function ExchangeDialog({
                           {" "}&middot;{" "}
                           Stock {Number(selectedReplacement.stock || 0)}
                         </p>
+                        <p className="mt-1 text-xs text-[var(--ops-text-muted)]">
+                          {formatCurrency(replacementTotal)}
+                        </p>
                       </div>
                     </div>
-                    <div className="mt-2">
-                      <OpsStatusBadge tone={valueMatches ? "success" : "warning"}>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <OpsStatusBadge
+                        tone={
+                          sameVariantSelected || requiresRefundOrCredit
+                            ? "danger"
+                            : valueMatches
+                              ? "success"
+                              : "warning"
+                        }
+                      >
                         {valueMatches
-                          ? PS.exchangeDialog.sameValueBadge
-                          : `${PS.exchangeDialog.diffValueBadge} ${formatCurrency(replacementTotal)}`}
+                          ? PS.exchangeDialog.noDifference
+                          : `${requiresCharge ? PS.exchangeDialog.chargeDifference : PS.exchangeDialog.differenceLabel} ${formatCurrency(Math.abs(differenceAmount))}`}
                       </OpsStatusBadge>
                     </div>
+                    {sameVariantSelected || requiresRefundOrCredit ? (
+                      <p className="mt-2 text-xs font-medium text-[var(--ops-tone-danger-text)]">
+                        {sameVariantSelected
+                          ? PS.exchangeDialog.sameVariantBlocked
+                          : PS.exchangeDialog.refundBlocked}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
+              </div>
+            ) : null}
+
+            {requiresCharge ? (
+              <div className="grid gap-3 rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-3 py-3 md:grid-cols-2">
+                <OpsSelect
+                  label={PS.exchangeDialog.paymentMethod}
+                  value={paymentMethod}
+                  onChange={setPaymentMethod}
+                  options={paymentMethodOptions}
+                />
+                <OpsFormField label={PS.exchangeDialog.paymentReference} density="compact">
+                  <input
+                    autoComplete="off"
+                    value={paymentReference}
+                    onChange={(e) => setPaymentReference(e.target.value)}
+                    maxLength={80}
+                    className={opsInputCompact}
+                    placeholder={PS.exchangeDialog.paymentReferencePlaceholder}
+                  />
+                </OpsFormField>
               </div>
             ) : null}
 
@@ -388,10 +430,7 @@ export default function ExchangeDialog({
               required
               error={reasonError}
               value={reason}
-              onChange={(v) => {
-                setReason(v)
-                setReasonError(null)
-              }}
+              onChange={setReason}
               presets={EXCHANGE_REASON_PRESETS}
               placeholder={PS.detail.lines.reasonPlaceholder}
               textareaRows={2}

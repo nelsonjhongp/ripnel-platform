@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/compact-picker"
 import { Button } from "@/components/ui/button"
 
+type SearchablePickerEmptyStateMode = "idle" | "query" | "always"
+
 export interface SearchablePickerProps<T> {
   value: string
   onChange: (value: string) => void
@@ -33,12 +35,17 @@ export interface SearchablePickerProps<T> {
   error?: string | null
   loadingMessage?: string
   emptyMessage?: string
+  idleMessage?: string
+  minQueryLength?: number
+  hasSearched?: boolean
+  emptyStateMode?: SearchablePickerEmptyStateMode
   maxVisibleItems?: number
   highlightedIndex: number
   onHighlightChange: (index: number) => void
   getItemKey: (item: T) => string
   renderItem: (item: T) => ReactNode
   onSelect: (item: T) => void
+  closeOnSelect?: boolean
   selectedItemKey?: string
   onClear?: () => void
   showClear?: boolean
@@ -67,12 +74,17 @@ export function SearchablePicker<T>({
   error = null,
   loadingMessage = "Buscando…",
   emptyMessage = "Sin resultados",
+  idleMessage,
+  minQueryLength = 0,
+  hasSearched,
+  emptyStateMode = "always",
   maxVisibleItems,
   highlightedIndex,
   onHighlightChange,
   getItemKey,
   renderItem,
   onSelect,
+  closeOnSelect = true,
   selectedItemKey,
   onClear,
   showClear,
@@ -134,6 +146,7 @@ export function SearchablePicker<T>({
       event.preventDefault()
       const item = visibleItems[clampedIndex]
       if (item) {
+        if (closeOnSelect) onOpenChange(false)
         onSelect(item)
       }
     }
@@ -155,6 +168,17 @@ export function SearchablePicker<T>({
 
   const effectiveShowClear =
     showClear !== undefined ? showClear : Boolean(value && !disabled)
+
+  const normalizedQueryLength = value.trim().length
+  const meetsMinQueryLength = normalizedQueryLength >= minQueryLength
+  const effectiveHasSearched =
+    hasSearched !== undefined
+      ? hasSearched
+      : emptyStateMode === "always" || meetsMinQueryLength
+  const emptyStateMessage =
+    emptyStateMode !== "always" && (!meetsMinQueryLength || !effectiveHasSearched)
+      ? (idleMessage ?? emptyMessage)
+      : emptyMessage
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>
@@ -225,13 +249,12 @@ export function SearchablePicker<T>({
           ) : loading && visibleItems.length === 0 ? (
             <CompactPickerEmpty>{loadingMessage}</CompactPickerEmpty>
           ) : visibleItems.length === 0 ? (
-            <CompactPickerEmpty>{emptyMessage}</CompactPickerEmpty>
+            <CompactPickerEmpty>{emptyStateMessage}</CompactPickerEmpty>
           ) : (
             <CompactPickerList
               role="listbox"
               id={listId}
-              className="max-h-72 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-              style={{ scrollbarWidth: "none" }}
+              className="max-h-72 overflow-y-auto"
             >
               <div className="divide-y divide-[var(--ops-border-strong)]">
                 {visibleItems.map((item, index) => (
@@ -244,6 +267,7 @@ export function SearchablePicker<T>({
                     selected={selectedItemKey === getItemKey(item)}
                     onMouseEnter={() => onHighlightChange(index)}
                     onClick={() => {
+                      if (closeOnSelect) onOpenChange(false)
                       onSelect(item)
                       onHighlightChange(0)
                     }}

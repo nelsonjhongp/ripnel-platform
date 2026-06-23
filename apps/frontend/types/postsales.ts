@@ -25,6 +25,7 @@ export type SaleLine = {
   line_subtotal: number
   line_tax: number
   line_total: number
+  exchanged_qty: number
 }
 
 export type SalePayment = {
@@ -57,6 +58,12 @@ export type ExchangeLine = {
   color_code: string
   quantity: number
   unit_reference_price: number | null
+  unit_price_list: number | null
+  unit_price_final: number | null
+  line_subtotal: number
+  line_tax: number
+  line_total: number
+  price_source: string | null
 }
 
 export type ExchangeRecord = {
@@ -65,6 +72,11 @@ export type ExchangeRecord = {
   status: string
   reason: string | null
   notes: string | null
+  original_total: number
+  replacement_total: number
+  difference_amount: number
+  settlement_type: "none" | "charge" | "refund_pending" | "credit_pending"
+  settlement_payment_id: string | null
   created_by_name: string | null
   confirmed_by_name: string | null
   confirmed_at: string | null
@@ -85,6 +97,7 @@ export type PostsaleContext = {
     location_name: string
     seller_name: string
     subtotal_amount: number
+    sale_discount_amount: number
     tax_amount: number
     tax_rate: number
     total_amount: number

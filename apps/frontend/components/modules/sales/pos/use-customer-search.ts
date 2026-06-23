@@ -7,7 +7,7 @@ import {
   filterCustomersByDocumentType,
   getCustomerSearchFilter,
   replaceCustomerInResults,
-} from "./pos-utils"
+} from "./pos-customer-utils"
 
 export function useCustomerSearch(documentType: string) {
   const [customerQuery, setCustomerQuery] = useState("")
