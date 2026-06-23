@@ -16,7 +16,7 @@ import { POS } from "./pos-messages"
 import type { PaymentStageProps } from "./pos-stage-props"
 import { PAYMENT_METHODS } from "./pos-types"
 import { getPaymentReferenceMeta, parseAmountInput } from "./pos-utils"
-import { INPUT_CLASS, PAYMENT_TOLERANCE } from "./pos-constants"
+import { INPUT_CLASS, PAYMENT_TOLERANCE, SUBTLE_BORDER, SUBTLE_MUTED_SURFACE } from "./pos-constants"
 
 const CIRCLE_CLASS =
   "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
@@ -335,7 +335,7 @@ function PaymentLine({
 }) {
   const refMeta = getPaymentReferenceMeta(method)
   return (
-    <div className="grid gap-2 rounded-lg border border-[color:color-mix(in_srgb,var(--ops-border-strong)_72%,transparent)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_28%,var(--ops-surface))] p-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0">
+    <div className={`grid gap-2 rounded-lg border border-[${SUBTLE_BORDER}] bg-[${SUBTLE_MUTED_SURFACE}] p-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0`}>
       <div className="space-y-1">
         <div className="flex items-center justify-between gap-2 sm:block">
           <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)] sm:hidden">{POS.payment.method}</span>

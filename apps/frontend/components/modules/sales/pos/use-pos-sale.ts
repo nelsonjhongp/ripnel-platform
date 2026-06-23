@@ -20,25 +20,31 @@ import type {
   Stage,
 } from "./pos-types"
 import {
-  buildCustomerDisplayName,
-  buildCustomerDocument,
   buildVariantTone,
-  calculateSalePreview,
   createDefaultMixedPayments,
   createPaymentDraft,
   explainApiError,
   getPaymentMethodLabel,
-  isCustomerValidForDocumentType,
   parseAmountInput,
   round2,
-  shouldApplyWholesalePreview,
   trimOrNull,
 } from "./pos-utils"
+import {
+  calculateSalePreview,
+  shouldApplyWholesalePreview,
+} from "./pos-pricing-utils"
+import {
+  buildCustomerDisplayName,
+  buildCustomerDocument,
+  isCustomerValidForDocumentType,
+} from "./pos-customer-utils"
+import { deriveSummaryState } from "./pos-summary-utils"
 import { useCart } from "./use-cart"
 import { useCashContext } from "./use-cash-context"
 import { useCustomerSearch } from "./use-customer-search"
 import { usePaymentState } from "./use-payment-state"
 import { useProductSearch } from "./use-product-search"
+import { POS } from "./pos-messages"
 
 export function usePosSale() {
   const { defaultLocation, locationsLoading, has } = useAuth()
@@ -174,16 +180,16 @@ export function usePosSale() {
     if (saleDiscount.mode === "none" || cartItems.length === 0) return null
     const discountValue = parseAmountInput(saleDiscount.value)
     if (discountValue === null || discountValue <= 0) {
-      return "Ingresa un descuento valido."
+      return POS.discount.valueError
     }
     if (saleDiscount.mode === "percent" && discountValue > 100) {
-      return "El descuento porcentual no puede superar 100%."
+      return POS.discount.percentError
     }
     if (saleDiscount.mode === "amount" && discountValue > totals.baseSubtotal) {
-      return "El descuento no puede superar el subtotal base."
+      return POS.discount.amountError
     }
-    if (totals.total <= 0) return "El total final debe ser mayor a cero."
-    if (!trimOrNull(saleDiscount.reason)) return "Ingresa el motivo del descuento."
+    if (totals.total <= 0) return POS.summaryStatus.totalZero
+    if (!trimOrNull(saleDiscount.reason)) return POS.discount.reasonError
     return null
   }, [cartItems.length, saleDiscount, totals.baseSubtotal, totals.total])
 
@@ -221,11 +227,11 @@ export function usePosSale() {
 
     if (cartItems.length > 0) {
       if (positivePayments.length < 2) {
-        errorMessage = "Distribuye el cobro en al menos dos pagos."
+        errorMessage = POS.validation.mixedMinTwoPayments
       } else if (hasEmptyMethodWithAmount) {
-        errorMessage = "Selecciona el metodo en cada linea de pago."
+        errorMessage = POS.validation.mixedSelectMethod
       } else if (normalizedPayments.some((payment) => !payment.methodIsValid)) {
-        errorMessage = "Revisa los metodos del pago mixto."
+        errorMessage = POS.validation.mixedReviewMethods
       } else if (
         normalizedPayments.some(
           (payment) =>
@@ -233,12 +239,12 @@ export function usePosSale() {
             payment.amountValue === null,
         )
       ) {
-        errorMessage = "Revisa los montos del pago mixto."
+        errorMessage = POS.validation.mixedReviewAmounts
       } else if (Math.abs(difference) >= 0.01) {
         errorMessage =
           difference > 0
-            ? `Faltan S/. ${difference.toFixed(2)} por asignar.`
-            : `El pago excede el total por S/. ${Math.abs(difference).toFixed(2)}.`
+            ? POS.validation.mixedShortfall(difference.toFixed(2))
+            : POS.validation.mixedExcess(Math.abs(difference).toFixed(2))
       }
     }
 
@@ -279,7 +285,7 @@ export function usePosSale() {
     DOC_TYPES.find((docType) => docType.value === documentType) || DOC_TYPES[0]
   const paymentSummaryLabel =
     paymentMode === "mixed"
-      ? `${mixedPaymentsPreview.payments.length || mixedPayments.length} lineas de pago`
+      ? POS.paymentLine.linesOfPayment(mixedPaymentsPreview.payments.length || mixedPayments.length)
       : getPaymentMethodLabel(paymentMethod)
   const selectedCustomerName = buildCustomerDisplayName(selectedCustomer)
   const selectedCustomerDocument = buildCustomerDocument(selectedCustomer)
@@ -304,25 +310,6 @@ export function usePosSale() {
       saleDiscount.mode !== "none"
     )
 
-  const summaryStatusMessage = (() => {
-    if (!defaultLocation?.location_id) return "Asigna una sede operativa antes de vender."
-    if (posContextLoading) return "Validando sede y caja operativa..."
-    if (!cashReady) {
-      return (
-        posContext?.cash?.message ||
-        "La venta no se puede registrar hasta que se abra una caja"
-      )
-    }
-    if (cartItems.length === 0) return "Agrega al menos un producto."
-    if (totals.hasMissingPrice) return "Hay items sin precio vigente."
-    if (saleDiscountError) return saleDiscountError
-    if (singlePaymentMissingMethod) return "Selecciona un metodo de pago."
-    if (mixedPaymentsPreview.error) return mixedPaymentsPreview.error
-    if (!selectedCustomer) return "Selecciona un cliente o crea uno con el boton."
-    if (!customerIsValid) return "Revisa cliente y comprobante."
-    return "Venta lista para confirmar."
-  })()
-
   const submitDisabled =
     cartItems.length === 0 ||
     Boolean(confirmedSale) ||
@@ -336,6 +323,46 @@ export function usePosSale() {
     Boolean(mixedPaymentsPreview.error) ||
     !customerIsValid ||
     submitting
+
+  const derivedSummary = useMemo(
+    () =>
+      deriveSummaryState({
+        documentType,
+        activeDocumentOption,
+        selectedCustomerName,
+        selectedCustomerDocument,
+        customerStepReady,
+        cartCount,
+        totals,
+        paymentMode,
+        paymentMethod,
+        paymentSummaryLabel,
+        mixedPaymentsPreview,
+        mixedPayments,
+        cashReady,
+        cashStatus,
+        submitDisabled,
+        submitting,
+      }),
+    [
+      documentType,
+      activeDocumentOption,
+      selectedCustomerName,
+      selectedCustomerDocument,
+      customerStepReady,
+      cartCount,
+      totals,
+      paymentMode,
+      paymentMethod,
+      paymentSummaryLabel,
+      mixedPaymentsPreview,
+      mixedPayments,
+      cashReady,
+      cashStatus,
+      submitDisabled,
+      submitting,
+    ],
+  )
 
   useEffect(() => {
     if (!hasDraftSale) return
@@ -479,7 +506,6 @@ export function usePosSale() {
         single.retail_price !== null || single.wholesale_price !== null
       if (hasPrice && single.stock > 0) {
         addToCart(single, 1)
-        productSearchInputRef.current?.focus()
         return
       }
     }
@@ -489,6 +515,7 @@ export function usePosSale() {
 
   function closeProductConfigModal() {
     setProductConfigOpen(false)
+    rawSelectProductStyle(null)
   }
 
   function addSelectedVariantToCart(variant: SaleVariant, quantity = 1) {
@@ -527,8 +554,8 @@ export function usePosSale() {
         })),
       )
       showInfo(
-        "Cobro mixto reiniciado",
-        "El total cambio. Reingresa los montos del pago mixto.",
+        POS.toast.mixedResetTitle,
+        POS.toast.mixedResetDesc,
       )
     }
 
@@ -635,11 +662,11 @@ export function usePosSale() {
       setCustomerQuery("")
       setDiscountModalOpen(false)
       await refreshPosContext()
-      showSuccess("Venta confirmada", sale.sale_number ? `#${sale.sale_number}` : "Exitosa")
+      showSuccess(POS.sale.success, sale.sale_number ? `#${sale.sale_number}` : POS.sale.successDesc)
     } catch (submitError) {
-      const message = explainApiError(submitError, "No se pudo confirmar la venta.")
+      const message = explainApiError(submitError, POS.toast.saleConfirmError)
       setError(message)
-      showError("Error al confirmar venta", message)
+      showError(POS.sale.error, message)
       await refreshPosContext()
     } finally {
       setSubmitting(false)
@@ -650,11 +677,13 @@ export function usePosSale() {
     defaultLocation,
     locationsLoading,
     has,
-    customerSectionRef,
-    productSectionRef,
-    paymentSectionRef,
-    productSearchInputRef,
-    customerSearchInputRef,
+    refs: {
+      customerSectionRef,
+      productSectionRef,
+      paymentSectionRef,
+      productSearchInputRef,
+      customerSearchInputRef,
+    },
     query,
     setQuery,
     loadingVariants,
@@ -732,7 +761,7 @@ export function usePosSale() {
     cashStatus,
     canOpenCashModule,
     canReopenCash,
-    summaryStatusMessage,
+    derivedSummary,
     submitDisabled,
     hasDraftSale,
     cartCount,
