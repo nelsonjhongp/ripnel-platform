@@ -20,14 +20,17 @@ const {
   nextExchangeNumberInTx,
   insertExchange,
   insertExchangeLine,
+  updateExchangeSettlementPayment,
   cancelSaleInTx,
   insertSaleCancellation,
   insertPaymentReversal,
   upsertInventoryQty,
   insertStockMovement,
 } = require('./postsales.repo');
+const { insertSalePayment } = require('../sales/sales.repo');
 
 const ALLOWED_SALE_STATUSES = ['confirmed', 'draft', 'cancelled'];
+const ALLOWED_PAYMENT_METHODS = ['cash', 'yape', 'plin', 'transfer'];
 
 function normalizeText(value) {
   if (value === undefined || value === null) return null;
@@ -52,6 +55,10 @@ function normalizePositiveInteger(value, fallback = null) {
 
 function isCloseEnough(left, right) {
   return Math.abs(round2(left) - round2(right)) < 0.01;
+}
+
+function todayPeruDate() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
 }
 
 function sanitizeCashStatus(value) {
@@ -94,9 +101,16 @@ function buildAvailability({ sale, details, cancellation, confirmedExchangeCount
     cancelReasons.push('La venta ya registra una anulación controlada.');
   }
 
+  const hasRemainingUnits = Array.isArray(details) && details.some(
+    (line) => (line.quantity - (Number(line.exchanged_qty) || 0)) > 0
+  );
+
+  if (!hasRemainingUnits) {
+    exchangeReasons.push('Todas las unidades de esta venta ya fueron cambiadas.');
+  }
+
   if (confirmedExchangeCount > 0) {
-    exchangeReasons.push('La venta ya registra un cambio confirmado.');
-    cancelReasons.push('La venta ya registra un cambio confirmado.');
+    cancelReasons.push('No se puede anular una venta que ya tiene cambios registrados.');
   }
 
   if (cashStatus !== 'open') {
@@ -322,6 +336,11 @@ async function createSimpleExchange(input = {}) {
   const replacementVariantId = normalizeUuid(input.replacement_variant_id);
   const reason = normalizeText(input.reason);
   const notes = normalizeText(input.notes);
+  const paymentMethod = normalizeText(input.payment_method);
+  const paymentReference = normalizeText(input.payment_reference);
+  const exchangeQty = Number.isFinite(Number(input.quantity)) && Number(input.quantity) > 0
+    ? Math.round(Number(input.quantity))
+    : null;
 
   if (!saleId) {
     throw new AppError('sale_id es obligatorio', 400, { code: 'INVALID_SALE_ID' });
@@ -383,6 +402,19 @@ async function createSimpleExchange(input = {}) {
       });
     }
 
+    const lineQty = Number(originalLine.quantity || 0);
+    const alreadyExchanged = Number(originalLine.exchanged_qty) || 0;
+    const remainingQty = lineQty - alreadyExchanged;
+    const effectiveQty = exchangeQty !== null ? exchangeQty : remainingQty;
+
+    if (effectiveQty < 1 || effectiveQty > remainingQty) {
+      throw new AppError(
+        `Cantidad a cambiar inválida. La línea tiene ${lineQty} unidades, ${alreadyExchanged} ya fueron cambiadas, ${remainingQty} disponibles.`,
+        400,
+        { code: 'INVALID_EXCHANGE_QUANTITY' }
+      );
+    }
+
     const replacementVariant = await findVariantById(replacementVariantId, executor);
     if (!replacementVariant) {
       throw new AppError('La variante de reemplazo no existe.', 404, {
@@ -404,7 +436,7 @@ async function createSimpleExchange(input = {}) {
       getCurrentRetailPriceInTx(executor, replacementVariant.style_id, replacementVariant.size_id),
     ]);
 
-    if (replacementQty < Number(originalLine.quantity || 0)) {
+    if (replacementQty < effectiveQty) {
       throw new AppError('No hay stock suficiente para la variante de reemplazo.', 409, {
         code: 'REPLACEMENT_STOCK_INSUFFICIENT',
       });
@@ -416,16 +448,54 @@ async function createSimpleExchange(input = {}) {
       });
     }
 
-    const replacementSubtotal = round2(Number(replacementUnitPrice) * Number(originalLine.quantity || 0));
+    const replacementSubtotal = round2(Number(replacementUnitPrice) * effectiveQty);
     const replacementTax = round2(replacementSubtotal * Number(sale.tax_rate || 0));
     const replacementTotal = round2(replacementSubtotal + replacementTax);
 
-    if (!isCloseEnough(replacementTotal, Number(originalLine.line_total || 0))) {
+    const originalSubtotal = round2(
+      Number(originalLine.line_subtotal || 0) * (effectiveQty / lineQty)
+    );
+    const originalTax = round2(
+      Number(originalLine.line_tax || 0) * (effectiveQty / lineQty)
+    );
+    const proportionalLineTotal = round2(
+      Number(originalLine.line_total || 0) * (effectiveQty / lineQty)
+    );
+    const differenceAmount = round2(replacementTotal - proportionalLineTotal);
+    const settlementType = isCloseEnough(differenceAmount, 0)
+      ? 'none'
+      : differenceAmount > 0
+        ? 'charge'
+        : 'refund_pending';
+
+    if (settlementType === 'refund_pending') {
       throw new AppError(
-        'El cambio simple solo permite reemplazos con el mismo valor total de la línea original.',
+        'El reemplazo tiene menor valor. Esta version requiere devolucion o credito interno para completar el cambio.',
         409,
-        { code: 'POSTSALE_EXCHANGE_VALUE_MISMATCH' }
+        { code: 'POSTSALE_EXCHANGE_REFUND_OR_CREDIT_REQUIRED' }
       );
+    }
+
+    if (settlementType === 'charge') {
+      if (!paymentMethod || !ALLOWED_PAYMENT_METHODS.includes(paymentMethod)) {
+        throw new AppError('Selecciona un metodo de pago para cobrar la diferencia.', 400, {
+          code: 'POSTSALE_EXCHANGE_PAYMENT_METHOD_REQUIRED',
+        });
+      }
+
+      const cashClosing = await findCashClosingByLocationAndDate(
+        sale.location_id,
+        todayPeruDate(),
+        executor
+      );
+
+      if (!cashClosing || cashClosing.status !== 'open') {
+        throw new AppError(
+          'La caja operativa de hoy debe estar abierta para cobrar la diferencia del cambio.',
+          409,
+          { code: 'POSTSALE_EXCHANGE_CASH_REQUIRED' }
+        );
+      }
     }
 
     const exchangeNumber = await nextExchangeNumberInTx(executor);
@@ -437,6 +507,10 @@ async function createSimpleExchange(input = {}) {
         status: 'confirmed',
         reason,
         notes,
+        original_total: proportionalLineTotal,
+        replacement_total: replacementTotal,
+        difference_amount: differenceAmount,
+        settlement_type: settlementType,
         created_by: user.user_id,
         confirmed_by: user.user_id,
       },
@@ -448,8 +522,15 @@ async function createSimpleExchange(input = {}) {
         exchange_id: exchange.exchange_id,
         direction: 'IN',
         variant_id: originalLine.variant_id,
-        quantity: originalLine.quantity,
+        quantity: effectiveQty,
         unit_reference_price: originalLine.unit_price_final,
+        unit_price_list: originalLine.unit_price_list,
+        unit_price_final: originalLine.unit_price_final,
+        line_subtotal: originalSubtotal,
+        line_tax: originalTax,
+        line_total: proportionalLineTotal,
+        price_source: 'original_sale',
+        sale_detail_id: saleDetailId,
         notes: `Devuelto por cambio de ${sale.sale_number || sale.sale_id}`,
       },
       executor
@@ -460,8 +541,15 @@ async function createSimpleExchange(input = {}) {
         exchange_id: exchange.exchange_id,
         direction: 'OUT',
         variant_id: replacementVariant.variant_id,
-        quantity: originalLine.quantity,
+        quantity: effectiveQty,
         unit_reference_price: replacementUnitPrice,
+        unit_price_list: replacementUnitPrice,
+        unit_price_final: replacementUnitPrice,
+        line_subtotal: replacementSubtotal,
+        line_tax: replacementTax,
+        line_total: replacementTotal,
+        price_source: 'current_retail',
+        sale_detail_id: saleDetailId,
         notes: `Entregado por cambio de ${sale.sale_number || sale.sale_id}`,
       },
       executor
@@ -470,14 +558,14 @@ async function createSimpleExchange(input = {}) {
     await upsertInventoryQty(
       sale.location_id,
       originalLine.variant_id,
-      originalQty + Number(originalLine.quantity || 0),
+      originalQty + effectiveQty,
       executor
     );
 
     await upsertInventoryQty(
       sale.location_id,
       replacementVariant.variant_id,
-      replacementQty - Number(originalLine.quantity || 0),
+      replacementQty - effectiveQty,
       executor
     );
 
@@ -486,7 +574,7 @@ async function createSimpleExchange(input = {}) {
         location_id: sale.location_id,
         variant_id: originalLine.variant_id,
         movement_type: 'IN',
-        quantity: originalLine.quantity,
+        quantity: effectiveQty,
         reason: `Cambio simple ${exchangeNumber}`,
         reference_type: 'exchange',
         reference_id: exchange.exchange_id,
@@ -501,7 +589,7 @@ async function createSimpleExchange(input = {}) {
         location_id: sale.location_id,
         variant_id: replacementVariant.variant_id,
         movement_type: 'OUT',
-        quantity: originalLine.quantity,
+        quantity: effectiveQty,
         reason: `Cambio simple ${exchangeNumber}`,
         reference_type: 'exchange',
         reference_id: exchange.exchange_id,
@@ -510,6 +598,19 @@ async function createSimpleExchange(input = {}) {
       },
       executor
     );
+
+    if (settlementType === 'charge') {
+      const payment = await insertSalePayment(executor, {
+        sale_id: saleId,
+        method: paymentMethod,
+        amount: differenceAmount,
+        reference: paymentReference || `Diferencia ${exchangeNumber}`,
+      });
+
+      if (payment && payment.payment_id) {
+        await updateExchangeSettlementPayment(exchange.exchange_id, payment.payment_id, executor);
+      }
+    }
 
     await client.query('commit');
     return loadPostsaleContext(saleId, location.location_id);

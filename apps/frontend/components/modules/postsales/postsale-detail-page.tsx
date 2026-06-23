@@ -7,12 +7,7 @@ import {
   CreditCard,
   Download,
   MoreHorizontal,
-  PackageSearch,
   ReceiptText,
-  RefreshCcw,
-  ShieldAlert,
-  Undo2,
-  User,
 } from "lucide-react"
 
 import { useAuth } from "@/components/auth/AuthProvider"
@@ -29,9 +24,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { OpsMetricRow } from "@/components/ui/ops-metric-row"
 import { OpsPageShell } from "@/components/ui/ops-page-shell"
 import { OpsPanelSection } from "@/components/ui/ops-panel-section"
+import { OpsMetricRow } from "@/components/ui/ops-metric-row"
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { ReceiptOptionsModal } from "@/components/ui/purchase-system/ReceiptOptionsModal"
@@ -39,21 +34,24 @@ import { apiFetch } from "@/lib/api"
 import { formatDate, formatDateTime } from "@/lib/date-utils"
 import { explainApiError } from "@/lib/error-utils"
 import { formatCurrency, round2 } from "@/lib/format-utils"
+import { formatDocumentType } from "@/components/modules/sales/sales-utils"
 import { appRoutes, buildSaleDetailRoute } from "@/lib/routes"
-import { cn } from "@/lib/utils"
 import type { PostsaleContext } from "@/types/postsales"
 import { PS } from "./postsales-messages"
 import {
   ACCENT_HIGHLIGHT_PANEL,
   ACCENT_LABEL_TEXT,
-  CARD_BASE,
-  INFO_BOX,
-  INFO_BOX_MUTED,
+  INFO_BOX_XL,
 } from "./postsales-constants"
+import {
+  BaseSalePanel,
+  CancellationPanel,
+  ExchangeTracePanel,
+  PaymentsNetPanel,
+  PostsaleActionsPanel,
+} from "./postsale-detail-sections"
 import ExchangeDialog from "./postsale-exchange-dialog"
 import CancelDialog from "./postsale-cancel-dialog"
-
-const mutedBlockClass = cn(INFO_BOX_MUTED, "px-3 py-3")
 
 function resolveDocumentPath(context: PostsaleContext) {
   if (context.sale.document_type === "proforma") {
@@ -182,9 +180,7 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
   const exchangeAllowed = context.availability.exchange.allowed
   const cancelAllowed = context.availability.cancel.allowed
 
-  const hasCancellation = Boolean(context.cancellation)
-  const hasExchanges = context.exchanges.length > 0
-  const isFinalized = hasCancellation || hasExchanges
+  const isFinalized = Boolean(context.cancellation) || context.exchanges.length > 0
 
   return (
     <PermissionGuard permission="sales.postsale.view">
@@ -281,18 +277,30 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
           }
         />
 
-        <div className={`${ACCENT_HIGHLIGHT_PANEL} px-4 py-3`}>
+        <div className={`${INFO_BOX_XL} p-5 shadow-sm md:p-6`}>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0 space-y-2">
-              <p
-                className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${ACCENT_LABEL_TEXT}`}
-              >
+              <p className="text-sm text-[var(--ops-text-muted)]">
+                {formatDocumentType(context.sale.document_type)} · {formatDateTime(context.sale.confirmed_at || context.sale.created_at)} · {context.sale.location_name || PS.detail.sede}
+              </p>
+              <div>
+                <p className="font-semibold text-[var(--ops-text)]">{context.sale.customer_name_text || PS.table.genericCustomer}</p>
+                {context.sale.customer_doc_type || context.sale.customer_doc_number ? (
+                  <p className="text-sm text-[var(--ops-text-muted)]">{context.sale.customer_doc_type} {context.sale.customer_doc_number}</p>
+                ) : null}
+              </div>
+              <p className="text-xs text-[var(--ops-text-muted)]">
+                {PS.detail.sellerAt}: {context.sale.seller_name || PS.table.fallbackDash} · {PS.detail.createdAt}: {formatDateTime(context.sale.created_at)}{context.sale.confirmed_at ? ` · ${PS.detail.confirmedAt}: ${formatDateTime(context.sale.confirmed_at)}` : ""}
+              </p>
+            </div>
+            <div className={`${ACCENT_HIGHLIGHT_PANEL} px-4 py-3 lg:min-w-60`}>
+              <p className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${ACCENT_LABEL_TEXT}`}>
                 {PS.detail.totalHeader}
               </p>
-              <p className="text-3xl font-semibold tracking-[-0.02em] text-[var(--ops-text)]">
+              <p className="mt-1 text-3xl font-semibold tracking-[-0.02em] text-[var(--ops-text)]">
                 {formatCurrency(Number(context.sale.total_amount))}
               </p>
-              <div className="flex flex-wrap items-center gap-2 text-sm text-[var(--ops-text-muted)]">
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-[var(--ops-text-muted)]">
                 <span>
                   {PS.detail.paid} {formatCurrency(paymentSummary.netTotal)}
                 </span>
@@ -301,334 +309,76 @@ export default function PostsaleDetailPage({ params }: { params: Promise<{ saleI
                 ) : null}
               </div>
               {!paymentSummary.isFullyPaid && paymentSummary.balanceDue > 0 ? (
-                <p className="text-sm font-semibold text-[var(--ops-tone-warning-text)]">
+                <p className="mt-1 text-sm font-semibold text-[var(--ops-tone-warning-text)]">
                   {PS.detail.missing} {formatCurrency(paymentSummary.balanceDue)}
                 </p>
               ) : null}
             </div>
           </div>
+          {context.sale.notes ? (
+            <p className="mt-3 text-sm text-[var(--ops-text-muted)] border-t border-[var(--ops-border-soft)] pt-3">
+              {PS.detail.noteAt}: {context.sale.notes}
+            </p>
+          ) : null}
         </div>
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)] lg:items-start">
           <div className="space-y-4">
-            <OpsPanelSection
-              title={PS.detail.sections.baseSale}
-              icon={<PackageSearch className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />}
-            >
-              <div className="space-y-2.5">
-                {context.sale.details.map((line) => (
-                  <div
-                    key={line.sale_detail_id}
-                    className={cn(CARD_BASE, "rounded-lg px-3 py-3")}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                          {line.style_name}
-                        </p>
-                        <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
-                          {line.sku} &middot; {line.size_code} / {line.color_code}
-                        </p>
-                      </div>
-                      <p className="shrink-0 text-sm font-semibold text-[var(--ops-text)]">
-                        {formatCurrency(Number(line.line_total))}
-                      </p>
-                    </div>
-                    <div className="mt-3 grid gap-2 text-xs text-[var(--ops-text-muted)] md:grid-cols-4">
-                      <span>
-                        {PS.detail.lines.quantity} {line.quantity}
-                      </span>
-                      <span>
-                        {PS.detail.lines.listPrice}{" "}
-                        {formatCurrency(Number(line.unit_price_list))}
-                      </span>
-                      <span>
-                        {PS.detail.lines.finalPrice}{" "}
-                        {formatCurrency(Number(line.unit_price_final))}
-                      </span>
-                      <span>
-                        {PS.detail.lines.lineSubtotal}{" "}
-                        {formatCurrency(Number(line.line_subtotal))}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </OpsPanelSection>
-
-            {hasExchanges ? (
-              <OpsPanelSection
-                title={PS.detail.sections.exchangeTrace}
-                icon={<RefreshCcw className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />}
-              >
-                <div className="space-y-3">
-                  {context.exchanges.map((ex) => (
-                    <div key={ex.exchange_id} className={mutedBlockClass}>
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-[var(--ops-text)]">
-                            {ex.exchange_number || ex.exchange_id}
-                          </p>
-                          <p className="mt-1 text-xs text-[var(--ops-text-muted)]">
-                            {ex.reason || PS.table.fallbackNoReason} &middot;{" "}
-                            {formatDateTime(ex.confirmed_at, ex.created_at)}
-                          </p>
-                        </div>
-                        <OpsStatusBadge tone="success">{ex.status}</OpsStatusBadge>
-                      </div>
-                      <div className="mt-3 grid gap-2 md:grid-cols-2">
-                        {ex.lines.map((l) => (
-                          <div key={l.exchange_line_id} className={INFO_BOX}>
-                            <p className="text-sm font-semibold text-[var(--ops-text)]">
-                              {l.direction === "IN"
-                                ? PS.detail.lines.exchangeIn
-                                : PS.detail.lines.exchangeOut}{" "}
-                              &middot; {l.style_name}
-                            </p>
-                            <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
-                              {l.sku} &middot; {l.size_code} / {l.color_code}
-                            </p>
-                            <p className="mt-2 text-xs text-[var(--ops-text-muted)]">
-                              {PS.detail.lines.quantity} {l.quantity} &middot;{" "}
-                              {PS.detail.lines.referenceAbbr}{" "}
-                              {formatCurrency(Number(l.unit_reference_price || 0))}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                      {ex.notes ? (
-                        <p className="mt-3 text-sm text-[var(--ops-text-muted)]">{ex.notes}</p>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              </OpsPanelSection>
-            ) : null}
-
-            {hasCancellation ? (
-              <OpsPanelSection title={PS.detail.sections.cancellation} tone="danger">
-                <p className="text-sm text-[var(--ops-tone-danger-text)]">
-                  {context.cancellation!.reason} &middot;{" "}
-                  {formatDateTime(context.cancellation!.cancelled_at)}
-                </p>
-                {context.cancellation!.notes ? (
-                  <p className="mt-2 text-sm text-[var(--ops-tone-danger-text)]">
-                    {context.cancellation!.notes}
-                  </p>
-                ) : null}
-                <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-tone-danger-text)]">
-                  {PS.detail.fields.executedBy}{" "}
-                  {context.cancellation!.cancelled_by_name || PS.table.fallbackUnknownUser}
-                </p>
-              </OpsPanelSection>
-            ) : null}
+            <BaseSalePanel context={context} />
+            <ExchangeTracePanel context={context} />
+            <CancellationPanel context={context} />
           </div>
 
           <aside className="space-y-4 lg:sticky lg:top-20">
+            <PostsaleActionsPanel
+              context={context}
+              canExchange={canExchange}
+              canCancel={canCancel}
+              exchangeAllowed={exchangeAllowed}
+              cancelAllowed={cancelAllowed}
+              isFinalized={isFinalized}
+              onOpenExchange={() => {
+                setExchangeDialogKey((k) => k + 1)
+                setExchangeDialogOpen(true)
+              }}
+              onOpenCancel={() => {
+                setCancelDialogKey((k) => k + 1)
+                setCancelDialogOpen(true)
+              }}
+            />
 
             <OpsPanelSection
-              title={PS.detail.sections.actions}
-              icon={<RefreshCcw className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />}
-            >
-              <div className="space-y-3">
-                {isFinalized ? (
-                  <div className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-3 py-3">
-                    <p className="text-sm text-[var(--ops-text-muted)]">
-                      <ShieldAlert className="mr-2 inline-block h-4 w-4 text-[var(--ops-text-muted)]" />
-                      {PS.detail.actionsPanel.finalized}
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    {canExchange ? (
-                      exchangeAllowed ? (
-                        <Button
-                          variant="accent"
-                          size="sm"
-                          className="w-full rounded-lg"
-                          onClick={() => {
-                            setExchangeDialogKey((k) => k + 1)
-                            setExchangeDialogOpen(true)
-                          }}
-                        >
-                          <RefreshCcw className="h-4 w-4" />
-                          {PS.detail.sections.simpleExchange}
-                        </Button>
-                      ) : (
-                        <div className="rounded-lg border border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)] px-3 py-3">
-                          <div className="flex items-start gap-2">
-                            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ops-tone-warning-text)]" />
-                            <p className="text-sm text-[var(--ops-tone-warning-text)]">
-                              {context.availability.exchange.reasons.join(" ") || PS.detail.actionsPanel.exchangeBlocked}
-                            </p>
-                          </div>
-                        </div>
-                      )
-                    ) : null}
-
-                    {canCancel ? (
-                      cancelAllowed ? (
-                        <Button
-                          variant="accent"
-                          size="sm"
-                          className="w-full rounded-lg"
-                          onClick={() => {
-                            setCancelDialogKey((k) => k + 1)
-                            setCancelDialogOpen(true)
-                          }}
-                        >
-                          <Undo2 className="h-4 w-4" />
-                          {PS.detail.sections.totalCancellation}
-                        </Button>
-                      ) : (
-                        <div className="rounded-lg border border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)] px-3 py-3">
-                          <div className="flex items-start gap-2">
-                            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-[var(--ops-tone-warning-text)]" />
-                            <p className="text-sm text-[var(--ops-tone-warning-text)]">
-                              {context.availability.cancel.reasons.join(" ") || PS.detail.actionsPanel.cancelBlocked}
-                            </p>
-                          </div>
-                        </div>
-                      )
-                    ) : null}
-
-                    {!canExchange && !canCancel ? (
-                      <p className="text-sm text-[var(--ops-text-muted)]">
-                        {PS.detail.actionsPanel.finalized}
-                      </p>
-                    ) : null}
-                  </>
-                )}
-              </div>
-            </OpsPanelSection>
-
-            <OpsPanelSection
-              title={PS.detail.sections.customerOperation}
-              icon={<User className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />}
-            >
-              <div className="grid gap-2 text-sm md:grid-cols-2">
-                <div className={mutedBlockClass}>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">
-                    {PS.detail.fields.client}
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-[var(--ops-text)]">
-                    {context.sale.customer_name_text || PS.table.genericCustomer}
-                  </p>
-                </div>
-                <div className={mutedBlockClass}>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">
-                    {PS.detail.fields.document}
-                  </p>
-                  <p className="mt-1 text-sm text-[var(--ops-text)]">
-                    {context.sale.customer_doc_type || PS.table.fallbackDash}{" "}
-                    {context.sale.customer_doc_number || ""}
-                  </p>
-                </div>
-                <div className={mutedBlockClass}>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">
-                    {PS.detail.fields.location}
-                  </p>
-                  <p className="mt-1 text-sm text-[var(--ops-text)]">
-                    {context.sale.location_name}
-                  </p>
-                </div>
-                <div className={mutedBlockClass}>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">
-                    {PS.detail.fields.seller}
-                  </p>
-                  <p className="mt-1 text-sm text-[var(--ops-text)]">
-                    {context.sale.seller_name}
-                  </p>
-                </div>
-                <div className={cn(mutedBlockClass, "md:col-span-2")}>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">
-                    {PS.detail.fields.address}
-                  </p>
-                  <p className="mt-1 text-sm text-[var(--ops-text)]">
-                    {context.sale.customer_address_text || PS.table.fallbackDash}
-                  </p>
-                </div>
-              </div>
-            </OpsPanelSection>
-
-            <OpsPanelSection
-              title={PS.detail.sections.paymentsNet}
-              icon={<CreditCard className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />}
+              title={PS.detail.sections.totals}
+              icon={<ReceiptText className="h-4 w-4 text-[var(--ripnel-accent)]" />}
             >
               <div className="space-y-2">
-                {(context.sale.payments || []).map((payment) => (
-                  <div key={payment.payment_id} className={mutedBlockClass}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold capitalize text-[var(--ops-text)]">
-                          {payment.method}
-                        </p>
-                        <p className="mt-1 text-xs text-[var(--ops-text-muted)]">
-                          {formatDateTime(payment.paid_at)}
-                        </p>
-                      </div>
-                      <p className="text-sm font-semibold text-[var(--ops-text)]">
-                        {formatCurrency(Number(payment.amount))}
-                      </p>
-                    </div>
-                    {payment.reference ? (
-                      <p className="mt-2 text-xs text-[var(--ops-text-muted)]">
-                        {PS.detail.lines.referenceAbbr} {payment.reference}
-                      </p>
-                    ) : null}
-                  </div>
-                ))}
-
-                {context.payment_reversals.length > 0 ? (
-                  <div className="space-y-2 pt-1">
-                    {context.payment_reversals.map((reversal) => (
-                      <div
-                        key={reversal.payment_reversal_id}
-                        className="rounded-lg border border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] px-3 py-3"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold capitalize text-[var(--ops-tone-danger-text)]">
-                              {PS.detail.payments.reversalMethod} {reversal.method}
-                            </p>
-                            <p className="mt-1 text-xs text-[var(--ops-tone-danger-text)]">
-                              {reversal.reason} &middot;{" "}
-                              {formatDateTime(reversal.reversed_at)}
-                            </p>
-                          </div>
-                          <p className="text-sm font-semibold text-[var(--ops-tone-danger-text)]">
-                            - {formatCurrency(Number(reversal.amount))}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                <OpsMetricRow label={PS.detail.subtotal} value={formatCurrency(Number(context.sale.subtotal_amount))} />
+                {Number(context.sale.sale_discount_amount || 0) > 0 ? (
+                  <OpsMetricRow label={PS.detail.discount} value={`-${formatCurrency(Number(context.sale.sale_discount_amount))}`} tone="warning" />
                 ) : null}
-              </div>
-
-              <div className="mt-4 space-y-2 border-t border-[var(--ops-border-strong)] pt-4">
-                <OpsMetricRow
-                  label={PS.detail.payments.registered}
-                  value={formatCurrency(paymentSummary.paymentTotal)}
-                />
-                <OpsMetricRow
-                  label={PS.detail.payments.reversals}
-                  value={formatCurrency(paymentSummary.reversalTotal)}
-                />
+                {Number(context.sale.tax_amount) !== 0 ? (
+                  <OpsMetricRow label={PS.detail.tax} value={formatCurrency(Number(context.sale.tax_amount))} />
+                ) : null}
                 <div className="border-t border-[var(--ops-border-strong)] pt-2">
-                  <OpsMetricRow
-                    label={PS.detail.payments.net}
-                    value={formatCurrency(paymentSummary.netTotal)}
-                  />
+                  <OpsMetricRow label={PS.detail.totalAmount} value={formatCurrency(Number(context.sale.total_amount))} />
+                </div>
+                <div className="border-t border-[var(--ops-border-soft)] pt-2">
+                  <OpsMetricRow label={PS.detail.units} value={String((context.sale.details || []).reduce((acc, d) => acc + Number(d.quantity || 0), 0))} />
+                  <OpsMetricRow label={PS.detail.lineCount} value={String((context.sale.details || []).length)} />
                 </div>
               </div>
             </OpsPanelSection>
 
-            {context.sale.notes ? (
-              <OpsPanelSection title={PS.detail.sections.originalNotes}>
-                <p className="text-sm text-[var(--ops-text-muted)]">{context.sale.notes}</p>
-              </OpsPanelSection>
-            ) : null}
+            <OpsPanelSection
+              title={PS.detail.sections.payments}
+              icon={<CreditCard className="h-4 w-4 text-[var(--ripnel-accent)]" />}
+            >
+              {(context.sale.payments || []).length === 0 && context.payment_reversals.length === 0 ? (
+                <p className="py-2 text-sm text-[var(--ops-text-muted)]">{PS.detail.noPayments}</p>
+              ) : (
+                <PaymentsNetPanel context={context} paymentSummary={paymentSummary} />
+              )}
+            </OpsPanelSection>
           </aside>
         </div>
 

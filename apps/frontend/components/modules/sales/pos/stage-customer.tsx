@@ -6,8 +6,8 @@ import { PencilLine, UserPlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { OpsStepSectionHeading } from "@/components/ui/ops-step-section-heading"
 import { OpsSelect, type OpsOption } from "@/components/ui/ops-selection"
-import { SearchablePicker } from "@/components/ui/searchable-picker"
 import { OpsHint } from "@/components/ui/ops-hint"
+import { CustomerPicker } from "@/components/modules/sales/search/customer-picker"
 
 import { StageSection } from "./stage-section"
 import { renderDocumentIcon } from "./pos-icons"
@@ -15,11 +15,6 @@ import type { CustomerStageProps } from "./pos-stage-props"
 import { DOC_TYPES } from "./pos-types"
 import { INFO_BOX } from "./pos-constants"
 import { POS } from "./pos-messages"
-import {
-  buildCustomerDisplayName,
-  buildCustomerDocument,
-} from "./pos-utils"
-
 export function CustomerStage(props: CustomerStageProps) {
   const {
     pulseStage,
@@ -97,7 +92,7 @@ export function CustomerStage(props: CustomerStageProps) {
 
       <div className="space-y-3">
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(248px,296px)]">
-          <SearchablePicker
+          <CustomerPicker
               value={customerInputValue}
               onChange={(value) => {
                 setCustomerQuery(value)
@@ -111,28 +106,12 @@ export function CustomerStage(props: CustomerStageProps) {
               onOpenChange={setCustomerPickerOpen}
               items={customerResults}
               loading={loadingCustomers}
-              loadingMessage="Buscando clientes…"
-              emptyMessage={
-                customerResults.length === 0 && customerQuery.trim()
-                  ? POS.customer.noMatchMessage
-                  : ""
-              }
-              maxVisibleItems={6}
+              loadingMessage={POS.customer.loadingMessage}
+              emptyMessage={POS.customer.noMatchMessage}
+              idleMessage=""
+              hasSearched={Boolean(customerQuery.trim())}
               highlightedIndex={highlightedCustomerIndex}
               onHighlightChange={setHighlightedCustomerIndex}
-              getItemKey={(customer) => customer.customer_id}
-              renderItem={(customer) => (
-                <div className="flex w-full min-w-0 items-center gap-2.5 text-sm">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-[var(--ops-text)]">
-                      {buildCustomerDisplayName(customer)}
-                    </p>
-                    <p className="text-[11px] text-[var(--ops-text-muted)]">
-                      {buildCustomerDocument(customer)}
-                    </p>
-                  </div>
-                </div>
-              )}
               onSelect={(customer) => {
                 selectCustomer(customer)
               }}
@@ -145,11 +124,7 @@ export function CustomerStage(props: CustomerStageProps) {
               }}
               inputRef={customerSearchInputRef}
               name="sale_customer_search"
-              autoComplete="off"
-              inputMode="search"
-              enterKeyHint="search"
               showClear={Boolean(selectedCustomer || customerQuery)}
-              density="compact"
               className={pulseStage === "customer" ? "animate-focus-flash" : ""}
             />
           <div>

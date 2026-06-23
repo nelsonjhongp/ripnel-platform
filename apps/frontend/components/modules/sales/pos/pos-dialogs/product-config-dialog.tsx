@@ -9,8 +9,9 @@ import { OpsSelect, type OpsOption } from "@/components/ui/ops-selection"
 import { OpsQuantityStepper } from "@/components/ui/ops-quantity-stepper"
 import { formatMoney } from "@/lib/format-utils"
 import type { EffectivePriceMode, SaleVariant, SearchableStyle } from "../pos-types"
-import { INFO_BOX } from "../pos-constants"
-import { findVariantByAttributes, getVariantOptionValues } from "../pos-utils"
+import { INFO_BOX, MUTED_SURFACE_MIX } from "../pos-constants"
+import { findVariantByAttributes, getVariantOptionValues } from "../pos-search-utils"
+import { POS } from "../pos-messages"
 
 const PANEL_LABEL = "text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)] w-[52px] shrink-0"
 const PANEL_VALUE = "text-sm font-medium text-[var(--ops-text)]"
@@ -149,9 +150,9 @@ export function ProductConfigDialog({
 
   const errorMessage = (() => {
     if (!sizeCode || !colorCode) return null
-    if (!selectedVariant) return "No existe una variante con esa combinacion."
-    if (Number(selectedVariant.stock || 0) <= 0) return "Sin stock disponible."
-    if (price == null) return "Sin precio vigente."
+    if (!selectedVariant) return POS.productConfig.noVariant
+    if (Number(selectedVariant.stock || 0) <= 0) return POS.productConfig.noStock
+    if (price == null) return POS.productConfig.noPriceMsg
     return null
   })()
 
@@ -174,30 +175,30 @@ export function ProductConfigDialog({
   const status = (() => {
     if (addedCount > 0) {
       return {
-        message: "Agregado. Puedes seguir sumando.",
+        message: POS.productConfig.added,
         toneClass:
           "border-[var(--ops-tone-success-border)] bg-[var(--ops-tone-success-bg)] text-[var(--ops-tone-success-text)]",
       }
     }
     if (needsSizeSelection && needsColorSelection) {
       return {
-        message: "Selecciona talla y color.",
+        message: POS.productConfig.selectBoth,
         toneClass:
-          "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_58%,var(--ops-surface))] text-[var(--ops-text-muted)]",
+          "border-[var(--ops-border-strong)] bg-[${MUTED_SURFACE_MIX}] text-[var(--ops-text-muted)]",
       }
     }
     if (needsSizeSelection) {
       return {
-        message: "Selecciona talla.",
+        message: POS.productConfig.selectSizeOnly,
         toneClass:
-          "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_58%,var(--ops-surface))] text-[var(--ops-text-muted)]",
+          "border-[var(--ops-border-strong)] bg-[${MUTED_SURFACE_MIX}] text-[var(--ops-text-muted)]",
       }
     }
     if (needsColorSelection) {
       return {
-        message: "Selecciona color.",
+        message: POS.productConfig.selectColorOnly,
         toneClass:
-          "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_58%,var(--ops-surface))] text-[var(--ops-text-muted)]",
+          "border-[var(--ops-border-strong)] bg-[${MUTED_SURFACE_MIX}] text-[var(--ops-text-muted)]",
       }
     }
     if (errorMessage) {
@@ -209,9 +210,9 @@ export function ProductConfigDialog({
     }
     if (canConfirm) {
       return {
-        message: "Listo para agregar.",
+        message: POS.productConfig.ready,
         toneClass:
-          "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_58%,var(--ops-surface))] text-[var(--ops-text)]",
+          "border-[var(--ops-border-strong)] bg-[${MUTED_SURFACE_MIX}] text-[var(--ops-text)]",
       }
     }
     return null
@@ -243,7 +244,8 @@ export function ProductConfigDialog({
     <OpsDialog
       open={open}
       onOpenChange={(nextOpen) => (nextOpen ? onOpenChange(true) : close())}
-      title={style?.style_name || "Configurar producto"}
+      title={style?.style_name || POS.productConfig.title}
+      description={POS.productConfig.description}
       size="sm"
       bodyClassName="space-y-2.5"
       footerClassName="pt-1"
@@ -256,7 +258,7 @@ export function ProductConfigDialog({
             className="rounded-lg px-4"
             onClick={close}
           >
-            {addedCount > 0 ? "Listo" : "Cerrar"}
+            {addedCount > 0 ? POS.productConfig.done : POS.productConfig.close}
           </Button>
           <Button
             type="button"
@@ -266,7 +268,7 @@ export function ProductConfigDialog({
             disabled={!canConfirm}
             onClick={handleAdd}
           >
-            {addedCount > 0 ? "Agregar otro" : "Agregar"}
+            {addedCount > 0 ? POS.productConfig.addAnother : POS.productConfig.addButton}
           </Button>
         </div>
       }
@@ -275,20 +277,20 @@ export function ProductConfigDialog({
         <OpsSelect
           value={sizeCode}
           onValueChange={handleSizeChange}
-          placeholder="Seleccionar talla"
+          placeholder={POS.productConfig.selectSize}
           options={sizeSelectOptions}
         />
         <OpsSelect
           value={colorCode}
           onValueChange={handleColorChange}
-          placeholder="Seleccionar color"
+          placeholder={POS.productConfig.selectColor}
           options={colorSelectOptions}
         />
       </div>
 
       <div className={`space-y-1.5 ${INFO_BOX}`}>
         {panelRow(
-          "Talla",
+          POS.productConfig.size,
           sizeLabel ? (
             <span className={PANEL_VALUE}>{sizeLabel}</span>
           ) : (
@@ -296,7 +298,7 @@ export function ProductConfigDialog({
           ),
         )}
         {panelRow(
-          "Color",
+          POS.productConfig.color,
           colorLabel ? (
             <span className={PANEL_VALUE}>{colorLabel}</span>
           ) : (
@@ -304,35 +306,35 @@ export function ProductConfigDialog({
           ),
         )}
         {panelRow(
-          "Stock",
+          POS.productConfig.stock,
           selectedVariant ? (
             selectedVariant.stock > 0 ? (
               <span className={PANEL_VALUE}>{selectedVariant.stock}</span>
             ) : (
               <span className="text-sm font-medium text-[var(--ops-tone-danger-text)]">
-                Agotado
+                {POS.productConfig.outOfStock}
               </span>
             )
           ) : (
-            <span className={PANEL_PLACEHOLDER}>Pendiente</span>
+            <span className={PANEL_PLACEHOLDER}>{POS.productConfig.pending}</span>
           ),
         )}
         {panelRow(
-          "Precio",
+          POS.productConfig.price,
           price != null ? (
-            <span className={PANEL_VALUE}>S/. {formatMoney(price)}</span>
+            <span className={PANEL_VALUE}>{POS.summary.moneyPrefix} {formatMoney(price)}</span>
           ) : selectedVariant ? (
             <span className="text-sm font-medium text-[var(--ops-tone-danger-text)]">
-              Sin precio
+              {POS.productConfig.noPrice}
             </span>
           ) : (
-            <span className={PANEL_PLACEHOLDER}>Pendiente</span>
+            <span className={PANEL_PLACEHOLDER}>{POS.productConfig.pending}</span>
           ),
         )}
       </div>
 
       {selectedVariant && selectedVariant.stock > 0 ? (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_58%,var(--ops-surface))] px-3 py-2">
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--ops-border-strong)] bg-[${MUTED_SURFACE_MIX}] px-3 py-2">
           <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
             Cantidad
           </span>

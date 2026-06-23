@@ -3,84 +3,94 @@
 import { useState } from "react"
 import { apiFetch } from "@/lib/api"
 import { explainApiError } from "@/lib/error-utils"
-import { type PostsaleContext } from "@/types/postsales"
 import { PS } from "./postsales-messages"
 
-export function useExchangeForm(saleId: string | null, refetch: () => void) {
+interface ExchangeSubmitParams {
+  saleId: string
+  saleDetailId: string
+  replacementVariantId: string
+  quantity: number
+  paymentMethod?: string
+  paymentReference?: string
+}
+
+export function useExchangeForm(onSuccess: () => void) {
   const [reason, setReason] = useState("")
   const [reasonError, setReasonError] = useState<string | null>(null)
   const [notes, setNotes] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   function clearErrors() {
     setError(null)
-    setSuccess(null)
+    setReasonError(null)
   }
 
   function resetForm() {
     setReason("")
     setReasonError(null)
     setNotes("")
+    setError(null)
   }
 
-  async function handleSubmit(
-    event: React.FormEvent,
-    selectedSaleDetailId: string,
-    selectedReplacementVariantId: string,
-  ) {
-    event.preventDefault()
-
-    if (!saleId || !selectedSaleDetailId || !selectedReplacementVariantId) {
-      setError(PS.detail.alerts.exchangeBlockedMsg)
-      return
+  async function handleSubmit({
+    saleId,
+    saleDetailId,
+    replacementVariantId,
+    quantity,
+    paymentMethod,
+    paymentReference,
+  }: ExchangeSubmitParams): Promise<boolean> {
+    if (!saleId || !saleDetailId || !replacementVariantId) {
+      setError(PS.exchangeDialog.blockValidation)
+      return false
     }
 
     if (!reason.trim()) {
       setReasonError(PS.detail.alerts.reasonValidation)
-      return
+      return false
     }
 
     setError(null)
-    setSuccess(null)
+    setReasonError(null)
     setSubmitting(true)
 
     try {
-      await apiFetch<PostsaleContext>(`/api/postsales/${saleId}/exchanges`, {
+      await apiFetch(`/api/postsales/${saleId}/exchanges`, {
         method: "POST",
         body: JSON.stringify({
-          sale_detail_id: selectedSaleDetailId,
-          replacement_variant_id: selectedReplacementVariantId,
+          sale_detail_id: saleDetailId,
+          replacement_variant_id: replacementVariantId,
+          quantity,
+          payment_method: paymentMethod || undefined,
+          payment_reference: paymentReference || null,
           reason,
           notes,
         }),
       })
-
-      refetch()
-      setSuccess(PS.detail.alerts.exchangeSuccess)
-      resetForm()
+      onSuccess()
+      return true
     } catch (submitError) {
-      setError(explainApiError(submitError, PS.detail.alerts.operationFallback))
+      setError(explainApiError(submitError, PS.exchangeDialog.errorFallback))
+      return false
     } finally {
       setSubmitting(false)
     }
   }
 
   return {
-    exchangeReason: reason,
-    setExchangeReason: (value: string) => {
+    reason,
+    setReason: (value: string) => {
       setReason(value)
       setReasonError(null)
     },
-    exchangeReasonError: reasonError,
-    exchangeNotes: notes,
-    setExchangeNotes: setNotes,
-    exchangeError: error,
-    exchangeSuccess: success,
-    exchangeSubmitting: submitting,
-    handleExchangeSubmit: handleSubmit,
-    clearExchangeErrors: clearErrors,
-    exchangeResetForm: resetForm,
+    reasonError,
+    notes,
+    setNotes,
+    error,
+    submitting,
+    handleSubmit,
+    clearErrors,
+    resetForm,
   }
 }

@@ -767,6 +767,11 @@ CREATE TABLE IF NOT EXISTS exchanges (
   status VARCHAR(20) NOT NULL DEFAULT 'draft',
   reason VARCHAR(200),
   notes TEXT,
+  original_total NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (original_total >= 0),
+  replacement_total NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (replacement_total >= 0),
+  difference_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+  settlement_type VARCHAR(20) NOT NULL DEFAULT 'none',
+  settlement_payment_id UUID REFERENCES sales_payments(payment_id),
 
   created_by UUID REFERENCES users(user_id),
   confirmed_by UUID REFERENCES users(user_id),
@@ -777,7 +782,8 @@ CREATE TABLE IF NOT EXISTS exchanges (
   cancelled_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-  CHECK (status IN ('draft','confirmed','cancelled'))
+  CHECK (status IN ('draft','confirmed','cancelled')),
+  CHECK (settlement_type IN ('none','charge','refund_pending','credit_pending'))
 );
 
 CREATE TABLE IF NOT EXISTS exchange_lines (
@@ -786,9 +792,16 @@ CREATE TABLE IF NOT EXISTS exchange_lines (
 
   direction VARCHAR(10) NOT NULL,
   variant_id UUID NOT NULL REFERENCES product_variants(variant_id),
+  sale_detail_id UUID REFERENCES sales_details(sale_detail_id),
   quantity INT NOT NULL CHECK (quantity > 0),
 
   unit_reference_price NUMERIC(10,2),
+  unit_price_list NUMERIC(10,2),
+  unit_price_final NUMERIC(10,2),
+  line_subtotal NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (line_subtotal >= 0),
+  line_tax NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (line_tax >= 0),
+  line_total NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (line_total >= 0),
+  price_source VARCHAR(30),
   notes TEXT,
 
   CHECK (direction IN ('IN','OUT'))
@@ -799,6 +812,12 @@ CREATE INDEX IF NOT EXISTS idx_exchange_lines_exchange
 
 CREATE INDEX IF NOT EXISTS idx_exchange_lines_variant
   ON exchange_lines(variant_id);
+
+CREATE INDEX IF NOT EXISTS idx_exchange_lines_sale_detail
+  ON exchange_lines(sale_detail_id);
+
+CREATE INDEX IF NOT EXISTS idx_exchanges_settlement_payment
+  ON exchanges(settlement_payment_id);
 
 -- ============================================================
 -- 11) FUNCIÓN: PRECIO VIGENTE

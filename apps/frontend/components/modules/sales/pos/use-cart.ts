@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react"
 import { showError } from "@/lib/toast"
 import type { CartItem, PreviewItem, SaleVariant } from "./pos-types"
+import { POS } from "./pos-messages"
 
 export function useCart() {
   const [cart, setCart] = useState<CartItem[]>([])
@@ -16,11 +17,11 @@ export function useCart() {
       variant.wholesale_price !== null
     const availableStock = Number(variant.stock || 0)
     if (!hasPrice) {
-      showError("No se pudo agregar producto", "La variante no tiene precio vigente.")
+      showError(POS.toast.cartNoPriceTitle, POS.toast.cartNoPriceDesc)
       return
     }
     if (availableStock <= 0) {
-      showError("No se pudo agregar producto", "La variante no tiene stock disponible.")
+      showError(POS.toast.cartNoStockTitle, POS.toast.cartNoStockDesc)
       return
     }
 
