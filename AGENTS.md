@@ -278,6 +278,100 @@ Use `LoaderCircle` from `lucide-react` with `animate-spin`:
 ```
 Button should be `disabled` while loading.
 
+### Per-field error types
+
+For forms with multiple editable fields, use a typed error object with optional keys
+per field instead of a single `string | null`:
+
+```tsx
+// customers-types.ts
+export type CustomerFormErrors = {
+  _form?: string
+  full_name?: string
+  business_name?: string
+  commercial_name?: string
+  document_number?: string
+  address?: string
+}
+
+// customers-utils.ts
+export function validateCustomerInput(input): CustomerFormErrors | null {
+  const errors: CustomerFormErrors = {}
+
+  if (!input.full_name.trim() && !input.business_name.trim()) {
+    errors.full_name = CUSTOMERS.form.noNameError
+  }
+
+  if (input.document_type === "ruc") {
+    if (!input.business_name.trim()) {
+      errors.business_name = CUSTOMERS.form.rucBusinessNameRequired
+    }
+    if (!input.address.trim()) {
+      errors.address = CUSTOMERS.form.rucAddressRequired
+    }
+  }
+
+  // Document number validation
+  if (!/^\d{8}$/.test(input.document_number)) {
+    errors.document_number = CUSTOMERS.form.invalidFormat("DNI")
+  }
+
+  return Object.keys(errors).length > 0 ? errors : null
+}
+```
+
+**Rules:**
+- Error type has optional keys (`?`) for every validatable field
+- Validation function returns the error object or `null`
+- Each `OpsFormField` receives its individual error: `<OpsFormField error={errors?.document_number} />`
+- `_form` key is for cross-field errors (only valid when multiple fields share a constraint)
+- Errors clear via `useEffect` on dialog `open`, not via individual `onChange` per field
+
+### Two-phase save action state
+
+Dialogs that create/update entities with server-side validation (duplicate checks)
+use a 3-phase state machine, never a single boolean:
+
+```tsx
+const [actionState, setActionState] = useState<"idle" | "validating" | "saving">("idle")
+const isBusy = actionState !== "idle"
+
+async function save() {
+  // Phase 1: local validation
+  const validation = validateCustomerInput(form)
+  if (validation) { setErrors(validation); return }
+
+  // Phase 2: server-side validation (duplicate check)
+  setActionState("validating")
+  setErrors(null)
+  const duplicate = await findDuplicateByDocument({ ...excludeId })
+  if (duplicate) {
+    setErrors({ document_number: "Ya existe un cliente con este documento." })
+    setActionState("idle")
+    return
+  }
+
+  // Phase 3: actual save
+  setActionState("saving")
+  await apiFetchData("/api/entity", { method: "POST", body: JSON.stringify(payload) })
+  close()
+}
+
+// In the footer button:
+{actionState === "validating" ? (
+  <LoaderCircle className="animate-spin" /> Validando...
+) : actionState === "saving" ? (
+  <LoaderCircle className="animate-spin" /> Guardando...
+) : "Guardar"}
+```
+
+**Rules:**
+- `"idle"`: no action in progress — buttons enabled
+- `"validating"`: running local validation + pre-save checks (no DB write yet)
+- `"saving"`: executing POST/PATCH — buttons disabled
+- On validation or duplicate error, reset to `"idle"` so user can retry
+- Each phase shows distinct text with `LoaderCircle animate-spin`
+
 ## Testing
 
 Framework: Playwright (`@playwright/test` v1.60+).
@@ -708,9 +802,47 @@ Frontend:
 
 Current recommended order:
 
-1. `Hardening de ventas`: edge cases del POS (descuentos complejos, validaciones de stock, flujo de recibos)
-2. `Caja y cierres`: integracion completa de cash closing con ventas, arqueos y reportes
-3. `Reportes y BI`: expandir analytics mas alla del dashboard actual
-4. `Permisos granulares`: refinar permisos por ubicacion y rol en flujos criticos
-5. `Testing end-to-end`: flujos criticos (venta, caja, transferencias)
-6. `Optimizacion y pulido`: rendimiento, UX density, temas, carga de assets
+1. `Auditoria de modulos`: ejecutar `docs/module-review-checklist.md` en postsales, cash, inventory, transfers, customers, products, BI
+2. `Hardening post-auditoria`: aplicar `docs/refactor-vs-rebuild.md` segun el tier detectado en cada modulo
+3. `Caja y cierres`: integracion completa de cash closing con ventas, arqueos y reportes
+4. `Reportes y BI`: expandir analytics mas alla del dashboard actual
+5. `Permisos granulares`: refinar permisos por ubicacion y rol en flujos criticos
+6. `Testing end-to-end`: flujos criticos (venta, caja, transferencias)
+
+### Guias de auditoria y refactor
+
+Antes de modificar cualquier modulo existente, ejecutar:
+
+1. `docs/module-review-checklist.md` — checklist paso a paso con comandos grep
+2. `docs/refactor-vs-rebuild.md` — decision matrix y sistema de tiers
+
+El modulo `ventas` es la referencia canonica (Tier 3 completado, score ~0 actual).
+
+## Hardening checklist (ventas modulo)
+
+Refactor completado en Junio 2026 — ver `docs/sales-hardening-plan.md` para el plan completo.
+
+| Fase | Estado | Descripcion |
+|------|--------|-------------|
+| 1. Strings huerfanos | ✅ | `pos-utils.ts`, `use-product-search.ts` → centralizados en `pos-messages.ts` |
+| 2. Strings componentes | ✅ | `stage-products/customer/payment`, `product-config-dialog` → `pos-messages.ts` |
+| 3. CSS color-mix | ✅ | Extraido a `ops-control-styles.ts`. Corregido double-wrapping `border-[[...]]` → `border-[...]` en 4 archivos |
+| 4. Split orchestrator | ✅ | `use-pos-sale.ts` (807→712). Nuevos: `use-sale-confirmation.ts`, `use-sale-keyboard.ts` |
+| 5. Verificacion | ✅ | TypeScript, 98 tests Playwright pasan |
+
+### Nuevos hooks
+
+```
+usePosSale()
+  ├─ useCart()
+  ├─ useCashContext()
+  ├─ useCustomerSearch()
+  ├─ usePaymentState()
+  ├─ useProductSearch()
+  ├─ useSaleConfirmation()   ← nuevo (confirmacion, reset, revision, recibos)
+  └─ useSaleKeyboard()       ← nuevo (F2/F4/F8/Escape, pulse, goToStage)
+```
+
+### Convencion de mensajes
+
+El archivo `pos-messages.ts` usa español sin tildes por convencion. Toda string visible al usuario debe residir en `pos-messages.ts` o `sales-history-messages.ts`, nunca hardcodeada.
