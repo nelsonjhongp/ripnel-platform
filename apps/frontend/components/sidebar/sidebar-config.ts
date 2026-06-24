@@ -83,7 +83,6 @@ const clientesGroup: SidebarGroup = {
   onlyForRoles: ["ADMIN", "TIENDA", "CAJA", "VENTAS"],
   items: [
     { title: "Clientes", url: appRoutes.customers },
-    { title: "Nuevo cliente", url: `${appRoutes.customers}/nuevo` },
   ],
 };
 

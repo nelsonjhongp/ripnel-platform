@@ -71,3 +71,15 @@ export const MUTED_SURFACE_MIX =
 /** Fondo con acento suave para paneles destacados secundarios */
 export const ACCENT_MUTED_BG =
   "[color:color-mix(in_srgb,var(--ripnel-accent-soft)_68%,var(--ops-surface))]"
+
+/** Chip semantico con tono acento */
+export const CHIP_TONE_ACCENT =
+  "border-[color:color-mix(in_srgb,var(--ripnel-accent)_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_82%,var(--ops-surface))] text-[color:color-mix(in_srgb,var(--ripnel-accent)_72%,var(--ops-text))]"
+
+/** Chip semantico con tono neutral */
+export const CHIP_TONE_NEUTRAL =
+  "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] text-[var(--ops-text-muted)]"
+
+/** Pill de tipo de cliente en tablas */
+export const CUSTOMER_TYPE_PILL =
+  "inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]"
