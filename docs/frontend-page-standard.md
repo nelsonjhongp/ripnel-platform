@@ -349,6 +349,57 @@ Patron recomendado:
 - si no hay paginacion, usar un conteo breve solo si aporta contexto real;
 - no duplicar el mismo conteo en KPIs, filtros y paginacion al mismo tiempo.
 
+### Paginacion server-side
+
+Cuando el backend expone endpoints paginados (`LIMIT / OFFSET`), el frontend debe cablear la paginacion de forma consistente siguiendo este patron:
+
+**Estado local:**
+```tsx
+const [page, setPage] = useState(1)
+const pageSize = 20
+```
+
+**Query params al backend:**
+```tsx
+params.set("page", String(page))
+params.set("limit", String(pageSize))
+```
+
+**Dependencias del fetch:**
+- La llamada API incluye `page` en los query params
+- `page` esta en el array de dependencias de `useApiGet`
+- `page` se resetea a 1 en cada `onChange` de filtro (busqueda, tipo, orden)
+
+**Response del backend:**
+```json
+{ "ok": true, "data": [...], "total": 123 }
+```
+El frontend extrae `data` y `total` del JSON completo (no usa `apiFetchData` que solo devuelve `data`).
+Usar `apiFetch` directamente y mapear: `.then(res => ({ data: res.data, total: res.total }))`.
+
+**Calculos derivados:**
+```tsx
+const totalPages = Math.max(1, Math.ceil(total / pageSize))
+const safePage = Math.max(1, Math.min(page, totalPages))
+const firstVisible = total === 0 ? 0 : (safePage - 1) * pageSize + 1
+const lastVisible = Math.min(safePage * pageSize, total)
+```
+
+**Renderizado:**
+- Pasar `safePage` (no `page`) al componente `<Pagination>`
+- Mostrar rango: `CUSTOMERS.table.results(firstVisible, lastVisible, total)` → `"1-20 de 123"`
+- Si `total === 0`, mostrar `"0 resultados"`
+
+**Empty state:**
+- `total === 0` → `OpsEmptyState` ("no hay registros todavia")
+- La tabla usa `customers` directo (sin `usePagination` client-side)
+
+**Compatibilidad con busquedas sin paginar:**
+- El backend aplica `LIMIT/OFFSET` solo cuando recibe `page` explicitamente
+- Sin `page` → devuelve todos los resultados (usan este modo: search pickers, duplicate guards)
+
+**Referencia canonica:** `customers-page.tsx` lineas 63-100.
+
 ## Separadores entre modulos
 
 Los separadores deben ordenar modulos grandes, no romper la continuidad interna del bloque tabla.
@@ -572,6 +623,130 @@ function MetricPill({ label, value, tone = "default" }) { ... }
 <MetricPill label="Activos" value={activeCount} tone="accent" />
 <MetricPill label="Pendientes" value={pendingCount} tone="warning" />
 ```
+
+## Patrones de formulario: dialogo de creacion/edicion
+
+El dialogo de cliente (`customers-page.tsx` + `customer-form.tsx`) demuestra patrones
+reutilizables para cualquier entidad con variantes de tipo (ej. persona_natural vs empresa).
+
+### Entry-mode switch (solo en crear)
+
+Cuando una entidad tiene modos que cambian los campos requeridos:
+
+```tsx
+// Toggle al tope del form, solo en modo "create"
+{isCreate ? (
+  <OpsSegmentedControl
+    options={[
+      { value: "persona_natural", label: CUSTOMERS.form.switch.personaNatural },
+      { value: "empresa", label: CUSTOMERS.form.switch.empresa },
+    ]}
+    value={state.entry_mode}
+    onChange={(entryMode) => onChange({ ...state, ...patchEntryMode(entryMode) })}
+    tone="accent"
+    variant="switch"
+    className="w-full [&>div]:grid [&>div]:w-full [&>div]:grid-cols-2"
+  />
+) : null}
+```
+
+**Reglas:**
+- Opciones desde el archivo de mensajes del modulo (nunca hardcodeadas)
+- Cambiar de modo resetea todos los campos editables (documento, nombres, direccion)
+- Campos especificos de cada modo se renderizan con `{isEmpresa ? <CamposEmpresa/> : <CamposNatural/>}`
+- `required` en `OpsFormField` es dinamico segun el modo (`business_name` solo required en empresa)
+- En modo `"edit"` no se muestra el switch — el tipo ya esta definido por el registro existente
+
+### Hints contextuales (solo en editar)
+
+En edicion, cuando el tipo de documento implica campos adicionales, se muestra un hint
+informativo en vez del switch:
+
+```tsx
+{isEdit && isRuc && !isEmpresa ? (
+  <div className={`${INFO_BOX_MUTED} flex items-start gap-2 text-xs text-[var(--ops-text-muted)]`}>
+    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--ripnel-accent)]" />
+    <span>{CUSTOMERS.form.hintRuc}</span>
+  </div>
+) : null}
+```
+
+### Two-phase save (idle → validating → saving)
+
+El guardado en el dialog usa tres fases, no un solo booleano:
+
+| Fase | Estado | Que hace |
+|------|--------|----------|
+| 1. Validacion | `"validating"` | `validateCustomerInput()` + `findDuplicateByDocument()` via API |
+| 2. Guardado | `"saving"` | POST o PATCH al backend |
+
+```tsx
+const [actionState, setActionState] = useState<"idle" | "validating" | "saving">("idle")
+const isBusy = actionState !== "idle"
+
+async function save() {
+  const validation = validateInput(form)
+  if (validation) { setErrors(validation); return }
+
+  setActionState("validating")
+  setErrors(null)
+  const duplicate = await findDuplicateByX({ ...excludeId })
+  if (duplicate) { setErrors({ field: message }); setActionState("idle"); return }
+
+  setActionState("saving")
+  await apiFetchData(...)
+  close()
+}
+```
+
+Cada fase muestra `<LoaderCircle className="animate-spin">` + texto propio, y el boton
+esta `disabled` mientras `isBusy`.
+
+### Per-field errors
+
+Los errores de validacion se asignan al campo que los causo, no como mensaje generico:
+
+```tsx
+// Tipo de errores
+type EntityFormErrors = {
+  full_name?: string
+  document_number?: string
+  business_name?: string
+  address?: string
+}
+
+// Validacion retorna el tipo o null
+function validateInput(input): EntityFormErrors | null { ... }
+
+// Cada campo recibe su error individual
+<OpsFormField label="Razon social" required error={errors?.business_name} density="compact">
+  <input className={opsInputCompact} ... />
+</OpsFormField>
+```
+
+**Reglas:**
+- Errores se limpian al abrir el dialog (`useEffect` sobre `open`)
+- Errores del backend (409, 400) se mapean al campo correspondiente en el `catch`
+- `OpsFormField` aplica 3 canales: label rojo, input con borde rojo, mensaje abajo
+
+### Documento con normalizacion y contador
+
+Para campos de documento (DNI, RUC, CE, pasaporte), el input aplica normalizacion en
+tiempo real y muestra un contador de caracteres:
+
+```tsx
+function normalizeDocumentInput(type: string, value: string) {
+  if (type === "dni" || type === "ruc") return value.replace(/\D/g, "")
+  if (type === "passport") return value.replace(/[^A-Za-z0-9]/g, "").toUpperCase()
+  if (type === "ce") return value.replace(/[^A-Za-z0-9]/g, "")
+  return value
+}
+
+// Contador flotante sobre el input
+const counter = `${value.length}/${maxLength}`  // → "8/8"
+```
+
+---
 
 ## Casos de prueba del estandar
 
