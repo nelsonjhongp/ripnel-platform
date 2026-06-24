@@ -67,13 +67,20 @@ const HISTORY_STATUS_OPTIONS: ReadonlyArray<{
   },
 ];
 
+const todayStr = new Date().toISOString().slice(0, 10)
+const defaultFrom = (() => {
+  const d = new Date()
+  d.setDate(d.getDate() - 30)
+  return d.toISOString().slice(0, 10)
+})()
+
 export function TransfersHistoryPage() {
   const { loading: authLoading, permissions, user } = useAuth();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<TransferHistoryStatus>("closed");
   const [scope, setScope] = useState<TransferScope>("current");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState(defaultFrom);
+  const [dateTo, setDateTo] = useState(todayStr);
   const [debouncedQuery, setDebouncedQuery] = useState("");
 
   const transferCapabilities = useTransferCapabilities();
@@ -96,13 +103,8 @@ export function TransfersHistoryPage() {
         params.set("query", debouncedQuery.trim());
       }
 
-      if (dateFrom) {
-        params.set("date_from", dateFrom);
-      }
-
-      if (dateTo) {
-        params.set("date_to", dateTo);
-      }
+      params.set("date_from", dateFrom);
+      params.set("date_to", dateTo);
 
       return apiFetch<ApiEnvelope<TransferSummary[]> | TransferSummary[]>(
         `/api/transfers?${params.toString()}`,
@@ -131,15 +133,15 @@ export function TransfersHistoryPage() {
     setPage: setCurrentPage,
   } = usePagination(items);
   const hasActiveFilters =
-    Boolean(query.trim()) || status !== "closed" || scope !== "current" || Boolean(dateFrom) || Boolean(dateTo);
+    Boolean(query.trim()) || status !== "closed" || scope !== "current" || dateFrom !== defaultFrom || dateTo !== todayStr;
 
   function clearFilters() {
     setQuery("");
     setDebouncedQuery("");
     setStatus("closed");
     setScope("current");
-    setDateFrom("");
-    setDateTo("");
+    setDateFrom(defaultFrom);
+    setDateTo(todayStr);
     setCurrentPage(1);
   }
 
