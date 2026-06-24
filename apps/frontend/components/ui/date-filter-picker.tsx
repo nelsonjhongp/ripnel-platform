@@ -6,6 +6,7 @@ import { format, parse, isValid } from "date-fns"
 import { es } from "date-fns/locale"
 
 import { Calendar } from "@/components/ui/calendar"
+import { opsFieldLabelClassName } from "@/components/ui/ops-control-styles"
 import { cn } from "@/lib/utils"
 
 type DateFilterPickerProps = {
@@ -72,7 +73,7 @@ export function DateFilterPicker({
 
   return (
     <div ref={rootRef} className="relative">
-      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+      <label className={`mb-1 ${opsFieldLabelClassName}`}>
         {label}
       </label>
 
