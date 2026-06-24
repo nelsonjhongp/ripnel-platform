@@ -1,6 +1,7 @@
 "use client"
 
 import { apiFetchData, ApiError, formatApiFetchError } from "@/lib/api"
+import { CUSTOMERS } from "./customers-messages"
 
 type CustomerDocumentLookupRecord = {
   customer_id: string
@@ -70,16 +71,16 @@ export async function findDuplicateCustomerByDocument({
 
 export function mapCustomerSaveError(error: unknown) {
   if (error instanceof ApiError && error.status === 409) {
-    return "Ya existe un cliente con este documento."
+    return CUSTOMERS.dialog.duplicateError
   }
 
-  const message = formatApiFetchError(error, "No se pudo guardar el cliente.")
+  const message = formatApiFetchError(error, CUSTOMERS.dialog.saveError)
   if (
     /document already exists/i.test(message) ||
     /ya existe/i.test(message) ||
     /duplicate/i.test(message)
   ) {
-    return "Ya existe un cliente con este documento."
+    return CUSTOMERS.dialog.duplicateError
   }
 
   return message

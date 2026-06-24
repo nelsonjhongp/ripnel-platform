@@ -1,6 +1,6 @@
 const { query } = require('../../shared/db');
 
-async function findAllCustomers({ documentType, sort, q }) {
+async function findAllCustomers({ documentType, sort, q, page, limit }) {
   const params = [];
   const conditions = [];
 
@@ -29,6 +29,28 @@ async function findAllCustomers({ documentType, sort, q }) {
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const order = sort === 'asc' ? 'ASC' : 'DESC';
 
+  const hasPage = page !== undefined && page !== null;
+  let paginationClause = '';
+  let total = 0;
+
+  if (hasPage) {
+    const countResult = await query(
+      `SELECT COUNT(*) AS total FROM customers c ${where}`,
+      params
+    );
+    total = parseInt(countResult.rows[0].total, 10);
+
+    const safePage = Math.max(1, parseInt(String(page), 10) || 1);
+    const safeLimit = Math.min(100, Math.max(1, parseInt(String(limit), 10) || 20));
+    const offset = (safePage - 1) * safeLimit;
+
+    params.push(safeLimit);
+    const limitIdx = params.length;
+    params.push(offset);
+    const offsetIdx = params.length;
+    paginationClause = `LIMIT $${limitIdx} OFFSET $${offsetIdx}`;
+  }
+
   const result = await query(
     `SELECT
        c.customer_id,
@@ -50,11 +72,16 @@ async function findAllCustomers({ documentType, sort, q }) {
        c.updated_at
      FROM customers c
      ${where}
-     ORDER BY c.created_at ${order}`,
+     ORDER BY c.created_at ${order}
+     ${paginationClause}`,
     params
   );
 
-  return result.rows;
+  if (!hasPage) {
+    total = result.rows.length;
+  }
+
+  return { rows: result.rows, total };
 }
 
 async function findCustomerById(customerId) {
