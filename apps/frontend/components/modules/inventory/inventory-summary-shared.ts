@@ -10,7 +10,6 @@ export type InventoryVisibleLocation = {
 };
 
 export type ProductStockStatus = "available" | "low" | "out" | "incomplete";
-export type LocationHealthStatus = "normal" | "attention" | "critical";
 
 export type InventoryProductSummaryRow = {
   style_id: string;
@@ -25,17 +24,6 @@ export type InventoryProductSummaryRow = {
   status_label: string;
 };
 
-export type InventoryLocationSummaryRow = {
-  location_id: string;
-  location_name: string;
-  stock_total: number;
-  products_count: number;
-  low_stock_count: number;
-  out_of_stock_count: number;
-  status: LocationHealthStatus;
-  status_label: string;
-};
-
 export type InventorySummaryMeta = {
   low_stock_threshold: number;
   available_locations: InventoryVisibleLocation[];
@@ -46,11 +34,6 @@ export type InventorySummaryMeta = {
 
 export type InventoryProductSummaryResponse = {
   rows: InventoryProductSummaryRow[];
-  meta: InventorySummaryMeta;
-};
-
-export type InventoryLocationSummaryResponse = {
-  rows: InventoryLocationSummaryRow[];
   meta: InventorySummaryMeta;
 };
 
@@ -118,13 +101,6 @@ export type InventoryDetailResponse = {
 };
 
 export type ProductStatusFilter = "all" | ProductStockStatus;
-export type LocationStatusFilter = "all" | LocationHealthStatus;
-export type InventoryView = "product" | "location";
-export type InventoryDetailTab = "summary" | "locations" | "matrix" | "movements";
-
-export function normalizeInventoryView(value: string | null): InventoryView {
-  return value === "location" ? "location" : "product";
-}
 
 export function normalizeProductStatusFilter(value: string | null): ProductStatusFilter {
   if (value === "available" || value === "low" || value === "out" || value === "incomplete") {
@@ -134,32 +110,10 @@ export function normalizeProductStatusFilter(value: string | null): ProductStatu
   return "all";
 }
 
-export function normalizeLocationStatusFilter(value: string | null): LocationStatusFilter {
-  if (value === "normal" || value === "attention" || value === "critical") {
-    return value;
-  }
-
-  return "all";
-}
-
-export function normalizeInventoryDetailTab(value: string | null): InventoryDetailTab {
-  if (value === "locations" || value === "matrix" || value === "movements") {
-    return value;
-  }
-
-  return "summary";
-}
-
 export function getProductStatusTone(status: ProductStockStatus) {
   if (status === "out") return "danger" as const;
   if (status === "incomplete") return "warning" as const;
   if (status === "low") return "warning" as const;
-  return "success" as const;
-}
-
-export function getLocationStatusTone(status: LocationHealthStatus) {
-  if (status === "critical") return "danger" as const;
-  if (status === "attention") return "warning" as const;
   return "success" as const;
 }
 

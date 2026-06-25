@@ -121,13 +121,13 @@ async function findAllInventory(filters = {}) {
        i.qty
      from inventory i
      inner join locations l on l.location_id = i.location_id
-     inner join product_variants pv on pv.variant_id = i.variant_id
-     inner join product_styles ps on ps.style_id = pv.style_id
-     left join garment_types gt on gt.garment_type_id = ps.garment_type_id
-     inner join sizes s on s.size_id = pv.size_id
-     inner join colors c on c.color_id = pv.color_id
-     ${whereClause}
-     order by l.name asc, ps.name asc, s.sort_order asc, c.name asc`,
+      inner join product_variants pv on pv.variant_id = i.variant_id and pv.active = true
+      inner join product_styles ps on ps.style_id = pv.style_id and ps.active = true
+      left join garment_types gt on gt.garment_type_id = ps.garment_type_id
+      inner join sizes s on s.size_id = pv.size_id
+      inner join colors c on c.color_id = pv.color_id
+      ${whereClause}
+      order by l.name asc, ps.name asc, s.sort_order asc, c.name asc`,
     values
   );
 
@@ -195,16 +195,16 @@ async function findInventoryProductSummary(filters = {}) {
          i.qty
        from inventory i
        inner join locations l on l.location_id = i.location_id
-       inner join product_variants pv on pv.variant_id = i.variant_id
-       inner join product_styles ps on ps.style_id = pv.style_id
-       left join garment_types gt on gt.garment_type_id = ps.garment_type_id
-       inner join sizes s on s.size_id = pv.size_id
-       inner join colors c on c.color_id = pv.color_id
-       ${whereClause}
-     ),
-     grouped as (
-       select
-         style_id,
+        inner join product_variants pv on pv.variant_id = i.variant_id and pv.active = true
+        inner join product_styles ps on ps.style_id = pv.style_id and ps.active = true
+        left join garment_types gt on gt.garment_type_id = ps.garment_type_id
+        inner join sizes s on s.size_id = pv.size_id
+        inner join colors c on c.color_id = pv.color_id
+        ${whereClause}
+      ),
+      grouped as (
+        select
+          style_id,
          max(style_code) as style_code,
          max(style_name) as style_name,
          max(garment_type_name) as garment_type_name,
@@ -260,12 +260,12 @@ async function findInventoryLocationSummary(filters = {}) {
          i.qty
        from inventory i
        inner join locations l on l.location_id = i.location_id
-       inner join product_variants pv on pv.variant_id = i.variant_id
-       inner join product_styles ps on ps.style_id = pv.style_id
-       left join garment_types gt on gt.garment_type_id = ps.garment_type_id
-       ${whereClause}
-     ),
-     product_totals as (
+        inner join product_variants pv on pv.variant_id = i.variant_id and pv.active = true
+        inner join product_styles ps on ps.style_id = pv.style_id and ps.active = true
+        left join garment_types gt on gt.garment_type_id = ps.garment_type_id
+        ${whereClause}
+      ),
+      product_totals as (
        select
          location_id,
          max(location_name) as location_name,
@@ -333,9 +333,9 @@ async function findInventoryStyleRows(filters = {}) {
        i.qty
      from inventory i
      inner join locations l on l.location_id = i.location_id
-     inner join product_variants pv on pv.variant_id = i.variant_id
-     inner join product_styles ps on ps.style_id = pv.style_id
-     left join garment_types gt on gt.garment_type_id = ps.garment_type_id
+      inner join product_variants pv on pv.variant_id = i.variant_id and pv.active = true
+      inner join product_styles ps on ps.style_id = pv.style_id and ps.active = true
+      left join garment_types gt on gt.garment_type_id = ps.garment_type_id
      inner join sizes s on s.size_id = pv.size_id
      inner join colors c on c.color_id = pv.color_id
      ${whereClause}
@@ -377,8 +377,8 @@ async function findAllKardex(filters = {}) {
          sm.created_at
        from stock_movements sm
        inner join locations l on l.location_id = sm.location_id
-       inner join product_variants pv on pv.variant_id = sm.variant_id
-       inner join product_styles ps on ps.style_id = pv.style_id
+        inner join product_variants pv on pv.variant_id = sm.variant_id and pv.active = true
+        inner join product_styles ps on ps.style_id = pv.style_id and ps.active = true
        left join users u on u.user_id = sm.created_by
        left join inventory_adjustment_lines ial
          on ial.adjustment_line_id = sm.reference_line_id
@@ -531,6 +531,47 @@ async function findAllAdjustments(filters = {}) {
 }
 
 async function findAdjustmentVariants(locationId, searchQuery, executor = query) {
+  const words = (searchQuery || "").trim().split(/\s+/).filter(Boolean);
+
+  if (!words.length) {
+    const result = await executor(
+      `select
+         pv.variant_id,
+         pv.sku,
+         ps.style_code,
+         ps.name as style_name,
+         s.code as size_code,
+         c.name as color_name,
+         coalesce(i.qty, 0)::int as system_qty
+       from product_variants pv
+       inner join product_styles ps on ps.style_id = pv.style_id
+       inner join sizes s on s.size_id = pv.size_id
+       inner join colors c on c.color_id = pv.color_id
+       left join inventory i
+         on i.variant_id = pv.variant_id
+        and i.location_id = $1
+       order by ps.name asc, s.sort_order asc, c.name asc`,
+      [locationId]
+    );
+    return result.rows;
+  }
+
+  const clauseParts = [];
+  const params = [locationId];
+  let paramIndex = 2;
+
+  for (const word of words) {
+    clauseParts.push(`(
+      pv.sku ilike $${paramIndex}
+      or ps.style_code ilike $${paramIndex}
+      or ps.name ilike $${paramIndex}
+      or s.code ilike $${paramIndex}
+      or c.name ilike $${paramIndex}
+    )`);
+    params.push(`%${word}%`);
+    paramIndex++;
+  }
+
   const result = await executor(
     `select
        pv.variant_id,
@@ -547,15 +588,9 @@ async function findAdjustmentVariants(locationId, searchQuery, executor = query)
      left join inventory i
        on i.variant_id = pv.variant_id
       and i.location_id = $1
-     where (
-       pv.sku ilike $2
-       or ps.style_code ilike $2
-       or ps.name ilike $2
-       or s.code ilike $2
-       or c.name ilike $2
-     )
+     where ${clauseParts.join("\n       and ")}
      order by ps.name asc, s.sort_order asc, c.name asc`,
-    [locationId, `%${searchQuery}%`]
+    params
   );
 
   return result.rows;

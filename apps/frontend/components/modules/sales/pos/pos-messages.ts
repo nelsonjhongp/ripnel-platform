@@ -20,6 +20,9 @@ export const POS = {
     open: "Caja abierta",
     closed: "Caja cerrada",
     missing: "Aun no se abrio caja",
+    openLabel: "Caja operativa abierta",
+    closedLabel: "Caja cerrada",
+    missingLabel: "Aun no se abrio caja",
     loadingLocation: "Cargando sede\u2026",
     noLocation: "Sin sede asignada",
     openTitle: "Abrir caja",
@@ -58,6 +61,23 @@ export const POS = {
     noMatchMessage: "No encontramos coincidencias para esta busqueda.",
     emptyCart: "Aun no hay productos agregados a la venta.",
     missingPrice: "Hay items sin precio vigente. Ajustalos antes del cierre.",
+    priceTypeRetail: "Retail",
+    priceTypeWholesale: "Mayorista",
+    priceModeRetail: "Minorista",
+    priceModeWholesale: "Mayorista",
+    priceModeManual: "Manual",
+    priceAdjustLabel: "Ajuste",
+    editPriceAria: "Editar precio",
+    removeProductAria: "Quitar producto",
+    removeProductTitle: "Eliminar producto",
+  },
+
+  priceModeToggle: {
+    activateManualWholesale: "Activar modo manual mayorista",
+    switchToManualRetail: "Cambiar a modo manual minorista",
+    returnToAuto: "Volver a modo automatico",
+    manualTooltip: (mode: string) => `Modo manual: ${mode} — clic para volver a automatico`,
+    autoTooltip: (mode: string) => `Automatico: ${mode} — clic para activar mayorista manual`,
   },
 
   customer: {
@@ -83,6 +103,7 @@ export const POS = {
     validating: "Validando...",
     saving: "Guardando...",
     cancel: "Cancelar",
+    selectDocumentPlaceholder: "Seleccionar",
   },
 
   payment: {
@@ -103,6 +124,7 @@ export const POS = {
     missing: "Falta",
     complete: "Completo",
     inactiveHint: "Se activara al agregar productos a la venta.",
+    removeMethodAria: "Quitar metodo de pago",
   },
 
   summary: {
@@ -298,5 +320,44 @@ export const POS = {
     paymentNumber: "Pago",
     paymentLabel: "Metodo",
     linesOfPayment: (count: number) => `${count} lineas de pago`,
+  },
+
+  table: {
+    columns: {
+      product: "Producto",
+      variant: "Variante",
+      quantity: "Cant.",
+      unitPrice: "Precio unit.",
+      subtotal: "Subtotal",
+      actions: "Acciones",
+    },
+  },
+
+  paymentReferenceMeta: {
+    cash: {
+      label: "Referencia",
+      placeholder: "Opcional",
+      helper: "En efectivo es opcional. Solo usalo si necesitas dejar una observacion corta.",
+    },
+    transfer: {
+      label: "Operacion / voucher",
+      placeholder: "Nro. de operacion o voucher",
+      helper: "Registra el numero de operacion o voucher para rastrear el deposito.",
+    },
+    yape: {
+      label: "Operacion / celular",
+      placeholder: "Ultimos 4 digitos o codigo",
+      helper: "Registra codigo o ultimos 4 digitos para identificar el abono.",
+    },
+    plin: {
+      label: "Operacion / celular",
+      placeholder: "Ultimos 4 digitos o codigo",
+      helper: "Registra codigo o ultimos 4 digitos para identificar el abono.",
+    },
+    default: {
+      label: "Referencia",
+      placeholder: "Codigo de referencia",
+      helper: "Usa este campo para dejar el dato que ayude a rastrear el pago.",
+    },
   },
 } as const

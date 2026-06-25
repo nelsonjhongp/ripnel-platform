@@ -1,22 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePagination } from "@/hooks/use-pagination";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowDownCircle,
   ArrowUpCircle,
+  Download,
+  MapPin,
   RefreshCw,
   RotateCcw,
-  Download,
 } from "lucide-react";
 import { apiFetchData } from "@/lib/api";
 import { useApiGet } from "@/hooks/use-api-get";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/date-utils";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { Button } from "@/components/ui/button";
 import { OpsSelect } from "@/components/ui/ops-selection";
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
 import { OpsDataTable } from "@/components/ui/ops-data-table";
 import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import { Pagination } from "@/components/ui/pagination";
@@ -34,68 +37,57 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-import type { KardexResponse, MovementOperationFilter, MovementOriginFilter } from "@/lib/kardex-domain";
-import { resolveDocumentFamily, resolveMovementDirection, resolveSemanticOrigin, formatMovementOperationLabel, formatMovementOriginLabel, formatReference, resolveMovementTypeFromParams, resolveOriginFilterFromParams, resolveBackendReferenceType } from "@/lib/kardex-domain";
+import type { KardexResponse, MovementOperationFilter, MovementOriginFilter } from "./kardex-domain";
+import { resolveDocumentFamily, resolveMovementDirection, resolveSemanticOrigin, formatMovementOperationLabel, formatMovementOriginLabel, formatReference, resolveMovementTypeFromParams, resolveOriginFilterFromParams, resolveBackendReferenceType } from "./kardex-domain";
 import { exportToCsv } from "@/lib/export-csv";
+import { KARDEX } from "./kardex-messages";
+import { CHIP_ENTRY, CHIP_EXIT, CHIP_ADJUST, QTY_POSITIVE, QTY_NEGATIVE } from "./kardex-constants";
+import { DateFilterPicker } from "@/components/ui/date-filter-picker";
 
 export default function KardexPage() {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const searchParamsKey = searchParams.toString();
-  const initialQuery = searchParams.get("query") ?? searchParams.get("reference_id") ?? "";
-  const initialLocation = searchParams.get("location_id") ?? searchParams.get("location") ?? "ALL";
+  const { defaultLocation, locationsLoading } = useAuth();
+
+  const urlLocationId = searchParams.get("location_id") ?? searchParams.get("location");
+  const referenceTypeParam = searchParams.get("reference_type");
+  const referenceIdParam = searchParams.get("reference_id");
+  const hasSearchContext = Boolean(searchParams.toString());
+
+  const initialQuery = searchParams.get("query") ?? referenceIdParam ?? "";
   const initialMovementType = resolveMovementTypeFromParams(
     searchParams.get("movement_type"),
-    searchParams.get("reference_type")
+    referenceTypeParam
   );
-  const initialOriginFilter = resolveOriginFilterFromParams(searchParams.get("reference_type"));
+  const initialOriginFilter = resolveOriginFilterFromParams(
+    referenceTypeParam ?? searchParams.get("origin")
+  );
   const initialDateFrom = searchParams.get("date_from") ?? "";
   const initialDateTo = searchParams.get("date_to") ?? "";
 
-  return (
-    <KardexPageContent
-      key={searchParamsKey}
-      initialQuery={initialQuery}
-      initialLocation={initialLocation}
-      initialMovementType={initialMovementType}
-      initialOriginFilter={initialOriginFilter}
-      initialDateFrom={initialDateFrom}
-      initialDateTo={initialDateTo}
-      referenceTypeParam={searchParams.get("reference_type")}
-      referenceIdParam={searchParams.get("reference_id")}
-      hasSearchContext={Boolean(searchParamsKey)}
-    />
-  );
-}
-
-function KardexPageContent({
-  initialQuery,
-  initialLocation,
-  initialMovementType,
-  initialOriginFilter,
-  initialDateFrom,
-  initialDateTo,
-  referenceTypeParam,
-  referenceIdParam,
-  hasSearchContext,
-}: {
-  initialQuery: string;
-  initialLocation: string;
-  initialMovementType: MovementOperationFilter;
-  initialOriginFilter: MovementOriginFilter;
-  initialDateFrom: string;
-  initialDateTo: string;
-  referenceTypeParam: string | null;
-  referenceIdParam: string | null;
-  hasSearchContext: boolean;
-}) {
-  const router = useRouter();
-  const pathname = usePathname();
   const [query, setQuery] = useState(initialQuery);
-  const [locationFilter, setLocationFilter] = useState(initialLocation);
+  const [locationFilter, setLocationFilter] = useState(
+    urlLocationId || defaultLocation?.location_id || "ALL"
+  );
   const [movementType, setMovementType] = useState<MovementOperationFilter>(initialMovementType);
   const [originFilter, setOriginFilter] = useState<MovementOriginFilter>(initialOriginFilter);
   const [dateFrom, setDateFrom] = useState(initialDateFrom);
   const [dateTo, setDateTo] = useState(initialDateTo);
+
+  const locationAutoSet = useRef(false);
+
+  useEffect(() => {
+    if (
+      !locationAutoSet.current &&
+      !urlLocationId &&
+      !locationsLoading &&
+      defaultLocation?.location_id
+    ) {
+      locationAutoSet.current = true;
+      setLocationFilter(defaultLocation.location_id);
+    }
+  }, [locationsLoading, defaultLocation?.location_id, urlLocationId]);
 
   const { data: kardexResponse, loading, error, refetch } = useApiGet<KardexResponse>(
     () => {
@@ -146,6 +138,18 @@ function KardexPageContent({
     [query, locationFilter, movementType, originFilter, referenceTypeParam, referenceIdParam, dateFrom, dateTo]
   );
 
+  useEffect(() => {
+    const p = new URLSearchParams();
+    if (query.trim()) p.set("query", query.trim());
+    if (locationFilter !== "ALL") p.set("location_id", locationFilter);
+    if (movementType !== "ALL") p.set("movement_type", movementType);
+    if (originFilter !== "ALL") p.set("origin", originFilter);
+    if (dateFrom) p.set("date_from", dateFrom);
+    if (dateTo) p.set("date_to", dateTo);
+    const nextUrl = p.toString() ? `${pathname}?${p.toString()}` : pathname;
+    router.replace(nextUrl, { scroll: false });
+  }, [query, locationFilter, movementType, originFilter, dateFrom, dateTo, pathname, router]);
+
   const movements = useMemo(() => kardexResponse?.rows || [], [kardexResponse]);
   const availableLocations = useMemo(() => kardexResponse?.meta?.available_locations || [], [kardexResponse]);
 
@@ -163,29 +167,42 @@ function KardexPageContent({
     }));
   }, [availableLocations]);
 
+  const locationBadgeText = useMemo(() => {
+    if (locationsLoading) return KARDEX.locationBadge.loading;
+    if (!defaultLocation?.name) return KARDEX.locationBadge.noLocation;
+    if (locationFilter === "ALL") return KARDEX.filters.locationAll;
+    const loc = availableLocations.find((l) => l.location_id === locationFilter);
+    return loc?.name || defaultLocation.name;
+  }, [locationsLoading, defaultLocation, locationFilter, availableLocations]);
+
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
   const filteredMovements = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return movements.filter((movement) => {
       const movementDate = new Date(movement.created_at);
-      const movementDirection = resolveMovementDirection(movement);
-      const documentFamily = resolveDocumentFamily(movement);
-      const semanticOrigin = resolveSemanticOrigin(movement);
+      const direction = movement.movement_direction ?? resolveMovementDirection(movement);
+      const family = movement.document_family ?? resolveDocumentFamily(movement);
+      const semantic = movement.semantic_origin ?? resolveSemanticOrigin(movement);
+
       const matchesType =
         movementType === "ALL" ||
         (movementType === "TRANSFER"
-          ? documentFamily === "transfer"
+          ? family === "transfer"
           : movementType === "IN"
-            ? movementDirection === "entry" && documentFamily !== "transfer"
+            ? direction === "entry" && family !== "transfer"
             : movementType === "OUT"
-              ? movementDirection === "exit" && documentFamily !== "transfer"
-              : movementDirection === "adjustment");
+              ? direction === "exit" && family !== "transfer"
+              : direction === "adjustment");
+
       const matchesOrigin =
         originFilter === "ALL" ||
         (originFilter === "opening"
-          ? semanticOrigin === "opening_confirmed"
+          ? semantic === "opening_confirmed"
           : originFilter === "adjustment"
-            ? semanticOrigin === "adjustment_confirmed"
-            : documentFamily === originFilter);
+            ? semantic === "adjustment_confirmed"
+            : family === originFilter);
+
       const matchesLocation =
         effectiveLocationFilter === "ALL" || movement.location_id === effectiveLocationFilter;
       const matchesDateFrom =
@@ -219,18 +236,13 @@ function KardexPageContent({
   const totals = useMemo(() => {
     return filteredMovements.reduce(
       (acc, movement) => {
-        if (movement.quantity_effect > 0) {
-          acc.entries += movement.quantity_effect;
-        }
-        if (movement.quantity_effect < 0) {
-          acc.exits += Math.abs(movement.quantity_effect);
-        }
-        if (resolveMovementDirection(movement) === "adjustment") {
-          acc.adjustments += 1;
-        }
-        if (resolveDocumentFamily(movement) === "transfer") {
-          acc.transfers += 1;
-        }
+        const direction = movement.movement_direction ?? resolveMovementDirection(movement);
+        const family = movement.document_family ?? resolveDocumentFamily(movement);
+
+        if (direction === "entry" && family !== "transfer") acc.entries += 1;
+        if (direction === "exit" && family !== "transfer") acc.exits += 1;
+        if (direction === "adjustment") acc.adjustments += 1;
+        if (family === "transfer") acc.transfers += 1;
         return acc;
       },
       { entries: 0, exits: 0, adjustments: 0, transfers: 0 }
@@ -260,8 +272,21 @@ function KardexPageContent({
     dateTo !== "" ||
     hasSearchContext;
 
+  function resetFilters() {
+    setQuery("");
+    setLocationFilter(defaultLocation?.location_id || "ALL");
+    setMovementType("ALL");
+    setOriginFilter("ALL");
+    setDateFrom("");
+    setDateTo("");
+    setPage(1);
+    if (hasSearchContext) {
+      router.replace(pathname);
+    }
+  }
+
   function handleExport() {
-    const headers = ["SKU", "Producto", "Sede", "Tipo", "Cantidad", "Efecto", "Saldo", "Origen", "Referencia", "Usuario", "Fecha"]
+    const headers = [...KARDEX.csv.headers]
     const rows = filteredMovements.map((m) => [
       m.sku,
       `${m.style_name} (${m.style_code})`,
@@ -275,14 +300,24 @@ function KardexPageContent({
       m.created_by_name || "-",
       formatDateTime(m.created_at),
     ])
-    exportToCsv("kardex", headers, rows)
+    exportToCsv(KARDEX.csv.filename, headers, rows)
   }
 
   return (
+    <TooltipProvider delayDuration={120}>
     <OpsPageShell width="wide">
         <PosHeader
-          eyebrow="Kardex"
-          title="Movimientos de stock"
+          eyebrow={KARDEX.header.eyebrow}
+          title={KARDEX.header.title}
+          meta={
+            <OpsStatusBadge
+              tone="neutral"
+              size="sm"
+              icon={<MapPin className="h-3.5 w-3.5 text-[var(--ripnel-accent)]" />}
+            >
+              {locationBadgeText}
+            </OpsStatusBadge>
+          }
           actions={
             <div className="flex items-center gap-2">
               <Tooltip>
@@ -294,13 +329,13 @@ function KardexPageContent({
                     className="rounded-lg"
                     onClick={handleExport}
                     disabled={filteredMovements.length === 0}
-                    aria-label="Exportar CSV"
+                    aria-label={KARDEX.actions.exportCsv}
                   >
                     <Download className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" sideOffset={8}>
-                  Exportar CSV
+                  {KARDEX.actions.exportCsv}
                 </TooltipContent>
               </Tooltip>
               <Button
@@ -312,7 +347,7 @@ function KardexPageContent({
                 disabled={loading}
               >
                 <RefreshCw className={loading ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
-                Actualizar
+                {KARDEX.actions.refresh}
               </Button>
             </div>
           }
@@ -320,145 +355,135 @@ function KardexPageContent({
 
         <OpsMetricInlineGroup
           items={[
-            { label: "Entradas", value: totals.entries, tone: "accent" },
-            { label: "Salidas", value: totals.exits, tone: "warning" },
-            { label: "Ajustes", value: totals.adjustments, tone: "default" },
-            { label: "Transferencias", value: totals.transfers, tone: "default" },
+            { label: KARDEX.metrics.entries, value: totals.entries, tone: "accent" },
+            { label: KARDEX.metrics.exits, value: totals.exits, tone: "warning" },
+            { label: KARDEX.metrics.adjustments, value: totals.adjustments, tone: "default" },
+            { label: KARDEX.metrics.transfers, value: totals.transfers, tone: "default" },
           ]}
         />
 
         <OpsSectionDivider>
           <OpsTableBlock>
-          <OpsFiltersRow className="lg:grid-cols-[minmax(0,1.45fr)_0.75fr_0.75fr_0.75fr_0.72fr_0.72fr_auto]">
+          <OpsFiltersRow
+            className={cn(
+              "lg:grid-cols-[minmax(0,1.25fr)_0.78fr_0.78fr_0.95fr_0.95fr_auto]",
+              availableLocations.length > 1
+                ? "lg:grid-cols-[minmax(0,1.15fr)_0.72fr_0.72fr_0.72fr_0.95fr_0.95fr_auto]"
+                : ""
+            )}
+          >
             <OpsSearchField
               value={query}
               onChange={(value) => handleFilterChange(() => setQuery(value))}
-              placeholder="Buscar por SKU, producto, sede, origen o referencia"
-              ariaLabel="Buscar movimientos de stock"
+              placeholder={KARDEX.filters.searchPlaceholder}
+              ariaLabel={KARDEX.filters.searchAria}
             />
 
-            <OpsSelect
-              label="Sede"
-              value={effectiveLocationFilter}
-              options={[
-                { value: "ALL", label: "Todas" },
-                ...locationOptions.map((location) => ({
-                  value: location.location_id,
-                  label: `${location.code} - ${location.name}`,
-                })),
-              ]}
-              onChange={(value) => handleFilterChange(() => setLocationFilter(value))}
-            />
+            {availableLocations.length > 1 && (
+              <OpsSelect
+                label={KARDEX.filters.location}
+                value={effectiveLocationFilter}
+                options={[
+                  { value: "ALL", label: KARDEX.filters.locationAll },
+                  ...locationOptions.map((location) => ({
+                    value: location.location_id,
+                    label: location.name,
+                  })),
+                ]}
+                onChange={(value) => handleFilterChange(() => setLocationFilter(value))}
+              />
+            )}
 
             <OpsSelect
-              label="Operación"
+              label={KARDEX.filters.operation}
               value={movementType}
               options={[
-                { value: "ALL", label: "Todos" },
-                { value: "IN", label: "Entradas" },
-                { value: "OUT", label: "Salidas" },
-                { value: "ADJUST", label: "Ajustes" },
-                { value: "TRANSFER", label: "Por transferencia" },
+                { value: "ALL", label: KARDEX.filters.operationAll },
+                { value: "IN", label: KARDEX.filters.operationIn },
+                { value: "OUT", label: KARDEX.filters.operationOut },
+                { value: "ADJUST", label: KARDEX.filters.operationAdjust },
+                { value: "TRANSFER", label: KARDEX.filters.operationTransfer },
               ]}
               onChange={(v) => handleFilterChange(() => setMovementType(v as MovementOperationFilter))}
             />
 
             <OpsSelect
-              label="Origen"
+              label={KARDEX.filters.origin}
               value={originFilter}
               options={[
-                { value: "ALL", label: "Todos" },
-                { value: "sale", label: "Venta" },
-                { value: "transfer", label: "Transferencia" },
-                { value: "exchange", label: "Cambio" },
-                { value: "adjustment", label: "Ajuste" },
-                { value: "opening", label: "Apertura" },
+                { value: "ALL", label: KARDEX.filters.originAll },
+                { value: "sale", label: KARDEX.filters.originSale },
+                { value: "transfer", label: KARDEX.filters.originTransfer },
+                { value: "exchange", label: KARDEX.filters.originExchange },
+                { value: "adjustment", label: KARDEX.filters.originAdjustment },
+                { value: "opening", label: KARDEX.filters.originOpening },
               ]}
               onChange={(v) => handleFilterChange(() => setOriginFilter(v as MovementOriginFilter))}
             />
 
-            <div>
-              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                Desde
-              </label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(event) => handleFilterChange(() => setDateFrom(event.target.value))}
-                className="sales-field h-10 w-full rounded-lg px-3 text-sm text-[var(--ops-text)]"
-              />
-            </div>
+            <DateFilterPicker
+              label={KARDEX.filters.dateFrom}
+              value={dateFrom}
+              onChange={(value) => handleFilterChange(() => setDateFrom(value))}
+              max={dateTo || undefined}
+              density="compact"
+            />
 
-            <div>
-              <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                Hasta
-              </label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(event) => handleFilterChange(() => setDateTo(event.target.value))}
-                className="sales-field h-10 w-full rounded-lg px-3 text-sm text-[var(--ops-text)]"
-              />
-            </div>
+            <DateFilterPicker
+              label={KARDEX.filters.dateTo}
+              value={dateTo}
+              onChange={(value) => handleFilterChange(() => setDateTo(value))}
+              min={dateFrom || undefined}
+              max={todayStr}
+              density="compact"
+            />
 
-            <TooltipProvider>
-              <Tooltip>
+            <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="outline"
                     size="icon-sm"
-                    onClick={() => handleFilterChange(() => {
-                      setQuery("");
-                      setLocationFilter("ALL");
-                      setMovementType("ALL");
-                      setOriginFilter("ALL");
-                      setDateFrom("");
-                      setDateTo("");
-                      if (hasSearchContext) {
-                        router.replace(pathname);
-                      }
-                    })}
+                    onClick={resetFilters}
                     disabled={!hasActiveFilters}
                     className="rounded-lg"
-                    aria-label="Limpiar filtros"
+                    aria-label={KARDEX.filters.clearAria}
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Limpiar filtros</TooltipContent>
+                <TooltipContent>{KARDEX.filters.clear}</TooltipContent>
               </Tooltip>
-            </TooltipProvider>
           </OpsFiltersRow>
 
           <OpsDataTable
             columns={[
-              { key: "fecha", header: "Fecha" },
-              { key: "sku", header: "SKU" },
-              { key: "producto", header: "Producto" },
-              { key: "origen", header: "Origen", className: "hidden sm:table-cell" },
-              { key: "ref", header: "Ref.", className: "hidden xl:table-cell" },
-              { key: "tipo", header: "Tipo" },
-              { key: "cantidad", header: "Cantidad", className: "text-right" },
-              { key: "ubicacion", header: "Ubicación" },
-              { key: "usuario", header: "Usuario" },
+              { key: "fecha", header: KARDEX.columns.date },
+              { key: "sku", header: KARDEX.columns.sku },
+              { key: "producto", header: KARDEX.columns.product },
+              { key: "origen", header: KARDEX.columns.origin, className: "hidden sm:table-cell" },
+              { key: "ref", header: KARDEX.columns.reference, className: "hidden xl:table-cell" },
+              { key: "tipo", header: KARDEX.columns.type },
+              { key: "cantidad", header: KARDEX.columns.quantity, className: "text-right" },
+              { key: "ubicacion", header: KARDEX.columns.location },
+              { key: "usuario", header: KARDEX.columns.user },
             ]}
             minWidth="1080px"
             loading={loading}
-            loadingMessage="Cargando movimientos..."
+            loadingMessage={KARDEX.table.loading}
             error={error}
-            errorTitle="No pudimos cargar movimientos"
+            errorTitle={KARDEX.table.errorTitle}
             isEmpty={filteredMovements.length === 0}
             emptyMessage={
               movements.length === 0
-                ? "No hay movimientos de stock registrados."
-                : "No se encontraron movimientos con los filtros actuales."
+                ? KARDEX.table.emptyNoData
+                : KARDEX.table.emptyNoResults
             }
             footer={
               <>
                 <span className="text-[var(--ops-text-muted)]">
                   {filteredMovements.length === 0
-                    ? "0 resultados"
-                    : `${firstVisible}-${lastVisible} de ${filteredMovements.length}`}
+                    ? KARDEX.table.footerZero
+                    : KARDEX.table.footerSummary(firstVisible, lastVisible, filteredMovements.length)}
                 </span>
                 <Pagination
                   page={safePage}
@@ -469,7 +494,9 @@ function KardexPageContent({
               </>
             }
           >
-            {paginatedMovements.map((movement) => (
+            {paginatedMovements.map((movement) => {
+                      const dir = movement.movement_direction ?? resolveMovementDirection(movement);
+                      return (
                       <tr
                         key={movement.movement_id}
                         className="transition hover:bg-[var(--ops-surface-muted)]"
@@ -493,18 +520,15 @@ function KardexPageContent({
                           <span
                             className={cn(
                               "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
-                              resolveMovementDirection(movement) === "entry" &&
-                                "border-[color:color-mix(in_srgb,#10b981_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_82%,var(--ops-text))]",
-                              resolveMovementDirection(movement) === "exit" &&
-                                "border-[color:color-mix(in_srgb,#f59e0b_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] text-[color:color-mix(in_srgb,#d97706_72%,var(--ops-text))]",
-                              resolveMovementDirection(movement) === "adjustment" &&
-                                "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text-muted)]"
+                              dir === "entry" && CHIP_ENTRY,
+                              dir === "exit" && CHIP_EXIT,
+                              dir === "adjustment" && CHIP_ADJUST
                             )}
                           >
-                            {resolveMovementDirection(movement) === "entry" && (
+                            {dir === "entry" && (
                               <ArrowUpCircle className="h-3 w-3" />
                             )}
-                            {resolveMovementDirection(movement) === "exit" && (
+                            {dir === "exit" && (
                               <ArrowDownCircle className="h-3 w-3" />
                             )}
                             {formatMovementOperationLabel(movement)}
@@ -514,8 +538,8 @@ function KardexPageContent({
                           className={cn(
                             "px-4 py-[var(--ops-row-py)] text-right text-sm font-semibold tabular-nums",
                             movement.quantity_effect >= 0
-                              ? "text-[color:color-mix(in_srgb,#059669_88%,var(--ops-text))]"
-                              : "text-[color:color-mix(in_srgb,#e11d48_88%,var(--ops-text))]"
+                              ? QTY_POSITIVE
+                              : QTY_NEGATIVE
                           )}
                         >
                           {movement.quantity_effect >= 0 ? "+" : ""}
@@ -525,13 +549,15 @@ function KardexPageContent({
                           {movement.location_name}
                         </td>
                         <td className="px-4 py-[var(--ops-row-py)] text-xs text-[var(--ops-text-muted)]">
-                          {movement.created_by_name || "Sistema"}
+                          {movement.created_by_name || KARDEX.fallback.systemUser}
                         </td>
                       </tr>
-            ))}
+                      );
+            })}
           </OpsDataTable>
           </OpsTableBlock>
         </OpsSectionDivider>
     </OpsPageShell>
+    </TooltipProvider>
   );
 }

@@ -701,6 +701,31 @@ const isInvoice = sale.document_type === "boleta" || sale.document_type === "fac
 - Modal strings must live in a module-specific messages file (e.g. `receipt-messages.ts`), never hardcoded as string literals.
 - `OpsStatusBadge` icon must use the `icon` prop, not be passed as a child.
 
+### Subsequent load feedback (detail pages)
+
+Detail pages that render raw `<table>` (not `OpsDataTable`) must dim the content while re-fetching on filter changes. Use `opacity-50 transition-opacity duration-150 pointer-events-none` on the content wrapper when `loading && data` (subsequent loads, not first load which already has `LoadingPage`):
+
+```tsx
+const { data, loading, error } = useApiGet(fetcher, deps)
+
+// In JSX — wrapper around the reloadable content block:
+<div
+  className={cn(
+    "base classes...",
+    loading && data && "opacity-50 transition-opacity duration-150 pointer-events-none"
+  )}
+>
+  {/* table content */}
+</div>
+```
+
+**Rules:**
+- Guard: `loading && data` — only dim on subsequent fetches, never on first load
+- `pointer-events-none` prevents clicks on stale data
+- Apply to the outermost wrapper of the reloadable content block (not the entire section)
+- Do NOT use on sections that don't change with the re-fetch (e.g., sidebar metrics that are static)
+- This pattern applies to any detail page with raw tables: `inventory-detail`, `sale-detail`, `postsale-detail`, `transfers-detail`
+
 ### Conditional metrics
 
 Rows like IGV and discount must be hidden when their value is 0 — same guard pattern:
@@ -846,3 +871,76 @@ usePosSale()
 ### Convencion de mensajes
 
 El archivo `pos-messages.ts` usa español sin tildes por convencion. Toda string visible al usuario debe residir en `pos-messages.ts` o `sales-history-messages.ts`, nunca hardcodeada.
+
+## Hardening checklist (inventario / stock modulo)
+
+Refactor iniciado en Junio 2026. Modulo compuesto por 5 pantallas: stock actual, detalle de producto, movimientos (kardex), ajustes (lista), ajustes (creacion).
+
+| Fase | Estado | Descripcion |
+|------|--------|-------------|
+| 1. Pagina principal (`/inventario`) | ✅ | Vista unificada sin tabs. 737→304 lineas. UI identica admin/usuario. Auto-scope a sede default via `useAuth()`. Badge de sede en `PosHeader.meta`. Strings en `inventory-messages.ts`. |
+| 2. Pagina detalle (`/inventario/[styleId]`) | ✅ | Sin tabs. 394→310 lineas. Patron canonico detail pages: `INFO_BOX_XL` + grid 1.35fr/0.65fr + sidebar. Matriz en main column, cards de sede y link a kardex en sidebar. Redirect a kardex con `query` y `location_id` (UUID). |
+| 3. Shared types (`inventory-summary-shared.ts`) | ✅ | Limpieza: removidos 8 tipos/funciones de tabs y vista por sede. 176→130 lineas. |
+| 4. Constants (`inventory-constants.ts`) | ✅ | Nuevo archivo. Re-export de `INFO_BOX_XL`, `ACCENT_HIGHLIGHT_PANEL`, etc. desde `ops-control-styles.ts`. |
+| 5. Pagina kardex (`/inventario/movimientos`) | ✅ | Hardening completo Junio 2026. `kardex-messages.ts` + `kardex-constants.ts` creados. `kardex-domain.ts` migrado de `lib/` a `kardex/`. Componente unificado (sin split `KardexPage`/`KardexPageContent`). 0 strings hardcodeados, 0 `color-mix()` inline. Auto-scope a sede default via `useAuth()`. Badge de sede en `PosHeader.meta` con `OpsStatusBadge`. Dropdown de sede condicional: solo visible si `availableLocations.length > 1`. Fechas con `DateFilterPicker` (estandar de la app) + restriccion cruzada (`max={dateTo}` / `min={dateFrom}`) + `max={todayStr}` en Hasta. Metricas homogeneas (4 conteos, no mezcla conteo/cantidad). `movement.movement_direction` del backend usado directo en render (sin re-resolver por fila). Filtros con URL-sync. Clear filters → sede default. Labels de dominio en `KARDEX.labels.{operation,origin,reference}` importados por `kardex-domain.ts`. Redirect desde inventory-detail-page verificado. |
+| 6. Pagina ajustes lista (`/inventario/ajustes`) | 🔲 | Pendiente: refactorizar con mensajes, revisar strings huerfanas. |
+| 7. Pagina ajustes creacion (`/inventario/ajustes/nuevo`) | 🔲 | Pendiente: refactorizar con mensajes. |
+| 8. Umbral `LOW_STOCK_THRESHOLD` | 🔲 | Pendiente: extraer de constante `3` en backend a configuracion por sede. Duplicado en 4 archivos backend. |
+| 9. Sistema de estados y notificaciones | ✅ | `active = TRUE` agregado en 7 queries (`inventory.repo.js` + `dashboard.repo.js`). URLs de notificaciones corregidas (`sin-stock`→`out`, `stock-bajo`→`low`). Labels de status centralizados en `inventory-messages.ts`. Desactivar producto (`active=false`) ahora lo oculta de inventario y detiene notificaciones — borrado logico real. |
+| 10. CSS y UX en detalle | ✅ | `opsControlClassName`: `focus-visible:ring-*` → `focus-visible:shadow-[...]` (eliminado borde azul de Tailwind en todos los selects/inputs ops). Matriz tallas/colores: `minWidth` 820→600px, padding reducido `px-4`→`px-3`, wrapper redundante eliminado. Feedback dimmer (`opacity-50`) al cambiar sede. |
+
+### Archivos del modulo inventario
+
+```
+apps/frontend/components/modules/inventory/
+├── inventory-constants.ts          ← re-export de ops-control-styles
+├── inventory-messages.ts           ← STOCK.* (list + detail)
+├── inventory-page.tsx              ← pagina principal (vista unica, sin tabs)
+├── inventory-detail-page.tsx       ← detalle de producto (patron canonico)
+├── inventory-summary-shared.ts     ← tipos compartidos
+├── inventory-adjustments-shared.ts ← tipos de ajustes (pendiente refactor)
+├── inventory-adjustments-page.tsx  ← lista de ajustes (pendiente refactor)
+└── inventory-adjustments-create-page.tsx ← creacion de ajustes (pendiente refactor)
+
+apps/frontend/components/modules/kardex/
+├── kardex-constants.ts            ← re-export de ops-control-styles + chips kardex
+├── kardex-domain.ts               ← logica de dominio (tipos, resolvers, labels)
+├── kardex-messages.ts             ← KARDEX.* strings centralizados
+└── kardex-page.tsx                ← movimientos de stock (refactorizado)
+```
+
+### Patrones aplicados en inventario
+
+- **Pagina principal**: `PosHeader` + `OpsMetricInlineGroup` + `OpsTableBlock className="border-t ... pt-4"` + `OpsFiltersRow` + `OpsDataTable`. Igual que ventas historial.
+- **Pagina detalle**: `PosHeader` con `meta` badges + `INFO_BOX_XL` header panel + `ACCENT_HIGHLIGHT_PANEL` + grid `lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]` + `OpsPanelSection` en main y sidebar. Igual que sale-detail y postsale-detail.
+- **Auto-scopeo**: `useAuth()` → `defaultLocation?.location_id` como valor inicial del filtro de sede. `useRef` para que el efecto solo se ejecute una vez.
+- **Mensajes**: `STOCK.header.*`, `STOCK.filters.*`, `STOCK.columns.*`, `STOCK.detail.*` — todos los strings visibles referencian `STOCK.*`.
+
+### Patrones aplicados en kardex
+
+- **Pagina kardex**: `PosHeader` con `meta` badge de sede + `OpsMetricInlineGroup` (4 metricas homogeneas: conteo) + `OpsTableBlock` + `OpsFiltersRow` + `OpsDataTable`. Mismo patron que inventory-page y sales history.
+- **Auto-scopeo**: replica el patron de inventory-page: `useAuth()` → `defaultLocation?.location_id` como valor inicial. `useRef` guard para una sola ejecucion. El dropdown de sede se oculta si `availableLocations.length <= 1`.
+- **Fechas**: `DateFilterPicker` con `density="compact"` (estandar de la app). Restriccion cruzada (`max={dateTo}` en Desde, `min={dateFrom}` en Hasta). `max={todayStr}` en Hasta (sin fechas futuras). Sin defaults de rango (el usuario decide si filtra).
+- **Filtros condicionales**: dropdown de sede solo visible si `availableLocations.length > 1`. Grid `OpsFiltersRow` ajusta columnas dinamicamente con `cn()`.
+- **Render de filas**: `movement.movement_direction` del backend como fuente primaria (`??` fallback al resolver local). Chips con `CHIP_ENTRY`/`CHIP_EXIT`/`CHIP_ADJUST` y cantidades con `QTY_POSITIVE`/`QTY_NEGATIVE` desde `kardex-constants.ts`.
+- **Domain logic**: `kardex-domain.ts` con tipos, resolvers y formateadores. Labels de operacion/origen/referencia en `KARDEX.labels.*`. Formateadores (`formatMovementOperationLabel`, etc.) importan desde `kardex-messages.ts`.
+- **URL-sync**: filtros se persisten en query params via `router.replace` en `useEffect`.
+- **Clear filters**: resetea a sede default del usuario, no a `"ALL"`. Si hay contexto de navegacion (`reference_type`/`reference_id`), navega a `pathname` limpio.
+- **Mensajes**: `KARDEX.header.*`, `KARDEX.filters.*`, `KARDEX.columns.*`, `KARDEX.table.*`, `KARDEX.metrics.*`, `KARDEX.labels.{operation,origin,reference}` — todos los strings visibles referencian `KARDEX.*`.
+
+### Como continuar en otro chat
+
+Para continuar con la fase 6 (ajustes lista), usar este prompt:
+
+```
+Continuar hardening del modulo inventario/stock en RIPNEL.
+Revisar AGENTS.md seccion "Hardening checklist (inventario / stock modulo)".
+Fase actual: 6 — pagina ajustes lista (/inventario/ajustes).
+
+Tareas:
+1. Crear adjustments-messages.ts con strings centralizados
+2. Refactorizar inventory-adjustments-page.tsx: usar mensajes, revisar strings huerfanas
+3. Revisar inventory-adjustments-shared.ts: limpiar tipos no usados
+
+No modificar los archivos ya refactorizados (inventory-page.tsx, inventory-detail-page.tsx, inventory-messages.ts, inventory-constants.ts, inventory-summary-shared.ts, kardex-page.tsx, kardex-messages.ts, kardex-constants.ts, kardex-domain.ts).
+```
