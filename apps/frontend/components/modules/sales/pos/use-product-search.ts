@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState } from "react"
 import { apiFetch } from "@/lib/api"
 import type { PriceModeOverride, SaleVariant, SearchableStyle } from "./pos-types"
+import { explainApiError } from "./pos-utils"
 import {
   buildProductSearchResults,
-  explainApiError,
   findVariantByAttributes,
   getVariantOptionValues,
   groupVariantsByStyle,
-} from "./pos-utils"
+} from "./pos-search-utils"
 
 export function useProductSearch(locationId: string | undefined) {
   const [query, setQuery] = useState("")

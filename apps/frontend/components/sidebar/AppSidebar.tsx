@@ -26,7 +26,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-} from "@/components/ui/sidebar"
+  useSidebar,
+} from "@/components/ui/sidebar";
 import {
   Collapsible,
   CollapsibleContent,
@@ -43,40 +44,15 @@ import {
   type SidebarGroup as SidebarGroupConfig,
   type SidebarItem,
 } from "./sidebar-config";
-
-const SUBMENU_GUTTER_WIDTH = "28px";
-const SUBMENU_RAIL_X = "18px";
-const SUBMENU_DOT_SIZE = "6px";
-const SUBMENU_ROW_HEIGHT = "36px";
-const SUBMENU_CONTENT_OFFSET = "8px";
-
-function isRouteActive(pathname: string, url: string) {
-  return pathname === url || pathname.startsWith(`${url}/`);
-}
-
-function resolveActiveItemIndex(items: SidebarItem[], pathname: string) {
-  const exactIndex = items.findIndex((item) => pathname === item.url);
-
-  if (exactIndex !== -1) {
-    return exactIndex;
-  }
-
-  let bestIndex = -1;
-  let bestLength = -1;
-
-  items.forEach((item, index) => {
-    if (!pathname.startsWith(`${item.url}/`)) {
-      return;
-    }
-
-    if (item.url.length > bestLength) {
-      bestIndex = index;
-      bestLength = item.url.length;
-    }
-  });
-
-  return bestIndex;
-}
+import { SidebarCompactFlyout } from "./SidebarCompactFlyout";
+import { SidebarNavRailList } from "./SidebarNavRailList";
+import {
+  SIDEBAR_COMPACT_ACTIVE_MARKER_CLASS,
+  SIDEBAR_ICON_ONLY_CLASS,
+  SIDEBAR_MENU_BUTTON_CLASS,
+  SIDEBAR_MENU_EXPANDED_ACTIVE_CLASS,
+} from "./sidebar-styles";
+import { isRouteActive, resolveActiveItemIndex } from "./sidebar-utils";
 
 function SidebarLink({
   href,
@@ -91,10 +67,18 @@ function SidebarLink({
 }) {
   return (
     <SidebarMenuItem>
+      {active ? (
+        <span aria-hidden="true" className={SIDEBAR_COMPACT_ACTIVE_MARKER_CLASS} />
+      ) : null}
       <SidebarMenuButton
         asChild
         isActive={active}
-        className="relative h-10 gap-2.5 rounded-none px-3 text-sm font-medium transition-all duration-150 ease-out cursor-pointer data-[active=true]:font-semibold data-[active=true]:text-sidebar-primary data-[active=true]:bg-sidebar-accent data-[active=true]:shadow-[inset_3px_0_0_var(--sidebar-primary)]"
+        tooltip={label}
+        className={[
+          SIDEBAR_MENU_BUTTON_CLASS,
+          "data-[active=true]:font-semibold data-[active=true]:text-sidebar-primary data-[active=true]:bg-sidebar-accent data-[active=true]:shadow-[inset_3px_0_0_var(--sidebar-primary)] group-data-[collapsible=icon]:shadow-none!",
+          SIDEBAR_ICON_ONLY_CLASS,
+        ].join(" ")}
       >
         <Link href={href}>
           {Icon ? (
@@ -116,116 +100,6 @@ function SidebarLink({
   );
 }
 
-function SidebarSubmenuLink({
-  href,
-  label,
-  active,
-}: {
-  href: string;
-  label: string;
-  active?: boolean;
-}) {
-  return (
-    <SidebarMenuItem>
-      <Link
-        href={href}
-        className="group relative flex min-h-9 items-stretch text-sm"
-      >
-        <span
-          aria-hidden="true"
-          className={[
-            "pointer-events-none absolute top-1/2 z-[2] -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors duration-150",
-            active ? "bg-sidebar-primary" : "bg-sidebar-foreground/35",
-          ].join(" ")}
-          style={{
-            left: "var(--submenu-rail-x)",
-            width: "var(--submenu-dot-size)",
-            height: "var(--submenu-dot-size)",
-          }}
-        />
-        <span
-          aria-hidden="true"
-          className="shrink-0"
-          style={{
-            width: "var(--submenu-gutter-width)",
-          }}
-        />
-        <span
-          className={[
-            "relative flex min-h-9 flex-1 items-center rounded-none transition-all duration-150",
-            active
-              ? "font-semibold text-sidebar-primary"
-              : "text-sidebar-foreground/74 group-hover:text-sidebar-foreground/85",
-          ].join(" ")}
-          style={{
-            paddingLeft: "var(--submenu-content-offset)",
-            paddingRight: "12px",
-          }}
-        >
-          <span
-            className={[
-              "relative inline-flex items-center",
-              active ? "pb-1" : "",
-            ].join(" ")}
-          >
-            {active ? (
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute right-0 bottom-0 left-0 h-[2px] rounded-full bg-[linear-gradient(to_right,rgba(176,122,228,0.95)_0%,rgba(176,122,228,0.42)_68%,rgba(176,122,228,0.08)_100%)]"
-              />
-            ) : null}
-            <span className="relative z-[1]">{label}</span>
-          </span>
-        </span>
-      </Link>
-    </SidebarMenuItem>
-  );
-}
-
-function SidebarSubmenu({
-  items,
-  pathname,
-}: {
-  items: SidebarItem[];
-  pathname: string;
-}) {
-  const activeIndex = resolveActiveItemIndex(items, pathname);
-
-  return (
-    <div
-      className="relative overflow-visible"
-      style={
-        {
-          "--submenu-gutter-width": SUBMENU_GUTTER_WIDTH,
-          "--submenu-rail-x": SUBMENU_RAIL_X,
-          "--submenu-dot-size": SUBMENU_DOT_SIZE,
-          "--submenu-row-height": SUBMENU_ROW_HEIGHT,
-          "--submenu-content-offset": SUBMENU_CONTENT_OFFSET,
-        } as React.CSSProperties
-      }
-    >
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute z-[1] w-px bg-sidebar-border/55"
-        style={{
-          left: "calc(var(--submenu-rail-x) - 0.5px)",
-          top: "calc(var(--submenu-row-height) / 2)",
-          bottom: "calc(var(--submenu-row-height) / 2)",
-        }}
-      />
-      <SidebarMenu className="relative z-10 gap-0">
-        {items.map((item, index) => (
-          <SidebarSubmenuLink
-            key={item.url}
-            href={item.url}
-            label={item.title}
-            active={index === activeIndex}
-          />
-        ))}
-      </SidebarMenu>
-    </div>
-  );
-}
 
 function SidebarGroupSection({
   title,
@@ -242,6 +116,7 @@ function SidebarGroupSection({
   pathname: string;
   roleName?: string | null;
 }) {
+  const { state, isMobile } = useSidebar();
   const visibleItems = items.filter((item) => {
     if (
       item.onlyForRoles &&
@@ -284,6 +159,17 @@ function SidebarGroupSection({
 
   const sectionIsActive = resolveActiveItemIndex(visibleItems, pathname) !== -1;
 
+  if (state === "collapsed" && !isMobile) {
+    return (
+      <SidebarCompactFlyout
+        title={title}
+        icon={Icon}
+        items={visibleItems}
+        pathname={pathname}
+      />
+    );
+  }
+
   return (
     <SidebarGroup className="p-0">
       <Collapsible defaultOpen={sectionIsActive} className="group">
@@ -292,10 +178,11 @@ function SidebarGroupSection({
             <SidebarMenuItem>
               <CollapsibleTrigger asChild>
                 <SidebarMenuButton
+                  tooltip={title}
                   className={[
-                    "h-10 gap-2.5 rounded-none px-3 text-sm font-medium transition-all duration-150 ease-out cursor-pointer",
+                    SIDEBAR_MENU_BUTTON_CLASS,
                     sectionIsActive
-                      ? "bg-sidebar-accent shadow-[inset_3px_0_0_var(--sidebar-primary)] font-semibold"
+                      ? SIDEBAR_MENU_EXPANDED_ACTIVE_CLASS
                       : "hover:bg-sidebar-accent/50 group-data-[state=open]:bg-sidebar-accent/90 group-data-[state=open]:text-sidebar-foreground",
                   ].join(" ")}
                 >
@@ -321,7 +208,11 @@ function SidebarGroupSection({
             </SidebarMenuItem>
           </SidebarMenu>
           <CollapsibleContent className="pt-0">
-            <SidebarSubmenu items={visibleItems} pathname={pathname} />
+            <SidebarNavRailList
+              items={visibleItems}
+              pathname={pathname}
+              mode="inline"
+            />
           </CollapsibleContent>
         </SidebarGroupContent>
       </Collapsible>
@@ -331,7 +222,7 @@ function SidebarGroupSection({
 
 function SidebarSectionLabel({ label }: { label: string }) {
   return (
-    <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/45 select-none">
+    <p className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/45 select-none group-data-[collapsible=icon]:hidden">
       {label}
     </p>
   );
@@ -478,15 +369,19 @@ export function AppSidebar({
         }
         {...props}
       >
-        <SidebarHeader className="border-b border-sidebar-border px-3 pb-3 pt-4">
-          <Link href={appRoutes.home} className="flex items-center gap-2.5">
-              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full ring-1 ring-sidebar-border">
+        <SidebarHeader className="border-b border-sidebar-border px-3 pb-3 pt-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-3">
+          <Link
+            href={appRoutes.home}
+            className="flex items-center gap-2.5 group-data-[collapsible=icon]:justify-center"
+            aria-label="Inicio Ripnel"
+          >
+              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full ring-1 ring-sidebar-border group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8">
                 <Image
                   src="/ripnel-logo.svg"
                   alt="Ripnel"
                   width={36}
                   height={33}
-                  className="object-contain"
+                  className="h-8 w-8 object-contain group-data-[collapsible=icon]:h-7 group-data-[collapsible=icon]:w-7"
                 />
             </div>
             <div className="min-w-0 group-data-[collapsible=icon]:hidden">
@@ -565,12 +460,16 @@ export function AppSidebar({
           </nav>
         </SidebarContent>
 
-        <SidebarFooter className="border-t border-sidebar-border bg-sidebar px-0 pb-3 pt-2.5">
+        <SidebarFooter className="border-t border-sidebar-border bg-sidebar px-0 pb-3 pt-2.5 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2">
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild className="h-11 rounded-none px-3">
-                <Link href={appRoutes.account}>
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-foreground">
+              <SidebarMenuButton
+                asChild
+                tooltip="Cuenta"
+                className="h-11 rounded-none px-3 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:h-9! group-data-[collapsible=icon]:w-10! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-lg"
+              >
+                <Link href={appRoutes.account} aria-label="Cuenta">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-accent text-sidebar-foreground group-data-[collapsible=icon]:h-8 group-data-[collapsible=icon]:w-8">
                     <CircleUserRound className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 group-data-[collapsible=icon]:hidden">
@@ -586,9 +485,12 @@ export function AppSidebar({
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton
+                tooltip="Cerrar sesión"
+                aria-label="Cerrar sesión"
                 onClick={handleLogout}
-                className="h-10 gap-2.5 rounded-none px-3 text-sm font-medium text-sidebar-foreground/60 transition-all duration-150 ease-out cursor-pointer hover:bg-red-500/10 hover:text-red-500"
+                className="h-10 gap-2.5 rounded-none px-3 text-sm font-medium text-sidebar-foreground/60 transition-all duration-150 ease-out cursor-pointer hover:bg-red-500/10 hover:text-red-500 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:h-9! group-data-[collapsible=icon]:w-10! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-lg"
               >
+                <LogOut className="h-4 w-4" />
                 <span className="group-data-[collapsible=icon]:hidden">Cerrar sesión</span>
               </SidebarMenuButton>
             </SidebarMenuItem>

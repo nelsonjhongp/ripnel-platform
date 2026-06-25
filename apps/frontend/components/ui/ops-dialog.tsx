@@ -54,7 +54,9 @@ export function OpsDialogPanel({
             <h3 className="truncate text-lg font-semibold text-[var(--ops-text)]">{title}</h3>
           </DialogPrimitive.Title>
           {description ? (
-            <p className="mt-0.5 text-sm text-[var(--ops-text-muted)]">{description}</p>
+            <DialogPrimitive.Description asChild>
+              <p className="mt-0.5 text-sm text-[var(--ops-text-muted)]">{description}</p>
+            </DialogPrimitive.Description>
           ) : null}
         </div>
 

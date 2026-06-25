@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { OpsDialog } from "@/components/ui/ops-dialog"
+import { POS } from "../pos-messages"
 import type { CartItem } from "../pos-types"
 
 export function RemoveItemDialog({
@@ -26,22 +27,22 @@ export function RemoveItemDialog({
     <OpsDialog
       open={open}
       onOpenChange={(nextOpen) => (nextOpen ? onOpenChange(true) : close())}
-      title="Quitar producto"
-      description={item?.label}
+      title={POS.removeItem.title}
+      description={item?.label ?? POS.removeItem.title}
       size="sm"
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="outline" size="sm" className="rounded-lg px-4" onClick={close}>
-            Cancelar
+            {POS.removeItem.cancel}
           </Button>
           <Button type="button" variant="destructive" size="sm" className="rounded-lg px-4" onClick={onConfirm}>
-            Quitar
+            {POS.removeItem.confirm}
           </Button>
         </div>
       }
     >
       <p className="text-sm text-[var(--ops-text-muted)]">
-        El producto se retirará del carrito de esta venta.
+        {POS.removeItem.desc}
       </p>
     </OpsDialog>
   )

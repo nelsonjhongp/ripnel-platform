@@ -111,6 +111,7 @@ export function OpsSearchField({
   placeholder,
   ariaLabel,
   onFocus,
+  density,
 }: {
   label?: string
   name?: string
@@ -121,13 +122,15 @@ export function OpsSearchField({
   placeholder: string
   ariaLabel: string
   onFocus?: () => void
+  density?: "default" | "compact"
 }) {
+  const height = density === "compact" ? "h-9" : "h-10"
   return (
     <div>
       <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
         {label}
       </label>
-      <div className="sales-field flex h-10 items-center gap-2 rounded-lg px-3 transition hover:bg-[var(--ops-surface-muted)] focus-within:border-[var(--ripnel-accent)] focus-within:ring-2 focus-within:ring-[var(--ripnel-accent-soft)]">
+      <div className={`sales-field flex ${height} items-center gap-2 rounded-lg px-3 transition hover:bg-[var(--ops-surface-muted)] focus-within:border-[var(--ripnel-accent)] focus-within:ring-2 focus-within:ring-[var(--ripnel-accent-soft)]`}>
         <Search className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
         <input
           type="text"

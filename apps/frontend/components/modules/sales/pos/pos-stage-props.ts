@@ -1,7 +1,6 @@
 import type { CartItem, PreviewItem, SalePreview, SearchableStyle, PaymentDraft, PosContext, PosCustomer, MixedPaymentPreview, SaleVariant, PriceModeOverride, Stage } from "./pos-types"
 
 export type ProductStageProps = {
-  active: boolean
   pulseStage?: Stage | null
   query: string
   setQuery: (v: string) => void
@@ -27,11 +26,9 @@ export type ProductStageProps = {
   productSectionRef: React.RefObject<HTMLElement | null>
   pricingModeOverride: PriceModeOverride
   setPricingModeOverride: (value: PriceModeOverride) => void
-  onActivate: () => void
 }
 
 export type CustomerStageProps = {
-  active: boolean
   pulseStage?: Stage | null
   documentType: string
   setDocumentType: (v: string) => void
@@ -55,11 +52,9 @@ export type CustomerStageProps = {
   goToPayment?: () => void
   customerSearchInputRef: React.RefObject<HTMLInputElement | null>
   customerSectionRef: React.RefObject<HTMLElement | null>
-  onActivate: () => void
 }
 
 export type PaymentStageProps = {
-  active: boolean
   pulseStage?: Stage | null
   cartCount: number
   totals: ProductStageProps["totals"]
@@ -75,7 +70,6 @@ export type PaymentStageProps = {
   updateMixedPaymentDraft: (id: string, field: "method" | "amount" | "reference", value: string) => void
   addMixedPaymentDraft: () => void
   removeMixedPaymentDraft: (id: string) => void
-  onActivate: () => void
   paymentSectionRef: React.RefObject<HTMLElement | null>
 }
 
@@ -94,7 +88,6 @@ export type SummaryStageProps = {
   mixedPayments: PaymentStageProps["mixedPayments"]
   cashReady: boolean
   cashStatus: string
-  summaryStatusMessage: string | null
   submitDisabled: boolean
   submitting: boolean
   error: string | null

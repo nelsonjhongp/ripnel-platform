@@ -7,10 +7,12 @@ import { OpsDialog } from "@/components/ui/ops-dialog"
 import { OpsFormField } from "@/components/ui/ops-form-field"
 import { OpsSegmentedControl } from "@/components/ui/ops-segmented-control"
 import { PresetTextField } from "@/components/ui/preset-text-field"
-import { formatMoney, parseAmountInput, computeSaleDiscountAmount, round2 } from "../pos-utils"
+import { formatMoney, parseAmountInput, round2 } from "../pos-utils"
+import { computeSaleDiscountAmount } from "../pos-pricing-utils"
 import { ADJUSTMENT_REASON_PRESETS } from "../pos-types"
 import type { SaleDiscountState, SalePreview } from "../pos-types"
-import { INPUT_CLASS, SURFACE_MUTED_BG } from "../pos-constants"
+import { INPUT_CLASS, SURFACE_MUTED_BG, ACCENT_HOVER_BORDER, ACCENT_MUTED_BG } from "../pos-constants"
+import { POS } from "../pos-messages"
 
 export function DiscountDialog({
   open,
@@ -73,23 +75,23 @@ export function DiscountDialog({
   function apply() {
     const amount = parseAmountInput(draft.value)
     if (amount === null || amount <= 0) {
-      setValueError("Ingresa un descuento valido.")
+      setValueError(POS.discount.valueError)
       setReasonError(null)
       return
     }
     if (draft.mode === "percent" && amount > 100) {
-      setValueError("El porcentaje no puede superar 100%.")
+      setValueError(POS.discount.percentError)
       setReasonError(null)
       return
     }
     if (draft.mode === "amount" && amount > totals.baseSubtotal) {
-      setValueError("El descuento no puede superar el subtotal base.")
+      setValueError(POS.discount.amountError)
       setReasonError(null)
       return
     }
     if (!draft.reason.trim()) {
       setValueError(null)
-      setReasonError("Ingresa el motivo del descuento.")
+      setReasonError(POS.discount.reasonError)
       return
     }
 
@@ -115,8 +117,8 @@ export function DiscountDialog({
     <OpsDialog
       open={open}
       onOpenChange={(nextOpen) => (nextOpen ? onOpenChange(true) : close())}
-      title="Descuento comercial"
-      description={`Subtotal base S/. ${formatMoney(totals.baseSubtotal)}`}
+      title={POS.discount.title}
+      description={`${POS.discount.subtotalBase} ${POS.summary.moneyPrefix} ${formatMoney(totals.baseSubtotal)}`}
       size="md"
       bodyClassName="space-y-2.5"
       footer={
@@ -130,29 +132,29 @@ export function DiscountDialog({
                 onClick={handleRemoveDiscount}
                 className="w-full justify-start px-0 text-[var(--ops-text-muted)] hover:bg-transparent hover:text-[var(--ops-tone-danger-text)] sm:w-auto"
               >
-                Quitar descuento
+                {POS.discount.remove}
               </Button>
             ) : null}
           </div>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" size="sm" className="rounded-lg px-4" onClick={close}>
-              Cancelar
+              {POS.discount.cancel}
             </Button>
             <Button type="button" variant="accent" size="sm" className="rounded-lg px-4" onClick={apply}>
-              Aplicar descuento
+              {POS.discount.apply}
             </Button>
           </div>
         </div>
       }
     >
       {isEditing ? (
-        <div className="rounded-lg border border-[color:color-mix(in_srgb,var(--ripnel-accent)_24%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_68%,var(--ops-surface))] px-3 py-2 text-sm">
+        <div className={`rounded-lg border border-[${ACCENT_HOVER_BORDER}] bg-[${ACCENT_MUTED_BG}] px-3 py-2 text-sm`}>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[var(--ops-text-muted)]">Descuento actual</span>
+            <span className="text-[var(--ops-text-muted)]">{POS.discount.current}</span>
             <span className="font-semibold text-[var(--ripnel-accent-hover)]">
               {currentDiscount.mode === "percent"
-                ? `${currentDiscount.value}% → S/. ${formatMoney(currentDiscountAmount)}`
-                : `S/. ${formatMoney(currentDiscountAmount)}`}
+                ? `${currentDiscount.value}% -> ${POS.summary.moneyPrefix} ${formatMoney(currentDiscountAmount)}`
+                : `${POS.summary.moneyPrefix} ${formatMoney(currentDiscountAmount)}`}
             </span>
           </div>
         </div>
@@ -160,8 +162,8 @@ export function DiscountDialog({
 
       <OpsSegmentedControl
         options={[
-          { value: "percent", label: "Porcentaje" },
-          { value: "amount", label: "Monto fijo" },
+          { value: "percent", label: POS.discount.percent },
+          { value: "amount", label: POS.discount.fixed },
         ]}
         value={draft.mode}
         onChange={(mode) => handleModeChange(mode as "percent" | "amount")}
@@ -170,7 +172,7 @@ export function DiscountDialog({
       />
 
       <OpsFormField
-        label={draft.mode === "percent" ? "Porcentaje" : "Monto"}
+        label={draft.mode === "percent" ? POS.discount.percent : POS.discount.amount}
         required
         error={valueError}
         density="compact"
@@ -196,7 +198,7 @@ export function DiscountDialog({
                 : "pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-[var(--ops-text-muted)]"
             }
           >
-            {draft.mode === "percent" ? "%" : "S/."}
+            {draft.mode === "percent" ? "%" : POS.summary.moneyPrefix}
           </span>
         </div>
       </OpsFormField>
@@ -204,11 +206,11 @@ export function DiscountDialog({
       {estimatedAmount > 0 ? (
         <div className={`rounded-lg border border-[var(--ops-border-strong)] ${SURFACE_MUTED_BG} px-3 py-2 text-sm`}>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[var(--ops-text-muted)]">Descuento estimado</span>
+            <span className="text-[var(--ops-text-muted)]">{POS.discount.estimated}</span>
             <span className="font-semibold text-[var(--ops-text)]">
-              S/. {formatMoney(estimatedAmount)}
+              {POS.summary.moneyPrefix} {formatMoney(estimatedAmount)}
               <span className="ml-1 font-normal text-[var(--ops-text-muted)]">
-                ({estimatedPercent}% del subtotal)
+                ({estimatedPercent}% {POS.discount.estimatedPercentSuffix})
               </span>
             </span>
           </div>
@@ -216,7 +218,7 @@ export function DiscountDialog({
       ) : null}
 
       <PresetTextField
-        label="Motivo"
+        label={POS.discount.reason}
         required
         error={reasonError}
         value={draft.reason}
@@ -225,7 +227,7 @@ export function DiscountDialog({
           setReasonError(null)
         }}
         presets={ADJUSTMENT_REASON_PRESETS}
-        placeholder="Selecciona el motivo"
+        placeholder={POS.discount.reasonPlaceholder}
         textareaRows={2}
         textareaClassName="min-h-[72px]"
       />

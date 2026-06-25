@@ -5,10 +5,9 @@ import { appRoutes } from "@/lib/routes";
 type StatusTone = "neutral" | "warning" | "danger";
 type StatusVariant = "default" | "ops";
 
-const defaultToneClasses: Record<StatusTone, string> = {
-  neutral: "border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100",
-  warning: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200",
-  danger: "border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200",
+const panelClasses: Record<StatusVariant, string> = {
+  default: "border-slate-200 bg-white text-slate-900 dark:border-slate-700 dark:bg-slate-900",
+  ops: "border-[var(--ops-border-strong)] bg-[var(--ops-surface)] text-[var(--ops-text)]",
 };
 
 const iconToneClasses: Record<StatusVariant, Record<StatusTone, string>> = {
@@ -69,7 +68,7 @@ export function StatusPage({
       className={
         isOps
           ? "ops-page flex min-h-[calc(100dvh-3.5rem)] w-full items-center px-4 py-8 md:px-6"
-          : "flex min-h-[calc(100dvh-3.5rem)] w-full items-center bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_30%,#f8fafc_65%,#eef2ff_100%)] px-4 py-10 dark:bg-[radial-gradient(circle_at_top,rgba(126,80,220,0.15)_0%,rgba(30,30,30,0.9)_40%,var(--ops-surface)_100%)] md:px-8"
+          : "flex min-h-[calc(100dvh-3.5rem)] w-full items-center bg-[radial-gradient(circle_at_top,#ede9fe_0%,#f5f3ff_30%,#f8fafc_65%,#eef2ff_100%)] px-4 py-10 md:px-8"
       }
     >
       <div className={isOps ? "mx-auto w-full max-w-4xl" : "mx-auto w-full max-w-5xl"}>
@@ -77,13 +76,7 @@ export function StatusPage({
           className={`border ${isOps ? "rounded-2xl p-5 shadow-sm md:p-6" : "min-h-[60vh] rounded-[28px] p-6 shadow-lg md:p-10"} ${panelClasses[variant]}`}
         >
           <div className={`flex h-full items-start ${isOps ? "gap-3.5 md:gap-4" : "gap-4 md:gap-5"}`}>
-            <div
-              className={
-                isOps
-                  ? "rounded-xl bg-[var(--ops-surface-muted)] p-2.5 text-current"
-                  : "rounded-2xl bg-slate-900/5 p-3 text-current dark:bg-slate-100/10"
-              }
-            >
+            <div className={`shrink-0 pt-0.5 ${iconToneClass}`}>
               {icon}
             </div>
             <div className={`flex min-h-full flex-1 flex-col justify-center ${isOps ? "space-y-2.5" : "space-y-3"}`}>
@@ -118,7 +111,7 @@ export function StatusPage({
                       className={
                         isOps
                           ? "inline-flex items-center gap-2 rounded-xl border border-[color:color-mix(in_srgb,var(--ripnel-accent)_30%,transparent)] bg-[var(--ripnel-accent)] px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)]"
-                          : "inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+                          : "inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
                       }
                     >
                       <Home className="h-4 w-4" />
@@ -130,7 +123,7 @@ export function StatusPage({
                       className={
                         isOps
                           ? "inline-flex items-center gap-2 rounded-xl border border-[color:color-mix(in_srgb,var(--ripnel-accent)_30%,transparent)] bg-[var(--ripnel-accent)] px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-[var(--ripnel-accent-hover)] cursor-pointer"
-                          : "inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 cursor-pointer"
+                          : "inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 cursor-pointer"
                       }
                     >
                       <Home className="h-4 w-4" />
@@ -145,7 +138,7 @@ export function StatusPage({
                       className={
                         isOps
                           ? "inline-flex items-center gap-2 rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3.5 py-2 text-sm font-semibold text-[var(--ops-text-muted)] transition hover:text-[var(--ops-text)]"
-                          : "inline-flex items-center gap-2 rounded-2xl border border-current/15 px-4 py-2.5 text-sm font-semibold text-current/80 transition hover:bg-white/60 dark:hover:bg-white/10"
+                          : "inline-flex items-center gap-2 rounded-2xl border border-current/15 px-4 py-2.5 text-sm font-semibold text-current/80 transition hover:bg-white/60"
                       }
                     >
                       <RefreshCcw className="h-4 w-4" />
@@ -157,7 +150,7 @@ export function StatusPage({
                       className={
                         isOps
                           ? "inline-flex items-center gap-2 rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3.5 py-2 text-sm font-semibold text-[var(--ops-text-muted)] transition hover:text-[var(--ops-text)] cursor-pointer"
-                          : "inline-flex items-center gap-2 rounded-2xl border border-current/15 px-4 py-2.5 text-sm font-semibold text-current/80 transition hover:bg-white/60 dark:hover:bg-white/10 cursor-pointer"
+                          : "inline-flex items-center gap-2 rounded-2xl border border-current/15 px-4 py-2.5 text-sm font-semibold text-current/80 transition hover:bg-white/60 cursor-pointer"
                       }
                     >
                       <RefreshCcw className="h-4 w-4" />
@@ -298,16 +291,8 @@ export function InlineStatusCard({
   return (
     <div className={`border p-4 shadow-sm ${isOps ? "rounded-xl" : "rounded-2xl"} ${panelClasses[variant]}`}>
       <div className="flex items-start gap-3">
-        {icon ? (
-          <div
-            className={
-              variant === "ops"
-                ? "rounded-xl bg-[var(--ops-surface-muted)] p-2 text-current"
-                : "rounded-2xl bg-slate-900/5 p-2.5 text-current dark:bg-slate-100/10"
-            }
-          >
-            {icon}
-          </div>
+        {resolvedIcon ? (
+          <div className={`mt-0.5 shrink-0 ${iconToneClass}`}>{resolvedIcon}</div>
         ) : null}
         <div>
           <p className={`${isOps ? "text-sm font-semibold" : "text-base font-semibold"} ${titleToneClass}`}>{title}</p>

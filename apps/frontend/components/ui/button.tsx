@@ -12,6 +12,8 @@ const buttonVariants = cva(
         default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
         accent:
           "border-[color:color-mix(in_srgb,var(--ripnel-accent)_34%,transparent)] bg-[var(--ripnel-accent)] text-white hover:bg-[var(--ripnel-accent-hover)] focus-visible:ring-[color:color-mix(in_srgb,var(--ripnel-accent)_26%,transparent)]",
+        warning:
+          "border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)] text-[var(--ops-tone-warning-text)] hover:bg-[color:color-mix(in_srgb,var(--ops-tone-warning-bg)_80%,var(--ops-surface))] focus-visible:ring-[color:color-mix(in_srgb,var(--ops-tone-warning-text)_20%,transparent)]",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
         secondary:

@@ -16,6 +16,7 @@ type DateFilterPickerProps = {
   ariaLabel?: string
   min?: string
   max?: string
+  density?: "default" | "compact"
 }
 
 function parseDateValue(value: string) {
@@ -43,6 +44,7 @@ export function DateFilterPicker({
   ariaLabel,
   min,
   max,
+  density,
 }: DateFilterPickerProps) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -50,6 +52,7 @@ export function DateFilterPicker({
   const minDate = parseDateValue(min || "")
   const maxDate = parseDateValue(max || "")
   const buttonLabel = formatDateValue(value, placeholder)
+  const height = density === "compact" ? "h-9" : "h-10"
 
   useEffect(() => {
     function handlePointerDown(event: MouseEvent) {
@@ -78,7 +81,7 @@ export function DateFilterPicker({
         aria-label={ariaLabel || label}
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className="sales-field sales-field-interactive flex h-10 w-full items-center gap-2 rounded-lg px-3 text-left"
+        className={`sales-field sales-field-interactive flex ${height} w-full items-center gap-2 rounded-lg px-3 text-left`}
       >
         <CalendarRange className="h-4 w-4 text-[var(--ops-text-muted)]" />
         <span

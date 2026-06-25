@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
 export function useApiGet<T>(
-  fetcher: (() => Promise<T>) | null,
+  fetcher: ((signal: AbortSignal) => Promise<T>) | null,
   deps: unknown[] = []
 ): {
   data: T | null
@@ -30,6 +30,7 @@ export function useApiGet<T>(
     if (!fetcher) return
 
     let active = true
+    const controller = new AbortController()
 
     queueMicrotask(() => {
       if (!active || !mountedRef.current) return
@@ -37,7 +38,7 @@ export function useApiGet<T>(
       setLoading(true)
       setError(null)
 
-      fetcher()
+      fetcher(controller.signal)
         .then((result) => {
           if (active && mountedRef.current) {
             setData(result)
@@ -58,6 +59,7 @@ export function useApiGet<T>(
 
     return () => {
       active = false
+      controller.abort()
     }
   }, [nonce, ...deps])
 

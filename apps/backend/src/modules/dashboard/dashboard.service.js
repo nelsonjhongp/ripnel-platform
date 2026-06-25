@@ -183,7 +183,7 @@ function buildShortcuts(sections, cashClosing) {
     shortcuts.push({
       key: "new-sale",
       label: "Nueva venta",
-      href: "/ventas",
+      href: "/ventas/nueva",
       description: "Registrar una nueva venta en la sede activa.",
     });
     shortcuts.push({
