@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { usePagination } from "@/hooks/use-pagination";
 import Link from "next/link";
 import {
@@ -9,7 +8,6 @@ import {
   LoaderCircle,
   MapPin,
   PackagePlus,
-  PencilLine,
   RefreshCw,
   RotateCcw,
 } from "lucide-react";
@@ -17,16 +15,18 @@ import { InlineStatusCard } from "@/components/feedback/status-page";
 import { ForbiddenPage } from "@/components/feedback/status-page";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
-import { FilterDropdown } from "@/components/ui/filter-dropdown";
-import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import { OpsSelect } from "@/components/ui/ops-selection";
+import { OpsEmptyState } from "@/components/ui/ops-empty-state";
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import {
   OpsFiltersRow,
   OpsPageShell,
   OpsSearchField,
   OpsSectionDivider,
   OpsTableBlock,
+  OpsTableFooter,
+  OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
-import { OpsDataTable } from "@/components/ui/ops-data-table";
 import { Pagination } from "@/components/ui/pagination";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
@@ -91,7 +91,6 @@ function AdjustmentIntentChip({
 }
 
 export function InventoryAdjustmentsPage() {
-  const router = useRouter();
   const { user } = useAuth();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | AdjustmentStatus>("all");

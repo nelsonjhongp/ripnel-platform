@@ -8,9 +8,7 @@ const { findAllLocations } = require('../locations/locations.repo');
 const {
   findAllInventory,
   findInventoryProductSummary,
-  countInventoryProductSummary,
   findInventoryLocationSummary,
-  countInventoryLocationSummary,
   findInventoryStyleRows,
   findAllKardex,
   findAllAdjustments,
@@ -60,16 +58,6 @@ function normalizeNonNegativeInteger(value) {
   const parsed = Number(value);
 
   if (!Number.isInteger(parsed) || parsed < 0) {
-    return null;
-  }
-
-  return parsed;
-}
-
-function normalizePositiveInteger(value) {
-  const parsed = Number(value);
-
-  if (!Number.isInteger(parsed) || parsed < 1) {
     return null;
   }
 
@@ -371,36 +359,18 @@ async function listInventoryProductSummary(input = {}, auth = {}) {
     throw new AppError('Location id is invalid', 400);
   }
 
-  const page = normalizePositiveInteger(input.page);
-  const pageSize = normalizePositiveInteger(input.page_size);
-
-  const repoFilters = {
+  const rows = await findInventoryProductSummary({
     locationIds: scope.activeLocationIds,
     locationId: requestedLocationId,
     query: normalizeText(input.query),
     garmentType,
-    status,
     lowStockThreshold: LOW_STOCK_THRESHOLD,
-  };
+  });
 
-  let rows;
-  let total;
-
-  if (page && pageSize) {
-    const offset = (page - 1) * pageSize;
-    rows = await findInventoryProductSummary({
-      ...repoFilters,
-      limit: pageSize,
-      offset,
-    });
-    total = await countInventoryProductSummary(repoFilters);
-  } else {
-    rows = await findInventoryProductSummary(repoFilters);
-    total = rows.length;
-  }
+  const filteredRows = status ? rows.filter((row) => row.status === status) : rows;
 
   return {
-    rows: rows.map((row) => ({
+    rows: filteredRows.map((row) => ({
       style_id: row.style_id,
       style_code: row.style_code,
       style_name: row.style_name,
@@ -422,14 +392,6 @@ async function listInventoryProductSummary(input = {}, auth = {}) {
         : scope.availableLocations.length > 1
           ? 'Todas las sedes'
           : 'Stock en sede',
-      ...(page && pageSize
-        ? {
-            total,
-            page,
-            page_size: pageSize,
-            total_pages: Math.ceil(total / pageSize),
-          }
-        : {}),
     },
   };
 }
@@ -440,42 +402,31 @@ async function listInventoryLocationSummary(input = {}, auth = {}) {
   }
 
   const scope = await resolveInventoryScope(auth, input);
-  const status = normalizeStockStatus(normalizeText(input.status));
+  const status = normalizeText(input.status);
   const requestedLocationId = normalizeUuid(input.location_id);
 
   if (input.location_id && !requestedLocationId) {
     throw new AppError('Location id is invalid', 400);
   }
 
-  const page = normalizePositiveInteger(input.page);
-  const pageSize = normalizePositiveInteger(input.page_size);
-
-  const repoFilters = {
+  const rows = await findInventoryLocationSummary({
     locationIds: scope.activeLocationIds,
     locationId: requestedLocationId,
     query: normalizeText(input.query),
-    status,
     lowStockThreshold: LOW_STOCK_THRESHOLD,
-  };
+  });
 
-  let rows;
-  let total;
-
-  if (page && pageSize) {
-    const offset = (page - 1) * pageSize;
-    rows = await findInventoryLocationSummary({
-      ...repoFilters,
-      limit: pageSize,
-      offset,
-    });
-    total = await countInventoryLocationSummary(repoFilters);
-  } else {
-    rows = await findInventoryLocationSummary(repoFilters);
-    total = rows.length;
-  }
+  const filteredRows = status
+    ? rows.filter((row) => {
+        if (status === 'normal') return row.status === 'normal';
+        if (status === 'attention') return row.status === 'attention';
+        if (status === 'critical') return row.status === 'critical';
+        return true;
+      })
+    : rows;
 
   return {
-    rows: rows.map((row) => ({
+    rows: filteredRows.map((row) => ({
       location_id: row.location_id,
       location_name: row.location_name,
       stock_total: Number(row.stock_total || 0),
@@ -489,14 +440,6 @@ async function listInventoryLocationSummary(input = {}, auth = {}) {
       low_stock_threshold: LOW_STOCK_THRESHOLD,
       available_locations: scope.availableLocations,
       can_view_all_locations: scope.canViewGlobal,
-      ...(page && pageSize
-        ? {
-            total,
-            page,
-            page_size: pageSize,
-            total_pages: Math.ceil(total / pageSize),
-          }
-        : {}),
     },
   };
 }

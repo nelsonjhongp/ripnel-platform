@@ -20,15 +20,16 @@ import {
 } from "lucide-react"
 import {
   Bar,
+  BarChart,
   CartesianGrid,
   Cell,
   Pie,
+  PieChart,
+  ResponsiveContainer,
   Tooltip as RechartsTooltip,
   XAxis,
   YAxis,
 } from "recharts"
-
-import { BarChart, PieChart, ResponsiveContainer } from "@/components/charts/dynamic-charts"
 
 import { AttentionPanel, type AttentionPanelItem } from "@/components/dashboard/attention-panel"
 import { DashboardChartCard } from "@/components/dashboard/dashboard-chart-card"
@@ -42,7 +43,6 @@ import {
 import { DashboardKpiCard, type DashboardKpiTone } from "@/components/dashboard/dashboard-kpi-card"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { useApiGet } from "@/hooks/use-api-get"
-import { AdminInlineMessage } from "@/components/admin/admin-ui"
 import { ErrorPage, ProtectedLoadingPage } from "@/components/feedback/status-page"
 import { useSidebarTopbarActions } from "@/components/sidebar"
 import { Button } from "@/components/ui/button"
@@ -52,7 +52,6 @@ import { OpsMetricRow } from "@/components/ui/ops-metric-row"
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import StockRiskCard from "@/components/modules/predictions/stock-risk-card"
 import { fetchCommercialActivity, fetchCustomerAnalytics, fetchDashboardOverview } from "@/lib/api-dashboard"
 import type {
   CashSection,
@@ -207,7 +206,6 @@ export default function DashboardPage() {
   const loading = loadingOverview || loadingAnalytics || loadingActivity
   const error = overviewError || analyticsError || activityError
   const refreshing = loading && !!overview
-  const staleError = !loading && error && !!overview ? error : null
 
   const refetchAll = () => {
     refetchOverview()
@@ -541,12 +539,6 @@ export default function DashboardPage() {
         <div className="mx-auto max-w-[1480px] space-y-4 px-3 lg:px-4">
           <PosHeader eyebrow={locationLabel} title="Dashboard general" actions={periodActions} />
 
-          {staleError ? (
-            <AdminInlineMessage tone="warning">
-              Los datos pueden estar desactualizados. La ultima actualizacion fallo.
-            </AdminInlineMessage>
-          ) : null}
-
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
             {kpis.map((kpi) => (
               <DashboardKpiCard
@@ -564,14 +556,6 @@ export default function DashboardPage() {
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_360px]">
             <CommercialActivityCard data={commercialActivity} />
             <AttentionPanel items={attentionItems} />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            <div className="sm:col-span-2 xl:col-span-1">
-              <StockRiskCard
-                locationId={selectedLocation !== ALL_LOCATIONS_VALUE && selectedLocation ? selectedLocation : undefined}
-              />
-            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-12">

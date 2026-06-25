@@ -72,7 +72,7 @@ export default function LoginRipnel() {
   }
 
   return (
-    <AuthShell footer="Creaciones Ripnel - Sistema ERP">
+    <AuthShell onBack={() => window.history.back()} footer="Creaciones Ripnel - Sistema ERP">
       <AuthCard
         logo={
             <Image
@@ -133,7 +133,21 @@ export default function LoginRipnel() {
             </InputGroup>
           </AuthField>
 
-          <div className="pt-0.5" />
+          <div className="flex items-center justify-between pt-0.5">
+            <label className="flex cursor-pointer items-center gap-2 select-none">
+              <input
+                type="checkbox"
+                className="m-0 h-[0.9375rem] w-[0.9375rem] cursor-pointer rounded-[0.25rem] accent-[var(--ripnel-accent)]"
+              />
+              <span className="text-[0.8125rem] leading-none text-[var(--ops-text-muted)]">Recordarme</span>
+            </label>
+            <a
+              href="#"
+              className="text-[0.8125rem] font-medium text-[color:color-mix(in_srgb,var(--ops-text-muted)_65%,transparent)] transition-colors hover:text-[var(--ripnel-accent)]"
+            >
+              ¿Olvidaste tu contraseña?
+            </a>
+          </div>
 
           <Button
             type="submit"

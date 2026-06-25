@@ -7,13 +7,12 @@
   ],
   "devDependencies": {
     "@playwright/test": "^1.60.0",
-    "next": "^16.2.9"
+    "next": "^16.2.4"
   },
   "scripts": {
     "dev:backend": "npm run dev --workspace @ripnel/backend",
     "dev:frontend": "npm run dev --workspace @ripnel/frontend",
     "start:backend": "npm run start --workspace @ripnel/backend",
-    "lint:frontend": "npm run lint --workspace @ripnel/frontend",
-    "test:e2e": "playwright test"
+    "lint:frontend": "npm run lint --workspace @ripnel/frontend"
   }
 }

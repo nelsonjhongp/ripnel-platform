@@ -30,10 +30,6 @@ export type InventorySummaryMeta = {
   selected_location_id?: string | null;
   can_view_all_locations: boolean;
   scope_label?: string;
-  total?: number;
-  page?: number;
-  page_size?: number;
-  total_pages?: number;
 };
 
 export type InventoryProductSummaryResponse = {

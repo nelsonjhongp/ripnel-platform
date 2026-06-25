@@ -30,7 +30,6 @@ import {
   OpsSectionDivider,
   OpsTableBlock,
 } from "@/components/ui/ops-page-shell";
-import { OpsDataTable } from "@/components/ui/ops-data-table";
 import {
   Tooltip,
   TooltipContent,

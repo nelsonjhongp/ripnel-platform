@@ -15,7 +15,6 @@ import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import { OpsPageShell, OpsTableWrap } from "@/components/ui/ops-page-shell";
 import { OpsPanelSection } from "@/components/ui/ops-panel-section";
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
-import { OpsDataTable } from "@/components/ui/ops-data-table";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
   Tooltip,

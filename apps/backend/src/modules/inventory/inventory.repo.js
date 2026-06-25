@@ -180,21 +180,6 @@ async function findInventoryProductSummary(filters = {}) {
   values.push(lowStockThreshold);
   const thresholdIndex = values.length;
 
-  let statusWhere = '';
-  if (filters.status) {
-    values.push(filters.status);
-    statusWhere = ` and status = $${values.length}`;
-  }
-
-  let paginationClause = '';
-  if (Number.isInteger(filters.limit) && Number.isInteger(filters.offset)) {
-    values.push(filters.limit);
-    const limitIdx = values.length;
-    values.push(filters.offset);
-    const offsetIdx = values.length;
-    paginationClause = ` limit $${limitIdx} offset $${offsetIdx}`;
-  }
-
   const result = await query(
     `with scoped_inventory as (
        select
@@ -227,13 +212,7 @@ async function findInventoryProductSummary(filters = {}) {
          bool_or(qty = 0) as has_zero_variant,
          count(distinct size_id)::int as sizes_count,
          count(distinct color_id)::int as colors_count,
-         count(distinct case when qty > 0 then location_id end)::int as locations_with_stock,
-         case
-           when sum(qty)::int = 0 then 'out'
-           when bool_or(qty = 0) then 'incomplete'
-           when sum(qty)::int <= $${thresholdIndex} then 'low'
-           else 'available'
-         end as status
+         count(distinct case when qty > 0 then location_id end)::int as locations_with_stock
        from scoped_inventory
        group by style_id
      )
@@ -246,70 +225,18 @@ async function findInventoryProductSummary(filters = {}) {
        sizes_count,
        colors_count,
        locations_with_stock,
-       status
+       case
+         when total_qty = 0 then 'out'
+         when has_zero_variant then 'incomplete'
+         when total_qty <= $${thresholdIndex} then 'low'
+         else 'available'
+       end as status
      from grouped
-     where 1=1${statusWhere}
-     order by style_name asc, style_code asc${paginationClause}`,
+     order by style_name asc, style_code asc`,
     values
   );
 
   return result.rows;
-}
-
-async function countInventoryProductSummary(filters = {}) {
-  const lowStockThreshold = Number.isInteger(filters.lowStockThreshold)
-    ? filters.lowStockThreshold
-    : 3;
-  const { whereClause, values } = buildScopedInventoryWhereClause(filters);
-  values.push(lowStockThreshold);
-  const thresholdIndex = values.length;
-
-  let statusWhere = '';
-  if (filters.status) {
-    values.push(filters.status);
-    statusWhere = ` and status = $${values.length}`;
-  }
-
-  const result = await query(
-    `with scoped_inventory as (
-       select
-         i.location_id,
-         l.name as location_name,
-         pv.variant_id,
-         ps.style_id,
-         ps.style_code,
-         ps.name as style_name,
-         gt.name as garment_type_name,
-         s.size_id,
-         c.color_id,
-         i.qty
-       from inventory i
-       inner join locations l on l.location_id = i.location_id
-       inner join product_variants pv on pv.variant_id = i.variant_id
-       inner join product_styles ps on ps.style_id = pv.style_id
-       left join garment_types gt on gt.garment_type_id = ps.garment_type_id
-       inner join sizes s on s.size_id = pv.size_id
-       inner join colors c on c.color_id = pv.color_id
-       ${whereClause}
-     ),
-     grouped as (
-       select
-         case
-           when sum(qty)::int = 0 then 'out'
-           when bool_or(qty = 0) then 'incomplete'
-           when sum(qty)::int <= $${thresholdIndex} then 'low'
-           else 'available'
-         end as status
-       from scoped_inventory
-       group by style_id
-     )
-     select count(*)::int as total
-     from grouped
-     where 1=1${statusWhere}`,
-    values
-  );
-
-  return Number(result.rows[0]?.total || 0);
 }
 
 async function findInventoryLocationSummary(filters = {}) {
@@ -319,21 +246,6 @@ async function findInventoryLocationSummary(filters = {}) {
   const { whereClause, values } = buildScopedInventoryWhereClause(filters);
   values.push(lowStockThreshold);
   const thresholdIndex = values.length;
-
-  let statusWhere = '';
-  if (filters.status) {
-    values.push(filters.status);
-    statusWhere = ` and status = $${values.length}`;
-  }
-
-  let paginationClause = '';
-  if (Number.isInteger(filters.limit) && Number.isInteger(filters.offset)) {
-    values.push(filters.limit);
-    const limitIdx = values.length;
-    values.push(filters.offset);
-    const offsetIdx = values.length;
-    paginationClause = ` limit $${limitIdx} offset $${offsetIdx}`;
-  }
 
   const result = await query(
     `with scoped_inventory as (
@@ -379,16 +291,6 @@ async function findInventoryLocationSummary(filters = {}) {
          count(*) filter (where total_qty = 0)::int as out_of_stock_count
        from product_totals
        group by location_id
-     ),
-     with_status as (
-       select
-         *,
-         case
-           when out_of_stock_count > 0 then 'critical'
-           when low_stock_count > 0 then 'attention'
-           else 'normal'
-         end as status
-       from grouped
      )
      select
        location_id,
@@ -397,86 +299,17 @@ async function findInventoryLocationSummary(filters = {}) {
        products_count,
        low_stock_count,
        out_of_stock_count,
-       status
-     from with_status
-     where 1=1${statusWhere}
-     order by location_name asc${paginationClause}`,
+       case
+         when out_of_stock_count > 0 then 'critical'
+         when low_stock_count > 0 then 'attention'
+         else 'normal'
+       end as status
+     from grouped
+     order by location_name asc`,
     values
   );
 
   return result.rows;
-}
-
-async function countInventoryLocationSummary(filters = {}) {
-  const lowStockThreshold = Number.isInteger(filters.lowStockThreshold)
-    ? filters.lowStockThreshold
-    : 3;
-  const { whereClause, values } = buildScopedInventoryWhereClause(filters);
-  values.push(lowStockThreshold);
-  const thresholdIndex = values.length;
-
-  let statusWhere = '';
-  if (filters.status) {
-    values.push(filters.status);
-    statusWhere = ` and status = $${values.length}`;
-  }
-
-  const result = await query(
-    `with scoped_inventory as (
-       select
-         i.location_id,
-         l.name as location_name,
-         pv.variant_id,
-         ps.style_id,
-         ps.style_code,
-         ps.name as style_name,
-         gt.name as garment_type_name,
-         i.qty
-       from inventory i
-       inner join locations l on l.location_id = i.location_id
-       inner join product_variants pv on pv.variant_id = i.variant_id
-       inner join product_styles ps on ps.style_id = pv.style_id
-       left join garment_types gt on gt.garment_type_id = ps.garment_type_id
-       ${whereClause}
-     ),
-     product_totals as (
-       select
-         location_id,
-         style_id,
-         sum(qty)::int as total_qty,
-         bool_or(qty = 0) as has_zero_variant
-       from scoped_inventory
-       group by location_id, style_id
-     ),
-     grouped as (
-       select
-         count(*) filter (where total_qty = 0)::int as out_of_stock_count,
-         count(*) filter (
-           where total_qty > 0
-             and (
-               has_zero_variant = true
-               or total_qty <= $${thresholdIndex}
-             )
-         )::int as low_stock_count
-       from product_totals
-       group by location_id
-     ),
-     with_status as (
-       select
-         case
-           when out_of_stock_count > 0 then 'critical'
-           when low_stock_count > 0 then 'attention'
-           else 'normal'
-         end as status
-       from grouped
-     )
-     select count(*)::int as total
-     from with_status
-     where 1=1${statusWhere}`,
-    values
-  );
-
-  return Number(result.rows[0]?.total || 0);
 }
 
 async function findInventoryStyleRows(filters = {}) {
@@ -1055,9 +888,7 @@ async function insertStockMovement(payload, executor = query) {
 module.exports = {
   findAllInventory,
   findInventoryProductSummary,
-  countInventoryProductSummary,
   findInventoryLocationSummary,
-  countInventoryLocationSummary,
   findInventoryStyleRows,
   findAllKardex,
   findAllAdjustments,
