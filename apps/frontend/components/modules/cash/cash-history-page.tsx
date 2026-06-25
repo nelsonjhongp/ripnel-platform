@@ -1,166 +1,122 @@
-"use client";
+"use client"
 
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { ChevronRight, RotateCcw, RotateCw } from "lucide-react";
+import Link from "next/link"
+import { RotateCcw, RotateCw } from "lucide-react"
 
-import { Pagination } from "@/components/ui/pagination";
-import { OpsPageShell, OpsFiltersRow, OpsTableBlock, OpsTableFooter } from "@/components/ui/ops-page-shell";
-import { OpsDataTable, type OpsDataTableColumn } from "@/components/ui/ops-data-table";
-import { OpsSelect, type OpsOption } from "@/components/ui/ops-selection";
-import { Button } from "@/components/ui/button";
-import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
-import { AdminActionButton } from "@/components/admin/admin-ui";
-import { PermissionGuard } from "@/components/auth/PermissionGuard";
+import { Pagination } from "@/components/ui/pagination"
 import {
-  ErrorPage,
-  LoadingPage,
-} from "@/components/feedback/status-page";
+  OpsPageShell,
+  OpsFiltersRow,
+  OpsTableBlock,
+} from "@/components/ui/ops-page-shell"
+import { OpsDataTable } from "@/components/ui/ops-data-table"
+import { OpsSelect, type OpsOption } from "@/components/ui/ops-selection"
+import { Button } from "@/components/ui/button"
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
+import { AdminActionButton } from "@/components/admin/admin-ui"
+import { PermissionGuard } from "@/components/auth/PermissionGuard"
+import { LoadingPage } from "@/components/feedback/status-page"
+import { DateFilterPicker } from "@/components/ui/date-filter-picker"
 import {
   TooltipProvider,
   Tooltip,
   TooltipTrigger,
   TooltipContent,
-} from "@/components/ui/tooltip";
-import { OpsPageShell } from "@/components/ui/ops-page-shell";
-import { ApiError, apiFetch } from "@/lib/api";
-import { useApiGet } from "@/hooks/use-api-get";
-import { usePagination } from "@/hooks/use-pagination";
-import {
-  CashClosingsResponse,
-  formatAmount,
-  formatBusinessDate,
-} from "@/lib/cash";
-import { formatDateTime } from "@/lib/date-utils";
+} from "@/components/ui/tooltip"
 
-import { CashStatusBadge } from "./cash-status-badge";
-
-type StatusFilter = "all" | "open" | "closed";
+import { formatAmount, formatBusinessDate } from "./cash-utils"
+import { formatDateTime } from "@/lib/date-utils"
+import { CashStatusBadge } from "./cash-status-badge"
+import { CAJA } from "./cash-messages"
+import { HISTORY_TABLE_COLUMNS } from "./cash-constants"
+import { useCashHistory } from "./use-cash-history"
 
 const STATUS_OPTIONS: OpsOption[] = [
-  { value: "all", label: "Todas" },
-  { value: "open", label: "Pendientes" },
-  { value: "closed", label: "Cerradas" },
-];
-
-const PAGE_SIZE = 10;
-
-const tableColumns: OpsDataTableColumn[] = [
-  { key: "fecha", header: "Fecha" },
-  { key: "abrio", header: "Abrió" },
-  { key: "cerro", header: "Cerró" },
-  { key: "total", header: "Total" },
-  { key: "accion", header: "" },
-];
+  { value: "all", label: CAJA.admin.statusOptions.all },
+  { value: "open", label: CAJA.admin.statusOptions.pending },
+  { value: "closed", label: CAJA.admin.statusOptions.closed },
+]
 
 export default function CashHistoryPage() {
-  const [status, setStatus] = useState<StatusFilter>("all");
-  const [page, setPage] = useState(1);
-  const [data, setData] = useState<CashClosingsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-
-  const queryParts = status !== "all" ? [`status=${status}`] : [];
-  queryParts.push(`page=${page}`, `pageSize=${PAGE_SIZE}`);
-  const query = queryParts.join("&");
-
-  useEffect(() => {
-    let active = true;
-
-    async function load() {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const result = await apiFetch<CashClosingsResponse>(
-          `/api/cash?${query}`,
-          { cache: "no-store" },
-        );
-
-        if (active) {
-          setData(result);
-        }
-      } catch (err) {
-        if (active) {
-          setError(
-            err instanceof Error ? err.message : "No se pudo cargar el historial.",
-          );
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    }
-
-    load();
-
-    return () => {
-      active = false;
-    };
-  }, [query, refreshKey]);
-
-  const items = useMemo(() => data?.items ?? [], [data?.items]);
-  const pagination = data?.pagination;
-
-  const hasActiveFilters = status !== "all";
-
-  function clearFilters() {
-    setStatus("all");
-    setPage(1);
-  }
-
-  function refetch() {
-    setRefreshKey((k) => k + 1);
-  }
+  const {
+    status,
+    setStatus,
+    dateFrom,
+    setDateFrom,
+    dateTo,
+    setDateTo,
+    setPage,
+    items,
+    pagination,
+    loading,
+    error,
+    hasActiveFilters,
+    clearFilters,
+    refetch,
+    data,
+  } = useCashHistory()
 
   if (loading && !data) {
     return (
       <LoadingPage
-        title="Cargando historial de caja"
-        description="Estamos recuperando las sesiones de caja registradas para tu sede operativa."
+        title={CAJA.loading.history.title}
+        description={CAJA.loading.history.desc}
         variant="ops"
       />
-    );
-  }
-
-  if (error && !data) {
-    return (
-      <ErrorPage
-        title="No pudimos abrir el historial de caja"
-        description={error}
-        variant="ops"
-      />
-    );
+    )
   }
 
   return (
     <PermissionGuard anyPermissions={["cash.view", "cash.operate"]}>
       <TooltipProvider delayDuration={120}>
-        <OpsPageShell width="wide" className="space-y-5">
-            <header className="px-1 space-y-4">
-              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ripnel-accent-hover)]">
-                      Caja
-                    </p>
-                    <HelpTooltip content="Aquí revisas las sesiones diarias registradas de la sede actual, con su estado y total consolidado." />
-                  </div>
-                  <h1 className="mt-1 text-2xl font-semibold text-[var(--ops-text)] md:text-[1.75rem]">
-                    Historial de caja
-                  </h1>
-                </div>
+        <OpsPageShell width="wide">
+          <PosHeader
+            eyebrow={CAJA.header.eyebrow}
+            title={CAJA.header.historyTitle}
+            actions={
+              <AdminActionButton onClick={refetch}>
+                <RotateCw className="h-4 w-4" />
+                {CAJA.actions.update}
+              </AdminActionButton>
+            }
+          />
 
-          <OpsTableBlock>
-            <OpsFiltersRow className="lg:grid-cols-[0.84fr_auto]">
+          <OpsTableBlock className="border-t border-[var(--ops-border-strong)] pt-4">
+            <OpsFiltersRow className="lg:grid-cols-[1fr_0.95fr_0.95fr_auto]">
               <OpsSelect
-                label="Estado"
+                label={CAJA.admin.filters.status}
                 value={status}
                 options={STATUS_OPTIONS}
-                onChange={(v) => { setStatus(v as StatusFilter); setPage(1); }}
+                onChange={(v) => {
+                  setStatus(v as Parameters<typeof setStatus>[0])
+                  setPage(1)
+                }}
               />
+
+              <DateFilterPicker
+                label={CAJA.history.filters.dateFrom}
+                value={dateFrom}
+                onChange={(value) => {
+                  setDateFrom(value)
+                  setPage(1)
+                }}
+                ariaLabel={CAJA.history.filters.dateFromAria}
+                max={dateTo || undefined}
+                density="compact"
+              />
+
+              <DateFilterPicker
+                label={CAJA.history.filters.dateTo}
+                value={dateTo}
+                onChange={(value) => {
+                  setDateTo(value)
+                  setPage(1)
+                }}
+                ariaLabel={CAJA.history.filters.dateToAria}
+                min={dateFrom || undefined}
+                density="compact"
+              />
+
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -169,37 +125,107 @@ export default function CashHistoryPage() {
                     className="h-10 w-10 rounded-lg"
                     onClick={clearFilters}
                     disabled={!hasActiveFilters}
-                    aria-label="Limpiar filtros"
+                    aria-label={CAJA.admin.filters.clearFilters}
                   >
                     <RotateCcw className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Limpiar filtros</TooltipContent>
+                <TooltipContent>{CAJA.admin.filters.clearFilters}</TooltipContent>
               </Tooltip>
             </OpsFiltersRow>
 
             <OpsDataTable
-              columns={tableColumns}
+              columns={HISTORY_TABLE_COLUMNS}
+              minWidth="860px"
               loading={loading}
+              error={error}
+              errorTitle={CAJA.history.table.error}
               isEmpty={items.length === 0}
-              emptyMessage="No se encontraron sesiones de caja para los filtros elegidos."
+              emptyMessage={CAJA.history.noResults}
               footer={
                 pagination && pagination.total_items > 0 ? (
-                  <OpsTableFooter>
+                  <>
                     <span className="text-sm text-[var(--ops-text-muted)]">
-                      {(pagination.page - 1) * pagination.page_size + 1}-{Math.min(pagination.page * pagination.page_size, pagination.total_items)} de {pagination.total_items}
+                      {(pagination.page - 1) * pagination.page_size + 1}-
+                      {Math.min(
+                        pagination.page * pagination.page_size,
+                        pagination.total_items,
+                      )}{" "}
+                      de {pagination.total_items}
                     </span>
                     <Pagination
                       page={pagination.page}
                       totalPages={pagination.total_pages}
                       onPageChange={setPage}
                     />
-                  </div>
-                </>
-              )}
-            </article>
+                  </>
+                ) : undefined
+              }
+            >
+              {items.map((closing) => (
+                <tr
+                  key={closing.cash_closing_id}
+                  className="text-sm text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
+                >
+                  <td className="px-4 py-[var(--ops-row-py)] text-sm font-medium text-[var(--ops-text)]">
+                    {formatBusinessDate(closing.business_date)}
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)] text-[var(--ops-text-muted)]">
+                    <span className="font-medium text-[var(--ops-text)]">
+                      {closing.opened_by_name || CAJA.fallback.dash}
+                    </span>
+                    <span className="ml-2 text-xs">
+                      {formatDateTime(closing.created_at)}
+                    </span>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)]">
+                    {closing.closed_at ? (
+                      <span className="text-[var(--ops-text-muted)]">
+                        <span className="font-medium text-[var(--ops-text)]">
+                          {closing.closed_by_name || CAJA.fallback.dash}
+                        </span>
+                        <span className="ml-2 text-xs">
+                          {formatDateTime(closing.closed_at)}
+                        </span>
+                      </span>
+                    ) : (
+                      <CashStatusBadge status={closing.status} />
+                    )}
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)]">
+                    <p className="font-semibold">
+                      {formatAmount(closing.total_all)}
+                    </p>
+                    {closing.is_consistent === false ? (
+                      <p className="text-xs text-[var(--ops-tone-warning-text)]">
+                        {CAJA.history.diffLabel} {formatAmount(closing.difference)}
+                      </p>
+                    ) : closing.status === "closed" ? (
+                      <p className="text-xs text-[var(--ops-tone-success-text)]">
+                        {CAJA.history.ok}
+                      </p>
+                    ) : null}
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)]">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="sm"
+                        className="rounded-lg px-3"
+                      >
+                        <Link href={`/caja/historial/${closing.cash_closing_id}`}>
+                          {CAJA.actions.view}
+                        </Link>
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </OpsDataTable>
+          </OpsTableBlock>
         </OpsPageShell>
       </TooltipProvider>
     </PermissionGuard>
-  );
+  )
 }

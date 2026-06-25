@@ -1,5 +1,5 @@
 export const opsControlClassName =
-  "w-full rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] text-sm text-[var(--ops-text)] outline-none transition hover:border-[var(--ops-border-soft)] hover:bg-[var(--ops-surface-muted)] focus-visible:border-[var(--ripnel-accent)] focus-visible:ring-2 focus-visible:ring-[var(--ripnel-accent-soft)] disabled:cursor-not-allowed disabled:opacity-60"
+  "w-full rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] text-sm text-[var(--ops-text)] outline-none transition hover:border-[var(--ops-border-soft)] hover:bg-[var(--ops-surface-muted)] focus-visible:border-[var(--ripnel-accent)] focus-visible:shadow-[0_0_0_2px_var(--ripnel-accent-soft)] disabled:cursor-not-allowed disabled:opacity-60"
 
 export const opsSelectTriggerClassName =
   `flex h-9 cursor-pointer items-center justify-between px-3.5 text-left ${opsControlClassName}`
@@ -71,3 +71,15 @@ export const MUTED_SURFACE_MIX =
 /** Fondo con acento suave para paneles destacados secundarios */
 export const ACCENT_MUTED_BG =
   "[color:color-mix(in_srgb,var(--ripnel-accent-soft)_68%,var(--ops-surface))]"
+
+/** Chip semantico con tono acento */
+export const CHIP_TONE_ACCENT =
+  "border-[color:color-mix(in_srgb,var(--ripnel-accent)_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_82%,var(--ops-surface))] text-[color:color-mix(in_srgb,var(--ripnel-accent)_72%,var(--ops-text))]"
+
+/** Chip semantico con tono neutral */
+export const CHIP_TONE_NEUTRAL =
+  "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] text-[var(--ops-text-muted)]"
+
+/** Pill de tipo de cliente en tablas */
+export const CUSTOMER_TYPE_PILL =
+  "inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]"

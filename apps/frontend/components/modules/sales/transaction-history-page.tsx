@@ -30,11 +30,18 @@ import { SALE_STATUS_META, SALE_STATUS_TONES, type SalesPageResponse } from "@/t
 import { SH } from "./sales-history-messages"
 import { PAGE_SIZE, SH_TABLE_COLUMNS } from "./sales-history-constants"
 
+const todayStr = new Date().toISOString().slice(0, 10)
+const defaultFrom = (() => {
+  const d = new Date()
+  d.setDate(d.getDate() - 30)
+  return d.toISOString().slice(0, 10)
+})()
+
 export default function TransactionHistoryPage() {
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState("all")
-  const [dateFrom, setDateFrom] = useState("")
-  const [dateTo, setDateTo] = useState("")
+  const [dateFrom, setDateFrom] = useState(defaultFrom)
+  const [dateTo, setDateTo] = useState(todayStr)
   const [currentPage, setCurrentPage] = useState(1)
   const debouncedSearch = useDebounce(search, 300)
 
@@ -43,8 +50,8 @@ export default function TransactionHistoryPage() {
       const params = new URLSearchParams()
       if (status !== "all") params.set("status", status)
       if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim())
-      if (dateFrom) params.set("date_from", dateFrom)
-      if (dateTo) params.set("date_to", dateTo)
+      params.set("date_from", dateFrom)
+      params.set("date_to", dateTo)
       params.set("limit", String(PAGE_SIZE))
       params.set("offset", String((currentPage - 1) * PAGE_SIZE))
       const path = `/api/sales?${params.toString()}`
@@ -66,15 +73,15 @@ export default function TransactionHistoryPage() {
   }, [sales])
 
   const hasActiveFilters =
-    Boolean(search.trim()) || status !== "all" || Boolean(dateFrom) || Boolean(dateTo)
+    Boolean(search.trim()) || status !== "all" || dateFrom !== defaultFrom || dateTo !== todayStr
   const firstVisible = sales.length === 0 ? 0 : (safeCurrentPage - 1) * PAGE_SIZE + 1
   const lastVisible = sales.length === 0 ? 0 : firstVisible + sales.length - 1
 
   function clearFilters() {
     setSearch("")
     setStatus("all")
-    setDateFrom("")
-    setDateTo("")
+    setDateFrom(defaultFrom)
+    setDateTo(todayStr)
     setCurrentPage(1)
   }
 

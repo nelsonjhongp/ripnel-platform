@@ -285,7 +285,7 @@ function SinglePaymentLine({
             <span className="flex min-w-0 items-center gap-2">
               {option?.leading}
               <span className="truncate text-sm font-medium text-[var(--ops-text)]">
-                {option?.label ?? "Método"}
+                {option?.label ?? POS.payment.method}
               </span>
             </span>
           )}
@@ -335,12 +335,12 @@ function PaymentLine({
 }) {
   const refMeta = getPaymentReferenceMeta(method)
   return (
-    <div className={`grid gap-2 rounded-lg border border-[${SUBTLE_BORDER}] bg-[${SUBTLE_MUTED_SURFACE}] p-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0`}>
+    <div className={`grid gap-2 rounded-lg border border-${SUBTLE_BORDER} bg-${SUBTLE_MUTED_SURFACE} p-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-center sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0`}>
       <div className="space-y-1">
         <div className="flex items-center justify-between gap-2 sm:block">
           <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)] sm:hidden">{POS.payment.method}</span>
           <span className="inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-2 py-0.5 text-[10px] font-semibold text-[var(--ops-text-muted)] sm:hidden">
-            Pago
+            {POS.paymentLine.paymentNumber}
           </span>
         </div>
         <OpsSelect
@@ -353,7 +353,7 @@ function PaymentLine({
             <span className="flex min-w-0 items-center gap-2">
               {option?.leading}
               <span className="truncate text-sm font-medium text-[var(--ops-text)]">
-                {option?.label ?? "Método"}
+                {option?.label ?? POS.payment.method}
               </span>
             </span>
           )}
@@ -394,7 +394,7 @@ function PaymentLine({
           size="icon-xs"
           disabled={!canRemove}
           onClick={onRemove}
-          aria-label="Quitar método de pago"
+          aria-label={POS.payment.removeMethodAria}
           className="shrink-0 text-[var(--ops-text-muted)] hover:text-[var(--ops-text)] disabled:cursor-not-allowed disabled:opacity-30"
         >
           <X className="h-3.5 w-3.5" strokeWidth={2.5} />

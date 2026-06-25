@@ -278,6 +278,100 @@ Use `LoaderCircle` from `lucide-react` with `animate-spin`:
 ```
 Button should be `disabled` while loading.
 
+### Per-field error types
+
+For forms with multiple editable fields, use a typed error object with optional keys
+per field instead of a single `string | null`:
+
+```tsx
+// customers-types.ts
+export type CustomerFormErrors = {
+  _form?: string
+  full_name?: string
+  business_name?: string
+  commercial_name?: string
+  document_number?: string
+  address?: string
+}
+
+// customers-utils.ts
+export function validateCustomerInput(input): CustomerFormErrors | null {
+  const errors: CustomerFormErrors = {}
+
+  if (!input.full_name.trim() && !input.business_name.trim()) {
+    errors.full_name = CUSTOMERS.form.noNameError
+  }
+
+  if (input.document_type === "ruc") {
+    if (!input.business_name.trim()) {
+      errors.business_name = CUSTOMERS.form.rucBusinessNameRequired
+    }
+    if (!input.address.trim()) {
+      errors.address = CUSTOMERS.form.rucAddressRequired
+    }
+  }
+
+  // Document number validation
+  if (!/^\d{8}$/.test(input.document_number)) {
+    errors.document_number = CUSTOMERS.form.invalidFormat("DNI")
+  }
+
+  return Object.keys(errors).length > 0 ? errors : null
+}
+```
+
+**Rules:**
+- Error type has optional keys (`?`) for every validatable field
+- Validation function returns the error object or `null`
+- Each `OpsFormField` receives its individual error: `<OpsFormField error={errors?.document_number} />`
+- `_form` key is for cross-field errors (only valid when multiple fields share a constraint)
+- Errors clear via `useEffect` on dialog `open`, not via individual `onChange` per field
+
+### Two-phase save action state
+
+Dialogs that create/update entities with server-side validation (duplicate checks)
+use a 3-phase state machine, never a single boolean:
+
+```tsx
+const [actionState, setActionState] = useState<"idle" | "validating" | "saving">("idle")
+const isBusy = actionState !== "idle"
+
+async function save() {
+  // Phase 1: local validation
+  const validation = validateCustomerInput(form)
+  if (validation) { setErrors(validation); return }
+
+  // Phase 2: server-side validation (duplicate check)
+  setActionState("validating")
+  setErrors(null)
+  const duplicate = await findDuplicateByDocument({ ...excludeId })
+  if (duplicate) {
+    setErrors({ document_number: "Ya existe un cliente con este documento." })
+    setActionState("idle")
+    return
+  }
+
+  // Phase 3: actual save
+  setActionState("saving")
+  await apiFetchData("/api/entity", { method: "POST", body: JSON.stringify(payload) })
+  close()
+}
+
+// In the footer button:
+{actionState === "validating" ? (
+  <LoaderCircle className="animate-spin" /> Validando...
+) : actionState === "saving" ? (
+  <LoaderCircle className="animate-spin" /> Guardando...
+) : "Guardar"}
+```
+
+**Rules:**
+- `"idle"`: no action in progress — buttons enabled
+- `"validating"`: running local validation + pre-save checks (no DB write yet)
+- `"saving"`: executing POST/PATCH — buttons disabled
+- On validation or duplicate error, reset to `"idle"` so user can retry
+- Each phase shows distinct text with `LoaderCircle animate-spin`
+
 ## Testing
 
 Framework: Playwright (`@playwright/test` v1.60+).
@@ -607,6 +701,31 @@ const isInvoice = sale.document_type === "boleta" || sale.document_type === "fac
 - Modal strings must live in a module-specific messages file (e.g. `receipt-messages.ts`), never hardcoded as string literals.
 - `OpsStatusBadge` icon must use the `icon` prop, not be passed as a child.
 
+### Subsequent load feedback (detail pages)
+
+Detail pages that render raw `<table>` (not `OpsDataTable`) must dim the content while re-fetching on filter changes. Use `opacity-50 transition-opacity duration-150 pointer-events-none` on the content wrapper when `loading && data` (subsequent loads, not first load which already has `LoadingPage`):
+
+```tsx
+const { data, loading, error } = useApiGet(fetcher, deps)
+
+// In JSX — wrapper around the reloadable content block:
+<div
+  className={cn(
+    "base classes...",
+    loading && data && "opacity-50 transition-opacity duration-150 pointer-events-none"
+  )}
+>
+  {/* table content */}
+</div>
+```
+
+**Rules:**
+- Guard: `loading && data` — only dim on subsequent fetches, never on first load
+- `pointer-events-none` prevents clicks on stale data
+- Apply to the outermost wrapper of the reloadable content block (not the entire section)
+- Do NOT use on sections that don't change with the re-fetch (e.g., sidebar metrics that are static)
+- This pattern applies to any detail page with raw tables: `inventory-detail`, `sale-detail`, `postsale-detail`, `transfers-detail`
+
 ### Conditional metrics
 
 Rows like IGV and discount must be hidden when their value is 0 — same guard pattern:
@@ -708,9 +827,120 @@ Frontend:
 
 Current recommended order:
 
-1. `Hardening de ventas`: edge cases del POS (descuentos complejos, validaciones de stock, flujo de recibos)
-2. `Caja y cierres`: integracion completa de cash closing con ventas, arqueos y reportes
-3. `Reportes y BI`: expandir analytics mas alla del dashboard actual
-4. `Permisos granulares`: refinar permisos por ubicacion y rol en flujos criticos
-5. `Testing end-to-end`: flujos criticos (venta, caja, transferencias)
-6. `Optimizacion y pulido`: rendimiento, UX density, temas, carga de assets
+1. `Auditoria de modulos`: ejecutar `docs/module-review-checklist.md` en postsales, cash, inventory, transfers, customers, products, BI
+2. `Hardening post-auditoria`: aplicar `docs/refactor-vs-rebuild.md` segun el tier detectado en cada modulo
+3. `Caja y cierres`: integracion completa de cash closing con ventas, arqueos y reportes
+4. `Reportes y BI`: expandir analytics mas alla del dashboard actual
+5. `Permisos granulares`: refinar permisos por ubicacion y rol en flujos criticos
+6. `Testing end-to-end`: flujos criticos (venta, caja, transferencias)
+
+### Guias de auditoria y refactor
+
+Antes de modificar cualquier modulo existente, ejecutar:
+
+1. `docs/module-review-checklist.md` — checklist paso a paso con comandos grep
+2. `docs/refactor-vs-rebuild.md` — decision matrix y sistema de tiers
+
+El modulo `ventas` es la referencia canonica (Tier 3 completado, score ~0 actual).
+
+## Hardening checklist (ventas modulo)
+
+Refactor completado en Junio 2026 — ver `docs/sales-hardening-plan.md` para el plan completo.
+
+| Fase | Estado | Descripcion |
+|------|--------|-------------|
+| 1. Strings huerfanos | ✅ | `pos-utils.ts`, `use-product-search.ts` → centralizados en `pos-messages.ts` |
+| 2. Strings componentes | ✅ | `stage-products/customer/payment`, `product-config-dialog` → `pos-messages.ts` |
+| 3. CSS color-mix | ✅ | Extraido a `ops-control-styles.ts`. Corregido double-wrapping `border-[[...]]` → `border-[...]` en 4 archivos |
+| 4. Split orchestrator | ✅ | `use-pos-sale.ts` (807→712). Nuevos: `use-sale-confirmation.ts`, `use-sale-keyboard.ts` |
+| 5. Verificacion | ✅ | TypeScript, 98 tests Playwright pasan |
+
+### Nuevos hooks
+
+```
+usePosSale()
+  ├─ useCart()
+  ├─ useCashContext()
+  ├─ useCustomerSearch()
+  ├─ usePaymentState()
+  ├─ useProductSearch()
+  ├─ useSaleConfirmation()   ← nuevo (confirmacion, reset, revision, recibos)
+  └─ useSaleKeyboard()       ← nuevo (F2/F4/F8/Escape, pulse, goToStage)
+```
+
+### Convencion de mensajes
+
+El archivo `pos-messages.ts` usa español sin tildes por convencion. Toda string visible al usuario debe residir en `pos-messages.ts` o `sales-history-messages.ts`, nunca hardcodeada.
+
+## Hardening checklist (inventario / stock modulo)
+
+Refactor iniciado en Junio 2026. Modulo compuesto por 5 pantallas: stock actual, detalle de producto, movimientos (kardex), ajustes (lista), ajustes (creacion).
+
+| Fase | Estado | Descripcion |
+|------|--------|-------------|
+| 1. Pagina principal (`/inventario`) | ✅ | Vista unificada sin tabs. 737→304 lineas. UI identica admin/usuario. Auto-scope a sede default via `useAuth()`. Badge de sede en `PosHeader.meta`. Strings en `inventory-messages.ts`. |
+| 2. Pagina detalle (`/inventario/[styleId]`) | ✅ | Sin tabs. 394→310 lineas. Patron canonico detail pages: `INFO_BOX_XL` + grid 1.35fr/0.65fr + sidebar. Matriz en main column, cards de sede y link a kardex en sidebar. Redirect a kardex con `query` y `location_id` (UUID). |
+| 3. Shared types (`inventory-summary-shared.ts`) | ✅ | Limpieza: removidos 8 tipos/funciones de tabs y vista por sede. 176→130 lineas. |
+| 4. Constants (`inventory-constants.ts`) | ✅ | Nuevo archivo. Re-export de `INFO_BOX_XL`, `ACCENT_HIGHLIGHT_PANEL`, etc. desde `ops-control-styles.ts`. |
+| 5. Pagina kardex (`/inventario/movimientos`) | ✅ | Hardening completo Junio 2026. `kardex-messages.ts` + `kardex-constants.ts` creados. `kardex-domain.ts` migrado de `lib/` a `kardex/`. Componente unificado (sin split `KardexPage`/`KardexPageContent`). 0 strings hardcodeados, 0 `color-mix()` inline. Auto-scope a sede default via `useAuth()`. Badge de sede en `PosHeader.meta` con `OpsStatusBadge`. Dropdown de sede condicional: solo visible si `availableLocations.length > 1`. Fechas con `DateFilterPicker` (estandar de la app) + restriccion cruzada (`max={dateTo}` / `min={dateFrom}`) + `max={todayStr}` en Hasta. Metricas homogeneas (4 conteos, no mezcla conteo/cantidad). `movement.movement_direction` del backend usado directo en render (sin re-resolver por fila). Filtros con URL-sync. Clear filters → sede default. Labels de dominio en `KARDEX.labels.{operation,origin,reference}` importados por `kardex-domain.ts`. Redirect desde inventory-detail-page verificado. |
+| 6. Pagina ajustes lista (`/inventario/ajustes`) | 🔲 | Pendiente: refactorizar con mensajes, revisar strings huerfanas. |
+| 7. Pagina ajustes creacion (`/inventario/ajustes/nuevo`) | 🔲 | Pendiente: refactorizar con mensajes. |
+| 8. Umbral `LOW_STOCK_THRESHOLD` | 🔲 | Pendiente: extraer de constante `3` en backend a configuracion por sede. Duplicado en 4 archivos backend. |
+| 9. Sistema de estados y notificaciones | ✅ | `active = TRUE` agregado en 7 queries (`inventory.repo.js` + `dashboard.repo.js`). URLs de notificaciones corregidas (`sin-stock`→`out`, `stock-bajo`→`low`). Labels de status centralizados en `inventory-messages.ts`. Desactivar producto (`active=false`) ahora lo oculta de inventario y detiene notificaciones — borrado logico real. |
+| 10. CSS y UX en detalle | ✅ | `opsControlClassName`: `focus-visible:ring-*` → `focus-visible:shadow-[...]` (eliminado borde azul de Tailwind en todos los selects/inputs ops). Matriz tallas/colores: `minWidth` 820→600px, padding reducido `px-4`→`px-3`, wrapper redundante eliminado. Feedback dimmer (`opacity-50`) al cambiar sede. |
+
+### Archivos del modulo inventario
+
+```
+apps/frontend/components/modules/inventory/
+├── inventory-constants.ts          ← re-export de ops-control-styles
+├── inventory-messages.ts           ← STOCK.* (list + detail)
+├── inventory-page.tsx              ← pagina principal (vista unica, sin tabs)
+├── inventory-detail-page.tsx       ← detalle de producto (patron canonico)
+├── inventory-summary-shared.ts     ← tipos compartidos
+├── inventory-adjustments-shared.ts ← tipos de ajustes (pendiente refactor)
+├── inventory-adjustments-page.tsx  ← lista de ajustes (pendiente refactor)
+└── inventory-adjustments-create-page.tsx ← creacion de ajustes (pendiente refactor)
+
+apps/frontend/components/modules/kardex/
+├── kardex-constants.ts            ← re-export de ops-control-styles + chips kardex
+├── kardex-domain.ts               ← logica de dominio (tipos, resolvers, labels)
+├── kardex-messages.ts             ← KARDEX.* strings centralizados
+└── kardex-page.tsx                ← movimientos de stock (refactorizado)
+```
+
+### Patrones aplicados en inventario
+
+- **Pagina principal**: `PosHeader` + `OpsMetricInlineGroup` + `OpsTableBlock className="border-t ... pt-4"` + `OpsFiltersRow` + `OpsDataTable`. Igual que ventas historial.
+- **Pagina detalle**: `PosHeader` con `meta` badges + `INFO_BOX_XL` header panel + `ACCENT_HIGHLIGHT_PANEL` + grid `lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)]` + `OpsPanelSection` en main y sidebar. Igual que sale-detail y postsale-detail.
+- **Auto-scopeo**: `useAuth()` → `defaultLocation?.location_id` como valor inicial del filtro de sede. `useRef` para que el efecto solo se ejecute una vez.
+- **Mensajes**: `STOCK.header.*`, `STOCK.filters.*`, `STOCK.columns.*`, `STOCK.detail.*` — todos los strings visibles referencian `STOCK.*`.
+
+### Patrones aplicados en kardex
+
+- **Pagina kardex**: `PosHeader` con `meta` badge de sede + `OpsMetricInlineGroup` (4 metricas homogeneas: conteo) + `OpsTableBlock` + `OpsFiltersRow` + `OpsDataTable`. Mismo patron que inventory-page y sales history.
+- **Auto-scopeo**: replica el patron de inventory-page: `useAuth()` → `defaultLocation?.location_id` como valor inicial. `useRef` guard para una sola ejecucion. El dropdown de sede se oculta si `availableLocations.length <= 1`.
+- **Fechas**: `DateFilterPicker` con `density="compact"` (estandar de la app). Restriccion cruzada (`max={dateTo}` en Desde, `min={dateFrom}` en Hasta). `max={todayStr}` en Hasta (sin fechas futuras). Sin defaults de rango (el usuario decide si filtra).
+- **Filtros condicionales**: dropdown de sede solo visible si `availableLocations.length > 1`. Grid `OpsFiltersRow` ajusta columnas dinamicamente con `cn()`.
+- **Render de filas**: `movement.movement_direction` del backend como fuente primaria (`??` fallback al resolver local). Chips con `CHIP_ENTRY`/`CHIP_EXIT`/`CHIP_ADJUST` y cantidades con `QTY_POSITIVE`/`QTY_NEGATIVE` desde `kardex-constants.ts`.
+- **Domain logic**: `kardex-domain.ts` con tipos, resolvers y formateadores. Labels de operacion/origen/referencia en `KARDEX.labels.*`. Formateadores (`formatMovementOperationLabel`, etc.) importan desde `kardex-messages.ts`.
+- **URL-sync**: filtros se persisten en query params via `router.replace` en `useEffect`.
+- **Clear filters**: resetea a sede default del usuario, no a `"ALL"`. Si hay contexto de navegacion (`reference_type`/`reference_id`), navega a `pathname` limpio.
+- **Mensajes**: `KARDEX.header.*`, `KARDEX.filters.*`, `KARDEX.columns.*`, `KARDEX.table.*`, `KARDEX.metrics.*`, `KARDEX.labels.{operation,origin,reference}` — todos los strings visibles referencian `KARDEX.*`.
+
+### Como continuar en otro chat
+
+Para continuar con la fase 6 (ajustes lista), usar este prompt:
+
+```
+Continuar hardening del modulo inventario/stock en RIPNEL.
+Revisar AGENTS.md seccion "Hardening checklist (inventario / stock modulo)".
+Fase actual: 6 — pagina ajustes lista (/inventario/ajustes).
+
+Tareas:
+1. Crear adjustments-messages.ts con strings centralizados
+2. Refactorizar inventory-adjustments-page.tsx: usar mensajes, revisar strings huerfanas
+3. Revisar inventory-adjustments-shared.ts: limpiar tipos no usados
+
+No modificar los archivos ya refactorizados (inventory-page.tsx, inventory-detail-page.tsx, inventory-messages.ts, inventory-constants.ts, inventory-summary-shared.ts, kardex-page.tsx, kardex-messages.ts, kardex-constants.ts, kardex-domain.ts).
+```
