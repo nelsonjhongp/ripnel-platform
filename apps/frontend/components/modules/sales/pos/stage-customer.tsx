@@ -133,7 +133,7 @@ export function CustomerStage(props: CustomerStageProps) {
               onValueChange={(value) => {
                 setDocumentType(value)
               }}
-              placeholder="Seleccionar"
+              placeholder={POS.customer.selectDocumentPlaceholder}
               options={documentOptions}
               className={`h-9 ${selectedCustomer && (!documentType || documentType === "none") ? "animate-hint-pulse" : ""} ${pulseStage === "customer" ? "animate-focus-flash" : ""}`}
               triggerContent={(option) => (
@@ -144,7 +144,7 @@ export function CustomerStage(props: CustomerStageProps) {
                       "h-4 w-4 shrink-0 text-[var(--ripnel-accent)]",
                     )}
                   <span className="truncate">
-                    {option?.label ?? activeDocumentOption?.label ?? "Seleccionar"}
+                    {option?.label ?? activeDocumentOption?.label ?? POS.customer.selectDocumentPlaceholder}
                   </span>
                 </span>
               )}
@@ -162,7 +162,7 @@ export function CustomerStage(props: CustomerStageProps) {
                   {selectedCustomerName}
                 </p>
                 <p className="mt-1 truncate text-xs text-[var(--ops-text-muted)]">
-                  {activeDocumentOption?.label ?? "Comprobante pendiente"} · {selectedCustomerDocument}
+                  {activeDocumentOption?.label ?? POS.summary.pendingDocument} · {selectedCustomerDocument}
                 </p>
               </div>
 

@@ -118,10 +118,12 @@ const cancelSale = z.object({
 const openCash = z.object({
   location_id: z.string().uuid().optional(),
   notes: z.string().optional(),
+  opening_balance: z.number().min(0).optional(),
 });
 
 const closeCash = z.object({
   notes: z.string().optional(),
+  closing_balance_declared: z.number().min(0).optional(),
 });
 
 const reopenCash = z.object({

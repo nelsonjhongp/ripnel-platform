@@ -2,9 +2,9 @@ const { listCustomers, createNewCustomer, patchCustomer, removeCustomer } = requ
 
 async function getCustomers(req, res, next) {
   try {
-    const { document_type, sort, q } = req.query;
-    const customers = await listCustomers({ documentType: document_type, sort, q });
-    res.json({ ok: true, data: customers });
+    const { document_type, sort, q, page, limit } = req.query;
+    const result = await listCustomers({ documentType: document_type, sort, q, page, limit });
+    res.json({ ok: true, data: result.rows, total: result.total });
   } catch (error) {
     next(error);
   }

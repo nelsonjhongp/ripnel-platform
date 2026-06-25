@@ -333,8 +333,10 @@ async function findCriticalInventoryCounts(locationId, lowStockThreshold = 3, ex
     `SELECT
        COUNT(*) FILTER (WHERE qty = 0)::int AS zero_stock_count,
        COUNT(*) FILTER (WHERE qty > 0 AND qty <= $2)::int AS low_stock_count
-     FROM inventory
-     WHERE location_id = ANY($1::uuid[])`,
+     FROM inventory i
+     INNER JOIN product_variants pv ON pv.variant_id = i.variant_id AND pv.active = TRUE
+     INNER JOIN product_styles ps ON ps.style_id = pv.style_id AND ps.active = TRUE
+     WHERE i.location_id = ANY($1::uuid[])`,
     [locationIds, lowStockThreshold]
   );
 
@@ -358,10 +360,11 @@ async function findCriticalInventoryItems(
        c.code AS color_code,
        i.qty
      FROM inventory i
-     INNER JOIN product_variants pv ON pv.variant_id = i.variant_id
+     INNER JOIN product_variants pv ON pv.variant_id = i.variant_id AND pv.active = TRUE
      INNER JOIN (
        SELECT style_id, name AS style_name, style_code
        FROM product_styles
+       WHERE active = TRUE
      ) ps ON ps.style_id = pv.style_id
      INNER JOIN sizes s ON s.size_id = pv.size_id
      INNER JOIN colors c ON c.color_id = pv.color_id

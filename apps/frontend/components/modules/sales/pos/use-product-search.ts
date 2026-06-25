@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { apiFetch } from "@/lib/api"
 import type { PriceModeOverride, SaleVariant, SearchableStyle } from "./pos-types"
+import { POS } from "./pos-messages"
 import { explainApiError } from "./pos-utils"
 import {
   buildProductSearchResults,
@@ -53,7 +54,7 @@ export function useProductSearch(locationId: string | undefined) {
       } catch (fetchError) {
         if (!active) return
         setVariants([])
-        setError(explainApiError(fetchError, "No se pudieron cargar productos."))
+        setError(explainApiError(fetchError, POS.error.loadProducts))
       } finally {
         if (active) setLoadingVariants(false)
       }

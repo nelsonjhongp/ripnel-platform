@@ -19,6 +19,7 @@ export function useCashContext(
   const [reopenCashDialogOpen, setReopenCashDialogOpen] = useState(false)
   const [reopenNotes, setReopenNotes] = useState("")
   const [reopeningCash, setReopeningCash] = useState(false)
+  const [initialCashCheckDone, setInitialCashCheckDone] = useState(false)
 
   const refreshPosContext = useCallback(async () => {
     if (!locationId) {
@@ -48,6 +49,15 @@ export function useCashContext(
   useEffect(() => {
     void Promise.resolve().then(() => refreshPosContext())
   }, [refreshPosContext])
+
+  useEffect(() => {
+    if (initialCashCheckDone || posContextLoading || !posContext) return
+    setInitialCashCheckDone(true)
+    const status = posContext?.cash?.status || "missing"
+    if (status === "missing" && has("cash.operate")) {
+      setCashOpenDialogOpen(true)
+    }
+  }, [posContextLoading, posContext, initialCashCheckDone, has])
 
   const cashReady = posContext?.cash?.sale_enabled === true
   const cashStatus = posContext?.cash?.status || "missing"

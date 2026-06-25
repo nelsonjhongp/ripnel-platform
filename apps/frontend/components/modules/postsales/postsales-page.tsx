@@ -44,6 +44,11 @@ import {
 } from "./postsales-constants"
 
 const todayStr = new Date().toISOString().slice(0, 10)
+const defaultFrom = (() => {
+  const d = new Date()
+  d.setDate(d.getDate() - 30)
+  return d.toISOString().slice(0, 10)
+})()
 
 function SaleActions({
   saleId,
@@ -80,7 +85,7 @@ export default function PostsalePage() {
   const { has } = useAuth()
   const [search, setSearch] = useState("")
   const [status, setStatus] = useState("confirmed")
-  const [dateFrom, setDateFrom] = useState("")
+  const [dateFrom, setDateFrom] = useState(defaultFrom)
   const [dateTo, setDateTo] = useState(todayStr)
   const debouncedSearch = useDebounce(search, 300)
 
@@ -89,8 +94,8 @@ export default function PostsalePage() {
       const params = new URLSearchParams()
       if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim())
       if (status !== "all") params.set("status", status)
-      if (dateFrom) params.set("date_from", dateFrom)
-      if (dateTo) params.set("date_to", dateTo)
+      params.set("date_from", dateFrom)
+      params.set("date_to", dateTo)
 
       const path = params.toString()
         ? `/api/postsales/eligible?${params.toString()}`
@@ -116,12 +121,12 @@ export default function PostsalePage() {
   const { paginatedItems: paginatedSales, totalPages, safePage, firstVisible, lastVisible, setPage } = usePagination(sales, PAGE_SIZE)
 
   const hasActiveFilters =
-    Boolean(search.trim()) || status !== "confirmed" || Boolean(dateFrom) || dateTo !== todayStr
+    Boolean(search.trim()) || status !== "confirmed" || dateFrom !== defaultFrom || dateTo !== todayStr
 
   function clearFilters() {
     setSearch("")
     setStatus("confirmed")
-    setDateFrom("")
+    setDateFrom(defaultFrom)
     setDateTo(todayStr)
     setPage(1)
   }

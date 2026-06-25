@@ -1,7 +1,7 @@
 "use client"
 
-import type { CashClosing } from "@/lib/cash"
-import { getCashStatusLabel } from "@/lib/cash"
+import type { CashClosing } from "./cash-types"
+import { getCashStatusLabel } from "./cash-utils"
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 
 export function CashStatusBadge({
@@ -12,7 +12,10 @@ export function CashStatusBadge({
   className?: string
 }) {
   return (
-    <OpsStatusBadge tone={status === "open" ? "warning" : "neutral"} className={className}>
+    <OpsStatusBadge
+      tone={status === "open" ? "warning" : "neutral"}
+      className={className}
+    >
       {getCashStatusLabel(status)}
     </OpsStatusBadge>
   )

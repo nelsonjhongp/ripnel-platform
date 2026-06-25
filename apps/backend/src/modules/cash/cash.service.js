@@ -1,6 +1,7 @@
 const { AppError } = require("../../shared/errors");
 const { round2 } = require("../../shared/numbers");
 const { normalizeUuid } = require("../../shared/uuid");
+const { ERRORS } = require("./cash.errors");
 const {
   findCashClosingByLocationAndDate,
   findCashClosingById,
@@ -75,7 +76,7 @@ function normalizeCashStatus(value) {
 function buildRangeFilter(range) {
   const normalizedRange = normalizeRange(range);
   if (!normalizedRange) {
-    throw new AppError("Invalid range value", 400, { code: "INVALID_RANGE" });
+    throw new AppError(ERRORS.INVALID_RANGE, 400, { code: "INVALID_RANGE" });
   }
 
   const endDate = todayPeruDate();
@@ -128,6 +129,11 @@ function serializeCashClosing(closing) {
   return {
     ...closing,
     business_date: normalizeBusinessDateValue(closing.business_date),
+    opening_balance: toNumber(closing.opening_balance),
+    closing_balance_declared:
+      closing.closing_balance_declared == null
+        ? null
+        : toNumber(closing.closing_balance_declared),
     total_cash: toNumber(closing.total_cash),
     total_yape: toNumber(closing.total_yape),
     total_plin: toNumber(closing.total_plin),
@@ -204,23 +210,23 @@ async function resolveCashContext(
   const normalizedUserId = normalizeUuid(userId);
 
   if (!normalizedUserId) {
-    throw new AppError("Not authenticated", 401, { code: "AUTH_REQUIRED" });
+    throw new AppError(ERRORS.AUTH_REQUIRED, 401, { code: "AUTH_REQUIRED" });
   }
 
   const user = await findActiveUserById(normalizedUserId);
   if (!user) {
-    throw new AppError("Not authenticated", 401, { code: "AUTH_REQUIRED" });
+    throw new AppError(ERRORS.AUTH_REQUIRED, 401, { code: "AUTH_REQUIRED" });
   }
 
   const capabilities = resolveCashCapabilities({ permissions });
   if (!capabilities.visible) {
-    throw new AppError("Forbidden", 403, { code: "FORBIDDEN" });
+    throw new AppError(ERRORS.FORBIDDEN, 403, { code: "FORBIDDEN" });
   }
 
   const defaultLocation = await findDefaultLocationByUserId(normalizedUserId);
   if (!defaultLocation) {
     throw new AppError(
-      "Authenticated user has no default location assigned",
+      ERRORS.DEFAULT_LOCATION_REQUIRED,
       409,
       {
         code: "DEFAULT_LOCATION_REQUIRED",
@@ -229,7 +235,7 @@ async function resolveCashContext(
   }
 
   if (!defaultLocation.active) {
-    throw new AppError("Default location is inactive", 409, {
+    throw new AppError(ERRORS.DEFAULT_LOCATION_INACTIVE, 409, {
       code: "DEFAULT_LOCATION_INACTIVE",
     });
   }
@@ -238,7 +244,7 @@ async function resolveCashContext(
     requestedLocationId &&
     requestedLocationId !== defaultLocation.location_id
   ) {
-    throw new AppError("Forbidden", 403, { code: "FORBIDDEN_LOCATION" });
+    throw new AppError(ERRORS.FORBIDDEN_LOCATION, 403, { code: "FORBIDDEN_LOCATION" });
   }
 
   return {
@@ -252,6 +258,7 @@ async function openCash(input) {
   const requestedLocationId = normalizeUuid(input.location_id);
   const businessDate = normalizeDate(input.business_date) || todayPeruDate();
   const notes = input.notes ? String(input.notes).trim() : null;
+  const openingBalance = toNumber(input.opening_balance);
 
   const { user, capabilities, locationId } = await resolveCashContext(
     input.user_id,
@@ -259,12 +266,12 @@ async function openCash(input) {
     requestedLocationId,
   );
   if (!capabilities.operate) {
-    throw new AppError("Forbidden", 403, { code: "FORBIDDEN" });
+    throw new AppError(ERRORS.FORBIDDEN, 403, { code: "FORBIDDEN" });
   }
 
   const locationExists = await validateLocationExists(locationId);
   if (!locationExists)
-    throw new AppError("Location not found", 404, {
+    throw new AppError(ERRORS.LOCATION_NOT_FOUND, 404, {
       code: "LOCATION_NOT_FOUND",
     });
 
@@ -276,7 +283,7 @@ async function openCash(input) {
   if (existing) {
     if (existing.status === "open") return serializeCashClosing(existing);
     throw new AppError(
-      "La caja operativa de la sede ya fue cerrada para esa fecha.",
+      ERRORS.CASH_ALREADY_CLOSED_FOR_DATE,
       409,
       {
         code: "CASH_ALREADY_CLOSED_FOR_DATE",
@@ -288,6 +295,7 @@ async function openCash(input) {
     location_id: locationId,
     business_date: businessDate,
     opened_by: user.user_id,
+    opening_balance: openingBalance,
     notes,
   });
 
@@ -300,17 +308,17 @@ async function resolveCashAdminContext(userId, permissions) {
   const normalizedUserId = normalizeUuid(userId);
 
   if (!normalizedUserId) {
-    throw new AppError("Not authenticated", 401, { code: "AUTH_REQUIRED" });
+    throw new AppError(ERRORS.AUTH_REQUIRED, 401, { code: "AUTH_REQUIRED" });
   }
 
   const user = await findActiveUserById(normalizedUserId);
   if (!user) {
-    throw new AppError("Not authenticated", 401, { code: "AUTH_REQUIRED" });
+    throw new AppError(ERRORS.AUTH_REQUIRED, 401, { code: "AUTH_REQUIRED" });
   }
 
   const capabilities = resolveCashCapabilities({ permissions });
   if (!capabilities.admin) {
-    throw new AppError("Forbidden", 403, { code: "FORBIDDEN" });
+    throw new AppError(ERRORS.FORBIDDEN, 403, { code: "FORBIDDEN" });
   }
 
   return { user, capabilities };
@@ -319,7 +327,7 @@ async function resolveCashAdminContext(userId, permissions) {
 async function reopenCash(input) {
   const normalizedId = normalizeUuid(input.cash_closing_id);
   if (!normalizedId)
-    throw new AppError("cash_closing_id is required", 400, {
+    throw new AppError(ERRORS.INVALID_CASH_CLOSING_ID, 400, {
       code: "INVALID_CASH_CLOSING_ID",
     });
 
@@ -328,16 +336,16 @@ async function reopenCash(input) {
     input.permissions,
   );
   if (!capabilities.reopen) {
-    throw new AppError("Forbidden", 403, { code: "FORBIDDEN" });
+    throw new AppError(ERRORS.FORBIDDEN, 403, { code: "FORBIDDEN" });
   }
 
   const closing = await findCashClosingById(normalizedId);
   if (!closing)
-    throw new AppError("Caja no encontrada", 404, {
+    throw new AppError(ERRORS.CASH_CLOSING_NOT_FOUND, 404, {
       code: "CASH_CLOSING_NOT_FOUND",
     });
   if (closing.status !== "closed")
-    throw new AppError("La caja no esta cerrada.", 409, {
+    throw new AppError(ERRORS.CASH_NOT_CLOSED, 409, {
       code: "CASH_NOT_CLOSED",
     });
 
@@ -354,7 +362,7 @@ async function reopenCash(input) {
 async function closeCash(input) {
   const normalizedId = normalizeUuid(input.cash_closing_id);
   if (!normalizedId)
-    throw new AppError("cash_closing_id is required", 400, {
+    throw new AppError(ERRORS.INVALID_CASH_CLOSING_ID, 400, {
       code: "INVALID_CASH_CLOSING_ID",
     });
 
@@ -364,19 +372,19 @@ async function closeCash(input) {
     normalizeUuid(input.location_id),
   );
   if (!capabilities.operate) {
-    throw new AppError("Forbidden", 403, { code: "FORBIDDEN" });
+    throw new AppError(ERRORS.FORBIDDEN, 403, { code: "FORBIDDEN" });
   }
 
   const closing = await findCashClosingById(normalizedId);
   if (!closing)
-    throw new AppError("Caja no encontrada", 404, {
+    throw new AppError(ERRORS.CASH_CLOSING_NOT_FOUND, 404, {
       code: "CASH_CLOSING_NOT_FOUND",
     });
   if (closing.location_id !== locationId) {
-    throw new AppError("Forbidden", 403, { code: "FORBIDDEN_LOCATION" });
+    throw new AppError(ERRORS.FORBIDDEN_LOCATION, 403, { code: "FORBIDDEN_LOCATION" });
   }
   if (closing.status === "closed")
-    throw new AppError("La caja operativa de la sede ya fue cerrada.", 409, {
+    throw new AppError(ERRORS.CASH_ALREADY_CLOSED, 409, {
       code: "CASH_ALREADY_CLOSED",
     });
 
@@ -385,7 +393,7 @@ async function closeCash(input) {
     closing.business_date,
   );
   if (unconfirmedCount > 0) {
-    throw new AppError("No se puede cerrar caja: existen ventas sin confirmar.", 409, {
+    throw new AppError(ERRORS.UNCONFIRMED_SALES_EXIST, 409, {
       code: "UNCONFIRMED_SALES_EXIST",
       count: unconfirmedCount,
     });
@@ -404,6 +412,7 @@ async function closeCash(input) {
     total_plin: totals.plin,
     total_transfer: totals.transfer,
     total_all: totals.all,
+    closing_balance_declared: input.closing_balance_declared ?? null,
     notes: input.notes || null,
   });
 
@@ -422,7 +431,7 @@ async function getCurrentCash(input) {
 
   const locationExists = await validateLocationExists(locationId);
   if (!locationExists)
-    throw new AppError("Location not found", 404, {
+    throw new AppError(ERRORS.LOCATION_NOT_FOUND, 404, {
       code: "LOCATION_NOT_FOUND",
     });
 
@@ -461,7 +470,7 @@ async function listCashClosings(input = {}) {
   );
 
   if (rawStatus != null && rawStatus !== "" && status === null && String(rawStatus).trim().toLowerCase() !== "all") {
-    throw new AppError("Invalid status value", 400, { code: "INVALID_STATUS" });
+    throw new AppError(ERRORS.INVALID_STATUS, 400, { code: "INVALID_STATUS" });
   }
 
   const page = Math.max(Number(input.page) || 1, 1);
@@ -493,14 +502,14 @@ async function listCashClosings(input = {}) {
 async function getCashClosing(input = {}) {
   const normalizedId = normalizeUuid(input.cash_closing_id);
   if (!normalizedId) {
-    throw new AppError("cash_closing_id is required", 400, {
+    throw new AppError(ERRORS.INVALID_CASH_CLOSING_ID, 400, {
       code: "INVALID_CASH_CLOSING_ID",
     });
   }
 
   const closing = await findCashClosingById(normalizedId);
   if (!closing)
-    throw new AppError("Caja no encontrada", 404, {
+    throw new AppError(ERRORS.CASH_CLOSING_NOT_FOUND, 404, {
       code: "CASH_CLOSING_NOT_FOUND",
     });
 
@@ -510,7 +519,7 @@ async function getCashClosing(input = {}) {
     closing.location_id,
   );
   if (closing.location_id !== locationId) {
-    throw new AppError("Forbidden", 403, { code: "FORBIDDEN_LOCATION" });
+    throw new AppError(ERRORS.FORBIDDEN_LOCATION, 403, { code: "FORBIDDEN_LOCATION" });
   }
 
   const [paymentRows, salesRow] = await Promise.all([
@@ -541,13 +550,13 @@ async function getCashAdminSummary(input = {}) {
   await resolveCashAdminContext(input.user_id, input.permissions);
 
   if (rawStatus != null && rawStatus !== "" && status === null && String(rawStatus).trim().toLowerCase() !== "all") {
-    throw new AppError("Invalid status value", 400, { code: "INVALID_STATUS" });
+    throw new AppError(ERRORS.INVALID_STATUS, 400, { code: "INVALID_STATUS" });
   }
 
   if (requestedLocationId) {
     const locationExists = await validateLocationExists(requestedLocationId);
     if (!locationExists) {
-      throw new AppError("Location not found", 404, {
+      throw new AppError(ERRORS.LOCATION_NOT_FOUND, 404, {
         code: "LOCATION_NOT_FOUND",
       });
     }
@@ -594,13 +603,13 @@ async function listCashAdminSessions(input = {}) {
   await resolveCashAdminContext(input.user_id, input.permissions);
 
   if (rawStatus != null && rawStatus !== "" && status === null && String(rawStatus).trim().toLowerCase() !== "all") {
-    throw new AppError("Invalid status value", 400, { code: "INVALID_STATUS" });
+    throw new AppError(ERRORS.INVALID_STATUS, 400, { code: "INVALID_STATUS" });
   }
 
   if (requestedLocationId) {
     const locationExists = await validateLocationExists(requestedLocationId);
     if (!locationExists) {
-      throw new AppError("Location not found", 404, {
+      throw new AppError(ERRORS.LOCATION_NOT_FOUND, 404, {
         code: "LOCATION_NOT_FOUND",
       });
     }

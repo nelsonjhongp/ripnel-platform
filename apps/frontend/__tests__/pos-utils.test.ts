@@ -669,7 +669,7 @@ test.describe("buildCashLabel", () => {
   test("returns readable labels", () => {
     expect(buildCashLabel("open")).toBe("Caja operativa abierta")
     expect(buildCashLabel("closed")).toBe("Caja cerrada")
-    expect(buildCashLabel("missing")).toBe("A\u00fan no se abri\u00f3 caja")
+    expect(buildCashLabel("missing")).toBe("Aun no se abrio caja")
   })
 })
 
