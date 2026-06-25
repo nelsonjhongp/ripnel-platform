@@ -8,6 +8,8 @@ export {
   SUBTLE_MUTED_SURFACE,
   MUTED_SURFACE_MIX,
   ACCENT_MUTED_BG,
+  CHIP_TONE_ACCENT,
+  CHIP_TONE_NEUTRAL,
   opsFieldLabelClassName,
   opsInputCompact as INPUT_CLASS,
 } from "@/components/ui/ops-control-styles"

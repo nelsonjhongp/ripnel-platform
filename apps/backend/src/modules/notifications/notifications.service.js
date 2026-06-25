@@ -315,7 +315,7 @@ function buildInventoryNotifications({
         description: primaryItemLabel
           ? `${zeroStockCount} variante(s) están en cero. Prioriza ${primaryItemLabel}.`
           : `${zeroStockCount} variante(s) están en cero en la sede activa.`,
-        href: "/inventario?status=sin-stock",
+        href: "/inventario?status=out",
         actionLabel: "Ver inventario",
         location,
         createdAt: generatedAt,
@@ -332,7 +332,7 @@ function buildInventoryNotifications({
         severity: "warning",
         title: "Stock bajo mínimo",
         description: `${lowStockCount} variante(s) están por debajo del umbral de ${LOW_STOCK_THRESHOLD} unidades.`,
-        href: "/inventario?status=stock-bajo",
+        href: "/inventario?status=low",
         actionLabel: "Revisar stock",
         location,
         createdAt: generatedAt,
