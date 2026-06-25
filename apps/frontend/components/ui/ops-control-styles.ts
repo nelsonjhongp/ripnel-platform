@@ -1,5 +1,5 @@
 export const opsControlClassName =
-  "w-full rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] text-sm text-[var(--ops-text)] outline-none transition hover:border-[var(--ops-border-soft)] hover:bg-[var(--ops-surface-muted)] focus-visible:border-[var(--ripnel-accent)] focus-visible:ring-2 focus-visible:ring-[var(--ripnel-accent-soft)] disabled:cursor-not-allowed disabled:opacity-60"
+  "w-full rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] text-sm text-[var(--ops-text)] outline-none transition hover:border-[var(--ops-border-soft)] hover:bg-[var(--ops-surface-muted)] focus-visible:border-[var(--ripnel-accent)] focus-visible:shadow-[0_0_0_2px_var(--ripnel-accent-soft)] disabled:cursor-not-allowed disabled:opacity-60"
 
 export const opsSelectTriggerClassName =
   `flex h-9 cursor-pointer items-center justify-between px-3.5 text-left ${opsControlClassName}`

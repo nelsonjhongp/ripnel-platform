@@ -3,27 +3,22 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 
 import { useAuth } from "@/components/auth/AuthProvider"
-import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcut"
-import { apiFetch } from "@/lib/api"
-import { showError, showInfo, showSuccess } from "@/lib/toast"
+import { showInfo } from "@/lib/toast"
 
 import {
   DOC_TYPES,
   PAYMENT_METHODS,
 } from "./pos-types"
 import type {
-  ConfirmedSale,
   PosCustomer,
   SaleDiscountState,
   SaleVariant,
   SearchableStyle,
-  Stage,
 } from "./pos-types"
 import {
   buildVariantTone,
   createDefaultMixedPayments,
   createPaymentDraft,
-  explainApiError,
   getPaymentMethodLabel,
   parseAmountInput,
   round2,
@@ -44,6 +39,8 @@ import { useCashContext } from "./use-cash-context"
 import { useCustomerSearch } from "./use-customer-search"
 import { usePaymentState } from "./use-payment-state"
 import { useProductSearch } from "./use-product-search"
+import { useSaleKeyboard } from "./use-sale-keyboard"
+import { useSaleConfirmation } from "./use-sale-confirmation"
 import { POS } from "./pos-messages"
 
 export function usePosSale() {
@@ -157,12 +154,6 @@ export function usePosSale() {
   const [customerDialogMode, setCustomerDialogMode] =
     useState<"create" | "edit">("create")
   const [productConfigOpen, setProductConfigOpen] = useState(false)
-  const [pulseStage, setPulseStage] = useState<Stage | null>(null)
-  const [submitting, setSubmitting] = useState(false)
-  const [confirmedSale, setConfirmedSale] = useState<ConfirmedSale | null>(null)
-  const [saleConfirmationOpen, setSaleConfirmationOpen] = useState(false)
-  const [saleReviewOpen, setSaleReviewOpen] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const totals = useMemo(
     () =>
@@ -289,10 +280,81 @@ export function usePosSale() {
       : getPaymentMethodLabel(paymentMethod)
   const selectedCustomerName = buildCustomerDisplayName(selectedCustomer)
   const selectedCustomerDocument = buildCustomerDocument(selectedCustomer)
+
+  const priceTargetPreviewItem = useMemo(
+    () => totals.items.find((item) => item.variant_id === cart.priceTargetId) || null,
+    [cart.priceTargetId, totals.items],
+  )
+
   const singlePaymentMissingMethod =
     cartItems.length > 0 && paymentMode === "single" && !paymentMethod.trim()
+
+  const submitDisabledBeforeConfirm =
+    cartItems.length === 0 ||
+    !defaultLocation?.location_id ||
+    locationsLoading ||
+    posContextLoading ||
+    !cashReady ||
+    totals.hasMissingPrice ||
+    Boolean(saleDiscountError) ||
+    singlePaymentMissingMethod ||
+    Boolean(mixedPaymentsPreview.error) ||
+    !customerIsValid
+
+  const confirm = useSaleConfirmation({
+    cartItems,
+    selectedCustomer,
+    documentType,
+    paymentMode,
+    paymentMethod,
+    singleReference,
+    mixedPaymentsPreview: {
+      payments: mixedPaymentsPreview.payments,
+      error: mixedPaymentsPreview.error,
+    },
+    totals: { saleDiscountAmount: totals.saleDiscountAmount, total: totals.total },
+    saleDiscount,
+    submitDisabled: submitDisabledBeforeConfirm,
+    refreshPosContext,
+    onReset: () => {
+      setCart([])
+      setSelectedCustomer(null)
+      setDocumentType("none")
+      setPaymentMethod("")
+      setPaymentMode("single")
+      setSingleReference("")
+      setMixedPayments(createDefaultMixedPayments(0, ""))
+      setSaleDiscount({ mode: "none", value: "", reason: "" })
+      setPricingModeOverride("auto")
+      closePriceSheet()
+      closeRemoveItemConfirm()
+    },
+    onConfirmed: () => {
+      setCustomerQuery("")
+      setDiscountModalOpen(false)
+    },
+  })
+
+  const submitDisabled =
+    submitDisabledBeforeConfirm ||
+    Boolean(confirm.confirmedSale) ||
+    confirm.submitting
+
+  const keyboard = useSaleKeyboard({
+    productSearchInputRef,
+    customerSearchInputRef,
+    productSectionRef,
+    customerSectionRef,
+    paymentSectionRef,
+    submitDisabled,
+    submitting: confirm.submitting,
+    onReviewSale: confirm.openSaleReview,
+    onCloseProductPicker: () => setProductPickerOpen(false),
+    onCloseCustomerPicker: () => setCustomerPickerOpen(false),
+  })
+
   const hasDraftSale =
-    !confirmedSale &&
+    !confirm.confirmedSale &&
     (
       cartItems.length > 0 ||
       Boolean(selectedCustomer) ||
@@ -309,20 +371,6 @@ export function usePosSale() {
       ) ||
       saleDiscount.mode !== "none"
     )
-
-  const submitDisabled =
-    cartItems.length === 0 ||
-    Boolean(confirmedSale) ||
-    !defaultLocation?.location_id ||
-    locationsLoading ||
-    posContextLoading ||
-    !cashReady ||
-    totals.hasMissingPrice ||
-    Boolean(saleDiscountError) ||
-    singlePaymentMissingMethod ||
-    Boolean(mixedPaymentsPreview.error) ||
-    !customerIsValid ||
-    submitting
 
   const derivedSummary = useMemo(
     () =>
@@ -342,7 +390,7 @@ export function usePosSale() {
         cashReady,
         cashStatus,
         submitDisabled,
-        submitting,
+        submitting: confirm.submitting,
       }),
     [
       documentType,
@@ -360,7 +408,7 @@ export function usePosSale() {
       cashReady,
       cashStatus,
       submitDisabled,
-      submitting,
+      confirm.submitting,
     ],
   )
 
@@ -380,58 +428,6 @@ export function usePosSale() {
       )
     }
   }, [mixedPayments.length, paymentMethod, paymentMode, setMixedPayments, totals.total])
-
-  const priceTargetPreviewItem = useMemo(
-    () => totals.items.find((item) => item.variant_id === cart.priceTargetId) || null,
-    [cart.priceTargetId, totals.items],
-  )
-
-  useKeyboardShortcuts([
-    {
-      key: "F2",
-      handler: () => productSearchInputRef.current?.focus(),
-      enabled: !submitting,
-    },
-    {
-      key: "F4",
-      handler: () => customerSearchInputRef.current?.focus(),
-      enabled: !submitting,
-    },
-    {
-      key: "F8",
-      handler: () => {
-        if (!submitDisabled) openSaleReview()
-      },
-      enabled: !submitting,
-    },
-    {
-      key: "Escape",
-      handler: () => {
-        setProductPickerOpen(false)
-        setCustomerPickerOpen(false)
-      },
-      enabled: true,
-    },
-  ])
-
-  function pulse(stage: Stage) {
-    setPulseStage(stage)
-    window.setTimeout(() => setPulseStage(null), 850)
-  }
-
-  function goToStage(stage: Stage) {
-    pulse(stage)
-    const ref =
-      stage === "products"
-        ? productSectionRef
-        : stage === "customer"
-          ? customerSectionRef
-          : paymentSectionRef
-    window.requestAnimationFrame(() => {
-      ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest" })
-      ref.current?.focus?.()
-    })
-  }
 
   function setPaymentModeWithDefaults(nextMode: "single" | "mixed") {
     setPaymentMode(nextMode)
@@ -577,100 +573,9 @@ export function usePosSale() {
     closeCustomerDialog()
   }
 
-  async function printConfirmedSaleReceipt(saleId: string) {
-    window.open(`/api/sales/${saleId}/receipt-pdf`, "_blank")
-  }
-
-  function startNextSale() {
-    resetSaleDraft()
-    productSearchInputRef.current?.focus()
-  }
-
   function resetSaleDraft() {
-    setConfirmedSale(null)
-    setSaleConfirmationOpen(false)
-    setSaleReviewOpen(false)
-    setCart([])
-    setSelectedCustomer(null)
-    setDocumentType("none")
-    setPaymentMethod("")
-    setPaymentMode("single")
-    setSingleReference("")
-    setMixedPayments(createDefaultMixedPayments(0, ""))
-    setSaleDiscount({ mode: "none", value: "", reason: "" })
-    setPricingModeOverride("auto")
-    setError(null)
-    closePriceSheet()
-    closeRemoveItemConfirm()
-  }
-
-  function openSaleReview() {
-    if (submitDisabled) return
-    setSaleReviewOpen(true)
-  }
-
-  function closeSaleReview() {
-    setSaleReviewOpen(false)
-  }
-
-  async function confirmSale() {
-    if (submitDisabled) return
-    setSubmitting(true)
-    setError(null)
-    setSaleReviewOpen(false)
-
-    try {
-      const payload: Record<string, unknown> = {
-        customer_id: selectedCustomer?.customer_id || null,
-        document_type: documentType,
-        items: cartItems.map((item) => ({
-          variant_id: item.variant_id,
-          quantity: item.quantity,
-          ...(item.price_override
-            ? {
-                price_override: {
-                  unit_price_final: item.price_override.unit_price_final,
-                  reason: item.price_override.reason,
-                },
-              }
-            : {}),
-        })),
-      }
-
-      if (totals.saleDiscountAmount > 0) {
-        payload.sale_discount = {
-          mode: saleDiscount.mode,
-          value: parseAmountInput(saleDiscount.value),
-          reason: trimOrNull(saleDiscount.reason),
-        }
-      }
-
-      if (paymentMode === "mixed") {
-        payload.payments = mixedPaymentsPreview.payments
-      } else {
-        payload.payment_method = paymentMethod
-        if (trimOrNull(singleReference)) payload.payment_reference = trimOrNull(singleReference)
-      }
-
-      const sale = (await apiFetch("/api/sales", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      })) as ConfirmedSale
-
-      setConfirmedSale(sale)
-      setSaleConfirmationOpen(true)
-      setCustomerQuery("")
-      setDiscountModalOpen(false)
-      await refreshPosContext()
-      showSuccess(POS.sale.success, sale.sale_number ? `#${sale.sale_number}` : POS.sale.successDesc)
-    } catch (submitError) {
-      const message = explainApiError(submitError, POS.toast.saleConfirmError)
-      setError(message)
-      showError(POS.sale.error, message)
-      await refreshPosContext()
-    } finally {
-      setSubmitting(false)
-    }
+    confirm.startNextSale()
+    productSearchInputRef.current?.focus()
   }
 
   return {
@@ -731,7 +636,7 @@ export function usePosSale() {
     priceSheetOpen,
     productConfigOpen,
     setProductConfigOpen,
-    pulseStage,
+    pulseStage: keyboard.pulseStage,
     priceTargetItem,
     priceTargetPreviewItem,
     pendingRemoveItem,
@@ -744,13 +649,13 @@ export function usePosSale() {
     reopenNotes,
     setReopenNotes,
     reopeningCash,
-    submitting,
-    confirmedSale,
-    saleConfirmationOpen,
-    setSaleConfirmationOpen,
-    saleReviewOpen,
-    setSaleReviewOpen,
-    error: error || productError,
+    submitting: confirm.submitting,
+    confirmedSale: confirm.confirmedSale,
+    saleConfirmationOpen: confirm.saleConfirmationOpen,
+    setSaleConfirmationOpen: confirm.setSaleConfirmationOpen,
+    saleReviewOpen: confirm.saleReviewOpen,
+    setSaleReviewOpen: confirm.setSaleReviewOpen,
+    error: confirm.error || productError,
     searchableStyles,
     effectivePreviewPriceMode: totals.priceMode,
     previewWholesaleApplies,
@@ -771,12 +676,12 @@ export function usePosSale() {
     paymentSummaryLabel,
     selectedCustomerName,
     selectedCustomerDocument,
-    printConfirmedSaleReceipt,
-    startNextSale,
+    printConfirmedSaleReceipt: confirm.printConfirmedSaleReceipt,
+    startNextSale: confirm.startNextSale,
     resetSaleDraft,
-    openSaleReview,
-    closeSaleReview,
-    goToStage,
+    openSaleReview: confirm.openSaleReview,
+    closeSaleReview: confirm.closeSaleReview,
+    goToStage: keyboard.goToStage,
     setPaymentModeWithDefaults,
     updateMixedPaymentDraft,
     addMixedPaymentDraft,
@@ -800,7 +705,7 @@ export function usePosSale() {
     openCustomerDialog,
     closeCustomerDialog,
     handleCustomerSaved,
-    confirmSale,
+    confirmSale: confirm.confirmSale,
     handleOpenCash,
     handleReopenCash,
   }

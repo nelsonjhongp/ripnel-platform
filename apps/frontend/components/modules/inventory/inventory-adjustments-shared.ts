@@ -1,3 +1,13 @@
+import { ADJ } from "./adjustments-messages";
+import {
+  CHIP_DRAFT,
+  CHIP_CONFIRMED,
+  CHIP_CANCELLED,
+  DIFF_POSITIVE,
+  DIFF_NEGATIVE,
+  DIFF_ZERO,
+} from "./adjustments-constants";
+
 export type Location = {
   location_id: string;
   code: string;
@@ -86,6 +96,38 @@ export type DraftAdjustmentLine = AdjustmentVariant & {
   counted_qty: number;
 };
 
+export type GroupedAdjustmentStyle = {
+  styleId: string;
+  styleCode: string;
+  styleName: string;
+  totalSystemQty: number;
+  variants: AdjustmentVariant[];
+};
+
+export function groupAdjustmentVariantsByStyle(
+  variants: AdjustmentVariant[]
+): GroupedAdjustmentStyle[] {
+  const map = new Map<string, GroupedAdjustmentStyle>();
+
+  for (const v of variants) {
+    const key = v.style_code;
+    if (!map.has(key)) {
+      map.set(key, {
+        styleId: key,
+        styleCode: v.style_code,
+        styleName: v.style_name,
+        totalSystemQty: 0,
+        variants: [],
+      });
+    }
+    const group = map.get(key)!;
+    group.variants.push(v);
+    group.totalSystemQty += v.system_qty;
+  }
+
+  return Array.from(map.values());
+}
+
 export function inferAdjustmentIntent(reason: string | null | undefined): AdjustmentIntent {
   return /apertura|inicial/i.test(String(reason || "")) ? "opening" : "adjustment";
 }
@@ -106,7 +148,7 @@ export function resolveAdjustmentIntent(value: {
 }
 
 export function formatAdjustmentIntent(intent: AdjustmentIntent) {
-  return intent === "opening" ? "Apertura inicial" : "Ajuste de inventario";
+  return intent === "opening" ? ADJ.intent.opening : ADJ.intent.adjustment;
 }
 
 export function buildAdjustmentReason(intent: AdjustmentIntent, rawReason: string) {
@@ -130,37 +172,19 @@ export function buildAdjustmentReason(intent: AdjustmentIntent, rawReason: strin
 export { formatDateTime as formatAdjustmentDateTime } from "@/lib/date-utils"
 
 export function formatAdjustmentStatus(status: AdjustmentStatus) {
-  if (status === "confirmed") {
-    return "Confirmado";
-  }
-
-  if (status === "cancelled") {
-    return "Cancelado";
-  }
-
-  return "Borrador";
+  if (status === "confirmed") return ADJ.status.confirmed;
+  if (status === "cancelled") return ADJ.status.cancelled;
+  return ADJ.status.draft;
 }
 
 export function getAdjustmentStatusClasses(status: AdjustmentStatus) {
-  if (status === "confirmed") {
-    return "border-[color:color-mix(in_srgb,#10b981_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_82%,var(--ops-text))]";
-  }
-
-  if (status === "cancelled") {
-    return "border-[color:color-mix(in_srgb,#e11d48_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#e11d48_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#e11d48_82%,var(--ops-text))]";
-  }
-
-  return "border-[color:color-mix(in_srgb,#f59e0b_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f59e0b_82%,var(--ops-text))]";
+  if (status === "confirmed") return CHIP_CONFIRMED;
+  if (status === "cancelled") return CHIP_CANCELLED;
+  return CHIP_DRAFT;
 }
 
 export function getAdjustmentDifferenceClasses(value: number) {
-  if (value > 0) {
-    return "text-[color:color-mix(in_srgb,#059669_88%,var(--ops-text))]";
-  }
-
-  if (value < 0) {
-    return "text-[color:color-mix(in_srgb,#e11d48_88%,var(--ops-text))]";
-  }
-
-  return "text-[var(--ops-text-muted)]";
+  if (value > 0) return DIFF_POSITIVE;
+  if (value < 0) return DIFF_NEGATIVE;
+  return DIFF_ZERO;
 }

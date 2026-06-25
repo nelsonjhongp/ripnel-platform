@@ -1,4 +1,5 @@
 import type { Location } from "@/types/shared";
+import { KARDEX } from "./kardex-messages";
 
 export type MovementType = "IN" | "OUT" | "ADJUST";
 export type MovementDirection = "entry" | "exit" | "adjustment";
@@ -136,71 +137,42 @@ export function resolveSemanticOrigin(movement: KardexMovement): SemanticOrigin 
 }
 
 export function formatMovementOperationLabel(movement: KardexMovement) {
-  switch (resolveSemanticOrigin(movement)) {
-    case "transfer_shipped":
-      return "Salida por transferencia";
-    case "transfer_received":
-      return "Entrada por transferencia";
-    case "sale_confirmed":
-      return "Salida por venta";
-    case "sale_cancelled":
-      return "Entrada por anulacion";
-    case "exchange_received":
-      return "Entrada por cambio";
-    case "exchange_delivered":
-      return "Salida por cambio";
-    case "opening_confirmed":
-      return "Apertura inicial";
-    case "adjustment_confirmed":
-      return "Ajuste";
-    default:
-      if (resolveMovementDirection(movement) === "entry") return "Entrada";
-      if (resolveMovementDirection(movement) === "exit") return "Salida";
-      return "Ajuste";
-  }
+  const semantic = movement.semantic_origin ?? resolveSemanticOrigin(movement);
+  const label = KARDEX.labels.operation[semantic];
+  if (label) return label;
+
+  const direction = resolveMovementDirection(movement);
+  if (direction === "entry") return KARDEX.labels.operation.fallback_entry;
+  if (direction === "exit") return KARDEX.labels.operation.fallback_exit;
+  return KARDEX.labels.operation.fallback_adjust;
 }
 
 export function formatMovementOriginLabel(movement: KardexMovement) {
-  switch (resolveSemanticOrigin(movement)) {
-    case "transfer_shipped":
-      return "Transferencia despachada";
-    case "transfer_received":
-      return "Transferencia recibida";
-    case "sale_confirmed":
-      return "Venta confirmada";
-    case "sale_cancelled":
-      return "Venta anulada";
-    case "exchange_received":
-      return "Cambio recibido";
-    case "exchange_delivered":
-      return "Cambio entregado";
-    case "opening_confirmed":
-      return "Apertura inicial";
-    case "adjustment_confirmed":
-      return "Ajuste de inventario";
-    default:
-      return "Movimiento sin documento";
-  }
+  const semantic = movement.semantic_origin ?? resolveSemanticOrigin(movement);
+  return KARDEX.labels.origin[semantic] || KARDEX.labels.origin.fallback;
 }
 
 export function formatReference(movement: KardexMovement) {
   if (movement.reference_type && movement.reference_id) {
+    const family = resolveDocumentFamily(movement);
+    const semantic = movement.semantic_origin ?? resolveSemanticOrigin(movement);
+    const refLabels = KARDEX.labels.reference;
     const referenceLabel =
-      resolveDocumentFamily(movement) === "transfer"
-        ? "Transferencia"
-        : resolveDocumentFamily(movement) === "sale"
-          ? "Venta"
-          : resolveDocumentFamily(movement) === "exchange"
-            ? "Postventa"
-        : resolveDocumentFamily(movement) === "adjustment"
-          ? resolveSemanticOrigin(movement) === "opening_confirmed"
-            ? "Apertura"
-            : "Ajuste"
-          : movement.reference_type;
+      family === "transfer"
+        ? refLabels.transfer
+        : family === "sale"
+          ? refLabels.sale
+          : family === "exchange"
+            ? refLabels.exchange
+            : family === "adjustment"
+              ? semantic === "opening_confirmed"
+                ? refLabels.opening
+                : refLabels.adjustment
+              : movement.reference_type;
     return `${referenceLabel} ${movement.reference_id.slice(0, 8)}`;
   }
   if (movement.reference_type) return movement.reference_type;
-  return movement.reason || "Sin referencia";
+  return movement.reason || KARDEX.labels.reference.fallback;
 }
 
 export function resolveMovementTypeFromParams(

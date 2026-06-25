@@ -70,3 +70,7 @@ export function buildInventoryDetailRoute(styleId: string, locationId?: string |
 export function buildSaleDetailRoute(saleId: string) {
   return `/ventas/${saleId}`
 }
+
+export function buildAdjustmentDetailRoute(adjustmentId: string) {
+  return `${appRoutes.inventoryAdjustments}/${adjustmentId}`
+}

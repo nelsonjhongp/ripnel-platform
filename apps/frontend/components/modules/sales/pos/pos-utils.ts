@@ -6,6 +6,8 @@ import type {
   CartItem,
 } from "./pos-types"
 import { PAYMENT_METHODS } from "./pos-types"
+import { POS } from "./pos-messages"
+import { CHIP_TONE_ACCENT, CHIP_TONE_NEUTRAL } from "./pos-constants"
 
 import { round2, formatMoney } from "@/lib/format-utils"
 export { round2, formatMoney }
@@ -42,10 +44,10 @@ export function buildSemanticChipClass(tone = "neutral"): string {
   }
 
   if (tone === "accent") {
-    return "border-[color:color-mix(in_srgb,var(--ripnel-accent)_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_82%,var(--ops-surface))] text-[color:color-mix(in_srgb,var(--ripnel-accent)_72%,var(--ops-text))]"
+    return CHIP_TONE_ACCENT
   }
 
-  return "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] text-[var(--ops-text-muted)]"
+  return CHIP_TONE_NEUTRAL
 }
 
 export function buildVariantTone(isWholesale: boolean): "success" | "neutral" {
@@ -72,9 +74,9 @@ export function createDefaultMixedPayments(
 }
 
 export function buildCashLabel(status: string): string {
-  if (status === "open") return "Caja operativa abierta"
-  if (status === "closed") return "Caja cerrada"
-  return "Aún no se abrió caja"
+  if (status === "open") return POS.cash.openLabel
+  if (status === "closed") return POS.cash.closedLabel
+  return POS.cash.missingLabel
 }
 
 export function buildCashTone(status: string): string {
@@ -84,7 +86,7 @@ export function buildCashTone(status: string): string {
 }
 
 export function getPaymentMethodLabel(method: string): string {
-  return PAYMENT_METHODS.find((option) => option.value === method)?.label || "Selecciona"
+  return PAYMENT_METHODS.find((option) => option.value === method)?.label || POS.payment.selectMethod
 }
 
 export function getPaymentReferenceMeta(method: string): {
@@ -92,33 +94,6 @@ export function getPaymentReferenceMeta(method: string): {
   placeholder: string
   helper: string
 } {
-  if (method === "cash") {
-    return {
-      label: "Referencia",
-      placeholder: "Opcional",
-      helper: "En efectivo es opcional. Solo úsalo si necesitas dejar una observación corta.",
-    }
-  }
-
-  if (method === "transfer") {
-    return {
-      label: "Operación / voucher",
-      placeholder: "Nro. de operación o voucher",
-      helper: "Registra el número de operación o voucher para rastrear el depósito.",
-    }
-  }
-
-  if (method === "yape" || method === "plin") {
-    return {
-      label: "Operación / celular",
-      placeholder: "Últimos 4 dígitos o código",
-      helper: "Registra código o últimos 4 dígitos para identificar el abono.",
-    }
-  }
-
-  return {
-    label: "Referencia",
-    placeholder: "Código de referencia",
-    helper: "Usa este campo para dejar el dato que ayude a rastrear el pago.",
-  }
+  const meta = POS.paymentReferenceMeta as Record<string, { label: string; placeholder: string; helper: string }>
+  return meta[method] ?? meta.default
 }
