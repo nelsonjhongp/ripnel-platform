@@ -102,6 +102,9 @@ const createSale = z.object({
 const createExchange = z.object({
   sale_detail_id: z.string().uuid(),
   replacement_variant_id: z.string().uuid(),
+  quantity: z.number().int().positive().optional(),
+  payment_method: z.enum(['cash', 'yape', 'plin', 'transfer']).optional(),
+  payment_reference: z.string().max(80).optional().nullable().default(null),
   reason: z.string().min(1, 'El motivo es requerido'),
   notes: z.string().optional(),
 });

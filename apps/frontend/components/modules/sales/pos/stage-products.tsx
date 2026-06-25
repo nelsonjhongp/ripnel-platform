@@ -5,15 +5,15 @@ import { useEffect, useRef } from "react"
 
 import { Button } from "@/components/ui/button"
 import { OpsQuantityStepper } from "@/components/ui/ops-quantity-stepper"
-import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import { OpsStepSectionHeading } from "@/components/ui/ops-step-section-heading"
-import { SearchablePicker } from "@/components/ui/searchable-picker"
 import { OpsHint } from "@/components/ui/ops-hint"
 import { cn } from "@/lib/utils"
 import { formatMoney } from "@/lib/format-utils"
+import { ProductStylePicker } from "@/components/modules/sales/search/product-style-picker"
 
 import { StageSection } from "./stage-section"
 import { POS } from "./pos-messages"
+import { ACCENT_HOVER_BORDER } from "./pos-constants"
 import type { ProductStageProps } from "./pos-stage-props"
 
 // NOTE: OpsDataTable is intentionally not used here.
@@ -92,7 +92,7 @@ export function ProductStage(props: ProductStageProps) {
                 else if (pricingModeOverride === "wholesale") setPricingModeOverride("retail")
                 else setPricingModeOverride("auto")
               }}
-              className="relative inline-flex h-7 min-w-[126px] max-w-[168px] items-center justify-center rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 pr-3.5 pl-8 text-[12px] font-medium text-[var(--ops-text)] transition hover:border-[color:color-mix(in_srgb,var(--ripnel-accent)_24%,var(--ops-border-strong))] hover:bg-[var(--ops-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ripnel-accent-soft)]"
+              className={`relative inline-flex h-7 min-w-[126px] max-w-[168px] items-center justify-center rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 pr-3.5 pl-8 text-[12px] font-medium text-[var(--ops-text)] transition hover:border-[${ACCENT_HOVER_BORDER}] hover:bg-[var(--ops-surface-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ripnel-accent-soft)]`}
               aria-label={
                 pricingModeOverride === "auto"
                   ? "Activar modo manual mayorista"
@@ -132,14 +132,13 @@ export function ProductStage(props: ProductStageProps) {
         })()}
       />
 
-      <SearchablePicker
+      <ProductStylePicker
         value={productInputValue}
         onChange={(value) => {
           setQuery(value)
         }}
         placeholder={productInputPlaceholder}
         disabled={!defaultLocation}
-        openOnFocus
         open={productPickerOpen}
         onOpenChange={setProductPickerOpen}
         items={searchableStyles}
@@ -153,26 +152,6 @@ export function ProductStage(props: ProductStageProps) {
         maxVisibleItems={6}
         highlightedIndex={highlightedProductIndex}
         onHighlightChange={setHighlightedProductIndex}
-        getItemKey={(style) => style.style_id}
-        renderItem={(style) => (
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0 flex gap-3">
-              <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                {style.style_name}
-              </p>
-              <p className="mt-0.5 text-[11px] text-[var(--ops-text-muted)]">
-                {style.variants.length} variante{style.variants.length === 1 ? "" : "s"}
-              </p>
-            </div>
-            <OpsStatusBadge
-              tone={style.totalStock > 0 ? "success" : "danger"}
-              size="xs"
-              className="shrink-0"
-            >
-              {style.totalStock > 0 ? `Stock ${style.totalStock}` : "Sin stock"}
-            </OpsStatusBadge>
-          </div>
-        )}
         onSelect={(style) => {
           selectProductStyle(style)
         }}
@@ -186,11 +165,7 @@ export function ProductStage(props: ProductStageProps) {
         }}
         inputRef={productSearchInputRef}
         name="sale_product_search"
-        autoComplete="off"
-        inputMode="search"
-        enterKeyHint="search"
         showClear={Boolean(query && defaultLocation)}
-        density="compact"
       />
 
       <div

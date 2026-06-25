@@ -13,7 +13,7 @@ type PaletteItem = {
 const PALETTE_ITEMS: PaletteItem[] = [
   { label: "Inicio", href: "/inicio", keywords: ["home", "inicio"] },
   { label: "Dashboard", href: "/panel", keywords: ["dashboard", "panel", "bi"] },
-  { label: "Nueva venta", href: "/ventas", keywords: ["venta", "pos", "punto de venta", "vender"] },
+  { label: "Nueva venta", href: "/ventas/nueva", keywords: ["venta", "pos", "punto de venta", "vender"] },
   { label: "Historial de ventas", href: "/ventas/historial", keywords: ["historial", "ventas"] },
   { label: "Postventa", href: "/postventa", keywords: ["cambio", "devolucion", "anulacion"] },
   { label: "Caja", href: "/caja", keywords: ["caja", "cash", "apertura", "cierre"] },

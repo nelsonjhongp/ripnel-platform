@@ -22,7 +22,7 @@ export const appRoutes = {
   transferRequest: "/transferencias/solicitar",
   transferPendingReceipts: "/transferencias/recepciones",
   transferHistory: "/transferencias/historial",
-  purchaseSystem: "/ventas",
+  purchaseSystem: "/ventas/nueva",
   transactionHistory: "/ventas/historial",
   postsales: "/postventa",
   cash: "/caja",
@@ -68,5 +68,5 @@ export function buildInventoryDetailRoute(styleId: string, locationId?: string |
 }
 
 export function buildSaleDetailRoute(saleId: string) {
-  return `${appRoutes.purchaseSystem}/${saleId}`
+  return `/ventas/${saleId}`
 }

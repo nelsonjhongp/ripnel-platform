@@ -414,8 +414,12 @@ Este estandar tambien aplica a otras vistas, aunque sin forzar tabla o KPIs.
 
 ### `postventa`
 
-- referencia valida cuando un modulo necesita alternar tabla y tarjetas;
-- no invalida el patron base, solo muestra una excepcion operativa legitima.
+- referencia valida para listados operativos con badges de disponibilidad;
+- sigue el mismo patron tabular que `historial ventas` (header → kpis → separador → bloque tabla);
+- usa `OpsStatusBadge size="xs"` para badges de categoria/accesorios (disponibilidad de cambio/anulacion) y `size="sm"` para badges de estado operativo;
+- columnas con multiples badges usan `flex gap-1` (sin `flex-wrap` en desktop cuando `minWidth` lo permite);
+- si una columna de metadata secundario (ej. vendedor) puede separarse en su propia columna, es preferible a empaquetarla como segunda linea de otra celda;
+- `dateTo` con default a hoy cuando el contexto operativo lo justifica.
 
 ### `PosHeader`
 

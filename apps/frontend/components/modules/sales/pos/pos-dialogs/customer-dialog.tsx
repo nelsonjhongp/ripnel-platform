@@ -13,12 +13,13 @@ import {
   mapCustomerSaveError,
 } from "@/components/modules/customers/customer-document-guard"
 import type { CustomerFormErrors, CustomerFormState, PosCustomer } from "../pos-types"
+import { POS } from "../pos-messages"
 import {
   buildCustomerFormFromCustomer,
   buildCustomerPayload,
   createEmptyCustomerForm,
   validateCustomerForm,
-} from "../pos-utils"
+} from "../pos-customer-utils"
 
 export function CustomerDialog({
   open,
@@ -79,7 +80,7 @@ export function CustomerDialog({
       })
 
       if (duplicateCustomer) {
-        setErrors({ document_number: "Ya existe un cliente con este documento." })
+        setErrors({ document_number: POS.customer.duplicateError })
         return
       }
 
@@ -95,11 +96,11 @@ export function CustomerDialog({
               body: JSON.stringify(payload),
             })
       onSaved(response)
-      showSuccess("Cliente guardado", "Datos actualizados para la venta.")
+      showSuccess(POS.customer.saved, POS.customer.savedDesc)
     } catch (error) {
       const message = mapCustomerSaveError(error)
       setErrors({ document_number: message })
-      showError("No se pudo guardar cliente", message)
+      showError(POS.customer.saveError, message)
     } finally {
       setActionState("idle")
     }
@@ -109,27 +110,28 @@ export function CustomerDialog({
     <OpsDialog
       open={open}
       onOpenChange={(nextOpen) => (nextOpen ? onOpenChange(true) : close())}
-      title={mode === "edit" ? "Editar cliente" : "Crear cliente"}
+      title={mode === "edit" ? POS.customer.editTitle : POS.customer.createTitle}
+      description={mode === "edit" ? POS.customer.editDesc : POS.customer.createDesc}
       size="sm"
       bodyClassName="space-y-2.5"
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="outline" size="sm" className="rounded-lg px-4" onClick={close} disabled={isBusy}>
-            Cancelar
+            {POS.customer.cancel}
           </Button>
           <Button type="button" variant="accent" size="sm" className="rounded-lg px-4" onClick={save} disabled={isBusy}>
             {actionState === "validating" ? (
               <span className="inline-flex items-center gap-2">
                 <LoaderCircle className="h-4 w-4 animate-spin" />
-                Validando...
+                {POS.customer.validating}
               </span>
             ) : actionState === "saving" ? (
               <span className="inline-flex items-center gap-2">
                 <LoaderCircle className="h-4 w-4 animate-spin" />
-                Guardando...
+                {POS.customer.saving}
               </span>
             ) : (
-              "Guardar cliente"
+              POS.customer.saveButton
             )}
           </Button>
         </div>

@@ -18,8 +18,8 @@ import {
   buildCashLabel,
   buildSemanticChipClass,
   formatMoney,
-  deriveSummaryState,
 } from "./pos-utils"
+import { deriveSummaryState } from "./pos-summary-utils"
 import { INFO_BOX_XL, SURFACE_MUTED_BG } from "./pos-constants"
 import { POS } from "./pos-messages"
 
@@ -106,7 +106,6 @@ export function SummaryStage(props: SummaryStageProps) {
     mixedPayments,
     cashReady,
     cashStatus,
-    summaryStatusMessage,
     submitDisabled,
   submitting,
   error,
@@ -170,7 +169,7 @@ export function SummaryStage(props: SummaryStageProps) {
       </div>
 
       <div className="mt-4 space-y-3">
-        {(!cashReady || ((summaryStatusMessage || summaryHeadline) && !isReadyToFinalize)) ? (
+        {(!cashReady || (summaryHeadline && !isReadyToFinalize)) ? (
           <div
             aria-live="polite"
             className={`rounded-xl border border-[var(--ops-border-strong)] ${SURFACE_MUTED_BG} px-3 py-2.5`}
@@ -186,7 +185,7 @@ export function SummaryStage(props: SummaryStageProps) {
                     ? "text-[var(--ops-tone-warning-text)]"
                     : "text-[var(--ops-text)]"
               }`}>
-                {!cashReady ? buildCashLabel(cashStatus) : summaryStatusMessage || summaryHeadline}
+                {!cashReady ? buildCashLabel(cashStatus) : summaryHeadline}
               </p>
             </div>
           </div>
@@ -215,7 +214,7 @@ export function SummaryStage(props: SummaryStageProps) {
           />
 
           <SummaryShortcut
-            label="Comprobante"
+            label={POS.summary.documentShort}
             value={documentSummary}
             detail={documentDetail}
             icon={<Receipt className="h-4 w-4" />}
@@ -226,7 +225,7 @@ export function SummaryStage(props: SummaryStageProps) {
           />
 
           <SummaryShortcut
-            label="Cobro"
+            label={POS.summary.charge}
             value={paymentSummary}
             icon={<CreditCard className="h-4 w-4" />}
             badge={paymentBadge}
