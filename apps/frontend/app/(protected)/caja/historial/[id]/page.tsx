@@ -1,4 +1,3 @@
-import { PermissionGuard } from "@/components/auth/PermissionGuard"
 import CashHistoryDetailPage from "@/components/modules/cash/cash-history-detail-page"
 
 type CashHistoryDetailRouteProps = {
@@ -6,9 +5,5 @@ type CashHistoryDetailRouteProps = {
 }
 
 export default function Page(props: CashHistoryDetailRouteProps) {
-  return (
-    <PermissionGuard permission="cash.view">
-      <CashHistoryDetailPage {...props} />
-    </PermissionGuard>
-  )
+  return <CashHistoryDetailPage {...props} />
 }

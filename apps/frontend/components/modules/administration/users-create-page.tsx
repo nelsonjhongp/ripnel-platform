@@ -4,7 +4,6 @@ import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 
 import { apiFetchData } from "@/lib/api"
-import { showSuccess } from "@/lib/toast"
 import { useApiGet } from "@/hooks/use-api-get"
 import { EMPTY_USER_FORM, type UserFormState } from "@/types/admin"
 import { AdminFormPageShell } from "@/components/admin/admin-form-page-shell"
@@ -144,9 +143,9 @@ export default function UsersCreatePage() {
       })
 
       if (createdUser.temporary_password) {
-        showSuccess(
-          "Usuario creado",
-          `Usuario: ${createdUser.username} — Clave temporal: ${createdUser.temporary_password}`
+        // TODO: Replace with toast notification in Phase 3
+        window.alert(
+          `Usuario creado.\nUsuario: ${createdUser.username}\nClave temporal: ${createdUser.temporary_password}\n\nEntrega esta clave al usuario para su primer ingreso.`
         )
       }
 

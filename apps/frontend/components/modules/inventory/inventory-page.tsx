@@ -6,10 +6,9 @@ import { MapPin, RefreshCw, RotateCcw, Download } from "lucide-react";
 import { usePagination } from "@/hooks/use-pagination";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
-import { PAGE_SIZE } from "@/lib/constants";
-import { FilterDropdown, type FilterDropdownOption } from "@/components/ui/filter-dropdown";
-import { OpsEmptyState } from "@/components/ui/ops-empty-state";
-import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import { OpsSelect, type OpsOption } from "@/components/ui/ops-selection";
+import { OpsDataTable } from "@/components/ui/ops-data-table";
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import {
   OpsFiltersRow,
   OpsPageShell,

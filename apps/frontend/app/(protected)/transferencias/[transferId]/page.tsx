@@ -1,5 +1,4 @@
 import { notFound, redirect } from "next/navigation"
-import { PermissionGuard } from "@/components/auth/PermissionGuard"
 import { TransferDetailPage } from "@/components/modules/transfers/transfers-detail-page"
 import { appRoutes, transferRouteSlugs } from "@/lib/routes"
 
@@ -27,11 +26,7 @@ export default async function TransferPage({
   }
 
   if (transferId) {
-    return (
-      <PermissionGuard anyPermissions={["transfers.manage", "transfers.request.view_own"]}>
-        <TransferDetailPage params={params} />
-      </PermissionGuard>
-    )
+    return <TransferDetailPage params={params} />
   }
 
   notFound()

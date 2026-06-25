@@ -11,7 +11,6 @@ import type { ApiEnvelope } from "@/lib/api";
 import { apiFetch, unwrapApiData } from "@/lib/api";
 import { useApiGet } from "@/hooks/use-api-get";
 import { useTransferCapabilities } from "@/hooks/use-transfer-capabilities";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,9 +22,9 @@ import {
   OpsPageShell,
   OpsSectionDivider,
   OpsTableBlock,
+  OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
-import { OpsDataTable } from "@/components/ui/ops-data-table";
-import { OpsMetricPill } from "@/components/ui/ops-metric-pill";
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import { useTransferDraft } from "./use-transfer-draft";
 
 type Location = {
@@ -162,8 +161,7 @@ export function TransfersManagePage() {
 
   return (
     <OpsPageShell width="wide">
-      <TooltipProvider delayDuration={120}>
-        <PosHeader
+      <PosHeader
         eyebrow="Transferencias"
         title="Registrar transferencia"
       />
@@ -246,79 +244,109 @@ export function TransfersManagePage() {
                 </div>
               </div>
 
-              <OpsDataTable
-                columns={[
-                  { key: "variante", header: "Variante" },
-                  { key: "detalle", header: "Detalle" },
-                  { key: "disponible", header: "Disponible", className: "text-right" },
-                  { key: "cantidad", header: "Cantidad" },
-                  { key: "agregar", header: "Agregar", className: "text-right" },
-                ]}
-                minWidth="760px"
-                loading={Boolean(originId) && loadingInventory}
-                loadingMessage="Cargando stock..."
-                emptyMessage={!originId ? "Selecciona un origen para ver el stock disponible." : "No hay stock disponible en el origen seleccionado."}
-                isEmpty={!loadingInventory && availableInventory.length === 0}
-              >
-                {availableInventory.map((item) => (
-                  <tr
-                    key={item.variant_id}
-                    className="transition hover:bg-[var(--ops-surface-muted)]"
-                  >
-                    <td className="px-4 py-[var(--ops-row-py)]">
-                      <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                        {item.style_name}
-                      </p>
-                      <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ripnel-accent-hover)]">
-                        {item.sku}
-                      </p>
-                    </td>
+              <OpsTableWrap minWidth="760px">
+                <table className="w-full border-collapse">
+                  <thead className="bg-[var(--ops-surface-muted)]">
+                    <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                      <th className="px-4 py-3">Variante</th>
+                      <th className="px-4 py-3">Detalle</th>
+                      <th className="px-4 py-3 text-right">Disponible</th>
+                      <th className="px-4 py-3">Cantidad</th>
+                      <th className="px-4 py-3 text-right">Agregar</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                    {!originId ? (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
+                        >
+                          Selecciona un origen para ver el stock disponible.
+                        </td>
+                      </tr>
+                    ) : loadingInventory ? (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
+                        >
+                          <LoaderCircle className="mr-2 inline-block h-5 w-5 animate-spin" />
+                          Cargando stock...
+                        </td>
+                      </tr>
+                    ) : availableInventory.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
+                        >
+                          No hay stock disponible en el origen seleccionado.
+                        </td>
+                      </tr>
+                    ) : (
+                      availableInventory.map((item) => (
+                        <tr
+                          key={item.variant_id}
+                          className="transition hover:bg-[var(--ops-surface-muted)]"
+                        >
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
+                              {item.style_name}
+                            </p>
+                            <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ripnel-accent-hover)]">
+                              {item.sku}
+                            </p>
+                          </td>
 
-                    <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
-                      <p className="truncate">
-                        {item.size_code} / {item.color_name}
-                      </p>
-                      <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                        {item.garment_type_name || item.style_code}
-                      </p>
-                    </td>
+                          <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                            <p className="truncate">
+                              {item.size_code} / {item.color_name}
+                            </p>
+                            <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                              {item.garment_type_name || item.style_code}
+                            </p>
+                          </td>
 
-                    <td className="px-4 py-[var(--ops-row-py)] text-right text-sm font-semibold tabular-nums text-[var(--ops-text)]">
-                      {item.qty}
-                    </td>
+                          <td className="px-4 py-[var(--ops-row-py)] text-right text-sm font-semibold tabular-nums text-[var(--ops-text)]">
+                            {item.qty}
+                          </td>
 
-                    <td className="px-4 py-[var(--ops-row-py)]">
-                      <input
-                        type="number"
-                        min={1}
-                        max={item.qty}
-                        value={pendingQuantities[item.variant_id] || ""}
-                        onChange={(event) =>
-                          setPendingQuantities((current) => ({
-                            ...current,
-                            [item.variant_id]: event.target.value,
-                          }))
-                        }
-                        placeholder="Cant."
-                        className="sales-field h-9 w-24 rounded-lg px-2 py-1 text-center text-sm"
-                      />
-                    </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <input
+                              type="number"
+                              min={1}
+                              max={item.qty}
+                              value={pendingQuantities[item.variant_id] || ""}
+                              onChange={(event) =>
+                                setPendingQuantities((current) => ({
+                                  ...current,
+                                  [item.variant_id]: event.target.value,
+                                }))
+                              }
+                              placeholder="Cant."
+                              className="sales-field h-9 w-24 rounded-lg px-2 py-1 text-center text-sm"
+                            />
+                          </td>
 
-                    <td className="px-4 py-[var(--ops-row-py)] text-right">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleAddLine(item)}
-                        className="rounded-lg px-3"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        Agregar
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </OpsDataTable>
+                          <td className="px-4 py-[var(--ops-row-py)] text-right">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleAddLine(item)}
+                              className="rounded-lg px-3"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              Agregar
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </OpsTableWrap>
             </OpsTableBlock>
 
             <OpsTableBlock>
@@ -339,66 +367,79 @@ export function TransfersManagePage() {
                 </span>
               </div>
 
-              <OpsDataTable
-                columns={[
-                  { key: "variante", header: "Variante" },
-                  { key: "stock", header: "Stock", className: "text-right" },
-                  { key: "cantidad", header: "Cantidad" },
-                  { key: "quitar", header: "Quitar", className: "text-right" },
-                ]}
-                minWidth="680px"
-                emptyMessage="Aún no agregas variantes a la transferencia."
-                isEmpty={draftLines.length === 0}
-              >
-                {draftLines.map((line) => (
-                  <tr
-                    key={line.variant_id}
-                    className="transition hover:bg-[var(--ops-surface-muted)]"
-                  >
-                    <td className="px-4 py-[var(--ops-row-py)]">
-                      <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                        {line.style_name}
-                      </p>
-                      <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ripnel-accent-hover)]">
-                        {line.sku}
-                      </p>
-                      <p className="mt-1 text-xs text-[var(--ops-text-muted)]">
-                        {line.size_code} / {line.color_name}
-                      </p>
-                    </td>
+              <OpsTableWrap minWidth="680px">
+                <table className="w-full border-collapse">
+                  <thead className="bg-[var(--ops-surface-muted)]">
+                    <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                      <th className="px-4 py-3">Variante</th>
+                      <th className="px-4 py-3 text-right">Stock</th>
+                      <th className="px-4 py-3">Cantidad</th>
+                      <th className="px-4 py-3 text-right">Quitar</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                    {draftLines.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={4}
+                          className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
+                        >
+                          Aún no agregas variantes a la transferencia.
+                        </td>
+                      </tr>
+                    ) : (
+                      draftLines.map((line) => (
+                        <tr
+                          key={line.variant_id}
+                          className="transition hover:bg-[var(--ops-surface-muted)]"
+                        >
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
+                              {line.style_name}
+                            </p>
+                            <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ripnel-accent-hover)]">
+                              {line.sku}
+                            </p>
+                            <p className="mt-1 text-xs text-[var(--ops-text-muted)]">
+                              {line.size_code} / {line.color_name}
+                            </p>
+                          </td>
 
-                    <td className="px-4 py-[var(--ops-row-py)] text-right text-sm text-[var(--ops-text)]">
-                      {line.qty}
-                    </td>
+                          <td className="px-4 py-[var(--ops-row-py)] text-right text-sm text-[var(--ops-text)]">
+                            {line.qty}
+                          </td>
 
-                    <td className="px-4 py-[var(--ops-row-py)]">
-                      <input
-                        type="number"
-                        min={1}
-                        max={line.qty}
-                        value={line.qty_requested}
-                        onChange={(event) =>
-                          updateLineQty(line.variant_id, event.target.value)
-                        }
-                        className="sales-field h-9 w-24 rounded-lg px-2 py-1 text-center text-sm"
-                      />
-                    </td>
+                          <td className="px-4 py-[var(--ops-row-py)]">
+                            <input
+                              type="number"
+                              min={1}
+                              max={line.qty}
+                              value={line.qty_requested}
+                              onChange={(event) =>
+                                updateLineQty(line.variant_id, event.target.value)
+                              }
+                              className="sales-field h-9 w-24 rounded-lg px-2 py-1 text-center text-sm"
+                            />
+                          </td>
 
-                    <td className="px-4 py-[var(--ops-row-py)] text-right">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={() => removeLine(line.variant_id)}
-                        className="rounded-lg text-[var(--ops-text-muted)] hover:text-[color:color-mix(in_srgb,#e11d48_82%,var(--ops-text))]"
-                        aria-label="Quitar linea"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </OpsDataTable>
+                          <td className="px-4 py-[var(--ops-row-py)] text-right">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => removeLine(line.variant_id)}
+                              className="rounded-lg text-[var(--ops-text-muted)] hover:text-[color:color-mix(in_srgb,#e11d48_82%,var(--ops-text))]"
+                              aria-label="Quitar linea"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </OpsTableWrap>
 
               <div className="flex flex-col gap-3 border-t border-[var(--ops-border-strong)] pt-4 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-sm text-[var(--ops-text-muted)]">
@@ -428,7 +469,6 @@ export function TransfersManagePage() {
           </div>
         </form>
       </OpsSectionDivider>
-    </TooltipProvider>
     </OpsPageShell>
   );
 }

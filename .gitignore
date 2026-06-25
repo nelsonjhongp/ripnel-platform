@@ -51,9 +51,6 @@ apps/graphify-out/
 
 # Local tool configs
 .opencode/
-
-# Playwright storage state
-.auth/
 linear.app/
 cookies.txt
 .codex-login-review.png

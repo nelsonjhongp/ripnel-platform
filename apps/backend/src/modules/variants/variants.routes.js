@@ -1,5 +1,4 @@
 const express = require('express');
-const { requireAuth, requirePermission } = require('../../middlewares/auth');
 const {
   getStyleVariantsConfig,
   putStyleVariantsConfig,
@@ -9,9 +8,9 @@ const {
 
 const router = express.Router();
 
-router.get('/styles/:styleId', requireAuth, requirePermission('products.manage'), getStyleVariantsConfig);
-router.put('/styles/:styleId/config', requireAuth, requirePermission('products.manage'), putStyleVariantsConfig);
-router.post('/styles/:styleId/generate', requireAuth, requirePermission('products.manage'), postGenerateStyleVariants);
-router.patch('/:variantId', requireAuth, requirePermission('products.manage'), patchVariantById);
+router.get('/styles/:styleId', getStyleVariantsConfig);
+router.put('/styles/:styleId/config', putStyleVariantsConfig);
+router.post('/styles/:styleId/generate', postGenerateStyleVariants);
+router.patch('/:variantId', patchVariantById);
 
 module.exports = router;
