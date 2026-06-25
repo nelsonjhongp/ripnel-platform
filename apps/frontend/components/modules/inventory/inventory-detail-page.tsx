@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft, Building2, Grid3X3, MapPin, RefreshCw } from "lucide-react";
 import {
   ErrorPage,
   LoadingPage,
@@ -12,39 +12,68 @@ import {
 import { Button } from "@/components/ui/button";
 import { OpsSelect } from "@/components/ui/ops-selection";
 import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
-import {
-  OpsPageShell,
-  OpsSectionDivider,
-  OpsTableBlock,
-  OpsTableWrap,
-} from "@/components/ui/ops-page-shell";
+import { OpsPageShell, OpsTableWrap } from "@/components/ui/ops-page-shell";
+import { OpsPanelSection } from "@/components/ui/ops-panel-section";
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { useSidebarTopbarBreadcrumbs } from "@/components/sidebar/SidebarShell";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiFetchData } from "@/lib/api";
 import { useApiGet } from "@/hooks/use-api-get";
 import { appRoutes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import {
+  ACCENT_HIGHLIGHT_PANEL,
+  ACCENT_LABEL_TEXT,
+  CARD_BASE,
+  INFO_BOX_XL,
+  SELECTED_CARD,
+} from "./inventory-constants";
+import { STOCK } from "./inventory-messages";
+import {
   type InventoryDetailResponse,
-  type InventoryDetailTab,
   getProductStatusTone,
-  normalizeInventoryDetailTab,
 } from "./inventory-summary-shared";
 
 export default function InventoryDetailPage() {
-  const params = useParams<{ styleId: string }>();
+  const routeParams = useParams<{ styleId: string }>();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const styleId = String(params?.styleId || "");
+  const styleId = String(routeParams?.styleId || "");
 
-  const [tab, setTab] = useState<InventoryDetailTab>(
-    normalizeInventoryDetailTab(searchParams.get("tab"))
+  const { defaultLocation, locationsLoading } = useAuth();
+
+  const urlLocationId = searchParams.get("location_id");
+  const [selectedLocationId, setSelectedLocationId] = useState(
+    urlLocationId || defaultLocation?.location_id || ""
   );
-  const [selectedLocationId, setSelectedLocationId] = useState(searchParams.get("location_id") || "");
   const [refreshNonce, setRefreshNonce] = useState(0);
+
+  const locationAutoSet = useRef(false);
+  const selectedLocationRef = useRef(selectedLocationId);
+
+  useEffect(() => {
+    selectedLocationRef.current = selectedLocationId;
+  }, [selectedLocationId]);
+
+  useEffect(() => {
+    if (
+      !locationAutoSet.current &&
+      !urlLocationId &&
+      !locationsLoading &&
+      defaultLocation?.location_id
+    ) {
+      locationAutoSet.current = true;
+      setSelectedLocationId(defaultLocation.location_id);
+    }
+  }, [locationsLoading, defaultLocation?.location_id, urlLocationId]);
 
   const { data: detail, loading, error } = useApiGet(
     () => {
@@ -65,29 +94,12 @@ export default function InventoryDetailPage() {
 
   useEffect(() => {
     const params = new URLSearchParams();
-
     if (selectedLocationId) {
       params.set("location_id", selectedLocationId);
     }
-
-    if (tab !== "summary") {
-      params.set("tab", tab);
-    }
-
     const nextUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname;
     router.replace(nextUrl, { scroll: false });
-  }, [pathname, router, selectedLocationId, tab]);
-
-  const locationOptions = useMemo(() => {
-    const availableLocations = detail?.meta.available_locations || [];
-
-    return availableLocations.map((location) => ({
-      value: location.location_id,
-      label: location.name,
-      badge: location.is_default ? "Actual" : undefined,
-      tone: location.is_default ? ("accent" as const) : undefined,
-    }));
-  }, [detail?.meta.available_locations]);
+  }, [pathname, router, selectedLocationId]);
 
   useEffect(() => {
     if (!detail) return;
@@ -95,39 +107,66 @@ export default function InventoryDetailPage() {
     const nextLocationId = detail.meta.selected_location_id || "";
     if (!nextLocationId) return;
 
-    const isCurrentValid = locationOptions.some((option) => option.value === selectedLocationId);
-    if (!selectedLocationId || !isCurrentValid) {
-      const timer = window.setTimeout(() => {
-        setSelectedLocationId(nextLocationId);
-      }, 0);
-
-      return () => window.clearTimeout(timer);
+    const currentId = selectedLocationRef.current;
+    const isCurrentValid = detail.meta.available_locations.some(
+      (loc) => loc.location_id === currentId
+    );
+    if (!currentId || !isCurrentValid) {
+      setSelectedLocationId(nextLocationId);
     }
-  }, [detail, locationOptions, selectedLocationId]);
+  }, [detail]);
 
-  const selectedLocation = detail?.locations.find((location) => location.location_id === detail?.matrix.selected_location_id) || null;
-  const backHref =
-    selectedLocationId
-      ? `${appRoutes.inventory}?location_id=${encodeURIComponent(selectedLocationId)}`
-      : appRoutes.inventory;
+  const locationOptions = useMemo(() => {
+    const available = detail?.meta.available_locations || [];
+    return available.map((location) => ({
+      value: location.location_id,
+      label: location.name,
+      badge: location.is_default ? STOCK.locationBadge.defaultBadge : undefined,
+      tone: location.is_default ? ("accent" as const) : undefined,
+    }));
+  }, [detail?.meta.available_locations]);
+
+  const selectedLocationName = useMemo(() => {
+    const loc = detail?.meta.available_locations.find(
+      (l) => l.location_id === selectedLocationId
+    );
+    return loc?.name || "";
+  }, [detail?.meta.available_locations, selectedLocationId]);
+
+  const otherLocations = useMemo(() => {
+    if (!detail) return [];
+    return detail.locations.filter(
+      (loc) => loc.location_id !== detail.matrix.selected_location_id
+    );
+  }, [detail]);
+
+  const backHref = selectedLocationId
+    ? `${appRoutes.inventory}?location_id=${encodeURIComponent(selectedLocationId)}`
+    : appRoutes.inventory;
+
   const kardexHref = detail
-    ? `${appRoutes.inventoryMovements}?${new URLSearchParams({
-        query: detail.style.style_code,
-        ...(selectedLocation?.location_code ? { location: selectedLocation.location_code } : {}),
-      }).toString()}`
+    ? `${appRoutes.inventoryMovements}?${new URLSearchParams(
+        (() => {
+          const p: Record<string, string> = { query: detail.style.style_code };
+          if (detail.matrix.selected_location_id) {
+            p.location_id = detail.matrix.selected_location_id;
+          }
+          return p;
+        })()
+      ).toString()}`
     : appRoutes.inventoryMovements;
 
   useSidebarTopbarBreadcrumbs(
     detail
       ? [
-          { label: "Inicio", href: appRoutes.home },
-          { label: "Stock actual", href: appRoutes.inventory },
+          { label: STOCK.detail.breadcrumbs.home, href: appRoutes.home },
+          { label: STOCK.header.title, href: appRoutes.inventory },
           { label: detail.style.style_name },
         ]
       : [
-          { label: "Inicio", href: appRoutes.home },
-          { label: "Stock actual", href: appRoutes.inventory },
-          { label: "Producto" },
+          { label: STOCK.detail.breadcrumbs.home, href: appRoutes.home },
+          { label: STOCK.header.title, href: appRoutes.inventory },
+          { label: STOCK.detail.breadcrumbs.fallbackProduct },
         ]
   );
 
@@ -135,8 +174,8 @@ export default function InventoryDetailPage() {
     return (
       <LoadingPage
         variant="ops"
-        title="Cargando detalle de stock"
-        description="Estamos preparando el resumen por sede y la matriz de tallas y colores."
+        title={STOCK.detail.loading}
+        description={STOCK.detail.loadingDesc}
       />
     );
   }
@@ -145,7 +184,7 @@ export default function InventoryDetailPage() {
     return (
       <ErrorPage
         variant="ops"
-        title="No pudimos abrir el detalle de stock"
+        title={STOCK.detail.error}
         description={error}
         onReset={() => setRefreshNonce((current) => current + 1)}
       />
@@ -157,238 +196,228 @@ export default function InventoryDetailPage() {
   }
 
   return (
-    <OpsPageShell width="wide">
-      <PosHeader
-        eyebrow="INVENTARIO"
-        title={detail.style.style_name}
-        description={`${detail.style.style_code} · ${detail.style.garment_type_name || "Sin tipo"}`}
-        actions={
-          <div className="flex items-center gap-2">
-            <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
-              <Link href={backHref}>
-                <ArrowLeft className="h-3.5 w-3.5" />
-                Volver a stock actual
-              </Link>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              className="rounded-lg"
-              onClick={() => setRefreshNonce((current) => current + 1)}
-              aria-label="Actualizar detalle"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-        }
-      />
+    <TooltipProvider delayDuration={120}>
+      <OpsPageShell width="wide" className="space-y-5">
+        <PosHeader
+          eyebrow={STOCK.header.eyebrow}
+          title={detail.style.style_name}
+          meta={
+            <div className="flex flex-wrap gap-2">
+              <OpsStatusBadge
+                tone="neutral"
+                size="sm"
+                icon={<MapPin className="h-3.5 w-3.5 text-[var(--ripnel-accent)]" />}
+              >
+                {selectedLocationName || STOCK.footer.scopeAll}
+              </OpsStatusBadge>
+              <OpsStatusBadge
+                tone={getProductStatusTone(detail.summary.status)}
+                size="sm"
+              >
+                {detail.summary.status_label}
+              </OpsStatusBadge>
+            </div>
+          }
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
+                <Link href={backHref}>
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  {STOCK.detail.back}
+                </Link>
+              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    className="rounded-lg"
+                    onClick={() => setRefreshNonce((current) => current + 1)}
+                    aria-label={STOCK.detail.refresh}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={8}>
+                  {STOCK.detail.refresh}
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          }
+        />
 
-      <OpsMetricInlineGroup items={[
-        { label: "Stock total", value: detail.summary.stock_total, tone: "accent" },
-        { label: "Tallas disponibles", value: detail.summary.sizes_available },
-        { label: "Colores disponibles", value: detail.summary.colors_available },
-      ]} />
-
-      <OpsSectionDivider className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <Tabs value={tab} onValueChange={(nextValue) => setTab(nextValue as InventoryDetailTab)}>
-            <TabsList variant="ops" className="max-w-full">
-              <TabsTrigger value="summary">Resumen</TabsTrigger>
-              <TabsTrigger value="locations">Por sede</TabsTrigger>
-              <TabsTrigger value="matrix">Tallas y colores</TabsTrigger>
-              <TabsTrigger value="movements">Movimientos</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          <div className="w-full sm:w-[260px]">
-            <OpsSelect
-              label="Sede"
-              value={selectedLocationId}
-              options={locationOptions}
-              onChange={(value) => setSelectedLocationId(value)}
-            />
+        <div className={`${INFO_BOX_XL} p-5 shadow-sm md:p-6`}>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0 space-y-2">
+              <p className="text-sm text-[var(--ops-text-muted)]">
+                {detail.style.style_code}
+                {detail.style.garment_type_name
+                  ? ` · ${detail.style.garment_type_name}`
+                  : ` · ${STOCK.fallback.noType}`}
+              </p>
+              <p className="text-xs text-[var(--ops-text-muted)]">
+                {STOCK.detail.fields.sizes}: {detail.summary.sizes_available} ·{" "}
+                {STOCK.detail.fields.colors}: {detail.summary.colors_available}
+              </p>
+            </div>
+            <div className={`${ACCENT_HIGHLIGHT_PANEL} px-4 py-3 lg:min-w-52`}>
+              <p
+                className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${ACCENT_LABEL_TEXT}`}
+              >
+                {STOCK.detail.totalStock}
+              </p>
+              <p className="mt-1 text-3xl font-semibold tracking-[-0.02em] text-[var(--ops-text)]">
+                {detail.summary.stock_total}
+              </p>
+            </div>
           </div>
         </div>
 
-        {tab === "summary" ? (
-          <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-            <section className="space-y-4 rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4">
-              <h2 className="text-sm font-semibold text-[var(--ops-text)]">Resumen</h2>
-              <div className="space-y-3 text-sm text-[var(--ops-text)]">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-[var(--ops-text-muted)]">Código</span>
-                  <span className="font-medium">{detail.style.style_code}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-[var(--ops-text-muted)]">Tipo</span>
-                  <span className="font-medium">{detail.style.garment_type_name || "Sin tipo"}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-[var(--ops-text-muted)]">Tallas disponibles</span>
-                  <span className="font-medium">{detail.summary.sizes_available}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-[var(--ops-text-muted)]">Colores disponibles</span>
-                  <span className="font-medium">{detail.summary.colors_available}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-[var(--ops-text-muted)]">Estado general</span>
-                  <OpsStatusBadge tone={getProductStatusTone(detail.summary.status)} size="xs">
-                    {detail.summary.status_label}
-                  </OpsStatusBadge>
-                </div>
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.65fr)] lg:items-start">
+          <OpsPanelSection
+            title={STOCK.detail.sections.matrix}
+            icon={<Grid3X3 className="h-4 w-4 text-[var(--ripnel-accent)]" />}
+            aside={
+              <div className="w-[220px]">
+                <OpsSelect
+                  label={STOCK.detail.matrix.locationLabel}
+                  value={selectedLocationId}
+                  options={locationOptions}
+                  onChange={(value) => setSelectedLocationId(value)}
+                />
               </div>
-            </section>
-
-            <section className="space-y-3 rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4">
-              <h2 className="text-sm font-semibold text-[var(--ops-text)]">Stock por sede</h2>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {detail.locations.map((location) => (
-                  <div
-                    key={location.location_id}
-                    className={cn(
-                      "rounded-xl border px-3 py-3",
-                      location.location_id === detail.matrix.selected_location_id
-                        ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_82%,var(--ops-surface))]"
-                        : "border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)]"
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-[var(--ops-text)]">{location.location_name}</p>
-                      <OpsStatusBadge tone={getProductStatusTone(location.status)} size="xs">
-                        {location.status_label}
-                      </OpsStatusBadge>
-                    </div>
-                    <p className="mt-1 text-[13px] text-[var(--ops-text-muted)]">
-                      {location.stock_total} unidades · {location.variants_with_stock} variantes con stock
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </div>
-        ) : null}
-
-        {tab === "locations" ? (
-          <OpsTableBlock>
-            <OpsTableWrap minWidth="880px">
-              <table className="w-full border-collapse">
-                <thead className="bg-[var(--ops-surface-muted)]">
-                  <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                    <th className="px-4 py-3">Sede</th>
-                    <th className="px-4 py-3">Stock total</th>
-                    <th className="px-4 py-3">Variantes con stock</th>
-                    <th className="px-4 py-3">Estado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                  {detail.locations.map((location) => (
-                    <tr key={location.location_id} className="transition hover:bg-[var(--ops-surface-muted)]">
-                      <td className="px-4 py-[var(--ops-row-py)] text-sm font-semibold text-[var(--ops-text)]">
-                        {location.location_name}
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
-                        {location.stock_total}
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
-                        {location.variants_with_stock}
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)]">
-                        <OpsStatusBadge tone={getProductStatusTone(location.status)} size="xs">
-                          {location.status_label}
-                        </OpsStatusBadge>
-                      </td>
+            }
+          >
+            <div
+              className={cn(
+                "-mx-[var(--ops-panel-padding)] overflow-hidden rounded-b-xl -mb-[var(--ops-panel-padding)]",
+                loading && detail && "opacity-50 transition-opacity duration-150 pointer-events-none"
+              )}
+            >
+              <OpsTableWrap minWidth="600px">
+                <table className="w-full border-collapse">
+                  <thead className="bg-[var(--ops-surface-muted)]">
+                    <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                      <th className="px-4 py-3">{STOCK.detail.matrix.colorSize}</th>
+                      {detail.matrix.sizes.map((size) => (
+                        <th key={size.size_id} className="px-3 py-3 text-center">
+                          {size.size_code}
+                        </th>
+                      ))}
+                      <th className="px-3 py-3 text-center">{STOCK.detail.matrix.total}</th>
+                      <th className="px-3 py-3">{STOCK.detail.matrix.status}</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </OpsTableWrap>
-          </OpsTableBlock>
-        ) : null}
-
-        {tab === "matrix" ? (
-          <OpsTableBlock>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-semibold text-[var(--ops-text)]">Matriz por talla y color</h2>
-              </div>
-            </div>
-
-            <OpsTableWrap minWidth="920px">
-              <table className="w-full border-collapse">
-                <thead className="bg-[var(--ops-surface-muted)]">
-                  <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                    <th className="px-4 py-3">Color / Talla</th>
-                    {detail.matrix.sizes.map((size) => (
-                      <th key={size.size_id} className="px-4 py-3">
-                        {size.size_code}
-                      </th>
-                    ))}
-                    <th className="px-4 py-3">Total</th>
-                    <th className="px-4 py-3">Estado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                  {detail.matrix.rows.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={detail.matrix.sizes.length + 3}
-                        className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
-                      >
-                        No hay matriz disponible para la sede seleccionada.
-                      </td>
-                    </tr>
-                  ) : (
-                    detail.matrix.rows.map((row) => (
-                      <tr key={row.color_id} className="transition hover:bg-[var(--ops-surface-muted)]">
-                        <td className="px-4 py-[var(--ops-row-py)] text-sm font-semibold text-[var(--ops-text)]">
-                          {row.color_name}
-                        </td>
-                        {row.cells.map((cell) => (
-                          <td
-                            key={`${row.color_id}-${cell.size_id}`}
-                            className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]"
-                          >
-                            <span className={cell.qty === 0 ? "text-[var(--ops-text-muted)]" : ""}>
-                              {cell.qty}
-                            </span>
-                          </td>
-                        ))}
-                        <td className="px-4 py-[var(--ops-row-py)] text-sm font-semibold text-[var(--ops-text)]">
-                          {row.total_qty}
-                        </td>
-                        <td className="px-4 py-[var(--ops-row-py)]">
-                          <OpsStatusBadge tone={getProductStatusTone(row.status)} size="xs">
-                            {row.status_label}
-                          </OpsStatusBadge>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                    {detail.matrix.rows.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={(detail.matrix.sizes.length || 1) + 3}
+                          className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
+                        >
+                          {STOCK.detail.matrix.empty}
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </OpsTableWrap>
-          </OpsTableBlock>
-        ) : null}
+                    ) : (
+                      detail.matrix.rows.map((row) => (
+                        <tr
+                          key={row.color_id}
+                          className="transition hover:bg-[var(--ops-surface-muted)]"
+                        >
+                          <td className="px-4 py-[var(--ops-row-py)] text-sm font-semibold text-[var(--ops-text)]">
+                            {row.color_name}
+                          </td>
+                          {row.cells.map((cell) => (
+                            <td
+                              key={`${row.color_id}-${cell.size_id}`}
+                              className="px-3 py-[var(--ops-row-py)] text-center text-sm text-[var(--ops-text)]"
+                            >
+                              <span
+                                className={cell.qty === 0 ? "text-[var(--ops-text-muted)]" : ""}
+                              >
+                                {cell.qty}
+                              </span>
+                            </td>
+                          ))}
+                          <td className="px-3 py-[var(--ops-row-py)] text-center text-sm font-semibold text-[var(--ops-text)]">
+                            {row.total_qty}
+                          </td>
+                          <td className="px-3 py-[var(--ops-row-py)]">
+                            <OpsStatusBadge
+                              tone={getProductStatusTone(row.status)}
+                              size="xs"
+                            >
+                              {row.status_label}
+                            </OpsStatusBadge>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </OpsTableWrap>
+            </div>
+          </OpsPanelSection>
 
-        {tab === "movements" ? (
-          <section className="rounded-2xl border border-dashed border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-5 py-6">
-            <div className="space-y-2">
-              <h2 className="text-sm font-semibold text-[var(--ops-text)]">Movimientos de stock</h2>
-              <p className="text-sm text-[var(--ops-text-muted)]">{detail.movements.message}</p>
+          <aside className="space-y-4 lg:sticky lg:top-20">
+            <OpsPanelSection
+              title={STOCK.detail.sections.locations}
+              icon={<Building2 className="h-4 w-4 text-[var(--ripnel-accent)]" />}
+            >
+              {otherLocations.length === 0 ? (
+                <p className="text-sm text-[var(--ops-text-muted)]">
+                  {STOCK.detail.locations.empty}
+                </p>
+              ) : (
+                <div className="grid gap-2">
+                  {otherLocations.map((location) => (
+                    <div
+                      key={location.location_id}
+                      className={cn(
+                        "rounded-xl border px-3 py-3",
+                        location.location_id === selectedLocationId
+                          ? SELECTED_CARD
+                          : CARD_BASE
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-[var(--ops-text)]">
+                          {location.location_name}
+                        </p>
+                        <OpsStatusBadge
+                          tone={getProductStatusTone(location.status)}
+                          size="xs"
+                        >
+                          {location.status_label}
+                        </OpsStatusBadge>
+                      </div>
+                      <p className="mt-1 text-[13px] text-[var(--ops-text-muted)]">
+                        {STOCK.detail.locations.units(location.stock_total)} ·{" "}
+                        {STOCK.detail.locations.variants(location.variants_with_stock)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </OpsPanelSection>
+
+            <OpsPanelSection
+              title={STOCK.detail.sections.movements}
+              icon={<RefreshCw className="h-4 w-4 text-[var(--ripnel-accent)]" />}
+            >
               <p className="text-sm text-[var(--ops-text-muted)]">
-                Aquí verás entradas, salidas, transferencias, ventas y ajustes que impactan el stock.
+                {STOCK.detail.movements.description}
               </p>
-              <div className="pt-2">
+              <div className="mt-3">
                 <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
-                  <Link href={kardexHref}>Ver movimientos de stock</Link>
+                  <Link href={kardexHref}>{STOCK.detail.movements.link}</Link>
                 </Button>
               </div>
-            </div>
-          </section>
-        ) : null}
-      </OpsSectionDivider>
-    </OpsPageShell>
+            </OpsPanelSection>
+          </aside>
+        </div>
+      </OpsPageShell>
+    </TooltipProvider>
   );
 }

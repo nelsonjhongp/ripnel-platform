@@ -184,21 +184,21 @@ export function ProductConfigDialog({
       return {
         message: POS.productConfig.selectBoth,
         toneClass:
-          "border-[var(--ops-border-strong)] bg-[${MUTED_SURFACE_MIX}] text-[var(--ops-text-muted)]",
+          "border-[var(--ops-border-strong)] bg-${MUTED_SURFACE_MIX} text-[var(--ops-text-muted)]",
       }
     }
     if (needsSizeSelection) {
       return {
         message: POS.productConfig.selectSizeOnly,
         toneClass:
-          "border-[var(--ops-border-strong)] bg-[${MUTED_SURFACE_MIX}] text-[var(--ops-text-muted)]",
+          "border-[var(--ops-border-strong)] bg-${MUTED_SURFACE_MIX} text-[var(--ops-text-muted)]",
       }
     }
     if (needsColorSelection) {
       return {
         message: POS.productConfig.selectColorOnly,
         toneClass:
-          "border-[var(--ops-border-strong)] bg-[${MUTED_SURFACE_MIX}] text-[var(--ops-text-muted)]",
+          "border-[var(--ops-border-strong)] bg-${MUTED_SURFACE_MIX} text-[var(--ops-text-muted)]",
       }
     }
     if (errorMessage) {
@@ -212,7 +212,7 @@ export function ProductConfigDialog({
       return {
         message: POS.productConfig.ready,
         toneClass:
-          "border-[var(--ops-border-strong)] bg-[${MUTED_SURFACE_MIX}] text-[var(--ops-text)]",
+          "border-[var(--ops-border-strong)] bg-${MUTED_SURFACE_MIX} text-[var(--ops-text)]",
       }
     }
     return null
@@ -334,9 +334,9 @@ export function ProductConfigDialog({
       </div>
 
       {selectedVariant && selectedVariant.stock > 0 ? (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--ops-border-strong)] bg-[${MUTED_SURFACE_MIX}] px-3 py-2">
+        <div className={`flex items-center justify-between gap-3 rounded-lg border border-[var(--ops-border-strong)] bg-${MUTED_SURFACE_MIX} px-3 py-2`}>
           <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-            Cantidad
+            {POS.productConfig.quantity}
           </span>
           <OpsQuantityStepper
             layout="horizontal"

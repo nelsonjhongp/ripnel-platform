@@ -1,4 +1,9 @@
 const { query } = require('../../shared/db');
+const { round2 } = require('../../shared/numbers');
+
+function toNumber(value) {
+  return round2(value || 0);
+}
 
 function appendCashFilters(conditions, values, filters = {}, alias = 'cc') {
   if (filters.locationId) {
@@ -73,6 +78,11 @@ function buildCashClosingProjection(alias = 'cc', includeConsistency = false) {
     ${alias}.status,
     ${alias}.opened_by,
     ${alias}.closed_by,
+    ${alias}.reopened_by,
+    ${alias}.reopened_at,
+    ${alias}.reopen_notes,
+    ${alias}.opening_balance,
+    ${alias}.closing_balance_declared,
     ${alias}.total_cash,
     ${alias}.total_yape,
     ${alias}.total_plin,
@@ -84,7 +94,8 @@ function buildCashClosingProjection(alias = 'cc', includeConsistency = false) {
     ${alias}.updated_at,
     l.name AS location_name,
     ou.full_name AS opened_by_name,
-    cu.full_name AS closed_by_name
+    cu.full_name AS closed_by_name,
+    ru.full_name AS reopened_by_name
     ${includeConsistency ? `,${buildConsistencySelect(alias)}` : ''}
   `;
 }
@@ -106,9 +117,10 @@ async function findCashClosingByLocationAndDate(locationId, dateFrom, dateToOrEx
        ${buildCashClosingProjection('cc')}
      FROM cash_closings cc
      INNER JOIN locations l ON l.location_id = cc.location_id
-     LEFT JOIN users ou ON ou.user_id = cc.opened_by
-     LEFT JOIN users cu ON cu.user_id = cc.closed_by
-     WHERE cc.location_id = $1 AND cc.business_date >= $2 AND cc.business_date <= $3`,
+      LEFT JOIN users ou ON ou.user_id = cc.opened_by
+      LEFT JOIN users cu ON cu.user_id = cc.closed_by
+      LEFT JOIN users ru ON ru.user_id = cc.reopened_by
+      WHERE cc.location_id = $1 AND cc.business_date >= $2 AND cc.business_date <= $3`,
     [locationId, dateFrom, dateEnd]
   );
   return result.rows[0] || null;
@@ -122,6 +134,7 @@ async function findCashClosingById(cashClosingId) {
      INNER JOIN locations l ON l.location_id = cc.location_id
      LEFT JOIN users ou ON ou.user_id = cc.opened_by
      LEFT JOIN users cu ON cu.user_id = cc.closed_by
+     LEFT JOIN users ru ON ru.user_id = cc.reopened_by
      ${buildConsistencyJoins('cc')}
      WHERE cc.cash_closing_id = $1`,
     [cashClosingId]
@@ -158,6 +171,7 @@ async function findAllCashClosings(filters = {}) {
      INNER JOIN locations l ON l.location_id = cc.location_id
      LEFT JOIN users ou ON ou.user_id = cc.opened_by
      LEFT JOIN users cu ON cu.user_id = cc.closed_by
+     LEFT JOIN users ru ON ru.user_id = cc.reopened_by
      ${buildConsistencyJoins('cc')}
      ${whereClause}
      ORDER BY cc.business_date DESC, cc.created_at DESC
@@ -170,10 +184,10 @@ async function findAllCashClosings(filters = {}) {
 async function insertCashClosing(data) {
   const result = await query(
     `INSERT INTO cash_closings
-       (location_id, business_date, status, opened_by, notes)
-     VALUES ($1, $2, 'open', $3, $4)
+       (location_id, business_date, status, opened_by, opening_balance, notes)
+     VALUES ($1, $2, 'open', $3, $4, $5)
      RETURNING *`,
-    [data.location_id, data.business_date, data.opened_by, data.notes || null]
+    [data.location_id, data.business_date, data.opened_by, toNumber(data.opening_balance), data.notes || null]
   );
   return result.rows[0];
 }
@@ -190,7 +204,8 @@ async function updateCashClosingClose(cashClosingId, data) {
        total_plin = $5,
        total_transfer = $6,
        total_all = $7,
-       notes = COALESCE($8, notes)
+       closing_balance_declared = $8,
+       notes = COALESCE($9, notes)
      WHERE cash_closing_id = $1
      RETURNING *`,
     [
@@ -201,6 +216,7 @@ async function updateCashClosingClose(cashClosingId, data) {
       data.total_plin,
       data.total_transfer,
       data.total_all,
+      data.closing_balance_declared ?? null,
       data.notes || null,
     ]
   );
@@ -467,6 +483,7 @@ async function findAdminCashSessions(filters = {}) {
      INNER JOIN locations l ON l.location_id = pc.location_id
      LEFT JOIN users ou ON ou.user_id = pc.opened_by
      LEFT JOIN users cu ON cu.user_id = pc.closed_by
+     LEFT JOIN users ru ON ru.user_id = pc.reopened_by
      ${buildConsistencyJoins('pc')}
      ORDER BY pc.business_date DESC, pc.created_at DESC`,
     values

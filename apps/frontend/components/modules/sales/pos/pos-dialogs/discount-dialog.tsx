@@ -148,7 +148,7 @@ export function DiscountDialog({
       }
     >
       {isEditing ? (
-        <div className={`rounded-lg border border-[${ACCENT_HOVER_BORDER}] bg-[${ACCENT_MUTED_BG}] px-3 py-2 text-sm`}>
+        <div className={`rounded-lg border border-${ACCENT_HOVER_BORDER} bg-${ACCENT_MUTED_BG} px-3 py-2 text-sm`}>
           <div className="flex items-center justify-between gap-3">
             <span className="text-[var(--ops-text-muted)]">{POS.discount.current}</span>
             <span className="font-semibold text-[var(--ripnel-accent-hover)]">
