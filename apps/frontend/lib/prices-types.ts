@@ -42,9 +42,6 @@ export type ProductSummary = {
   description: string | null
   active: boolean
   garment_type_name: string
-  fabric_name: string | null
-  fabric_detail_name?: string | null
-  target_name: string | null
   configured_size_count: number
   configured_color_count: number
   expected_variant_count: number
@@ -72,8 +69,6 @@ export type PriceCatalogRow = {
   style_name: string
   active: boolean
   garment_type_name: string
-  fabric_name: string | null
-  target_name: string | null
   configured_size_count: number
   size_codes?: string[]
   configured_color_count: number

@@ -1,57 +1,47 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  Calculator,
-  Check,
-  ClipboardList,
-  FileText,
-  LoaderCircle,
-  Package,
-  PackagePlus,
-  Settings2,
-  ShieldAlert,
-  Trash2,
-} from "lucide-react";
-import { InlineStatusCard } from "@/components/feedback/status-page";
-import { ForbiddenPage } from "@/components/feedback/status-page";
+import { ArrowLeft, LoaderCircle, PackagePlus, ShieldAlert, Trash2 } from "lucide-react";
+
 import { useAuth } from "@/components/auth/AuthProvider";
+import { ForbiddenPage, InlineStatusCard } from "@/components/feedback/status-page";
 import { Button } from "@/components/ui/button";
 import { OpsDialog } from "@/components/ui/ops-dialog";
 import { OpsFormField } from "@/components/ui/ops-form-field";
 import { OpsMetricRow } from "@/components/ui/ops-metric-row";
-import { OpsPanelSection } from "@/components/ui/ops-panel-section";
+import { OpsPageShell } from "@/components/ui/ops-page-shell";
 import { OpsQuantityStepper } from "@/components/ui/ops-quantity-stepper";
 import { OpsSelect, type OpsOption } from "@/components/ui/ops-selection";
-import { OpsPageShell } from "@/components/ui/ops-page-shell";
+import { OpsStepSectionHeading } from "@/components/ui/ops-step-section-heading";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { PresetTextField } from "@/components/ui/preset-text-field";
 import { SearchablePicker } from "@/components/ui/searchable-picker";
 import { apiFetchData } from "@/lib/api";
 import { appRoutes, buildAdjustmentDetailRoute } from "@/lib/routes";
-import { cn } from "@/lib/utils";
 import { showError, showSuccess } from "@/lib/toast";
-import { ADJ } from "./adjustments-messages";
+import { cn } from "@/lib/utils";
+
+import { AdjustmentSummaryStage } from "./adjustment-summary-stage";
 import {
+  DIFF_NEGATIVE,
+  DIFF_POSITIVE,
+  DIFF_ZERO,
   INFO_BOX_MUTED,
   INPUT_CLASS,
-  DIFF_POSITIVE,
-  DIFF_NEGATIVE,
-  DIFF_ZERO,
 } from "./adjustments-constants";
+import { ADJ } from "./adjustments-messages";
 import {
-  type AdjustmentDetailData,
-  type AdjustmentListData,
-  type AdjustmentIntent,
-  type AdjustmentVariant,
-  type AdjustmentVariantsData,
   buildAdjustmentReason,
-  type DraftAdjustmentLine,
   formatAdjustmentIntent,
   groupAdjustmentVariantsByStyle,
+  type AdjustmentDetailData,
+  type AdjustmentIntent,
+  type AdjustmentListData,
+  type AdjustmentVariant,
+  type AdjustmentVariantsData,
+  type DraftAdjustmentLine,
   type GroupedAdjustmentStyle,
 } from "./inventory-adjustments-shared";
 
@@ -64,10 +54,14 @@ const ADJUSTMENT_REASON_PRESETS: readonly string[] = [
 ];
 
 const NOTES_MAX = 200;
+const STAGE_SECTION_CLASS =
+  "relative space-y-3 rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4 shadow-sm transition-all duration-200 sm:p-5";
+
+type AdjustmentActionState = "idle" | "saving_draft" | "reviewing" | "confirming";
 
 export function InventoryAdjustmentsCreatePage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, defaultLocation } = useAuth();
 
   const initialSearchParams =
     typeof window === "undefined"
@@ -77,8 +71,10 @@ export function InventoryAdjustmentsCreatePage() {
   const canManageAdjustments = ["ADMIN", "ALMACEN"].includes(
     String(user?.role_name || "").toUpperCase()
   );
+  const canChangeLocation = ["ADMIN", "ALMACEN"].includes(
+    String(user?.role_name || "").toUpperCase()
+  );
 
-  // ── Config ──
   const [createLocationId, setCreateLocationId] = useState(
     () => initialSearchParams.get("location_id") || ""
   );
@@ -88,7 +84,6 @@ export function InventoryAdjustmentsCreatePage() {
   const [locations, setLocations] = useState<AdjustmentListData["meta"]["available_locations"]>([]);
   const [loadingLocations, setLoadingLocations] = useState(true);
 
-  // ── Variant search ──
   const [variantQuery, setVariantQuery] = useState(
     () => initialSearchParams.get("query") || ""
   );
@@ -98,27 +93,24 @@ export function InventoryAdjustmentsCreatePage() {
   const [loadingVariants, setLoadingVariants] = useState(false);
   const [selectedStyle, setSelectedStyle] = useState<GroupedAdjustmentStyle | null>(null);
 
-  // ── Draft lines ──
   const [draftLines, setDraftLines] = useState<DraftAdjustmentLine[]>([]);
 
-  // ── Submit state ──
-  const [saving, setSaving] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
+  const [actionState, setActionState] = useState<AdjustmentActionState>("idle");
+  const [errors, setErrors] = useState<{ _form?: string; location_id?: string; lines?: string }>({});
   const [savedAdjustmentId, setSavedAdjustmentId] = useState<string | null>(null);
   const [savedAdjustmentNumber, setSavedAdjustmentNumber] = useState<string | null>(null);
+  const [staleDraftNumber, setStaleDraftNumber] = useState<string | null>(null);
+  const [reviewAutoSaved, setReviewAutoSaved] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirming, setConfirming] = useState(false);
 
-  // ── Load locations ──
   useEffect(() => {
     let active = true;
 
     async function load() {
       try {
-        const data = await apiFetchData<AdjustmentListData>(
-          "/api/inventory/adjustments",
-          { cache: "no-store" }
-        );
+        const data = await apiFetchData<AdjustmentListData>("/api/inventory/adjustments", {
+          cache: "no-store",
+        });
         if (active) setLocations(data?.meta?.available_locations || []);
       } catch {
         if (active) setLocations([]);
@@ -127,59 +119,49 @@ export function InventoryAdjustmentsCreatePage() {
       }
     }
 
-    load();
-    return () => { active = false; };
+    void load();
+    return () => {
+      active = false;
+    };
   }, []);
 
-  // ── Auto-select default location ──
-  const locationAutoSet = useRef(false);
+  const defaultCreateLocationId = useMemo(
+    () => locations.find((location) => location.is_default)?.location_id || locations[0]?.location_id || "",
+    [locations]
+  );
 
-  useEffect(() => {
-    if (locationAutoSet.current || loadingLocations || !locations.length) return;
-    if (createLocationId && locations.some((l) => l.location_id === createLocationId)) return;
-
-    const defaultLoc = locations.find((l) => l.is_default) || locations[0];
-    if (defaultLoc) {
-      locationAutoSet.current = true;
-      setCreateLocationId(defaultLoc.location_id);
-    }
-  }, [loadingLocations, locations, createLocationId]);
-
-  // ── Effective location ──
   const effectiveCreateLocationId =
-    createLocationId && locations.some((l) => l.location_id === createLocationId)
+    createLocationId && locations.some((location) => location.location_id === createLocationId)
       ? createLocationId
-      : "";
+      : defaultCreateLocationId;
 
   const selectedCreateLocation = useMemo(
-    () => locations.find((l) => l.location_id === effectiveCreateLocationId) ?? null,
+    () => locations.find((location) => location.location_id === effectiveCreateLocationId) ?? null,
     [effectiveCreateLocationId, locations]
   );
 
   const locationOptions: OpsOption[] = useMemo(
     () =>
-      locations.map((l) => ({
-        value: l.location_id,
-        label: l.name,
-        badge: l.is_default ? "Actual" : undefined,
-        tone: l.is_default ? ("accent" as const) : undefined,
+      locations.map((location) => ({
+        value: location.location_id,
+        label: location.name,
+        badge: location.is_default ? ADJ.create.defaultLocationBadge : undefined,
+        tone: location.is_default ? ("accent" as const) : undefined,
       })),
     [locations]
   );
 
-  // ── Resolve effective reason ──
   const effectiveReason = useMemo(
     () => buildAdjustmentReason(adjustmentIntent, createReason),
-    [createReason, adjustmentIntent]
+    [adjustmentIntent, createReason]
   );
 
-  // ── Debounced variant search ──
+  const normalizedVariantQuery = variantQuery.trim();
+  const canSearchVariants =
+    effectiveCreateLocationId.length > 0 && normalizedVariantQuery.length >= 2;
+
   useEffect(() => {
-    const normalizedQuery = variantQuery.trim();
-    if (!effectiveCreateLocationId || normalizedQuery.length < 2) {
-      setVariantResults([]);
-      return;
-    }
+    if (!canSearchVariants) return;
 
     const controller = new AbortController();
     let active = true;
@@ -190,7 +172,7 @@ export function InventoryAdjustmentsCreatePage() {
       try {
         const params = new URLSearchParams({
           location_id: effectiveCreateLocationId,
-          query: normalizedQuery,
+          query: normalizedVariantQuery,
         });
         const data = await apiFetchData<AdjustmentVariantsData>(
           `/api/inventory/adjustment-variants?${params.toString()}`,
@@ -209,88 +191,162 @@ export function InventoryAdjustmentsCreatePage() {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [effectiveCreateLocationId, variantQuery]);
+  }, [canSearchVariants, effectiveCreateLocationId, normalizedVariantQuery]);
 
-  // ── Group variants by style, filter out fully-added styles ──
+  const visibleVariantResults = useMemo(
+    () => (canSearchVariants ? variantResults : []),
+    [canSearchVariants, variantResults]
+  );
+
   const groupedStyles = useMemo(
-    () => groupAdjustmentVariantsByStyle(variantResults),
-    [variantResults]
+    () => groupAdjustmentVariantsByStyle(visibleVariantResults),
+    [visibleVariantResults]
   );
 
   const filteredGroupedStyles = useMemo(
     () =>
       groupedStyles.filter((style) =>
         style.variants.some(
-          (v) => !draftLines.some((line) => line.variant_id === v.variant_id)
+          (variant) => !draftLines.some((line) => line.variant_id === variant.variant_id)
         )
       ),
-    [groupedStyles, draftLines]
+    [draftLines, groupedStyles]
   );
 
-  // ── Draft line CRUD ──
-  const addDraftLine = useCallback((variant: AdjustmentVariant) => {
-    setDraftLines((current) => [
-      ...current,
-      { ...variant, counted_qty: variant.system_qty },
-    ]);
-    setCreateError(null);
-    setSavedAdjustmentId(null);
-    setSavedAdjustmentNumber(null);
+  const clearFormError = useCallback(() => {
+    setErrors((current) => (current._form ? { ...current, _form: undefined } : current));
   }, []);
 
-  const removeDraftLine = useCallback((variantId: string) => {
-    setDraftLines((current) => current.filter((l) => l.variant_id !== variantId));
+  const resetSavedDraft = useCallback(() => {
+    setStaleDraftNumber((current) => current || savedAdjustmentNumber);
     setSavedAdjustmentId(null);
     setSavedAdjustmentNumber(null);
-  }, []);
+    setReviewAutoSaved(false);
+    setConfirmOpen(false);
+    setActionState("idle");
+  }, [savedAdjustmentNumber]);
 
-  const updateCountedQty = useCallback((variantId: string, rawValue: string) => {
-    setDraftLines((current) =>
-      current.map((line) => {
-        if (line.variant_id !== variantId) return line;
-        const parsed = Number(rawValue);
-        if (!Number.isInteger(parsed) || parsed < 0) return { ...line, counted_qty: 0 };
-        return { ...line, counted_qty: parsed };
-      })
-    );
-    setSavedAdjustmentId(null);
-    setSavedAdjustmentNumber(null);
-  }, []);
+  const isSavingDraft = actionState === "saving_draft";
+  const isReviewing = actionState === "reviewing";
+  const isConfirming = actionState === "confirming";
+  const hasPersistedDraft = Boolean(savedAdjustmentId && savedAdjustmentNumber);
+  const hasBlockingAction = isSavingDraft || isConfirming;
+  const selectedStyleAvailableCount = selectedStyle
+    ? selectedStyle.variants.filter(
+        (variant) => !draftLines.some((line) => line.variant_id === variant.variant_id)
+      ).length
+    : 0;
 
-  // ── Derived totals ──
+  const documentStatusCard = useMemo(() => {
+    if (hasPersistedDraft && savedAdjustmentNumber) {
+      return {
+        title: ADJ.create.draftStatusTitle,
+        description: reviewAutoSaved
+          ? ADJ.create.draftStatusAutoSaved(savedAdjustmentNumber)
+          : ADJ.create.draftStatusSaved(savedAdjustmentNumber),
+        tone: "neutral" as const,
+      };
+    }
+
+    if (staleDraftNumber) {
+      return {
+        title: ADJ.create.draftStatusDirtyTitle,
+        description: ADJ.create.draftStatusDirty(staleDraftNumber),
+        tone: "warning" as const,
+      };
+    }
+
+    if (effectiveCreateLocationId && draftLines.length > 0) {
+      return {
+        title: ADJ.create.readyTitle,
+        description: ADJ.create.readyDescription,
+        tone: "neutral" as const,
+      };
+    }
+
+    return {
+      title: isSavingDraft || isReviewing ? ADJ.create.localDraftTitle : ADJ.create.pendingTitle,
+      description: effectiveCreateLocationId
+        ? ADJ.create.pendingLines
+        : ADJ.create.pendingLocation,
+      tone: "warning" as const,
+    };
+  }, [
+    draftLines.length,
+    effectiveCreateLocationId,
+    hasPersistedDraft,
+    isReviewing,
+    isSavingDraft,
+    reviewAutoSaved,
+    savedAdjustmentNumber,
+    staleDraftNumber,
+  ]);
+
+  const addDraftLine = useCallback(
+    (variant: AdjustmentVariant) => {
+      setDraftLines((current) => [...current, { ...variant, counted_qty: variant.system_qty }]);
+      clearFormError();
+      setErrors((current) => (current.lines ? { ...current, lines: undefined } : current));
+      resetSavedDraft();
+    },
+    [clearFormError, resetSavedDraft]
+  );
+
+  const removeDraftLine = useCallback(
+    (variantId: string) => {
+      setDraftLines((current) => current.filter((line) => line.variant_id !== variantId));
+      clearFormError();
+      resetSavedDraft();
+    },
+    [clearFormError, resetSavedDraft]
+  );
+
+  const updateCountedQty = useCallback(
+    (variantId: string, rawValue: string) => {
+      setDraftLines((current) =>
+        current.map((line) => {
+          if (line.variant_id !== variantId) return line;
+          const parsed = Number(rawValue);
+          if (!Number.isInteger(parsed) || parsed < 0) return { ...line, counted_qty: 0 };
+          return { ...line, counted_qty: parsed };
+        })
+      );
+      clearFormError();
+      resetSavedDraft();
+    },
+    [clearFormError, resetSavedDraft]
+  );
+
   const draftTotals = useMemo(() => {
-    const totalSystem = draftLines.reduce((acc, l) => acc + l.system_qty, 0);
-    const totalCounted = draftLines.reduce((acc, l) => acc + l.counted_qty, 0);
+    const totalSystem = draftLines.reduce((acc, line) => acc + line.system_qty, 0);
+    const totalCounted = draftLines.reduce((acc, line) => acc + line.counted_qty, 0);
     const totalDiff = totalCounted - totalSystem;
-    const noChange = draftLines.filter((l) => l.counted_qty === l.system_qty).length;
-    const withDiff = draftLines.filter((l) => l.counted_qty !== l.system_qty).length;
+    const noChange = draftLines.filter((line) => line.counted_qty === line.system_qty).length;
+    const withDiff = draftLines.filter((line) => line.counted_qty !== line.system_qty).length;
     return { lines: draftLines.length, totalSystem, totalCounted, totalDiff, noChange, withDiff };
   }, [draftLines]);
 
-  // ── Lines with differences (for review dialog) ──
   const linesWithDiff = useMemo(
-    () => draftLines.filter((l) => l.counted_qty !== l.system_qty),
+    () => draftLines.filter((line) => line.counted_qty !== line.system_qty),
     [draftLines]
   );
 
-  // ── Save draft ──
-  const saveDraft = useCallback(async () => {
-    if (!effectiveCreateLocationId) {
-      setCreateError(ADJ.validation.locationRequired);
-      return null;
-    }
-    if (!draftLines.length) {
-      setCreateError(ADJ.validation.linesRequired);
-      return null;
-    }
+  const saveDraft = useCallback(
+    async (options?: { silent?: boolean; nextState?: AdjustmentActionState }) => {
+      if (!effectiveCreateLocationId) {
+        setErrors({ location_id: ADJ.validation.locationRequired });
+        return null;
+      }
+      if (!draftLines.length) {
+        setErrors({ lines: ADJ.validation.linesRequired });
+        return null;
+      }
 
-    setSaving(true);
-    setCreateError(null);
+      setActionState("saving_draft");
+      setErrors({});
 
-    try {
-      const data = await apiFetchData<AdjustmentDetailData>(
-        "/api/inventory/adjustments",
-        {
+      try {
+        const data = await apiFetchData<AdjustmentDetailData>("/api/inventory/adjustments", {
           method: "POST",
           cache: "no-store",
           body: JSON.stringify({
@@ -303,59 +359,81 @@ export function InventoryAdjustmentsCreatePage() {
               notes: null,
             })),
           }),
+        });
+
+        const id = data.adjustment.adjustment_id;
+        const number = data.adjustment.adjustment_number;
+        setSavedAdjustmentId(id);
+        setSavedAdjustmentNumber(number);
+        setStaleDraftNumber(null);
+        setReviewAutoSaved(Boolean(options?.silent));
+
+        if (!options?.silent) {
+          showSuccess(ADJ.toast.draftSaved);
         }
-      );
 
-      const id = data.adjustment.adjustment_id;
-      const number = data.adjustment.adjustment_number;
-      setSavedAdjustmentId(id);
-      setSavedAdjustmentNumber(number);
-      showSuccess(ADJ.toast.draftSaved);
-      return { adjustmentId: id, adjustmentNumber: number };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : ADJ.toast.draftCreateError;
-      setCreateError(message);
-      return null;
-    } finally {
-      setSaving(false);
-    }
-  }, [effectiveCreateLocationId, draftLines, effectiveReason, createNotes]);
+        setActionState(options?.nextState ?? "idle");
+        return { adjustmentId: id, adjustmentNumber: number };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : ADJ.toast.draftCreateError;
+        setErrors({ _form: message });
+        setActionState("idle");
+        return null;
+      }
+    },
+    [createNotes, draftLines, effectiveCreateLocationId, effectiveReason]
+  );
 
-  // ── Confirm adjustment ──
   const handleConfirm = useCallback(async () => {
-    const targetId = savedAdjustmentId;
-    if (!targetId) return;
+    if (!savedAdjustmentId) return;
 
-    setConfirming(true);
+    setActionState("confirming");
 
     try {
       await apiFetchData<AdjustmentDetailData>(
-        `/api/inventory/adjustments/${targetId}/confirm`,
+        `/api/inventory/adjustments/${savedAdjustmentId}/confirm`,
         { method: "POST", body: JSON.stringify({}), cache: "no-store" }
       );
       setConfirmOpen(false);
       showSuccess(ADJ.toast.confirmed);
-      router.push(buildAdjustmentDetailRoute(targetId));
+      router.push(buildAdjustmentDetailRoute(savedAdjustmentId));
     } catch (err) {
       const message = err instanceof Error ? err.message : ADJ.dialog.confirmError;
       showError(message);
     } finally {
-      setConfirming(false);
+      setActionState("reviewing");
     }
-  }, [savedAdjustmentId, router]);
+  }, [router, savedAdjustmentId]);
 
   const handleSaveAndStay = useCallback(async () => {
+    clearFormError();
+    setReviewAutoSaved(false);
     await saveDraft();
-  }, [saveDraft]);
+  }, [clearFormError, saveDraft]);
 
   const handleOpenConfirm = useCallback(async () => {
-    setCreateError(null);
+    clearFormError();
+
     if (!savedAdjustmentId || !savedAdjustmentNumber) {
-      const result = await saveDraft();
+      const result = await saveDraft({ silent: true, nextState: "reviewing" });
       if (!result) return;
+    } else {
+      setReviewAutoSaved(false);
+      setActionState("reviewing");
     }
+
     setConfirmOpen(true);
-  }, [savedAdjustmentId, savedAdjustmentNumber, saveDraft]);
+  }, [clearFormError, saveDraft, savedAdjustmentId, savedAdjustmentNumber]);
+
+  const handleConfirmOpenChange = useCallback(
+    (open: boolean) => {
+      setConfirmOpen(open);
+      if (!open && actionState !== "confirming") {
+        setActionState("idle");
+      }
+    },
+    [actionState]
+  );
 
   if (!canManageAdjustments) {
     return <ForbiddenPage variant="ops" />;
@@ -367,73 +445,134 @@ export function InventoryAdjustmentsCreatePage() {
         eyebrow={ADJ.header.eyebrow}
         title={ADJ.header.createTitle}
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Button asChild type="button" variant="outline" size="sm" className="rounded-lg">
-              <Link href={appRoutes.inventoryAdjustments}>
-                <ArrowLeft className="h-4 w-4" />
-                {ADJ.header.backToList}
-              </Link>
-            </Button>
-          </div>
+          <Button asChild type="button" variant="outline" size="sm" className="rounded-lg">
+            <Link href={appRoutes.inventoryAdjustments}>
+              <ArrowLeft className="h-4 w-4" />
+              {ADJ.header.backToList}
+            </Link>
+          </Button>
         }
       />
 
       <div className="mt-5 grid gap-5 border-t border-[var(--ops-border-soft)] pt-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.65fr)] xl:items-start">
-        {/* ═══════════ LEFT COLUMN ═══════════ */}
         <div className="min-w-0 space-y-4">
-          {/* ── Config section (Sede + Tipo only) ── */}
-          <OpsPanelSection
-            title={ADJ.create.configSection}
-            icon={<Settings2 className="h-4 w-4 text-[var(--ripnel-accent)]" />}
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <OpsSelect
-                label={ADJ.create.locationLabel}
-                value={effectiveCreateLocationId}
-                onValueChange={(v) => {
-                  setCreateLocationId(v);
-                  setSavedAdjustmentId(null);
-                  setSavedAdjustmentNumber(null);
-                }}
-                placeholder={ADJ.create.locationPlaceholder}
-                options={locationOptions}
-                disabled={loadingLocations}
-              />
-              <OpsSelect
-                label={ADJ.create.intentLabel}
-                value={adjustmentIntent}
-                onValueChange={(v) => {
-                  setAdjustmentIntent(v as AdjustmentIntent);
-                  setSavedAdjustmentId(null);
-                  setSavedAdjustmentNumber(null);
-                }}
-                options={[
-                  {
-                    value: "adjustment",
-                    label: formatAdjustmentIntent("adjustment"),
-                    helper: ADJ.create.intentAdjustmentHelper,
-                  },
-                  {
-                    value: "opening",
-                    label: formatAdjustmentIntent("opening"),
-                    helper: ADJ.create.intentOpeningHelper,
-                  },
-                ]}
-              />
-            </div>
-          </OpsPanelSection>
+          <section className={STAGE_SECTION_CLASS}>
+            <OpsStepSectionHeading step={1} title={ADJ.create.configSection} />
 
-          {/* ── Variants section ── */}
-          <OpsPanelSection
-            title={ADJ.create.variantsSection}
-            icon={<Package className="h-4 w-4 text-[var(--ripnel-accent)]" />}
-          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <OpsFormField
+                label={ADJ.create.locationLabel}
+                error={errors.location_id}
+                density="compact"
+              >
+                <OpsSelect
+                  value={effectiveCreateLocationId}
+                  onValueChange={(value) => {
+                    setCreateLocationId(value);
+                    clearFormError();
+                    resetSavedDraft();
+                    setErrors((current) => ({
+                      ...current,
+                      _form: undefined,
+                      location_id: undefined,
+                    }));
+                  }}
+                  placeholder={ADJ.create.locationPlaceholder}
+                  options={locationOptions}
+                  disabled={
+                    loadingLocations ||
+                    hasBlockingAction ||
+                    (!canChangeLocation && Boolean(defaultLocation?.location_id))
+                  }
+                />
+              </OpsFormField>
+
+              <OpsFormField label={ADJ.create.intentLabel} density="compact">
+                <OpsSelect
+                  value={adjustmentIntent}
+                  onValueChange={(value) => {
+                    setAdjustmentIntent(value as AdjustmentIntent);
+                    resetSavedDraft();
+                  }}
+                  options={[
+                    {
+                      value: "adjustment",
+                      label: formatAdjustmentIntent("adjustment"),
+                      helper: ADJ.create.intentAdjustmentHelper,
+                    },
+                    {
+                      value: "opening",
+                      label: formatAdjustmentIntent("opening"),
+                      helper: ADJ.create.intentOpeningHelper,
+                    },
+                  ]}
+                  disabled={hasBlockingAction}
+                />
+              </OpsFormField>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                  {ADJ.create.motivoLabel}
+                </p>
+                <PresetTextField
+                  value={createReason}
+                  onChange={(value) => {
+                    setCreateReason(value);
+                    resetSavedDraft();
+                  }}
+                  presets={ADJUSTMENT_REASON_PRESETS}
+                  placeholder={ADJ.create.customReasonPlaceholder}
+                  textareaRows={1}
+                  textareaClassName="min-h-[56px]"
+                  disabled={hasBlockingAction}
+                />
+              </div>
+
+              <OpsFormField
+                label={ADJ.create.notesLabel}
+                optionalLabel={ADJ.create.notesOptionalLabel}
+                density="compact"
+              >
+                <div className="relative">
+                  <textarea
+                    value={createNotes}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (value.length <= NOTES_MAX) {
+                        setCreateNotes(value);
+                        resetSavedDraft();
+                      }
+                    }}
+                    rows={2}
+                    placeholder={ADJ.create.notesPlaceholder}
+                    className={`${INPUT_CLASS} min-h-[72px] resize-none pr-12`}
+                    disabled={hasBlockingAction}
+                  />
+                  {createNotes.length > 0 ? (
+                    <span className="pointer-events-none absolute bottom-2 right-3 text-[10px] text-[var(--ops-text-muted)]">
+                      {ADJ.create.notesCounter(createNotes.length, NOTES_MAX)}
+                    </span>
+                  ) : null}
+                </div>
+              </OpsFormField>
+            </div>
+          </section>
+
+          <section className={STAGE_SECTION_CLASS}>
+            <OpsStepSectionHeading
+              step={2}
+              title={ADJ.create.variantsSection}
+            />
+
             <SearchablePicker
               value={variantQuery}
-              onChange={(v) => {
-                setVariantQuery(v);
+              onChange={(value) => {
+                setVariantQuery(value);
                 setHighlightedIndex(0);
                 setSelectedStyle(null);
+                clearFormError();
               }}
               open={pickerOpen}
               onOpenChange={setPickerOpen}
@@ -441,19 +580,19 @@ export function InventoryAdjustmentsCreatePage() {
               loading={loadingVariants}
               highlightedIndex={highlightedIndex}
               onHighlightChange={setHighlightedIndex}
-              getItemKey={(s) => s.styleId}
-              renderItem={(s) => (
+              getItemKey={(style) => style.styleId}
+              renderItem={(style) => (
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                      {s.styleName}
+                      {style.styleName}
                     </p>
                     <p className="text-[11px] uppercase tracking-[0.16em] text-[var(--ripnel-accent-hover)]">
-                      {s.styleCode}
+                      {style.styleCode}
                     </p>
                   </div>
                   <span className="shrink-0 text-xs text-[var(--ops-text-muted)]">
-                    {s.variants.length} vars · Stock {s.totalSystemQty}
+                    {ADJ.create.searchResultCounts(style.variants.length, style.totalSystemQty)}
                   </span>
                 </div>
               )}
@@ -462,7 +601,7 @@ export function InventoryAdjustmentsCreatePage() {
               }}
               closeOnSelect={false}
               density="compact"
-              disabled={!effectiveCreateLocationId}
+              disabled={!effectiveCreateLocationId || hasBlockingAction}
               placeholder={ADJ.create.searchPlaceholder}
               minQueryLength={2}
               emptyStateMode="query"
@@ -473,21 +612,26 @@ export function InventoryAdjustmentsCreatePage() {
                 setVariantResults([]);
                 setHighlightedIndex(0);
                 setSelectedStyle(null);
+                clearFormError();
               }}
             />
 
-            {/* ── Sub-panel: variants of selected style ── */}
             {selectedStyle ? (
               <div className="mt-4 space-y-3 rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-sm font-semibold text-[var(--ops-text)]">
                       {selectedStyle.styleName}
                     </p>
                     <p className="text-xs text-[var(--ops-text-muted)]">
-                      {selectedStyle.styleCode} · {selectedStyle.variants.length} variantes · Stock {selectedStyle.totalSystemQty}
+                      {ADJ.create.subpanelMeta(
+                        selectedStyle.styleCode,
+                        selectedStyle.variants.length,
+                        selectedStyle.totalSystemQty
+                      )}
                     </p>
                   </div>
+
                   <div className="flex items-center gap-2">
                     <Button
                       type="button"
@@ -496,7 +640,7 @@ export function InventoryAdjustmentsCreatePage() {
                       className="rounded-lg"
                       onClick={() => setSelectedStyle(null)}
                     >
-                      Cerrar
+                      {ADJ.create.closeSubpanel}
                     </Button>
                     <Button
                       type="button"
@@ -504,16 +648,16 @@ export function InventoryAdjustmentsCreatePage() {
                       size="sm"
                       className="rounded-lg"
                       onClick={() => {
-                        for (const v of selectedStyle.variants) {
-                          if (!draftLines.some((l) => l.variant_id === v.variant_id)) {
-                            addDraftLine(v);
+                        for (const variant of selectedStyle.variants) {
+                          if (!draftLines.some((line) => line.variant_id === variant.variant_id)) {
+                            addDraftLine(variant);
                           }
                         }
-                        setSelectedStyle(null);
                       }}
+                      disabled={selectedStyleAvailableCount === 0}
                     >
                       <PackagePlus className="h-4 w-4" />
-                      Agregar todas
+                      {ADJ.create.addAll}
                     </Button>
                   </div>
                 </div>
@@ -523,19 +667,20 @@ export function InventoryAdjustmentsCreatePage() {
                     <table className="w-full border-collapse">
                       <thead className="bg-[var(--ops-surface)]">
                         <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                          <th className="px-4 py-2.5">Talla / Color</th>
-                          <th className="px-4 py-2.5 text-right">Sistema</th>
-                          <th className="px-4 py-2.5 text-right">Agregar</th>
+                          <th className="px-4 py-2.5">{ADJ.create.variantTable.sizeColor}</th>
+                          <th className="px-4 py-2.5 text-right">{ADJ.create.variantTable.system}</th>
+                          <th className="px-4 py-2.5 text-right">{ADJ.create.variantTable.action}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                        {selectedStyle.variants.map((v) => {
+                        {selectedStyle.variants.map((variant) => {
                           const alreadyAdded = draftLines.some(
-                            (l) => l.variant_id === v.variant_id
+                            (line) => line.variant_id === variant.variant_id
                           );
+
                           return (
                             <tr
-                              key={v.variant_id}
+                              key={variant.variant_id}
                               className={cn(
                                 "transition",
                                 alreadyAdded
@@ -545,19 +690,19 @@ export function InventoryAdjustmentsCreatePage() {
                             >
                               <td className="px-4 py-2">
                                 <p className="text-sm text-[var(--ops-text)]">
-                                  {v.size_code} / {v.color_name}
+                                  {variant.size_code} / {variant.color_name}
                                 </p>
                                 <p className="text-[11px] uppercase text-[var(--ripnel-accent-hover)]">
-                                  {v.sku}
+                                  {variant.sku}
                                 </p>
                               </td>
                               <td className="px-4 py-2 text-right text-sm text-[var(--ops-text-muted)]">
-                                {v.system_qty}
+                                {variant.system_qty}
                               </td>
                               <td className="px-4 py-2 text-right">
                                 {alreadyAdded ? (
                                   <span className="text-xs text-[var(--ops-text-muted)]">
-                                    Agregado
+                                    {ADJ.create.added}
                                   </span>
                                 ) : (
                                   <Button
@@ -565,10 +710,10 @@ export function InventoryAdjustmentsCreatePage() {
                                     variant="outline"
                                     size="sm"
                                     className="rounded-lg"
-                                    onClick={() => addDraftLine(v)}
+                                    onClick={() => addDraftLine(variant)}
                                   >
                                     <PackagePlus className="h-3.5 w-3.5" />
-                                    Agregar
+                                    {ADJ.create.addOne}
                                   </Button>
                                 )}
                               </td>
@@ -581,20 +726,23 @@ export function InventoryAdjustmentsCreatePage() {
                 </div>
               </div>
             ) : null}
-          </OpsPanelSection>
+          </section>
 
-          {/* ── Draft lines section ── */}
-          <OpsPanelSection
-            title={ADJ.create.draftSection}
-            icon={<ClipboardList className="h-4 w-4 text-[var(--ripnel-accent)]" />}
-            aside={
-              <span className="inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]">
-                {formatAdjustmentIntent(adjustmentIntent)}
-              </span>
-            }
-          >
+          <section className={STAGE_SECTION_CLASS}>
+            <OpsStepSectionHeading
+              step={3}
+              title={ADJ.create.draftSection}
+              meta={
+                draftLines.length > 0 ? (
+                  <span className="text-xs text-[var(--ops-text-muted)]">
+                    {draftTotals.lines} lineas · {draftTotals.withDiff} con diferencia · {draftTotals.noChange} sin cambio
+                  </span>
+                ) : null
+              }
+            />
+
             {draftLines.length > 0 ? (
-              <div className="-mx-[var(--ops-panel-padding)] -mb-[var(--ops-panel-padding)] overflow-hidden rounded-b-xl">
+              <div className="-mx-4 overflow-hidden rounded-b-xl sm:-mx-5">
                 <div className="overflow-x-auto">
                   <div className="min-w-[680px] border-y border-[var(--ops-border-strong)]">
                     <table className="w-full border-collapse">
@@ -612,6 +760,7 @@ export function InventoryAdjustmentsCreatePage() {
                       <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
                         {draftLines.map((line) => {
                           const diff = line.counted_qty - line.system_qty;
+
                           return (
                             <tr
                               key={line.variant_id}
@@ -649,7 +798,6 @@ export function InventoryAdjustmentsCreatePage() {
                                     )
                                   }
                                   min={0}
-                                  className={diff !== 0 ? "ring-1 ring-[var(--ops-tone-warning-text)]" : undefined}
                                 />
                               </td>
                               <td
@@ -690,145 +838,59 @@ export function InventoryAdjustmentsCreatePage() {
                 {ADJ.create.emptyDraft}
               </p>
             )}
-          </OpsPanelSection>
+          </section>
         </div>
 
-        {/* ═══════════ RIGHT COLUMN (sidebar) ═══════════ */}
-        <aside className="space-y-4 xl:sticky xl:top-20">
-          {/* ── Resumen ── */}
-          <OpsPanelSection
-            title={ADJ.create.summary}
-            icon={<Calculator className="h-4 w-4 text-[var(--ripnel-accent)]" />}
-          >
-            <div className="space-y-2">
-              <OpsMetricRow
-                label={ADJ.metrics.systemTotal}
-                value={String(draftTotals.totalSystem)}
-              />
-              <OpsMetricRow
-                label={ADJ.metrics.countedTotal}
-                value={String(draftTotals.totalCounted)}
-              />
-              <OpsMetricRow
-                label={ADJ.metrics.difference}
-                value={`${draftTotals.totalDiff > 0 ? "+" : ""}${draftTotals.totalDiff}`}
-                tone={draftTotals.totalDiff !== 0 ? "warning" : "default"}
-              />
-              <div className="border-t border-[var(--ops-border-soft)] pt-2">
-                <OpsMetricRow
-                  label={ADJ.metrics.linesNoChange}
-                  value={String(draftTotals.noChange)}
-                />
-                <OpsMetricRow
-                  label={ADJ.metrics.linesWithDiff}
-                  value={String(draftTotals.withDiff)}
-                />
-              </div>
-            </div>
-          </OpsPanelSection>
-
-          {/* ── Motivo y notas ── */}
-          <OpsPanelSection
-            title={ADJ.create.motivoSection}
-            icon={<FileText className="h-4 w-4 text-[var(--ripnel-accent)]" />}
-          >
-            <div className="space-y-3">
-              <PresetTextField
-                value={createReason}
-                onChange={setCreateReason}
-                presets={ADJUSTMENT_REASON_PRESETS}
-                placeholder={ADJ.create.customReasonPlaceholder}
-                textareaRows={2}
-                textareaClassName="min-h-[72px]"
-              />
-
-              <OpsFormField label={ADJ.create.notesLabel} density="compact">
-                <div className="relative">
-                  <textarea
-                    value={createNotes}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val.length <= NOTES_MAX) setCreateNotes(val);
-                    }}
-                    rows={2}
-                    placeholder={ADJ.create.notesPlaceholder}
-                    className={`${INPUT_CLASS} min-h-[60px] resize-none pr-12`}
-                  />
-                  <span className="pointer-events-none absolute bottom-2 right-3 text-[11px] text-[var(--ops-text-muted)]">
-                    {ADJ.create.notesCounter(createNotes.length, NOTES_MAX)}
-                  </span>
-                </div>
-              </OpsFormField>
-            </div>
-          </OpsPanelSection>
-
-          {/* ── Error ── */}
-          {createError ? (
+        <aside className="space-y-4">
+          {errors._form ? (
             <InlineStatusCard
               title={ADJ.create.createError}
-              description={createError}
+              description={errors._form}
               tone="danger"
               variant="ops"
             />
           ) : null}
 
-          {/* ── CTAs ── */}
-          <div className="space-y-2">
-            <Button
-              type="button"
-              variant={savedAdjustmentId ? "outline" : "outline"}
-              size="sm"
-              className="w-full rounded-lg"
-              disabled={
-                saving || !effectiveCreateLocationId || !draftLines.length || savedAdjustmentId !== null
-              }
-              onClick={handleSaveAndStay}
-            >
-              {saving ? (
-                <>
-                  <LoaderCircle className="h-4 w-4 animate-spin" />
-                  {ADJ.create.saving}
-                </>
-              ) : savedAdjustmentId ? (
-                <>
-                  <Check className="h-4 w-4" />
-                  {ADJ.create.savedDraft}
-                </>
-              ) : (
-                <>
-                  <PackagePlus className="h-4 w-4" />
-                  {ADJ.create.saveDraft}
-                </>
-              )}
-            </Button>
-
-            <Button
-              type="button"
-              variant="accent"
-              size="sm"
-              className="w-full rounded-lg"
-              disabled={
-                saving || confirming || !effectiveCreateLocationId || !draftLines.length
-              }
-              onClick={handleOpenConfirm}
-            >
-              {confirming ? (
-                <>
-                  <LoaderCircle className="h-4 w-4 animate-spin" />
-                  {ADJ.dialog.confirming}
-                </>
-              ) : (
-                ADJ.dialog.confirmButton
-              )}
-            </Button>
-          </div>
+          <AdjustmentSummaryStage
+            locationLabel={
+              selectedCreateLocation?.name ||
+              (loadingLocations ? ADJ.locationBadge.loading : ADJ.locationBadge.noLocation)
+            }
+            intentLabel={formatAdjustmentIntent(adjustmentIntent)}
+            reasonLabel={effectiveReason || ADJ.list.emptyReason}
+            notesLabel={createNotes.trim() || ADJ.create.summaryNoNotes}
+            draftLabel={
+              hasPersistedDraft && savedAdjustmentNumber
+                ? ADJ.create.summaryDraftSaved(savedAdjustmentNumber)
+                : staleDraftNumber
+                  ? ADJ.create.summaryDraftSaved(staleDraftNumber)
+                  : ADJ.create.summaryDraftPending
+            }
+            draftStatus={documentStatusCard}
+            totals={draftTotals}
+            canSaveDraft={
+              !hasBlockingAction &&
+              Boolean(effectiveCreateLocationId && draftLines.length) &&
+              !hasPersistedDraft
+            }
+            canReview={!hasBlockingAction && Boolean(effectiveCreateLocationId && draftLines.length)}
+            isSavingDraft={isSavingDraft}
+            isReviewing={isReviewing}
+            isConfirming={isConfirming}
+            hasPersistedDraft={hasPersistedDraft}
+            onSaveDraft={() => {
+              void handleSaveAndStay();
+            }}
+            onReview={() => {
+              void handleOpenConfirm();
+            }}
+          />
         </aside>
       </div>
 
-      {/* ── Confirm dialog (full review) ── */}
       <OpsDialog
         open={confirmOpen}
-        onOpenChange={setConfirmOpen}
+        onOpenChange={handleConfirmOpenChange}
         title={ADJ.dialog.confirmTitle}
         description={
           savedAdjustmentNumber && selectedCreateLocation
@@ -848,8 +910,8 @@ export function InventoryAdjustmentsCreatePage() {
               variant="outline"
               size="sm"
               className="rounded-lg px-4"
-              onClick={() => setConfirmOpen(false)}
-              disabled={confirming}
+              onClick={() => handleConfirmOpenChange(false)}
+              disabled={isConfirming}
             >
               {ADJ.dialog.close}
             </Button>
@@ -859,9 +921,9 @@ export function InventoryAdjustmentsCreatePage() {
               size="sm"
               className="rounded-lg px-4"
               onClick={handleConfirm}
-              disabled={confirming}
+              disabled={isConfirming}
             >
-              {confirming ? (
+              {isConfirming ? (
                 <>
                   <LoaderCircle className="h-4 w-4 animate-spin" />
                   {ADJ.dialog.confirming}
@@ -873,19 +935,44 @@ export function InventoryAdjustmentsCreatePage() {
           </div>
         }
       >
-        {/* Motivo + Notas summary */}
+        {reviewAutoSaved ? (
+          <InlineStatusCard
+            title={ADJ.create.draftStatusTitle}
+            description={ADJ.dialog.reviewAutoSaved}
+            variant="ops"
+          />
+        ) : null}
+
         <div className={INFO_BOX_MUTED}>
-          <p className="text-sm font-medium text-[var(--ops-text)]">
-            {effectiveReason || ADJ.list.emptyReason}
-          </p>
+          <div className="space-y-1.5">
+            {savedAdjustmentNumber ? (
+              <OpsMetricRow label={ADJ.dialog.reviewNumber} value={savedAdjustmentNumber} />
+            ) : null}
+            {selectedCreateLocation ? (
+              <OpsMetricRow label={ADJ.dialog.reviewLocation} value={selectedCreateLocation.name} />
+            ) : null}
+            <OpsMetricRow
+              label={ADJ.dialog.reviewIntent}
+              value={formatAdjustmentIntent(adjustmentIntent)}
+            />
+          </div>
+        </div>
+
+        <div className={INFO_BOX_MUTED}>
+          <OpsMetricRow
+            label={ADJ.dialog.reviewReason}
+            value={effectiveReason || ADJ.list.emptyReason}
+          />
           {createNotes.trim() ? (
-            <p className="mt-0.5 text-xs text-[var(--ops-text-muted)]">
-              {createNotes}
-            </p>
+            <div className="mt-2 border-t border-[var(--ops-border-soft)] pt-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ops-text-muted)]">
+                {ADJ.dialog.reviewNotes}
+              </p>
+              <p className="mt-1 text-xs text-[var(--ops-text-muted)]">{createNotes}</p>
+            </div>
           ) : null}
         </div>
 
-        {/* Lines table (differences only) */}
         {linesWithDiff.length > 0 ? (
           <div className="overflow-hidden rounded-lg border border-[var(--ops-border-strong)]">
             <table className="w-full border-collapse">
@@ -900,6 +987,7 @@ export function InventoryAdjustmentsCreatePage() {
               <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
                 {linesWithDiff.map((line) => {
                   const diff = line.counted_qty - line.system_qty;
+
                   return (
                     <tr key={line.variant_id}>
                       <td className="px-4 py-2">
@@ -919,11 +1007,7 @@ export function InventoryAdjustmentsCreatePage() {
                       <td
                         className={cn(
                           "px-4 py-2 text-right text-sm font-semibold tabular-nums",
-                          diff > 0
-                            ? DIFF_POSITIVE
-                            : diff < 0
-                              ? DIFF_NEGATIVE
-                              : DIFF_ZERO
+                          diff > 0 ? DIFF_POSITIVE : diff < 0 ? DIFF_NEGATIVE : DIFF_ZERO
                         )}
                       >
                         {diff > 0 ? "+" : ""}
@@ -937,26 +1021,16 @@ export function InventoryAdjustmentsCreatePage() {
           </div>
         ) : null}
 
-        {/* Totals */}
         <div className="space-y-1.5">
-          <OpsMetricRow
-            label={ADJ.metrics.systemTotal}
-            value={String(draftTotals.totalSystem)}
-          />
-          <OpsMetricRow
-            label={ADJ.metrics.countedTotal}
-            value={String(draftTotals.totalCounted)}
-          />
+          <OpsMetricRow label={ADJ.metrics.systemTotal} value={String(draftTotals.totalSystem)} />
+          <OpsMetricRow label={ADJ.metrics.countedTotal} value={String(draftTotals.totalCounted)} />
           <OpsMetricRow
             label={ADJ.metrics.difference}
             value={`${draftTotals.totalDiff > 0 ? "+" : ""}${draftTotals.totalDiff}`}
             tone={draftTotals.totalDiff !== 0 ? "warning" : "default"}
           />
           <div className="border-t border-[var(--ops-border-soft)] pt-1.5">
-            <OpsMetricRow
-              label={ADJ.metrics.lines}
-              value={String(draftTotals.lines)}
-            />
+            <OpsMetricRow label={ADJ.metrics.lines} value={String(draftTotals.lines)} />
             <OpsMetricRow
               label={ADJ.metrics.linesWithDiff}
               value={String(draftTotals.withDiff)}
@@ -965,7 +1039,6 @@ export function InventoryAdjustmentsCreatePage() {
           </div>
         </div>
 
-        {/* Impact warning */}
         <div className="flex items-start gap-2.5 rounded-lg border border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] px-4 py-3 text-[13px] text-[var(--ops-tone-danger-text)]">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{ADJ.dialog.reviewImpact}</span>

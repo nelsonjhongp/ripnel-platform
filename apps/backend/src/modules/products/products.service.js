@@ -175,9 +175,6 @@ function decorateProductSummary(row) {
     created_at: row.created_at,
     updated_at: row.updated_at,
     garment_type_name: row.garment_type_name,
-    fabric_name: row.fabric_name,
-    fabric_detail_name: row.fabric_detail_name,
-    target_name: row.target_name,
     size_codes: Array.isArray(row.size_codes)
       ? row.size_codes.map((value) => String(value)).filter(Boolean)
       : [],

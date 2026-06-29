@@ -13,10 +13,10 @@ const productPages: Record<
 > = {
   [productRouteSlugs.styles]: {
     title: "Estilos de producto",
-    description: "Modulo para registrar el style base y su definicion comercial antes de configurar variantes.",
+    description: "Modulo para registrar el style base comercial antes de configurar variantes.",
     bullets: [
-      "Crear estilos con nombre, codigo y atributos maestros.",
-      "Mantener tela, target y detalle comercial del producto.",
+      "Crear estilos con nombre, codigo y tipo de prenda.",
+      "Mantener el nucleo comercial separado de la ficha tecnica.",
       "Visualizar estado activo y vigencia del style.",
       "Servira como nodo principal para variantes y precios.",
     ],

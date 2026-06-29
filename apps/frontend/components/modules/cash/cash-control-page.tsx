@@ -60,7 +60,6 @@ const RANGE_OPTIONS: OpsOption[] = [
   { value: "7d", label: CAJA.admin.rangeOptions.d7 },
   { value: "30d", label: CAJA.admin.rangeOptions.d30 },
   { value: "60d", label: CAJA.admin.rangeOptions.d60 },
-  { value: "90d", label: CAJA.admin.rangeOptions.d90 },
 ]
 
 const STATUS_OPTIONS: OpsOption[] = [
@@ -449,14 +448,22 @@ export default function CashControlPage() {
                     <p className="font-semibold">
                       {formatAmount(closing.total_all)}
                     </p>
-                    {closing.is_consistent === false ? (
+                    {closing.status !== "closed" ? (
+                      <p className="text-xs text-[var(--ops-text-muted)]">
+                        {CAJA.admin.consistencyPending}
+                      </p>
+                    ) : closing.is_consistent === false ? (
                       <p className="text-xs text-[var(--ops-tone-warning-text)]">
                         {CAJA.admin.diffLabel}{" "}
                         {formatAmount(closing.difference)}
                       </p>
-                    ) : (
+                    ) : closing.is_consistent === true ? (
                       <p className="text-xs text-[var(--ops-tone-success-text)]">
                         {CAJA.admin.consistencyOk}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-[var(--ops-text-muted)]">
+                        {CAJA.admin.consistencyReview}
                       </p>
                     )}
                   </td>

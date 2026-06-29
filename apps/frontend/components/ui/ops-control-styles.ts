@@ -83,3 +83,34 @@ export const CHIP_TONE_NEUTRAL =
 /** Pill de tipo de cliente en tablas */
 export const CUSTOMER_TYPE_PILL =
   "inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]"
+
+/** Chip semantico — estado borrador (amber) — inventory adjustments */
+export const CHIP_DRAFT =
+  "border-[color:color-mix(in_srgb,#f59e0b_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f59e0b_82%,var(--ops-text))]"
+
+/** Chip semantico — estado confirmado (green) — inventory adjustments */
+export const CHIP_CONFIRMED =
+  "border-[color:color-mix(in_srgb,#10b981_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_82%,var(--ops-text))]"
+
+/** Chip semantico — estado cancelado (red) — inventory adjustments */
+export const CHIP_CANCELLED =
+  "border-[color:color-mix(in_srgb,#e11d48_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#e11d48_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#e11d48_82%,var(--ops-text))]"
+
+/** Texto de diferencia positiva (green) — inventory adjustments */
+export const DIFF_POSITIVE =
+  "text-[color:color-mix(in_srgb,#059669_88%,var(--ops-text))]"
+
+/** Texto de diferencia negativa (red) — inventory adjustments */
+export const DIFF_NEGATIVE =
+  "text-[color:color-mix(in_srgb,#e11d48_88%,var(--ops-text))]"
+
+/** Texto de diferencia cero (muted) — inventory adjustments */
+export const DIFF_ZERO = "text-[var(--ops-text-muted)]"
+
+/** Chip de intencion — apertura (accent violet) — inventory adjustments */
+export const CHIP_INTENT_OPENING =
+  "border-[color:color-mix(in_srgb,var(--ripnel-accent)_26%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_88%,var(--ops-surface))] text-[var(--ripnel-accent-hover)]"
+
+/** Chip de intencion — ajuste (neutral) — inventory adjustments */
+export const CHIP_INTENT_ADJUSTMENT =
+  "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]"

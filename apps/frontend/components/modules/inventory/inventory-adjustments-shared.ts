@@ -156,14 +156,14 @@ export function buildAdjustmentReason(intent: AdjustmentIntent, rawReason: strin
 
   if (intent === "opening") {
     if (!normalized) {
-      return "Apertura inicial";
+      return ADJ.intent.opening;
     }
 
-    return /^apertura/i.test(normalized) ? normalized : `Apertura inicial - ${normalized}`;
+    return /^apertura/i.test(normalized) ? normalized : `${ADJ.intent.opening} - ${normalized}`;
   }
 
   if (!normalized) {
-    return "Ajuste por conteo";
+    return ADJ.list.fallbackReason;
   }
 
   return normalized;

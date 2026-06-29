@@ -7,15 +7,12 @@ import { useApiGet } from "@/hooks/use-api-get"
 
 import type { CashClosingsResponse } from "./cash-types"
 import { HISTORY_PAGE_SIZE } from "./cash-constants"
+import { addDaysToPeruDate, todayPeruDate } from "./cash-utils"
 
 type StatusFilter = "all" | "open" | "closed"
 
-const todayStr = new Date().toISOString().slice(0, 10)
-const defaultFrom = (() => {
-  const d = new Date()
-  d.setDate(d.getDate() - 30)
-  return d.toISOString().slice(0, 10)
-})()
+const todayStr = todayPeruDate()
+const defaultFrom = addDaysToPeruDate(todayStr, -30)
 
 export function useCashHistory() {
   const [status, setStatus] = useState<StatusFilter>("all")

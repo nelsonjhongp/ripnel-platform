@@ -260,14 +260,20 @@ CREATE INDEX IF NOT EXISTS idx_customers_assigned_seller
 CREATE TABLE IF NOT EXISTS product_styles (
   style_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   garment_type_id UUID NOT NULL REFERENCES garment_types(garment_type_id),
-  fabric_id UUID REFERENCES fabrics(fabric_id),
-  fabric_detail_id UUID REFERENCES fabric_details(fabric_detail_id),
-  target_id UUID REFERENCES targets(target_id),
-
   style_code VARCHAR(30) UNIQUE,
   name VARCHAR(140) NOT NULL,
   description TEXT,
 
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS product_technical_profiles (
+  technical_profile_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  style_id UUID NOT NULL UNIQUE REFERENCES product_styles(style_id) ON DELETE CASCADE,
+  fabric_id UUID REFERENCES fabrics(fabric_id),
+  fabric_detail_id UUID REFERENCES fabric_details(fabric_detail_id),
   active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -963,6 +969,11 @@ CREATE TRIGGER trg_styles_updated_at
 BEFORE UPDATE ON product_styles
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+DROP TRIGGER IF EXISTS trg_product_technical_profiles_updated_at ON product_technical_profiles;
+CREATE TRIGGER trg_product_technical_profiles_updated_at
+BEFORE UPDATE ON product_technical_profiles
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
 DROP TRIGGER IF EXISTS trg_variants_updated_at ON product_variants;
 CREATE TRIGGER trg_variants_updated_at
 BEFORE UPDATE ON product_variants
@@ -1040,6 +1051,9 @@ SET min_qty    = EXCLUDED.min_qty,
 
 COMMENT ON TABLE product_styles IS
 'Modelo o producto base. En UI puede mostrarse como Modelo, no necesariamente como Style.';
+
+COMMENT ON TABLE product_technical_profiles IS
+'Capa tecnica minima del producto. Conserva tela y detalle tecnico fuera del nucleo comercial.';
 
 COMMENT ON TABLE product_variants IS
 'SKU vendible por combinación de modelo, talla y color.';

@@ -68,6 +68,8 @@ export default function CajaPage() {
     grandTotal,
     saleCount,
     paymentTotal,
+    closeSummaryTotal,
+    closeWarningMessage,
     businessDate,
     balanceDiffLabel,
   } = useCashPage(locationId, canOperateCash)
@@ -308,7 +310,8 @@ export default function CajaPage() {
                 if (!open) setShowCloseConfirm(false)
               }}
               methodValues={methodValues}
-              grandTotal={grandTotal}
+              closeSummaryTotal={closeSummaryTotal}
+              warningMessage={closeWarningMessage}
               closingBalanceDeclared={closingBalanceDeclared}
               onClosingBalanceDeclaredChange={setClosingBalanceDeclared}
               notes={closeNotes}

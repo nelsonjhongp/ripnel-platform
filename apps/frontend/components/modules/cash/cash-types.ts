@@ -71,7 +71,7 @@ export type CurrentCashResponse = {
 }
 
 export type CashHistoryFilters = {
-  range: "7d" | "30d"
+  range: "7d" | "30d" | "60d"
   status: "all" | "open" | "closed"
   location_id?: string | null
 }

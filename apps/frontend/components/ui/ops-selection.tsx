@@ -1,7 +1,7 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { Check, ChevronDown, X } from "lucide-react"
+import { Check, ChevronDown, Plus, X } from "lucide-react"
 
 import {
   DropdownMenu,
@@ -241,22 +241,50 @@ export function OpsSelectionChip({
   selected = false,
   leading,
   title,
+  disabled = false,
+  removeMode = "icon",
 }: {
   label: string
   onRemove?: () => void
   selected?: boolean
   leading?: ReactNode
   title?: string
+  disabled?: boolean
+  removeMode?: "icon" | "chip"
 }) {
+  const chipClassName = cn(
+    "inline-flex min-h-7 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+    selected
+      ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_76%,var(--ops-surface))] text-[var(--ripnel-accent-hover)]"
+      : "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] text-[var(--ops-text-muted)]"
+  )
+
+  if (removeMode === "chip" && onRemove) {
+    return (
+      <button
+        type="button"
+        title={title}
+        disabled={disabled}
+        onClick={onRemove}
+        aria-label={`Quitar ${label}`}
+        className={cn(
+          chipClassName,
+          "cursor-pointer transition hover:bg-[var(--ops-surface)] hover:text-[var(--ops-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ripnel-accent-soft)]",
+          disabled && "cursor-not-allowed opacity-60",
+        )}
+      >
+        {selected ? <Check className="h-3 w-3" /> : null}
+        {leading ? <span className="shrink-0">{leading}</span> : null}
+        <span>{label}</span>
+        <X className="h-3 w-3 shrink-0" aria-hidden="true" />
+      </button>
+    )
+  }
+
   return (
     <span
       title={title}
-      className={cn(
-        "inline-flex min-h-7 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-        selected
-          ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_76%,var(--ops-surface))] text-[var(--ripnel-accent-hover)]"
-          : "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] text-[var(--ops-text-muted)]"
-      )}
+      className={chipClassName}
     >
       {selected ? <Check className="h-3 w-3" /> : null}
       {leading ? <span className="shrink-0">{leading}</span> : null}
@@ -264,14 +292,75 @@ export function OpsSelectionChip({
       {onRemove ? (
         <button
           type="button"
+          disabled={disabled}
           onClick={onRemove}
-          className="inline-flex h-4 w-4 cursor-pointer items-center justify-center rounded-full text-current transition hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ripnel-accent-soft)] dark:hover:bg-white/10"
+          className={cn(
+            "inline-flex h-4 w-4 cursor-pointer items-center justify-center rounded-full text-current transition hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ripnel-accent-soft)] dark:hover:bg-white/10",
+            disabled && "cursor-not-allowed opacity-60",
+          )}
           aria-label={`Quitar ${label}`}
         >
           <X className="h-3 w-3" />
         </button>
       ) : null}
     </span>
+  )
+}
+
+export function OpsToggleChip({
+  label,
+  selected,
+  onToggle,
+  disabled = false,
+  title,
+}: {
+  label: string
+  selected: boolean
+  onToggle: () => void
+  disabled?: boolean
+  title?: string
+}) {
+  return (
+    <button
+      type="button"
+      title={title}
+      disabled={disabled}
+      aria-pressed={selected}
+      onClick={onToggle}
+      className={cn(
+        "inline-flex min-h-7 cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ripnel-accent-soft)]",
+        selected
+          ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_82%,var(--ops-surface))] text-[var(--ripnel-accent-hover)]"
+          : "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface)] hover:text-[var(--ops-text)]",
+        disabled && "cursor-not-allowed opacity-60",
+      )}
+    >
+      {selected ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+      {label}
+    </button>
+  )
+}
+
+export function OpsColorSwatch({
+  hex,
+  className,
+}: {
+  hex?: string | null
+  className?: string
+}) {
+  const colorValue =
+    typeof hex === "string" && hex.trim()
+      ? hex
+      : "var(--ops-surface-muted)"
+
+  return (
+    <span
+      className={cn(
+        "inline-flex h-3.5 w-3.5 rounded-full border border-[var(--ops-border-soft)]",
+        className,
+      )}
+      style={{ backgroundColor: colorValue }}
+    />
   )
 }
 

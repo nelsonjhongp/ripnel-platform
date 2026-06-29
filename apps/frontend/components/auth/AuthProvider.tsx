@@ -2,6 +2,10 @@
 
 import React from "react";
 import { AUTH_ERROR_EVENT, ApiError, apiFetch, unwrapApiData } from "@/lib/api";
+import {
+  createSingleFlightRunner,
+  finalizeAuthLoginFlow,
+} from "@/components/auth/auth-login-flow";
 
 export type AuthUser = {
   user_id: string;
@@ -124,6 +128,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     locationAssignments: [],
     defaultLocation: null,
   });
+  const loginRunnerRef = React.useRef<ReturnType<typeof createSingleFlightRunner<[{
+    username: string
+    password: string
+  }], void>> | null>(null)
 
   React.useEffect(() => {
     function handleAuthError(event: Event) {
@@ -154,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const fetchLocations = React.useCallback(async (userId: string) => {
+  const fetchLocations = React.useCallback(async (userId: string, options?: { failOnError?: boolean }) => {
     setState((current) => ({ ...current, locationsLoading: true, locationsError: null }));
 
     try {
@@ -175,14 +183,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }));
     } catch (error) {
       console.warn("Failed to load user locations", error);
+      const message = formatLocationsError(error)
 
       setState((current) => ({
         ...current,
         locationsLoading: false,
-        locationsError: formatLocationsError(error),
+        locationsError: message,
         locationAssignments: [],
         defaultLocation: null,
       }));
+
+      if (options?.failOnError) {
+        throw new Error("AUTH_CONTEXT_LOAD_FAILED", {
+          cause: error,
+        } as ErrorOptions)
+      }
     }
   }, []);
 
@@ -234,44 +249,78 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchLocations]);
 
   React.useEffect(() => {
-    refresh();
+    const timeoutId = window.setTimeout(() => {
+      void refresh();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
   }, [refresh]);
 
-  const login = React.useCallback(
-    async (input: { username: string; password: string }) => {
-      setState((s) => ({ ...s, loading: true }));
-      try {
-        const data = await apiFetch<{ user: AuthUser; permissions: string[] }>("/api/auth/login", {
-          method: "POST",
-          body: JSON.stringify(input),
-        });
-        setState((current) => ({
-          ...current,
-          user: data.user,
-          permissions: data.permissions || [],
-          loading: false,
-          authMessage: null,
-          sessionExpired: false,
-          signedOutIntentional: false,
-        }));
-        if (data.user.must_change_password) {
-          setState((current) => ({
-            ...current,
-            locationsLoading: false,
-            locationsError: null,
-            locationAssignments: [],
-            defaultLocation: null,
-          }));
-        } else {
-          await fetchLocations(data.user.user_id);
+  const login = React.useCallback(async (input: { username: string; password: string }) => {
+    if (!loginRunnerRef.current) {
+      loginRunnerRef.current = createSingleFlightRunner(async (nextInput: { username: string; password: string }) => {
+        setState((s) => ({ ...s, loading: true, authMessage: null }));
+        try {
+          const data = await apiFetch<{ user: AuthUser; permissions: string[] }>("/api/auth/login", {
+            method: "POST",
+            body: JSON.stringify(nextInput),
+          });
+
+          await finalizeAuthLoginFlow({
+            payload: data,
+            fetchLocations: (userId) => fetchLocations(userId, { failOnError: true }),
+            setAuthenticatedPending: (payload) => {
+              setState((current) => ({
+                ...current,
+                user: payload.user,
+                permissions: payload.permissions || [],
+                loading: true,
+                authMessage: null,
+                sessionExpired: false,
+                signedOutIntentional: false,
+              }))
+            },
+            clearLocations: () => {
+              setState((current) => ({
+                ...current,
+                locationsLoading: false,
+                locationsError: null,
+                locationAssignments: [],
+                defaultLocation: null,
+              }))
+            },
+            setReady: () => {
+              setState((current) => ({
+                ...current,
+                loading: false,
+              }))
+            },
+            handleContextFailure: async () => {
+              try {
+                await apiFetch<void>("/api/auth/logout", {
+                  method: "POST",
+                  suppressAuthEvent: true,
+                })
+              } catch {}
+
+              setState(
+                buildSignedOutState({
+                  authMessage: "No se pudo completar el acceso actual.",
+                })
+              )
+            },
+          })
+        } catch (error) {
+          setState((current) => ({ ...current, loading: false }))
+          throw error
         }
-      } catch (error) {
-        setState((current) => ({ ...current, loading: false }));
-        throw error;
-      }
-    },
-    [fetchLocations]
-  );
+      })
+    }
+
+    return loginRunnerRef.current(input)
+  }, [fetchLocations])
 
   const changePassword = React.useCallback(
     async (input: { current_password: string; new_password: string }) => {
@@ -320,7 +369,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refreshLocations = React.useCallback(async () => {
-    if (!state.user?.user_id) {
+    const userId = state.user?.user_id;
+
+    if (!userId) {
       setState((current) => ({
         ...current,
         locationsLoading: false,
@@ -331,8 +382,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    await fetchLocations(state.user.user_id);
-  }, [fetchLocations, state.user?.user_id]);
+    await fetchLocations(userId);
+  }, [fetchLocations, state.user]);
 
   const setDefaultLocation = React.useCallback(
     async (locationId: string) => {

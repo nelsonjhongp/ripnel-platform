@@ -1,16 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { usePagination } from "@/hooks/use-pagination";
 import {
-  Power,
   LoaderCircle,
   PencilLine,
   Plus,
-  RefreshCw,
+  Power,
   ReceiptText,
+  RefreshCw,
   RotateCcw,
   Shapes,
 } from "lucide-react";
@@ -26,7 +25,6 @@ import {
   AdminRowActionsMenu,
   AdminTextarea,
 } from "@/components/admin/admin-ui";
-import { OpsReadonlyFieldState, OpsSelect } from "@/components/ui/ops-selection";
 import { apiFetchData } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/date-utils";
@@ -49,8 +47,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { CatalogItem, StatusFilter } from "@/types/products";
+import { OpsReadonlyFieldState, OpsSelect } from "@/components/ui/ops-selection";
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
+import { ProductCreateDialog } from "./product-create-dialog";
+import { PRODUCTS } from "./products-messages";
+import { PRODUCT_DESCRIPTION_MAX_LENGTH } from "./products-utils";
+import type { CatalogItem, StatusFilter } from "@/types/products";
 
 type StyleItem = {
   style_id: string;
@@ -61,21 +63,11 @@ type StyleItem = {
   created_at: string;
   garment_type_id: string;
   garment_type_name: string;
-  fabric_id: string | null;
-  fabric_name: string | null;
-  fabric_detail_id: string | null;
-  fabric_detail_name: string | null;
-  target_id: string | null;
-  target_name: string | null;
   size_codes: string[];
   color_codes: string[];
 };
 
 type FormState = {
-  garment_type_id: string;
-  fabric_id: string;
-  fabric_detail_id: string;
-  target_id: string;
   name: string;
   description: string;
   active: boolean;
@@ -88,28 +80,10 @@ const STATUS_OPTIONS = [
 ] as const;
 
 const initialFormState: FormState = {
-  garment_type_id: "",
-  fabric_id: "",
-  fabric_detail_id: "",
-  target_id: "",
   name: "",
   description: "",
   active: true,
 };
-
-function getOptionId(item: CatalogItem) {
-  return String(
-    item.garment_type_id ||
-      item.fabric_id ||
-      item.fabric_detail_id ||
-      item.target_id ||
-      ""
-  );
-}
-
-function getOptionLabel(item: CatalogItem) {
-  return String(item.name || "");
-}
 
 async function requestApiData<T>(path: string) {
   return apiFetchData<T>(path, {
@@ -118,26 +92,14 @@ async function requestApiData<T>(path: string) {
 }
 
 async function requestStylesModuleData() {
-  const [
-    stylesData,
-    garmentTypesData,
-    fabricsData,
-    fabricDetailsData,
-    targetsData,
-  ] = await Promise.all([
+  const [stylesData, garmentTypesData] = await Promise.all([
     requestApiData<StyleItem[]>("/api/styles"),
     requestApiData<CatalogItem[]>("/api/garment-types"),
-    requestApiData<CatalogItem[]>("/api/fabrics"),
-    requestApiData<CatalogItem[]>("/api/fabric-details"),
-    requestApiData<CatalogItem[]>("/api/targets"),
   ]);
 
   return {
     stylesData,
     garmentTypesData,
-    fabricsData,
-    fabricDetailsData,
-    targetsData,
   };
 }
 
@@ -149,9 +111,6 @@ export function StylesPage({
   const router = useRouter();
   const [styles, setStyles] = useState<StyleItem[]>([]);
   const [garmentTypes, setGarmentTypes] = useState<CatalogItem[]>([]);
-  const [fabrics, setFabrics] = useState<CatalogItem[]>([]);
-  const [fabricDetails, setFabricDetails] = useState<CatalogItem[]>([]);
-  const [targets, setTargets] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -159,6 +118,7 @@ export function StylesPage({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [editingStyleId, setEditingStyleId] = useState<string | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const [pendingStatusStyle, setPendingStatusStyle] = useState<StyleItem | null>(null);
   const [togglingStyleId, setTogglingStyleId] = useState<string | null>(null);
   const [formState, setFormState] = useState<FormState>(initialFormState);
@@ -169,19 +129,9 @@ export function StylesPage({
     setError(null);
 
     try {
-      const {
-        stylesData,
-        garmentTypesData,
-        fabricsData,
-        fabricDetailsData,
-        targetsData,
-      } = await requestStylesModuleData();
-
+      const { stylesData, garmentTypesData } = await requestStylesModuleData();
       setStyles(stylesData);
       setGarmentTypes(garmentTypesData);
-      setFabrics(fabricsData);
-      setFabricDetails(fabricDetailsData);
-      setTargets(targetsData);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -235,14 +185,7 @@ export function StylesPage({
         return true;
       }
 
-      return [
-        style.name,
-        style.style_code,
-        style.garment_type_name,
-        style.fabric_name,
-        style.fabric_detail_name,
-        style.target_name,
-      ]
+      return [style.name, style.style_code, style.garment_type_name]
         .filter((value) => value !== null && value !== undefined)
         .some((value) => String(value).toLowerCase().includes(normalizedSearch));
     });
@@ -281,10 +224,6 @@ export function StylesPage({
   function handleEdit(style: StyleItem) {
     setEditingStyleId(style.style_id);
     setFormState({
-      garment_type_id: style.garment_type_id,
-      fabric_id: style.fabric_id || "",
-      fabric_detail_id: style.fabric_detail_id || "",
-      target_id: style.target_id || "",
       name: style.name,
       description: style.description || "",
       active: style.active,
@@ -353,7 +292,6 @@ export function StylesPage({
         body: JSON.stringify({
           name: formState.name,
           description: formState.description.trim() || null,
-          target_id: formState.target_id || null,
           active: formState.active,
         }),
       });
@@ -374,379 +312,345 @@ export function StylesPage({
   return (
     <TooltipProvider delayDuration={120}>
       <OpsPageShell width="wide">
-          <PosHeader
-            eyebrow="Productos"
-            title="Estilos de producto"
-            actions={
-              <>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon-sm"
-                      onClick={loadData}
-                      disabled={loading}
-                      aria-label="Actualizar estilos"
-                      className="rounded-lg"
-                    >
-                      <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" sideOffset={8}>
-                    Actualizar
-                  </TooltipContent>
-                </Tooltip>
-                <Button asChild variant="accent" size="sm" className="rounded-lg">
-                  <Link href="/productos/nuevo">
-                    <Plus className="h-4 w-4" />
-                    Nuevo
-                  </Link>
-                </Button>
-              </>
-            }
-          />
-
-          <OpsMetricInlineGroup items={[
-            { label: "Styles base", value: styles.length },
-            { label: "Activos", value: activeCount, tone: "success" },
-            { label: "Inactivos", value: inactiveCount, tone: "warning" },
-          ]} />
-
-          <OpsSectionDivider className="space-y-4">
-            <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_auto]">
-              <OpsSearchField
-                value={search}
-                onChange={(value) => {
-                  setSearch(value);
-                  setPage(1);
-                }}
-                placeholder="Buscar por style, código o catálogos"
-                ariaLabel="Buscar styles"
-              />
-
-              <OpsSelect
-                label="Estado"
-                value={statusFilter}
-                options={STATUS_OPTIONS}
-                onChange={(value) => {
-                  setStatusFilter(value as "all" | "active" | "inactive");
-                  setPage(1);
-                }}
-              />
-
+        <PosHeader
+          eyebrow="Productos"
+          title="Estilos de producto"
+          actions={
+            <>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     type="button"
-                    onClick={clearFilters}
-                    disabled={!hasActiveFilters}
                     variant="outline"
                     size="icon-sm"
-                    className="h-10 w-10 rounded-lg"
-                    aria-label="Limpiar filtros"
+                    onClick={loadData}
+                    disabled={loading}
+                    aria-label="Actualizar estilos"
+                    className="rounded-lg"
                   >
-                    <RotateCcw className="h-4 w-4" />
+                    <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="top" sideOffset={8}>
-                  Limpiar filtros
+                  Actualizar
                 </TooltipContent>
               </Tooltip>
-            </OpsFiltersRow>
+              <Button
+                type="button"
+                variant="accent"
+                size="sm"
+                className="rounded-lg"
+                onClick={() => setCreateOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                {PRODUCTS.actions.newProduct}
+              </Button>
+            </>
+          }
+        />
 
-            <OpsTableWrap minWidth="1120px">
-                <div className="ops-surface-muted grid grid-cols-[1.3fr_0.9fr_0.9fr_0.9fr_0.82fr_0.82fr_0.72fr_1.22fr] gap-x-3 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                  <span>Style</span>
-                  <span>Tipo</span>
-                  <span>Tela</span>
-                  <span>Detalle</span>
-                  <span>Target</span>
-                  <span>Config.</span>
-                  <span>Estado</span>
-                  <span>Acciones</span>
+        <OpsMetricInlineGroup
+          items={[
+            { label: "Styles base", value: styles.length },
+            { label: "Activos", value: activeCount, tone: "success" },
+            { label: "Inactivos", value: inactiveCount, tone: "warning" },
+          ]}
+        />
+
+        <OpsSectionDivider className="space-y-4">
+          <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_auto]">
+            <OpsSearchField
+              value={search}
+              onChange={(value) => {
+                setSearch(value);
+                setPage(1);
+              }}
+              placeholder="Buscar por style, código o tipo de prenda"
+              ariaLabel="Buscar styles"
+            />
+
+            <OpsSelect
+              label="Estado"
+              value={statusFilter}
+              options={STATUS_OPTIONS}
+              onChange={(value) => {
+                setStatusFilter(value as "all" | "active" | "inactive");
+                setPage(1);
+              }}
+            />
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  onClick={clearFilters}
+                  disabled={!hasActiveFilters}
+                  variant="outline"
+                  size="icon-sm"
+                  className="h-10 w-10 rounded-lg"
+                  aria-label="Limpiar filtros"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={8}>
+                Limpiar filtros
+              </TooltipContent>
+            </Tooltip>
+          </OpsFiltersRow>
+
+          <OpsTableWrap minWidth="1120px">
+            <div className="ops-surface-muted grid grid-cols-[1.35fr_0.92fr_0.86fr_0.86fr_0.78fr_1.16fr] gap-x-3 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
+              <span>Style</span>
+              <span>Tipo</span>
+              <span>Tallas</span>
+              <span>Colores</span>
+              <span>Estado</span>
+              <span>Acciones</span>
+            </div>
+
+            <div className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+              {loading ? (
+                <div className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                  <LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />
+                  Cargando styles…
                 </div>
-
-                <div className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                  {loading ? (
-                    <div className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                      <LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />
-                      Cargando styles…
-                    </div>
-                  ) : paginatedStyles.length === 0 ? (
-                    <OpsEmptyState variant="compact" description={
-                      styles.length
-                        ? "No se encontraron styles con los filtros aplicados."
-                        : "Aun no hay styles registrados."
-                    } />
-                  ) : (
-                    paginatedStyles.map((style) => (
-                      <div
-                        key={style.style_id}
-                        className={cn(
-                          "grid grid-cols-[1.3fr_0.9fr_0.9fr_0.9fr_0.82fr_0.82fr_0.72fr_1.22fr] gap-x-3 px-4 py-[var(--ops-row-py)] transition hover:bg-[var(--ops-surface-muted)]",
-                          !style.active && "opacity-75"
-                        )}
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                            {style.name}
-                          </p>
-                          <div className="mt-1 flex items-center gap-2">
-                            <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                              {style.style_code || "Sin codigo"}
-                            </span>
-                            <span className="text-[11px] text-[var(--ops-text-muted)]">
-                              {formatDate(style.created_at)}
-                            </span>
-                          </div>
-                          {style.description ? (
-                            <p className="mt-1 truncate text-[11px] text-[var(--ops-text-muted)]">
-                              {style.description}
-                            </p>
-                          ) : null}
-                        </div>
-
-                        <div className="text-sm text-[var(--ops-text)]">
-                          {style.garment_type_name}
-                        </div>
-                        <div className="text-sm text-[var(--ops-text)]">
-                          {style.fabric_name || "-"}
-                        </div>
-                        <div className="text-sm text-[var(--ops-text)]">
-                          {style.fabric_detail_name || "-"}
-                        </div>
-                        <div className="text-sm text-[var(--ops-text)]">
-                          {style.target_name || "-"}
-                        </div>
-
-                        <div className="text-sm text-[var(--ops-text)]">
-                          <p>{style.size_codes.length} tallas</p>
-                          <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">
-                            {style.color_codes.length} colores
-                          </p>
-                        </div>
-
-                        <div>
-                           <OpsStatusBadge tone={style.active ? "success" : "neutral"}>
-                              {style.active ? "Activo" : "Inactivo"}
-                            </OpsStatusBadge>
-                        </div>
-
-                        <AdminRowActionsMenu
-                          ariaLabel={`Acciones para ${style.name}`}
-                          items={[
-                            {
-                              label: "Editar",
-                              icon: <PencilLine className="h-4 w-4" />,
-                              onSelect: () => handleEdit(style),
-                            },
-                            {
-                              label: "Variantes",
-                              icon: <Shapes className="h-4 w-4" />,
-                              onSelect: () =>
-                                router.push(
-                                  `/productos/variantes?style_id=${encodeURIComponent(style.style_id)}`
-                                ),
-                            },
-                            {
-                              label: "Precios",
-                              icon: <ReceiptText className="h-4 w-4" />,
-                              onSelect: () =>
-                                router.push(
-                                  `/precios/crear?style_id=${encodeURIComponent(style.style_id)}`
-                                ),
-                            },
-                            {
-                              label: style.active ? "Inactivar" : "Activar",
-                              icon: <Power className="h-4 w-4" />,
-                              tone: style.active ? "danger" : "neutral",
-                              disabled: togglingStyleId === style.style_id,
-                              onSelect: () => setPendingStatusStyle(style),
-                            },
-                          ]}
-                        />
-                      </div>
-                    ))
-                  )}
-                </div>
-            </OpsTableWrap>
-
-            {!loading ? (
-              <OpsTableFooter>
-                <span className="ops-secondary-text text-[var(--ops-text-muted)]">
-                  {filteredStyles.length === 0
-                    ? "0 resultados"
-                    : `${firstVisible}-${lastVisible} de ${filteredStyles.length}`}
-                </span>
-                <Pagination
-                  page={safeCurrentPage}
-                  totalPages={totalPages}
-                  onPageChange={setPage}
-                  className="self-end md:self-auto"
-                />
-              </OpsTableFooter>
-            ) : null}
-          </OpsSectionDivider>
-
-          {editingStyleId ? (
-            <AdminModalShell
-              title="Editar style"
-              onClose={resetForm}
-              widthClass="max-w-3xl"
-            >
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <AdminField label="Nombre">
-                  <AdminInput
-                    value={formState.name}
-                    onChange={(event) =>
-                      setFormState((current) => ({
-                        ...current,
-                        name: event.target.value,
-                      }))
-                    }
-                    placeholder="Jogger - French Terry"
-                    required
-                  />
-                </AdminField>
-
-                <AdminField label="Código">
-                  <OpsReadonlyFieldState
-                    value={styles.find((style) => style.style_id === editingStyleId)?.style_code || ""}
-                    placeholder="Sin código"
-                  />
-                </AdminField>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <AdminField label="Tipo de prenda">
-                    <OpsReadonlyFieldState
-                      value={
-                        garmentTypes.find((item) => getOptionId(item) === formState.garment_type_id)?.name ||
-                        ""
-                      }
-                      placeholder="Sin tipo"
-                    />
-                  </AdminField>
-
-                  <AdminField label="Tela">
-                    <OpsReadonlyFieldState
-                      value={
-                        fabrics.find((item) => getOptionId(item) === formState.fabric_id)?.name || ""
-                      }
-                      placeholder="Sin tela"
-                    />
-                  </AdminField>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <AdminField label="Detalle de tela">
-                    <OpsReadonlyFieldState
-                      value={
-                        fabricDetails.find((item) => getOptionId(item) === formState.fabric_detail_id)?.name ||
-                        ""
-                      }
-                      placeholder="Sin detalle"
-                    />
-                  </AdminField>
-
-                  <AdminField label="Target">
-                    <OpsSelect
-                      value={formState.target_id}
-                      onValueChange={(value) =>
-                        setFormState((current) => ({
-                          ...current,
-                          target_id: value,
-                        }))
-                      }
-                      placeholder="Sin target"
-                      options={targets.map((item) => ({
-                        value: getOptionId(item),
-                        label: getOptionLabel(item),
-                      }))}
-                    />
-                  </AdminField>
-                </div>
-
-                <AdminField label="Descripción">
-                  <AdminTextarea
-                    value={formState.description}
-                    onChange={(event) =>
-                      setFormState((current) => ({
-                        ...current,
-                        description: event.target.value,
-                      }))
-                    }
-                    placeholder="Notas internas del style"
-                  />
-                </AdminField>
-
-                <AdminCheckboxField
-                  label="Style activo"
-                  checked={formState.active}
-                  onChange={(checked) =>
-                    setFormState((current) => ({
-                      ...current,
-                      active: checked,
-                    }))
+              ) : paginatedStyles.length === 0 ? (
+                <OpsEmptyState
+                  variant="compact"
+                  description={
+                    styles.length
+                      ? "No se encontraron styles con los filtros aplicados."
+                      : "Aun no hay styles registrados."
                   }
                 />
-
-                {error ? (
-                  <AdminInlineMessage tone="danger">{error}</AdminInlineMessage>
-                ) : null}
-
-                {successMessage ? (
-                  <AdminInlineMessage tone="success">{successMessage}</AdminInlineMessage>
-                ) : null}
-
-                <AdminFormActionsBar>
-                  <AdminActionButton type="button" onClick={resetForm}>
-                    Cancelar
-                  </AdminActionButton>
-                  <AdminActionButton type="submit" tone="accent" disabled={submitting}>
-                    {submitting ? (
-                      <>
-                        <LoaderCircle className="h-4 w-4 animate-spin" />
-                        Guardando...
-                      </>
-                    ) : (
-                      <>
-                        <PencilLine className="h-4 w-4" />
-                        Guardar cambios
-                      </>
-                    )}
-                  </AdminActionButton>
-                </AdminFormActionsBar>
-              </form>
-            </AdminModalShell>
-          ) : null}
-
-          <AdminConfirmModal
-            open={Boolean(pendingStatusStyle)}
-            title={pendingStatusStyle?.active ? "Inactivar style" : "Activar style"}
-            description={
-              pendingStatusStyle ? (
-                <>
-                  {pendingStatusStyle.active
-                    ? `Inactivarás ${pendingStatusStyle.name}.`
-                    : `Activarás ${pendingStatusStyle.name}.`}
-                </>
               ) : (
-                ""
-              )
+                paginatedStyles.map((style) => (
+                  <div
+                    key={style.style_id}
+                    className={cn(
+                      "grid grid-cols-[1.35fr_0.92fr_0.86fr_0.86fr_0.78fr_1.16fr] gap-x-3 px-4 py-[var(--ops-row-py)] transition hover:bg-[var(--ops-surface-muted)]",
+                      !style.active && "opacity-75"
+                    )}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
+                        {style.name}
+                      </p>
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                          {style.style_code || "Sin código"}
+                        </span>
+                        <span className="text-[11px] text-[var(--ops-text-muted)]">
+                          {formatDate(style.created_at)}
+                        </span>
+                      </div>
+                      {style.description ? (
+                        <p className="mt-1 truncate text-[11px] text-[var(--ops-text-muted)]">
+                          {style.description}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div className="text-sm text-[var(--ops-text)]">{style.garment_type_name}</div>
+                    <div className="text-sm text-[var(--ops-text)]">{style.size_codes.length}</div>
+                    <div className="text-sm text-[var(--ops-text)]">{style.color_codes.length}</div>
+
+                    <div>
+                      <OpsStatusBadge tone={style.active ? "success" : "neutral"}>
+                        {style.active ? "Activo" : "Inactivo"}
+                      </OpsStatusBadge>
+                    </div>
+
+                    <AdminRowActionsMenu
+                      ariaLabel={`Acciones para ${style.name}`}
+                      items={[
+                        {
+                          label: "Editar",
+                          icon: <PencilLine className="h-4 w-4" />,
+                          onSelect: () => handleEdit(style),
+                        },
+                        {
+                          label: "Variantes",
+                          icon: <Shapes className="h-4 w-4" />,
+                          onSelect: () =>
+                            router.push(
+                              `/productos/variantes?style_id=${encodeURIComponent(style.style_id)}`
+                            ),
+                        },
+                        {
+                          label: "Precios",
+                          icon: <ReceiptText className="h-4 w-4" />,
+                          onSelect: () =>
+                            router.push(
+                              `/precios/crear?style_id=${encodeURIComponent(style.style_id)}`
+                            ),
+                        },
+                        {
+                          label: style.active ? "Inactivar" : "Activar",
+                          icon: <Power className="h-4 w-4" />,
+                          tone: style.active ? "danger" : "neutral",
+                          disabled: togglingStyleId === style.style_id,
+                          onSelect: () => setPendingStatusStyle(style),
+                        },
+                      ]}
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+          </OpsTableWrap>
+
+          {!loading ? (
+            <OpsTableFooter>
+              <span className="ops-secondary-text text-[var(--ops-text-muted)]">
+                {filteredStyles.length === 0
+                  ? "0 resultados"
+                  : `${firstVisible}-${lastVisible} de ${filteredStyles.length}`}
+              </span>
+              <Pagination
+                page={safeCurrentPage}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                className="self-end md:self-auto"
+              />
+            </OpsTableFooter>
+          ) : null}
+        </OpsSectionDivider>
+
+        {editingStyleId ? (
+          <AdminModalShell
+            title="Editar style"
+            onClose={resetForm}
+            widthClass="max-w-3xl"
+          >
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <AdminField label="Nombre">
+                <AdminInput
+                  value={formState.name}
+                  onChange={(event) =>
+                    setFormState((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
+                  }
+                  placeholder="Polo oversize básico"
+                  required
+                />
+              </AdminField>
+
+              <AdminField label="Código">
+                <OpsReadonlyFieldState
+                  value={styles.find((style) => style.style_id === editingStyleId)?.style_code || ""}
+                  placeholder="Sin código"
+                />
+              </AdminField>
+
+              <AdminField label="Tipo de prenda">
+                <OpsReadonlyFieldState
+                  value={
+                    garmentTypes.find(
+                      (item) =>
+                        String(item.garment_type_id || "") ===
+                        styles.find((style) => style.style_id === editingStyleId)?.garment_type_id
+                    )?.name || ""
+                  }
+                  placeholder="Sin tipo"
+                />
+              </AdminField>
+
+              <AdminField label="Descripción">
+                <AdminTextarea
+                  value={formState.description}
+                  onChange={(event) =>
+                    setFormState((current) => ({
+                      ...current,
+                      description: event.target.value,
+                    }))
+                  }
+                  maxLength={PRODUCT_DESCRIPTION_MAX_LENGTH}
+                  placeholder="Notas internas del style"
+                />
+                <div className="mt-1 flex justify-end">
+                  <span className="text-[11px] font-medium tabular-nums text-[var(--ops-text-muted)]">
+                    {PRODUCTS.form.descriptionCounter(
+                      formState.description.length,
+                      PRODUCT_DESCRIPTION_MAX_LENGTH
+                    )}
+                  </span>
+                </div>
+              </AdminField>
+
+              <AdminCheckboxField
+                label="Style activo"
+                checked={formState.active}
+                onChange={(checked) =>
+                  setFormState((current) => ({
+                    ...current,
+                    active: checked,
+                  }))
+                }
+              />
+
+              {error ? <AdminInlineMessage tone="danger">{error}</AdminInlineMessage> : null}
+              {successMessage ? (
+                <AdminInlineMessage tone="success">{successMessage}</AdminInlineMessage>
+              ) : null}
+
+              <AdminFormActionsBar>
+                <AdminActionButton type="button" onClick={resetForm}>
+                  Cancelar
+                </AdminActionButton>
+                <AdminActionButton type="submit" tone="accent" disabled={submitting}>
+                  {submitting ? (
+                    <>
+                      <LoaderCircle className="h-4 w-4 animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <PencilLine className="h-4 w-4" />
+                      Guardar cambios
+                    </>
+                  )}
+                </AdminActionButton>
+              </AdminFormActionsBar>
+            </form>
+          </AdminModalShell>
+        ) : null}
+
+        <AdminConfirmModal
+          open={Boolean(pendingStatusStyle)}
+          title={pendingStatusStyle?.active ? "Inactivar style" : "Activar style"}
+          description={
+            pendingStatusStyle
+              ? pendingStatusStyle.active
+                ? `Inactivarás ${pendingStatusStyle.name}.`
+                : `Activarás ${pendingStatusStyle.name}.`
+              : ""
+          }
+          confirmLabel={pendingStatusStyle?.active ? "Inactivar" : "Activar"}
+          confirmTone={pendingStatusStyle?.active ? "danger" : "accent"}
+          busy={Boolean(
+            pendingStatusStyle && togglingStyleId === pendingStatusStyle.style_id
+          )}
+          onCancel={() => setPendingStatusStyle(null)}
+          onConfirm={() => {
+            if (pendingStatusStyle) {
+              void handleToggleActive(pendingStatusStyle);
             }
-            confirmLabel={pendingStatusStyle?.active ? "Inactivar" : "Activar"}
-            confirmTone={pendingStatusStyle?.active ? "danger" : "accent"}
-            busy={Boolean(
-              pendingStatusStyle && togglingStyleId === pendingStatusStyle.style_id
-            )}
-            onCancel={() => setPendingStatusStyle(null)}
-            onConfirm={() => {
-              if (pendingStatusStyle) {
-                void handleToggleActive(pendingStatusStyle);
-              }
-            }}
-          />
+          }}
+        />
+        <ProductCreateDialog
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onCreated={(style) => {
+            void Promise.resolve().then(loadData);
+            router.push(
+              `/productos/variantes?style_id=${encodeURIComponent(style.style_id)}`
+            );
+          }}
+        />
       </OpsPageShell>
     </TooltipProvider>
   );

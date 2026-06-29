@@ -17,8 +17,6 @@ async function findProductSummaries(filters = {}) {
       ps.name ilike ${searchRef}
       or ps.style_code ilike ${searchRef}
       or gt.name ilike ${searchRef}
-      or coalesce(f.name, '') ilike ${searchRef}
-      or coalesce(t.name, '') ilike ${searchRef}
     )`);
   }
 
@@ -36,19 +34,13 @@ async function findProductSummaries(filters = {}) {
          ps.style_id,
          ps.style_code,
          ps.name,
-         ps.description,
-         ps.active,
-         ps.created_at,
-         ps.updated_at,
-         gt.name as garment_type_name,
-         f.name as fabric_name,
-         fd.name as fabric_detail_name,
-         t.name as target_name
+       ps.description,
+       ps.active,
+       ps.created_at,
+       ps.updated_at,
+       gt.name as garment_type_name
        from product_styles ps
        inner join garment_types gt on gt.garment_type_id = ps.garment_type_id
-       left join fabrics f on f.fabric_id = ps.fabric_id
-       left join fabric_details fd on fd.fabric_detail_id = ps.fabric_detail_id
-       left join targets t on t.target_id = ps.target_id
        ${styleWhereClause}
      ),
      size_stock as (
@@ -161,9 +153,6 @@ async function findProductSummaries(filters = {}) {
        bs.created_at,
        bs.updated_at,
        bs.garment_type_name,
-       bs.fabric_name,
-       bs.fabric_detail_name,
-       bs.target_name,
        coalesce(cs.configured_size_count, 0)::int as configured_size_count,
        coalesce(cs.size_codes, '{}') as size_codes,
        coalesce(cs.size_stock, '[]'::json) as size_stock,

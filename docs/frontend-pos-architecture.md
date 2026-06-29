@@ -16,12 +16,14 @@ components/modules/sales/pos/
   stage-customer.tsx    Customer search + document type selector.
   stage-payment.tsx     Payment method (single/mixed) + discount controls.
   stage-summary.tsx     Right sidebar: step status, totals, finalize button.
-  use-pos-sale.ts       Orchestrator hook. Composes 5 sub-hooks + cross-cutting logic.
+  use-pos-sale.ts       Orchestrator hook. Composes 7 sub-hooks + cross-cutting logic.
   use-cart.ts           Cart items, price overrides, removal dialogs.
   use-cash-context.ts   Cash session context, open/reopen cash.
   use-customer-search.ts Customer fetch, debounce, filter by document type.
   use-payment-state.ts  Payment mode, method, mixed payments, discount state.
   use-product-search.ts Product fetch, debounce, search ranking, style selection.
+  use-sale-confirmation.ts Sale confirmation, reset, review, receipts.
+  use-sale-keyboard.ts  Keyboard shortcuts (F2/F4/F8/Escape) + stage pulse.
   pos-dialogs/
     customer-dialog.tsx
     discount-dialog.tsx
@@ -43,14 +45,15 @@ usePosSale()            ← page entry
   ├─ useProductSearch() ← location (triggers fetch)
   ├─ usePaymentState()  ← documentType, payment mode, discounts
   ├─ useCustomerSearch()← documentType (filters by type)
-  └─ useCart()          ← cart items, price overrides
+  ├─ useCart()          ← cart items, price overrides
+  ├─ useSaleConfirmation() ← confirm, reset, review, receipts
+  └─ useSaleKeyboard()  ← keyboard shortcuts, stage navigation
 ```
 
 The orchestrator (usePosSale) handles:
 - Cross-cutting derived state (totals, mixedPaymentsPreview, summaryStatusMessage, submitDisabled)
 - Cross-cutting actions (selectProductStyle auto-add, confirmSale, resetSaleDraft, applyDiscountDraft)
 - UI dialogs (customerDialog, productConfig, saleConfirmation, saleReview)
-- Refs and keyboard shortcuts (F2, F4, F8, Escape)
 
 ## CSS constants
 
@@ -85,7 +88,7 @@ npm run test         # npx playwright test
 npm run test:watch   # npx playwright test --watch
 ```
 
-**Test file**: `__tests__/pos-utils.test.ts` — 71 tests across 20+ describe blocks covering:
+**Test file**: `__tests__/pos-utils.test.ts` — 98 tests across 20+ describe blocks covering:
 - `trimOrNull`, `parseAmountInput`, `round2`, `formatMoney`
 - `groupVariantsByStyle`, `findVariantByAttributes`, `getVariantOptionValues`
 - `buildProductSearchResults`, `computeSaleDiscountAmount`

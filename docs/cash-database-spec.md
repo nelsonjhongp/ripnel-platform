@@ -264,8 +264,6 @@ Regla especial: `admin.manage` (rol ADMIN global) concede **todos** los permisos
 
 | Concepto | Estado | Impacto |
 |----------|--------|---------|
-| Saldo de apertura | No existe | No se sabe con cuanto dinero fisico se abrio |
-| Saldo declarado al cierre | No existe | No se compara sistema vs fisico |
 | Arqueo (conteo de billetes/monedas) | No existe | Sin tabla `cash_counts` |
 | Registro de retiros durante el dia | No existe | Si alguien saca efectivo, no queda registro |
 | Eventos de auditoria | No existe | Solo la ultima reapertura; totals anteriores se pierden |

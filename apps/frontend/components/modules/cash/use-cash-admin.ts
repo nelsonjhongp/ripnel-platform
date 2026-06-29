@@ -12,11 +12,18 @@ import type {
   LocationOption,
 } from "./cash-types"
 import { ADMIN_PAGE_SIZE } from "./cash-constants"
-import { formatBusinessDate, buildCashAdminQuery } from "./cash-utils"
+import { buildCashAdminQuery } from "./cash-utils"
 import { CAJA } from "./cash-messages"
-
-type RangeFilter = "7d" | "30d" | "60d" | "90d"
-type StatusFilter = "all" | "open" | "closed"
+import {
+  buildCashLocationChartData,
+  buildCashLocationOptions,
+  buildCashTrendData,
+  buildReopenCashPayload,
+  CASH_ADMIN_DEFAULT_FILTERS,
+  hasCashAdminActiveFilters,
+  type RangeFilter,
+  type StatusFilter,
+} from "./cash-admin-logic"
 
 export function useCashAdmin() {
   const [summary, setSummary] = useState<CashAdminSummaryResponse | null>(null)
@@ -26,10 +33,16 @@ export function useCashAdmin() {
   const [locations, setLocations] = useState<LocationOption[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [range, setRange] = useState<RangeFilter>("7d")
-  const [status, setStatus] = useState<StatusFilter>("all")
-  const [locationId, setLocationId] = useState("all")
-  const [page, setPage] = useState(1)
+  const [range, setRange] = useState<RangeFilter>(
+    CASH_ADMIN_DEFAULT_FILTERS.range,
+  )
+  const [status, setStatus] = useState<StatusFilter>(
+    CASH_ADMIN_DEFAULT_FILTERS.status,
+  )
+  const [locationId, setLocationId] = useState(
+    CASH_ADMIN_DEFAULT_FILTERS.locationId,
+  )
+  const [page, setPage] = useState(CASH_ADMIN_DEFAULT_FILTERS.page)
   const [reloadKey, setReloadKey] = useState(0)
 
   const [reopenTarget, setReopenTarget] = useState<string | null>(null)
@@ -42,7 +55,7 @@ export function useCashAdmin() {
     try {
       await apiFetch(`/api/cash/${reopenTarget}/reopen`, {
         method: "PATCH",
-        body: JSON.stringify({ reopen_notes: reopenNotes.trim() || null }),
+        body: JSON.stringify(buildReopenCashPayload(reopenNotes)),
       })
       setReopenTarget(null)
       setReopenNotes("")
@@ -62,13 +75,7 @@ export function useCashAdmin() {
   }, [reopenTarget, reopeningCash, reopenNotes])
 
   const locationOptions: { value: string; label: string }[] = useMemo(
-    () => [
-      { value: "all", label: CAJA.admin.filters.allLocations },
-      ...locations.map((l) => ({
-        value: l.location_id,
-        label: l.name,
-      })),
-    ],
+    () => buildCashLocationOptions(locations),
     [locations],
   )
 
@@ -166,30 +173,24 @@ export function useCashAdmin() {
     }
   }, [range, status, locationId, page, reloadKey])
 
-  const trendData = useMemo(() => {
-    return (summary?.trend || []).map((item) => ({
-      ...item,
-      short_date: formatBusinessDate(item.business_date).slice(0, 5),
-    }))
-  }, [summary])
+  const trendData = useMemo(() => buildCashTrendData(summary), [summary])
 
-  const locationChartData = useMemo(() => {
-    return (summary?.by_location || []).slice(0, 8).map((item) => ({
-      ...item,
-      short_name:
-        item.location_name.length > 14
-          ? `${item.location_name.slice(0, 14)}\u2026`
-          : item.location_name,
-    }))
-  }, [summary])
+  const locationChartData = useMemo(
+    () => buildCashLocationChartData(summary),
+    [summary],
+  )
 
-  const hasActiveFilters = range !== "7d" || status !== "all" || locationId !== "all"
+  const hasActiveFilters = hasCashAdminActiveFilters({
+    range,
+    status,
+    locationId,
+  })
 
   const clearFilters = useCallback(() => {
-    setRange("7d")
-    setStatus("all")
-    setLocationId("all")
-    setPage(1)
+    setRange(CASH_ADMIN_DEFAULT_FILTERS.range)
+    setStatus(CASH_ADMIN_DEFAULT_FILTERS.status)
+    setLocationId(CASH_ADMIN_DEFAULT_FILTERS.locationId)
+    setPage(CASH_ADMIN_DEFAULT_FILTERS.page)
   }, [])
 
   return {

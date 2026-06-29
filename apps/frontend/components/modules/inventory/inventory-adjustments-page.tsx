@@ -1,22 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePagination } from "@/hooks/use-pagination";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Eye,
-  LoaderCircle,
   MapPin,
   PackagePlus,
   RefreshCw,
   RotateCcw,
 } from "lucide-react";
-import { InlineStatusCard } from "@/components/feedback/status-page";
 import { ForbiddenPage } from "@/components/feedback/status-page";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { OpsSelect } from "@/components/ui/ops-selection";
-import { OpsEmptyState } from "@/components/ui/ops-empty-state";
 import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import {
   OpsFiltersRow,
@@ -24,11 +21,11 @@ import {
   OpsSearchField,
   OpsSectionDivider,
   OpsTableBlock,
-  OpsTableFooter,
-  OpsTableWrap,
 } from "@/components/ui/ops-page-shell";
+import { OpsDataTable } from "@/components/ui/ops-data-table";
 import { Pagination } from "@/components/ui/pagination";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
 import {
   Tooltip,
   TooltipContent,
@@ -42,7 +39,6 @@ import { appRoutes, buildAdjustmentDetailRoute } from "@/lib/routes";
 import {
   type AdjustmentListData,
   type AdjustmentStatus,
-  type AdjustmentSummary,
   formatAdjustmentIntent,
   formatAdjustmentDateTime,
   formatAdjustmentStatus,
@@ -91,10 +87,22 @@ function AdjustmentIntentChip({
 }
 
 export function InventoryAdjustmentsPage() {
-  const { user } = useAuth();
-  const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | AdjustmentStatus>("all");
-  const [locationFilter, setLocationFilter] = useState("all");
+  const { user, defaultLocation } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = appRoutes.inventoryAdjustments;
+
+  const urlQuery = searchParams.get("query") || "";
+  const urlLocationId = searchParams.get("location_id") || null;
+  const urlStatus = searchParams.get("status") || null;
+
+  const [query, setQuery] = useState(urlQuery);
+  const [statusFilter, setStatusFilter] = useState<"all" | AdjustmentStatus>(
+    (urlStatus === "draft" || urlStatus === "confirmed" || urlStatus === "cancelled")
+      ? urlStatus
+      : "all"
+  );
+  const [locationFilter, setLocationFilter] = useState(urlLocationId || "all");
 
   const canManageAdjustments = ["ADMIN", "ALMACEN"].includes(
     String(user?.role_name || "").toUpperCase()
@@ -115,6 +123,29 @@ export function InventoryAdjustmentsPage() {
 
   const adjustments = adjustmentData?.rows || [];
   const locations: Location[] = adjustmentData?.meta?.available_locations || [];
+
+  // ── Auto-scope to default location ──
+  const locationAutoSet = useRef(false);
+
+  useEffect(() => {
+    if (locationAutoSet.current || loadingAdjustments || !locations.length) return;
+    if (urlLocationId) return;
+
+    const defaultLoc = locations.find((l) => l.is_default) ?? locations[0];
+    if (defaultLoc) {
+      locationAutoSet.current = true;
+      let cancelled = false;
+      void Promise.resolve().then(() => {
+        if (!cancelled) {
+          setLocationFilter(defaultLoc.location_id);
+        }
+      });
+
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [loadingAdjustments, locations, urlLocationId]);
 
   const effectiveLocationFilter =
     locationFilter === "all" ||
@@ -164,7 +195,35 @@ export function InventoryAdjustmentsPage() {
   const hasActiveFilters =
     Boolean(query.trim()) ||
     statusFilter !== "all" ||
-    effectiveLocationFilter !== "all";
+    locationFilter !== "all";
+
+  // ── Location badge text ──
+  const locationBadgeText = useMemo(() => {
+    if (loadingAdjustments) return ADJ.locationBadge.loading;
+    if (!locations.length) return ADJ.locationBadge.noLocation;
+    if (effectiveLocationFilter === "all") return ADJ.locationBadge.allLocations;
+    const loc = locations.find((l) => l.location_id === effectiveLocationFilter);
+    return loc?.name ?? defaultLocation?.name ?? ADJ.locationBadge.noLocation;
+  }, [loadingAdjustments, locations, effectiveLocationFilter, defaultLocation]);
+
+  // ── URL-sync ──
+  useEffect(() => {
+    const p = new URLSearchParams();
+    if (query.trim()) p.set("query", query.trim());
+    if (effectiveLocationFilter !== "all") p.set("location_id", effectiveLocationFilter);
+    if (statusFilter !== "all") p.set("status", statusFilter);
+    const nextUrl = p.toString() ? `${pathname}?${p.toString()}` : pathname;
+    router.replace(nextUrl, { scroll: false });
+  }, [query, effectiveLocationFilter, statusFilter, pathname, router]);
+
+  // ── Reset filters to default location ──
+  function resetFilters() {
+    setQuery("");
+    setStatusFilter("all");
+    setPage(1);
+    const defaultLoc = locations.find((l) => l.is_default) ?? locations[0];
+    setLocationFilter(defaultLoc?.location_id ?? "all");
+  }
 
   return (
     <TooltipProvider delayDuration={120}>
@@ -175,6 +234,11 @@ export function InventoryAdjustmentsPage() {
           <PosHeader
             eyebrow={ADJ.header.eyebrow}
             title={ADJ.header.title}
+            meta={
+              <OpsStatusBadge tone="neutral" size="sm" icon={<MapPin className="h-3.5 w-3.5 text-[var(--ripnel-accent)]" />}>
+                {locationBadgeText}
+              </OpsStatusBadge>
+            }
             actions={
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -265,12 +329,7 @@ export function InventoryAdjustmentsPage() {
                       variant="outline"
                       size="icon-sm"
                       className="h-10 w-10 self-start rounded-lg lg:self-end"
-                      onClick={() => {
-                        setQuery("");
-                        setStatusFilter("all");
-                        setLocationFilter("all");
-                        setPage(1);
-                      }}
+                      onClick={resetFilters}
                       disabled={!hasActiveFilters}
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
@@ -280,149 +339,110 @@ export function InventoryAdjustmentsPage() {
                 </Tooltip>
               </OpsFiltersRow>
 
-              <OpsTableWrap minWidth="980px">
-                <table className="w-full border-collapse">
-                  <thead className="bg-[var(--ops-surface-muted)]">
-                    <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                      <th className="px-4 py-3">{ADJ.table.columns.number}</th>
-                      <th className="px-4 py-3">{ADJ.table.columns.location}</th>
-                      <th className="px-4 py-3">{ADJ.table.columns.status}</th>
-                      <th className="px-4 py-3">{ADJ.table.columns.intent}</th>
-                      <th className="px-4 py-3">{ADJ.table.columns.reason}</th>
-                      <th className="px-4 py-3 text-right">
-                        {ADJ.table.columns.lines}
-                      </th>
-                      <th className="px-4 py-3">{ADJ.table.columns.created}</th>
-                      <th className="px-4 py-3 text-right">
-                        {ADJ.table.columns.actions}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                    {loadingAdjustments ? (
-                      <tr>
-                        <td
-                          colSpan={8}
-                          className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
+              <OpsDataTable
+                columns={[
+                  { key: "number", header: ADJ.table.columns.number },
+                  { key: "location", header: ADJ.table.columns.location },
+                  { key: "status", header: ADJ.table.columns.status },
+                  { key: "intent", header: ADJ.table.columns.intent },
+                  { key: "reason", header: ADJ.table.columns.reason },
+                  { key: "lines", header: ADJ.table.columns.lines, className: "text-right" },
+                  { key: "created", header: ADJ.table.columns.created },
+                  { key: "actions", header: ADJ.table.columns.actions, className: "text-right" },
+                ]}
+                minWidth="980px"
+                loading={loadingAdjustments}
+                loadingMessage={ADJ.table.loading}
+                error={error}
+                errorTitle={ADJ.table.loadErrorTitle}
+                isEmpty={paginatedAdjustments.length === 0}
+                emptyMessage={ADJ.table.empty}
+                footer={
+                  <>
+                    <span className="text-sm text-[var(--ops-text-muted)]">
+                      {filteredAdjustments.length
+                        ? ADJ.table.results(
+                            firstVisible,
+                            lastVisible,
+                            filteredAdjustments.length
+                          )
+                        : ADJ.table.zeroResults}
+                    </span>
+                    <Pagination
+                      page={safePage}
+                      totalPages={totalPages}
+                      onPageChange={setPage}
+                      className="self-end md:self-auto"
+                    />
+                  </>
+                }
+              >
+                {paginatedAdjustments.map((adj) => (
+                  <tr
+                    key={adj.adjustment_id}
+                    className="transition hover:bg-[var(--ops-surface-muted)]"
+                  >
+                    <td className="px-4 py-[var(--ops-row-py)] align-top">
+                      <span className="text-sm font-semibold text-[var(--ops-text)]">
+                        {adj.adjustment_number}
+                      </span>
+                    </td>
+                    <td className="px-4 py-[var(--ops-row-py)] align-top">
+                      <div className="text-sm text-[var(--ops-text)]">
+                        <span className="inline-flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />
+                          {adj.location_name}
+                        </span>
+                        <p className="text-[11px] text-[var(--ops-text-muted)]">
+                          {adj.location_code}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-[var(--ops-row-py)] align-top">
+                      <AdjustmentStatusChip status={adj.status} />
+                    </td>
+                    <td className="px-4 py-[var(--ops-row-py)] align-top">
+                      <AdjustmentIntentChip adjustment={adj} />
+                    </td>
+                    <td className="px-4 py-[var(--ops-row-py)] align-top">
+                      <span className="block max-w-[180px] truncate text-sm text-[var(--ops-text)]">
+                        {adj.reason || ADJ.list.emptyReason}
+                      </span>
+                    </td>
+                    <td className="px-4 py-[var(--ops-row-py)] align-top text-right text-sm font-semibold text-[var(--ops-text)]">
+                      {adj.line_count}
+                    </td>
+                    <td className="px-4 py-[var(--ops-row-py)] align-top">
+                      <div className="text-sm text-[var(--ops-text)]">
+                        {formatAdjustmentDateTime(adj.created_at)}
+                        <p className="text-[11px] text-[var(--ops-text-muted)]">
+                          {adj.created_by_name || ADJ.list.systemUser}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
+                      <Button
+                        asChild
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="rounded-lg px-3"
+                      >
+                        <Link
+                          href={buildAdjustmentDetailRoute(
+                            adj.adjustment_id
+                          )}
+                          aria-label={ADJ.table.actions.viewDetailAria(
+                            adj.adjustment_number
+                          )}
                         >
-                          <LoaderCircle className="mr-2 inline-block h-5 w-5 animate-spin align-middle" />
-                          {ADJ.table.loading}
-                        </td>
-                      </tr>
-                    ) : error ? (
-                      <tr>
-                        <td colSpan={8} className="px-4 py-6">
-                          <InlineStatusCard
-                            title={ADJ.table.loadErrorTitle}
-                            description={error}
-                            tone="danger"
-                            variant="ops"
-                          />
-                        </td>
-                      </tr>
-                    ) : paginatedAdjustments.length ? (
-                      paginatedAdjustments.map((adj) => (
-                        <tr
-                          key={adj.adjustment_id}
-                          className="transition hover:bg-[var(--ops-surface-muted)]"
-                        >
-                          <td className="px-4 py-[var(--ops-row-py)] align-top">
-                            <span className="text-sm font-semibold text-[var(--ops-text)]">
-                              {adj.adjustment_number}
-                            </span>
-                          </td>
-                          <td className="px-4 py-[var(--ops-row-py)] align-top">
-                            <div className="text-sm text-[var(--ops-text)]">
-                              <span className="inline-flex items-center gap-2">
-                                <MapPin className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />
-                                {adj.location_name}
-                              </span>
-                              <p className="text-[11px] text-[var(--ops-text-muted)]">
-                                {adj.location_code}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="px-4 py-[var(--ops-row-py)] align-top">
-                            <AdjustmentStatusChip status={adj.status} />
-                          </td>
-                          <td className="px-4 py-[var(--ops-row-py)] align-top">
-                            <AdjustmentIntentChip adjustment={adj} />
-                          </td>
-                          <td className="px-4 py-[var(--ops-row-py)] align-top">
-                            <span className="block max-w-[180px] truncate text-sm text-[var(--ops-text)]">
-                              {adj.reason || ADJ.list.emptyReason}
-                            </span>
-                          </td>
-                          <td className="px-4 py-[var(--ops-row-py)] align-top text-right text-sm font-semibold text-[var(--ops-text)]">
-                            {adj.line_count}
-                          </td>
-                          <td className="px-4 py-[var(--ops-row-py)] align-top">
-                            <div className="text-sm text-[var(--ops-text)]">
-                              {formatAdjustmentDateTime(adj.created_at)}
-                              <p className="text-[11px] text-[var(--ops-text-muted)]">
-                                {adj.created_by_name || ADJ.list.systemUser}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Link
-                                  href={buildAdjustmentDetailRoute(
-                                    adj.adjustment_id
-                                  )}
-                                >
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon-xs"
-                                    className="rounded-lg"
-                                    aria-label={ADJ.table.actions.viewDetailAria(
-                                      adj.adjustment_number
-                                    )}
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                  </Button>
-                                </Link>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {ADJ.table.actions.viewDetail}
-                              </TooltipContent>
-                            </Tooltip>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={8} className="px-4 py-10">
-                          <OpsEmptyState
-                            variant="compact"
-                            description={ADJ.table.empty}
-                          />
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </OpsTableWrap>
-
-              <OpsTableFooter>
-                <span className="text-sm text-[var(--ops-text-muted)]">
-                  {filteredAdjustments.length
-                    ? ADJ.table.results(
-                        firstVisible,
-                        lastVisible,
-                        filteredAdjustments.length
-                      )
-                    : ADJ.table.zeroResults}
-                </span>
-                <Pagination
-                  page={safePage}
-                  totalPages={totalPages}
-                  onPageChange={setPage}
-                  className="self-end md:self-auto"
-                />
-              </OpsTableFooter>
+                          {ADJ.table.actions.viewDetail}
+                        </Link>
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </OpsDataTable>
             </OpsTableBlock>
           </OpsSectionDivider>
         </OpsPageShell>

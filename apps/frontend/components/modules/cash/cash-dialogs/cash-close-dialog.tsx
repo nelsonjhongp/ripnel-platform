@@ -1,17 +1,21 @@
 "use client"
 
+import { AlertTriangle } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { OpsDialog } from "@/components/ui/ops-dialog"
 import { OpsFormField } from "@/components/ui/ops-form-field"
 import { opsInputCompact } from "@/components/ui/ops-control-styles"
 import { INFO_BOX_MUTED, METHOD_CONFIG } from "../cash-constants"
+import { HelpTooltip } from "@/components/ui/help-tooltip"
 import { CAJA } from "../cash-messages"
 
 export function CashCloseDialog({
   open,
   onOpenChange,
   methodValues,
-  grandTotal,
+  closeSummaryTotal,
+  warningMessage,
   closingBalanceDeclared,
   onClosingBalanceDeclaredChange,
   notes,
@@ -22,7 +26,8 @@ export function CashCloseDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
   methodValues: Record<string, string> | null
-  grandTotal: string | null
+  closeSummaryTotal: string | null
+  warningMessage?: string | null
   closingBalanceDeclared: string
   onClosingBalanceDeclaredChange: (value: string) => void
   notes: string
@@ -64,6 +69,13 @@ export function CashCloseDialog({
       }
     >
       <div>
+        {warningMessage ? (
+          <div className="mb-4 flex items-start gap-2 rounded-lg border border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)] px-3 py-2.5 text-sm text-[var(--ops-tone-warning-text)]">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>{warningMessage}</p>
+          </div>
+        ) : null}
+
         {methodValues ? (
           <div className={`${INFO_BOX_MUTED} space-y-1`}>
             {METHOD_CONFIG.map((method) => (
@@ -81,10 +93,13 @@ export function CashCloseDialog({
             ))}
             <div className="mt-2 flex justify-between border-t border-[var(--ops-border-strong)] pt-2 text-sm font-semibold">
               <span className="text-[var(--ops-text)]">
-                {CAJA.closeDialog.total}
+                <span className="inline-flex items-center gap-1">
+                  {CAJA.closeDialog.total}
+                  <HelpTooltip content={CAJA.closeDialog.totalHint} />
+                </span>
               </span>
               <span className="text-[var(--ops-text)]">
-                {grandTotal ?? ""}
+                {closeSummaryTotal ?? ""}
               </span>
             </div>
           </div>
@@ -107,6 +122,9 @@ export function CashCloseDialog({
               className={opsInputCompact}
             />
           </OpsFormField>
+          <p className="mt-1 text-xs text-[var(--ops-text-muted)]">
+            {CAJA.closeDialog.declaredHint}
+          </p>
         </div>
 
         <div className="mt-4">

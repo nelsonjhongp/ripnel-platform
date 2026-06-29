@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { usePagination } from "@/hooks/use-pagination";
@@ -36,6 +35,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { ProductCreateDialog } from "./product-create-dialog";
+import { PRODUCTS } from "./products-messages";
 import type { ProductStatus } from "@/types/products";
 
 type ProductSizeStock = {
@@ -51,8 +52,6 @@ type ProductSummary = {
   description: string | null;
   active: boolean;
   garment_type_name: string;
-  fabric_name: string | null;
-  target_name: string | null;
   configured_size_count: number;
   size_codes: string[];
   size_stock: ProductSizeStock[];
@@ -142,7 +141,11 @@ function formatExtraSizes(extraSizes: ProductSizeStock[]) {
   return extraSizes.map((size) => `${size.size_code}: ${size.qty}`).join(" · ");
 }
 
-export function ProductsOverviewPage() {
+export function ProductsOverviewPage({
+  initialCreateOpen = false,
+}: {
+  initialCreateOpen?: boolean;
+}) {
   const router = useRouter();
   const { defaultLocation, locationAssignments } = useAuth();
   const [response, setResponse] = useState<ProductsResponse | null>(null);
@@ -151,6 +154,7 @@ export function ProductsOverviewPage() {
   const [search, setSearch] = useState("");
   const [filterMode, setFilterMode] = useState<FilterMode>("all");
   const [selectedLocationId, setSelectedLocationId] = useState("");
+  const [createOpen, setCreateOpen] = useState(initialCreateOpen);
   const deferredSearch = useDeferredValue(search.trim());
   const effectiveLocationId = useMemo(() => {
     if (
@@ -248,11 +252,15 @@ export function ProductsOverviewPage() {
             title="Maestro de producto"
             actions={
               <>
-                <Button asChild variant="accent" size="sm" className="rounded-lg px-3">
-                  <Link href="/productos/nuevo">
-                    <Plus className="h-4 w-4" />
-                    Nuevo
-                  </Link>
+                <Button
+                  type="button"
+                  variant="accent"
+                  size="sm"
+                  className="rounded-lg px-3"
+                  onClick={() => setCreateOpen(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                  {PRODUCTS.actions.newProduct}
                 </Button>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -355,8 +363,8 @@ export function ProductsOverviewPage() {
               <OpsDataTable
                 columns={[
                   { key: "producto", header: "Producto" },
-                  { key: "sku", header: "SKU" },
-                  { key: "tipo", header: "Tipo" },
+                  { key: "sku", header: "Codigo" },
+                  { key: "tipo", header: "Cobertura" },
                   { key: "tallas", header: "Tallas" },
                   { key: "stock", header: "Stock" },
                   { key: "estado", header: "Estado" },
@@ -407,7 +415,10 @@ export function ProductsOverviewPage() {
                         <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">{product.style_code || "—"}</span>
                       </td>
                       <td className="px-4 py-[var(--ops-row-py)]">
-                        <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">{product.fabric_name || "—"}</span>
+                        <div className="space-y-1 text-[11px] text-[var(--ops-text-muted)]">
+                          <p>Retail: {product.retail_sizes_covered_count}/{product.configured_size_count}</p>
+                          <p>Mayorista: {product.wholesale_sizes_covered_count}/{product.configured_size_count}</p>
+                        </div>
                       </td>
                       <td className="px-4 py-[var(--ops-row-py)]">
                         <div className="flex flex-wrap gap-1">
@@ -512,6 +523,14 @@ export function ProductsOverviewPage() {
               </OpsDataTable>
             )}
       </OpsSectionDivider>
+      <ProductCreateDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={(style) => {
+          void Promise.resolve().then(loadProducts);
+          router.push(buildStyleHref("/productos/variantes", style.style_id));
+        }}
+      />
       </OpsPageShell>
     </TooltipProvider>
   );

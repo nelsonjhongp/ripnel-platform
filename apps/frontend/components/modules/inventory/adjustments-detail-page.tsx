@@ -189,7 +189,7 @@ export function InventoryAdjustmentsDetailPage() {
               size="icon-sm"
               className="rounded-lg"
               onClick={() => void refetch()}
-              aria-label="Actualizar"
+              aria-label={ADJ.detail.refreshAria}
             >
               <RotateCcw className="h-3.5 w-3.5" />
             </Button>
@@ -313,7 +313,10 @@ export function InventoryAdjustmentsDetailPage() {
         <aside className="space-y-4 lg:sticky lg:top-20">
           {/* ── Actions (only for draft) ── */}
           {isDraft ? (
-            <OpsPanelSection title={ADJ.detail.actions}>
+            <OpsPanelSection
+              title={ADJ.detail.actions}
+              icon={<SquareCheckBig className="h-4 w-4 text-[var(--ripnel-accent)]" />}
+            >
               <div className="space-y-2">
                 <Button
                   type="button"
@@ -371,20 +374,25 @@ export function InventoryAdjustmentsDetailPage() {
 
           {/* ── Link to kardex (only for confirmed) ── */}
           {detail.status === "confirmed" ? (
-            <Button
-              asChild
-              type="button"
-              variant="outline"
-              size="sm"
-              className="w-full rounded-lg"
+            <OpsPanelSection
+              title={ADJ.detail.movements}
+              icon={<Package className="h-4 w-4 text-[var(--ripnel-accent)]" />}
             >
-              <Link
-                href={`${appRoutes.inventoryMovements}?query=${encodeURIComponent(detail.adjustment_id)}`}
+              <Button
+                asChild
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full rounded-lg"
               >
-                <Package className="h-4 w-4" />
-                {ADJ.dialog.viewMovements}
-              </Link>
-            </Button>
+                <Link
+                  href={`${appRoutes.inventoryMovements}?query=${encodeURIComponent(detail.adjustment_id)}`}
+                >
+                  <Package className="h-4 w-4" />
+                  {ADJ.dialog.viewMovements}
+                </Link>
+              </Button>
+            </OpsPanelSection>
           ) : null}
         </aside>
       </div>
@@ -486,9 +494,7 @@ export function InventoryAdjustmentsDetailPage() {
           </div>
         }
       >
-        <p className="text-sm text-[var(--ops-text-muted)]">
-          {ADJ.dialog.cancelDesc(detail.adjustment_number)}
-        </p>
+        <></>
       </OpsDialog>
     </OpsPageShell>
   );

@@ -5,6 +5,16 @@ export function formatAmount(value: number | string | undefined) {
   return `S/. ${Number(value || 0).toFixed(2)}`
 }
 
+export function todayPeruDate() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Lima" })
+}
+
+export function addDaysToPeruDate(dateString: string, days: number) {
+  const date = new Date(`${dateString}T00:00:00-05:00`)
+  date.setUTCDate(date.getUTCDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
 export function formatBusinessDate(value: string | null | undefined) {
   if (!value) return "-"
 
