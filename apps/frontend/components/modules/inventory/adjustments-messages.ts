@@ -1,8 +1,4 @@
 export const ADJ = {
-  detailFallback: {
-    dash: "-",
-    unknownStatus: "Desconocido",
-  },
   header: {
     eyebrow: "Inventario",
     title: "Ajustes de inventario",
@@ -12,11 +8,17 @@ export const ADJ = {
   },
   filters: {
     searchPlaceholder: "Buscar por numero, sede, motivo o usuario",
+    searchAriaLabel: "Buscar ajustes de inventario",
     locationLabel: "Sede",
     allLocations: "Todas",
     statusLabel: "Estado",
     allStatuses: "Todos",
     clear: "Limpiar filtros",
+  },
+  locationBadge: {
+    loading: "Cargando...",
+    noLocation: "Sin ubicacion",
+    allLocations: "Todas las sedes",
   },
   metrics: {
     total: "Total",
@@ -63,9 +65,7 @@ export const ADJ = {
   list: {
     emptyReason: "Sin motivo",
     systemUser: "Sistema",
-    noNotes: "Sin notas",
-    pending: "Pendiente",
-    notApplied: "Sin aplicar",
+    fallbackReason: "Ajuste por conteo",
   },
   detail: {
     title: "Detalle del ajuste",
@@ -88,6 +88,7 @@ export const ADJ = {
     loading: "Cargando detalle...",
     loadError: "No se pudo cargar el detalle",
     back: "Volver a ajustes",
+    refreshAria: "Actualizar",
     confirmNote:
       "Al confirmar, cada linea actualiza la cantidad final de la sede y registra un movimiento ADJUST en movimientos de stock. No uses este flujo para mover mercaderia entre sedes.",
   },
@@ -102,6 +103,7 @@ export const ADJ = {
     reasonPlaceholderAdj: "Ej. Conteo fisico, merma, regularizacion",
     reasonPlaceholderOpen: "Ej. Stock previo a salida en vivo",
     notesLabel: "Notas",
+    notesOptionalLabel: "(opcional)",
     notesPlaceholder: "Notas del ajuste",
     notesCounter: (current: number, max: number) => `${current}/${max}`,
     motivoSection: "Motivo y notas",
@@ -115,27 +117,70 @@ export const ADJ = {
       otro: "Otro",
     },
     customReasonPlaceholder: "Describe el motivo del ajuste",
+    closeSubpanel: "Cerrar",
+    addAll: "Agregar todas",
+    addOne: "Agregar",
+    added: "Agregado",
     searchLabel: "Buscar variante",
     searchPlaceholder: "Buscar por SKU, style, talla o color",
     searchDisabledPlaceholder: "Primero selecciona una sede",
     activeLocation: (code: string, name: string) =>
       `Sede activa: ${code} - ${name}`,
-    variantsSection: "Variantes por contar",
+    defaultLocationBadge: "Actual",
+    variantsSection: "Busqueda y seleccion de variantes",
     variantsHint: "Busca por SKU, style, talla o color en la sede seleccionada.",
-    draftSection: "Lineas del ajuste",
+    variantTable: {
+      sizeColor: "Talla / Color",
+      system: "Sistema",
+      action: "Agregar",
+    },
+    draftSection: "Conteo y diferencias",
     draftHint: "Conteo fisico antes de guardar el borrador.",
     emptyDraft: "Aun no agregas variantes al ajuste.",
-    addButton: "Agregar",
+    removeColumnHeader: "Quitar",
     removeAria: "Quitar linea",
+    lineCountBadge: (count: number) => `${count} linea${count === 1 ? "" : "s"}`,
     systemCurrent: (qty: number) => `Sistema actual: ${qty}`,
+    searchResultCounts: (variants: number, stock: number) =>
+      `${variants} vars · Stock ${stock}`,
+    subpanelMeta: (code: string, variants: number, stock: number) =>
+      `${code} · ${variants} variantes · Stock ${stock}`,
     noResults: "No se encontraron variantes para esa busqueda.",
     searching: "Buscando variantes...",
     searchError: "Error al buscar variantes",
     saveDraft: "Guardar borrador",
     savedDraft: "Borrador guardado",
     saving: "Guardando...",
+    reviewAndConfirm: "Revisar y confirmar",
+    savingBeforeReview: "Guardando borrador...",
+    reviewReady: "Revision lista",
     createError: "Error al crear ajuste",
-    summary: "Resumen",
+    summary: "Resumen del ajuste",
+    summaryLocation: "Sede",
+    summaryIntent: "Intencion",
+    summaryReason: "Motivo",
+    summaryNotes: "Notas",
+    summaryNoNotes: "Sin notas",
+    summaryDraftPending: "Sin borrador",
+    summaryDraftSaved: (number: string) => number,
+    summaryStateLabel: "Estado",
+    draftStatusTitle: "Documento en borrador",
+    draftStatusSaved: (number: string) =>
+      `${number} ya esta guardado. Puedes seguir editando antes de confirmar.`,
+    draftStatusAutoSaved: (number: string) =>
+      `${number} se guardo automaticamente para que puedas revisarlo y confirmarlo.`,
+    draftStatusDirtyTitle: "Cambios pendientes por guardar",
+    draftStatusDirty: (number: string) =>
+      `${number} ya no refleja esta version. Guarda de nuevo o abre la revision para actualizar el borrador.`,
+    localDraftTitle: "Documento aun no guardado",
+    localDraftDescription:
+      "Los cambios siguen solo en esta pantalla hasta guardar el borrador o abrir la revision final.",
+    readyTitle: "Listo para revisar",
+    readyDescription:
+      "Ya tienes sede y lineas para abrir la revision final antes de confirmar el ajuste.",
+    pendingTitle: "Faltan datos para revisar",
+    pendingLocation: "Selecciona una sede para buscar variantes y preparar el documento.",
+    pendingLines: "Agrega al menos una variante al ajuste para habilitar la revision final.",
   },
   dialog: {
     confirmTitle: "Confirmar ajuste",
@@ -153,6 +198,13 @@ export const ADJ = {
     close: "Cerrar",
     reviewInfo: (number: string, location: string, intent: string) =>
       `${number} · ${location} · ${intent}`,
+    reviewAutoSaved:
+      "Primero se guardo el borrador y ahora vas a confirmarlo.",
+    reviewNumber: "Numero",
+    reviewLocation: "Sede",
+    reviewIntent: "Intencion",
+    reviewReason: "Motivo",
+    reviewNotes: "Notas",
     reviewImpact:
       "Al confirmar se actualizara el inventario de la sede y se generaran movimientos de stock ADJUST. Esta accion no se puede deshacer.",
     viewMovements: "Ver movimientos de stock",

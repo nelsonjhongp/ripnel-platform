@@ -1,10 +1,10 @@
 # Sistema de Permisos y Roles - Documentación
 
-## ��� Resumen
+## ��� Resumen
 
 Este documento describe cómo está implementado el sistema de control de permisos y roles en la plataforma Ripnel, incluyendo cómo cada rol puede acceder a diferentes secciones del sidebar.
 
-## ��� Estructura de Permisos en Base de Datos
+## ��� Estructura de Permisos en Base de Datos
 
 ### Tablas Involucradas
 
@@ -43,18 +43,23 @@ CREATE TABLE role_permissions (
 | `transfers.manage` | Transferencias de stock |
 | `inventory.view` | Inventario y kardex |
 | `sales.pos` | Venta rápida / compra |
+| `inventory.adjust` | Ajustes de inventario |
+| `cash.view` | Ver estado de caja |
+| `cash.operate` | Operar caja (abrir/cerrar) |
+| `cash.admin.view` | Ver control de caja (admin) |
+| `cash.admin.reopen` | Reabrir caja (admin) |
 
 ## �� Matriz de Roles y Permisos
 
-| Rol | admin.manage | catalogs.manage | products.manage | prices.manage | transfers.manage | inventory.view | sales.pos |
-|-----|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **ADMIN** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **TIENDA** | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
-| **CAJA** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| **VENTAS** | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| Rol | admin.manage | catalogs.manage | products.manage | prices.manage | transfers.manage | inventory.view | inventory.adjust | cash.view | cash.operate | cash.admin.view | cash.admin.reopen | sales.pos |
+|-----|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **ADMIN** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **TIENDA** | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
+| **CAJA** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ |
+| **VENTAS** | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ |
 | **ALMACEN** | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ❌ |
 
-## ��� Secciones del Sidebar por Rol
+## ��� Secciones del Sidebar por Rol
 
 ### ADMIN
 Acceso completo a todas las secciones:
@@ -108,7 +113,7 @@ Operación de stock y movimientos internos:
 - ❌ Compra
 - ✅ Inventario
 
-## ��� Flujo de Autenticación y Permisos
+## ��� Flujo de Autenticación y Permisos
 
 ### 1. Login
 ```typescript
@@ -143,7 +148,7 @@ export const useAuth() => {
 }
 ```
 
-## ��� Implementación en Frontend
+## ��� Implementación en Frontend
 
 ### AppSidebar.tsx - Lógica de Filtrado
 
@@ -230,7 +235,7 @@ function MiComponente() {
 - `canAccessTransfers()` - ¿Puede acceder a Transferencias?
 - `canAccessInventory()` - ¿Puede acceder a Inventario?
 
-## ���️ Protección de Rutas
+## ���️ Protección de Rutas
 
 ### Usando ProtectedGuard
 
@@ -259,7 +264,7 @@ export default function ProtectedLayout({ children }) {
 }
 ```
 
-## ��� Ejemplo de Uso en Componentes
+## ��� Ejemplo de Uso en Componentes
 
 ### Mostrar/Ocultar basado en Rol
 
@@ -304,7 +309,7 @@ function PreciosForm() {
 }
 ```
 
-## ��� Seguridad
+## ��� Seguridad
 
 ### Backend Validation (IMPORTANTE)
 
@@ -332,7 +337,7 @@ function checkPermission(requiredPermission) {
 2. **Backend**: Valida permisos antes de procesar (seguridad)
 3. **Database**: Row-level security (RLS) si es necesario
 
-## ��� Checklist de Implementación
+## ��� Checklist de Implementación
 
 - ✅ Base de datos: roles, permissions, role_permissions pobladas
 - ✅ Backend: `/api/auth/me` retorna user + permissions
@@ -342,7 +347,7 @@ function checkPermission(requiredPermission) {
 - ✅ ProtectedGuard: Protege rutas
 - ✅ Backend validation: Cada endpoint valida permisos
 
-## ��� Próximos Pasos (Futuros)
+## ��� Próximos Pasos (Futuros)
 
 - Implementar page-level permissions en protectedPages array
 - Agregar auditoría de acceso (logging)
@@ -350,7 +355,7 @@ function checkPermission(requiredPermission) {
 - Implementar permisos dinámicos por ubicación
 - Row-level security (RLS) en Supabase
 
-## ��� Soporte
+## ��� Soporte
 
 Para preguntas sobre la implementación de permisos:
 1. Revisar esta documentación

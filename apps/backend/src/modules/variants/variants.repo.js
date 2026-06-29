@@ -12,19 +12,9 @@ async function findStyleById(styleId) {
        ps.updated_at,
        gt.garment_type_id,
        gt.code as garment_type_code,
-       gt.name as garment_type_name,
-       f.fabric_id,
-       f.code as fabric_code,
-       f.name as fabric_name,
-       fd.fabric_detail_id,
-       fd.name as fabric_detail_name,
-       t.target_id,
-       t.name as target_name
+       gt.name as garment_type_name
      from product_styles ps
      inner join garment_types gt on gt.garment_type_id = ps.garment_type_id
-     left join fabrics f on f.fabric_id = ps.fabric_id
-     left join fabric_details fd on fd.fabric_detail_id = ps.fabric_detail_id
-     left join targets t on t.target_id = ps.target_id
      where ps.style_id = $1`,
     [styleId]
   );

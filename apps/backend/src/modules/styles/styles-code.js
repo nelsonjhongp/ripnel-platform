@@ -15,8 +15,8 @@ function formatStyleCode(value, maxLength) {
     .slice(0, maxLength);
 }
 
-function buildStyleCodeBase({ garmentTypeCode, fabricCode, name, maxLength }) {
-  const prefixParts = [garmentTypeCode, fabricCode].filter(Boolean).map((value) => sanitizeText(value));
+function buildStyleCodeBase({ garmentTypeCode, name, maxLength }) {
+  const prefixParts = [garmentTypeCode].filter(Boolean).map((value) => sanitizeText(value));
   const cleanedName = sanitizeText(name);
   const tokens = cleanedName.split(/\s+/).filter(Boolean);
   const suffix = tokens
@@ -53,7 +53,18 @@ function buildUniqueStyleCode(baseCode, existingCodes, maxLength) {
   }
 }
 
+function normalizeStyleComparableText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
 module.exports = {
   buildStyleCodeBase,
   buildUniqueStyleCode,
+  normalizeStyleComparableText,
 };

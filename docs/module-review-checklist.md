@@ -159,6 +159,11 @@ Todo modal debe cumplir:
 - [ ] Loading state: `<LoaderCircle className="animate-spin">` + texto + boton disabled
 - [ ] Errores se limpian al abrir el dialog (`useEffect` sobre `open`)
 - [ ] Errores se limpian al editar cada campo (`onChange`)
+- [ ] Errores por campo: editar un campo limpia solo ese error, no todo el objeto
+- [ ] Submit enfoca el primer campo invalido en orden visual
+- [ ] Conflictos `409` se asignan al campo responsable cuando sea claro
+- [ ] No muestra mensajes positivos permanentes como `disponible` salvo que cambien una decision operativa
+- [ ] Si hay alta completa con multiseleccion, revisar `Nuevo producto` como referencia antes de crear componentes locales
 
 **Comando rapido:**
 ```bash
@@ -228,6 +233,10 @@ Los formularios con multiples campos editables deben usar errores tipados por ca
 - [ ] Existe un tipo de errores con keys opcionales por cada campo validable: `{ full_name?: string; document_number?: string; business_name?: string; address?: string }`
 - [ ] La funcion de validacion (`validateInput`) retorna el tipo de errores o `null`
 - [ ] Cada `<OpsFormField>` recibe su error individual via `error={errors?.campo}`
+- [ ] Los mensajes viven en `<module>-messages.ts`
+- [ ] Existe helper puro para derivar/limpiar errores cuando la regla se comparte o se vuelve compleja
+- [ ] Validaciones reactivas se limitan a casos que evitan trabajo perdido, como duplicados
+- [ ] El backend conserva la validacion final y el frontend mapea el error al campo cuando sea posible
 - [ ] Errores se limpian en `onChange` de cada campo (el dialog re-renderiza y el campo pierde el error)
 - [ ] Todos los errores se limpian al abrir el dialog (`useEffect` sobre `open`)
 - [ ] Validacion usa early return secuencial: un error a la vez, primer campo invalido detiene el flujo

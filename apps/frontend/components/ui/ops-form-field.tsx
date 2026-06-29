@@ -7,7 +7,9 @@ export function OpsFormField({
   id,
   label,
   required = false,
+  optionalLabel,
   error,
+  hideErrorMessage = false,
   hint,
   children,
   className,
@@ -16,7 +18,9 @@ export function OpsFormField({
   id?: string
   label: string
   required?: boolean
+  optionalLabel?: boolean | string
   error?: string | null
+  hideErrorMessage?: boolean
   hint?: string
   children: ReactNode
   className?: string
@@ -44,6 +48,9 @@ export function OpsFormField({
       })()
     : children
 
+  const optionalText =
+    optionalLabel === true ? "(opcional)" : typeof optionalLabel === "string" ? optionalLabel : null
+
   return (
     <div
       data-field-error={error ? "true" : undefined}
@@ -64,10 +71,14 @@ export function OpsFormField({
         {label}
         {required ? (
           <span className="ml-0.5 text-sm leading-none text-[var(--ops-tone-danger-text)]">*</span>
+        ) : optionalText ? (
+          <span className="ml-1 normal-case tracking-normal text-[11px] font-medium text-[var(--ops-text-muted)]">
+            {optionalText}
+          </span>
         ) : null}
       </label>
       {describedChild}
-      {error ? (
+      {error && !hideErrorMessage ? (
         <p
           id={messageId}
           role="alert"

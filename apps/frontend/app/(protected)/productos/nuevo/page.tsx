@@ -1,5 +1,5 @@
-import { ProductCreatePage } from "@/components/modules/products/product-create-page";
+import { redirect } from "next/navigation";
 
 export default function NewProductPage() {
-  return <ProductCreatePage />;
+  redirect("/productos?crear=1");
 }

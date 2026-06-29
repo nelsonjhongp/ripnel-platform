@@ -73,9 +73,9 @@ Este documento complementa a `docs/frontend-page-standard.md`. Cuando haya regla
   - Texto secundario: `#B4B4B4`
   - Borde: `#2E2E2E`
 - Acento Ripnel:
-  - Base: `#8E5DB7`
-  - Hover: `#7B4EA3`
-  - Soft/focus: `#F4ECFA`
+  - Base: `#b07ae4`
+  - Hover: `#9a63d3`
+  - Soft/focus: `#f7effd`
 
 ## Uso del acento Ripnel
 

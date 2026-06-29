@@ -48,9 +48,15 @@ export const CAJA = {
     title: "Confirmar cierre de caja",
     description:
       "Se consolidaran los pagos registrados y ventas confirmadas de la fecha operativa actual para esta sede.",
-    total: "Total",
+    total: "Total pagos a cerrar",
+    totalHint:
+      "Este cierre usa los pagos registrados en el sistema para consolidar la sesion.",
+    consistencyWarning:
+      "Los pagos registrados no coinciden con el total de ventas confirmadas. Puedes cerrar, pero conviene revisar la diferencia antes.",
     declaredLabel: "Efectivo declarado",
     declaredPlaceholder: "0.00",
+    declaredHint:
+      "Opcional. Sirve para comparar el efectivo fisico con el total de pagos registrados.",
     notesLabel: "Observaciones (opcional)",
     notesPlaceholder: "Ej: Sin novedades",
     cancel: "Cancelar",
@@ -121,6 +127,8 @@ export const CAJA = {
     pendingBadge: "Pendiente",
     openSession: (n: number) => `${n} sesion abierta`,
     consistencyOk: "Consistencia OK",
+    consistencyPending: "Pendiente de cierre",
+    consistencyReview: "Sin evaluacion",
     unknownUser: "Usuario no identificado",
     pendingCloseStatus: "Cierre pendiente",
     openLabel: "Apertura:",

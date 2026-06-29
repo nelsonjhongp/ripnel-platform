@@ -18,6 +18,7 @@ export type PresetTextFieldProps = {
   placeholder?: string
   maxLength?: number
   onClear?: () => void
+  disabled?: boolean
   textareaRows?: number
   textareaClassName?: string
   className?: string
@@ -50,6 +51,7 @@ export function PresetTextField({
   placeholder = "Selecciona un motivo",
   maxLength = 200,
   onClear,
+  disabled = false,
   textareaRows = 3,
   textareaClassName,
   className,
@@ -99,6 +101,7 @@ export function PresetTextField({
             <button
               type="button"
               onClick={handleToggle}
+              disabled={disabled}
               className={TOGGLE_BUTTON_CLASS}
             >
               {mode === "preset" ? (
@@ -118,6 +121,7 @@ export function PresetTextField({
               <button
                 type="button"
                 onClick={onClear}
+                disabled={disabled}
                 className={CLEAR_BUTTON_CLASS}
               >
                 <Eraser className="h-3.5 w-3.5" />
@@ -131,6 +135,7 @@ export function PresetTextField({
           <button
             type="button"
             onClick={handleToggle}
+            disabled={disabled}
             className={TOGGLE_BUTTON_CLASS}
           >
             {mode === "preset" ? (
@@ -150,6 +155,7 @@ export function PresetTextField({
             <button
               type="button"
               onClick={onClear}
+              disabled={disabled}
               className={CLEAR_BUTTON_CLASS}
             >
               <Eraser className="h-3.5 w-3.5" />
@@ -167,12 +173,14 @@ export function PresetTextField({
             placeholder={placeholder}
             options={presetOptions}
             error={error}
+            disabled={disabled}
           />
         ) : (
           <>
             <textarea
               value={value}
               onChange={(event) => onChange(event.target.value)}
+              disabled={disabled}
               rows={textareaRows}
               maxLength={maxLength}
               placeholder="Describe el motivo del ajuste…"

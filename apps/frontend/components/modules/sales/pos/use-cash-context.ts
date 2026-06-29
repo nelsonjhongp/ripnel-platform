@@ -52,10 +52,19 @@ export function useCashContext(
 
   useEffect(() => {
     if (initialCashCheckDone || posContextLoading || !posContext) return
-    setInitialCashCheckDone(true)
-    const status = posContext?.cash?.status || "missing"
-    if (status === "missing" && has("cash.operate")) {
-      setCashOpenDialogOpen(true)
+    let cancelled = false
+    void Promise.resolve().then(() => {
+      if (cancelled) return
+
+      setInitialCashCheckDone(true)
+      const status = posContext?.cash?.status || "missing"
+      if (status === "missing" && has("cash.operate")) {
+        setCashOpenDialogOpen(true)
+      }
+    })
+
+    return () => {
+      cancelled = true
     }
   }, [posContextLoading, posContext, initialCashCheckDone, has])
 

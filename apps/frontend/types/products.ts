@@ -29,7 +29,4 @@ export type StyleBase = {
   active: boolean;
   created_at: string;
   garment_type_name: string;
-  fabric_name: string | null;
-  fabric_detail_name: string | null;
-  target_name: string | null;
 };

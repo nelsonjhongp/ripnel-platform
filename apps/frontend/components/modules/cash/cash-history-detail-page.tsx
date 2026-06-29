@@ -57,7 +57,7 @@ export default function CashHistoryDetailPage({
 
   const declaredBalance = closing.closing_balance_declared
   const balanceDiff =
-    declaredBalance != null ? closing.total_all - declaredBalance : null
+    declaredBalance != null ? declaredBalance - closing.total_all : null
 
   return (
     <PermissionGuard anyPermissions={["cash.view", "cash.operate"]}>
@@ -229,9 +229,9 @@ export default function CashHistoryDetailPage({
                       value={balanceDiff != null ? formatAmount(balanceDiff) : CAJA.fallback.dash}
                       tone={
                         balanceDiff != null && balanceDiff !== 0
-                          ? balanceDiff > 0
-                            ? undefined
-                            : "warning"
+                          ? balanceDiff < 0
+                            ? "warning"
+                            : undefined
                           : undefined
                       }
                     />

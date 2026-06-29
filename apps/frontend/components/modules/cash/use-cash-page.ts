@@ -8,8 +8,12 @@ import { showSuccess, showError } from "@/lib/toast"
 import { explainApiError } from "@/lib/error-utils"
 
 import type { CurrentCashResponse } from "./cash-types"
-import { formatAmount, formatBusinessDate } from "./cash-utils"
 import { CAJA } from "./cash-messages"
+import {
+  buildCloseCashPayload,
+  buildOpenCashPayload,
+  deriveCashPageState,
+} from "./cash-page-logic"
 
 export function useCashPage(
   locationId: string | undefined,
@@ -44,13 +48,13 @@ export function useCashPage(
     try {
       await apiFetch("/api/cash/open", {
         method: "POST",
-        body: JSON.stringify({
-          location_id: locationId,
-          notes: openNotes.trim() || undefined,
-          opening_balance: openingBalance
-            ? parseFloat(openingBalance)
-            : undefined,
-        }),
+        body: JSON.stringify(
+          buildOpenCashPayload({
+            locationId,
+            openNotes,
+            openingBalance,
+          }),
+        ),
       })
       setShowOpenConfirm(false)
       setOpenNotes("")
@@ -77,12 +81,12 @@ export function useCashPage(
         `/api/cash/${current.closing.cash_closing_id}/close`,
         {
           method: "PATCH",
-          body: JSON.stringify({
-            notes: closeNotes || undefined,
-            closing_balance_declared: closingBalanceDeclared
-              ? parseFloat(closingBalanceDeclared)
-              : undefined,
-          }),
+          body: JSON.stringify(
+            buildCloseCashPayload({
+              closeNotes,
+              closingBalanceDeclared,
+            }),
+          ),
         },
       )
       setShowCloseConfirm(false)
@@ -99,68 +103,25 @@ export function useCashPage(
     }
   }, [current, actionLoading, canOperateCash, closeNotes, closingBalanceDeclared, refetch])
 
-  const isClosed = current?.closing?.status === "closed"
-  const isOpen = current?.closing?.status === "open"
-  const summary = current?.sales_summary
-  const businessDate = current?.business_date
-  const consistencyOk = summary?.consistency.is_consistent ?? true
-
-  const cashStatusMeta = useMemo(() => {
-    if (!businessDate) return null
-    return {
-      text: formatBusinessDate(businessDate),
-      tooltip: CAJA.status.businessDateTooltip,
-    }
-  }, [businessDate])
-
-  const bannerState = useMemo(() => {
-    if (isOpen) {
-      return {
-        kind: "open" as const,
-        openedByName: current?.closing?.opened_by_name ?? null,
-      }
-    }
-    if (isClosed) {
-      return {
-        kind: "closed" as const,
-        closedByName: current?.closing?.closed_by_name ?? null,
-      }
-    }
-    return { kind: "not-open" as const }
-  }, [isOpen, isClosed, current])
-
-  const methodValues = useMemo(() => {
-    if (!summary) return null
-    return {
-      cash: formatAmount(summary.by_method.cash),
-      yape: formatAmount(summary.by_method.yape),
-      plin: formatAmount(summary.by_method.plin),
-      transfer: formatAmount(summary.by_method.transfer),
-    }
-  }, [summary])
-
-  const grandTotal = summary ? formatAmount(summary.grand_total) : null
-  const saleCount = summary ? summary.sale_count : null
-  const paymentTotal = summary ? formatAmount(summary.consistency.payment_total) : null
-
-  const closing = current?.closing
-  const declaredBalance = closing?.closing_balance_declared ?? null
-  const balanceDifference =
-    declaredBalance != null ? closing!.total_all - declaredBalance : null
-
-  const balanceDiffLabel = useMemo(() => {
-    if (balanceDifference == null) return null
-    return {
-      label:
-        balanceDifference >= 0
-          ? CAJA.summary.surplus
-          : CAJA.summary.shortage,
-      value: formatAmount(Math.abs(balanceDifference)),
-      tone: (balanceDifference >= 0 ? undefined : "warning") as
-        | "warning"
-        | undefined,
-    }
-  }, [balanceDifference])
+  const {
+    isClosed,
+    isOpen,
+    summary,
+    consistencyOk,
+    cashStatusMeta,
+    bannerState,
+    methodValues,
+    grandTotal,
+    saleCount,
+    paymentTotal,
+    closeSummaryTotal,
+    closeWarningMessage,
+    businessDate,
+    closing,
+    declaredBalance,
+    balanceDifference,
+    balanceDiffLabel,
+  } = useMemo(() => deriveCashPageState(current), [current])
 
   return {
     actionLoading,
@@ -194,6 +155,8 @@ export function useCashPage(
     grandTotal,
     saleCount,
     paymentTotal,
+    closeSummaryTotal,
+    closeWarningMessage,
     businessDate,
     closing,
     declaredBalance,

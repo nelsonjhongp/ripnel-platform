@@ -355,8 +355,6 @@ export function VariantsPage({
         style.name,
         style.style_code,
         style.garment_type_name,
-        style.fabric_name,
-        style.target_name,
       ]
         .map(normalizeText)
         .join(" ");
@@ -629,7 +627,7 @@ export function VariantsPage({
                       setStyleSearch(value);
                       setStylePage(1);
                     }}
-                    placeholder="Buscar por código, nombre o tela"
+                    placeholder="Buscar por código, nombre o tipo"
                     ariaLabel="Buscar styles para variantes"
                   />
 
@@ -673,8 +671,8 @@ export function VariantsPage({
                         <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                           <th className="px-4 py-3">Style</th>
                           <th className="px-4 py-3">Tipo</th>
-                          <th className="px-4 py-3">Tela</th>
-                          <th className="px-4 py-3">Target</th>
+                          <th className="px-4 py-3">Variantes</th>
+                          <th className="px-4 py-3">Siguiente paso</th>
                           <th className="px-4 py-3">Config.</th>
                           <th className="px-4 py-3">Cobertura</th>
                           <th className="px-4 py-3">Estado</th>
@@ -718,8 +716,12 @@ export function VariantsPage({
                                 </div>
                               </td>
                               <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{style.garment_type_name}</td>
-                              <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{style.fabric_name || "-"}</td>
-                              <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{style.target_name || "-"}</td>
+                              <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                                {style.variant_count}/{style.expected_variant_count}
+                              </td>
+                              <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                                {style.next_step_label}
+                              </td>
                               <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
                                 <p>{style.configured_size_count} tallas</p>
                                 <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">
@@ -818,12 +820,8 @@ export function VariantsPage({
                               {selectedSnapshot.style.garment_type_name}
                             </p>
                             <p>
-                              <span className="font-medium text-[var(--ops-text)]">Tela:</span>{" "}
-                              {selectedSnapshot.style.fabric_name || "-"}
-                            </p>
-                            <p>
-                              <span className="font-medium text-[var(--ops-text)]">Target:</span>{" "}
-                              {selectedSnapshot.style.target_name || "-"}
+                              <span className="font-medium text-[var(--ops-text)]">Siguiente paso:</span>{" "}
+                              {selectedProduct?.next_step_label || "Configurar variantes"}
                             </p>
                             <p>
                               <span className="font-medium text-[var(--ops-text)]">Variantes:</span>{" "}

@@ -1,4 +1,4 @@
-import { OpsMultiSelectMenu, OpsSelectionChip } from "@/components/ui/ops-selection";
+import { OpsColorSwatch, OpsMultiSelectMenu, OpsSelectionChip } from "@/components/ui/ops-selection";
 import { FieldLabel } from "@/components/ui/ops-field-label";
 
 type CatalogItem = {
@@ -56,12 +56,7 @@ export function MultiSelectCatalog({
     return {
       value: itemId,
       label: visibleLabel,
-      leading: colorMode ? (
-        <span
-          className="h-3.5 w-3.5 rounded-full border border-[color:var(--ops-border-soft)]"
-          style={{ backgroundColor: item.hex || "#ffffff" }}
-        />
-      ) : undefined,
+      leading: colorMode ? <OpsColorSwatch hex={item.hex} /> : undefined,
     };
   });
 
@@ -83,14 +78,7 @@ export function MultiSelectCatalog({
               <OpsSelectionChip
                 key={id}
                 label={colorMode ? getCatalogVisibleLabel(item) : getSizeLabel(item)}
-                leading={
-                  colorMode ? (
-                    <span
-                      className="h-3 w-3 rounded-full border border-[color:var(--ops-border-soft)]"
-                      style={{ backgroundColor: item.hex || "#ffffff" }}
-                    />
-                  ) : undefined
-                }
+                leading={colorMode ? <OpsColorSwatch hex={item.hex} className="h-3 w-3" /> : undefined}
                 onRemove={() => onToggle(id)}
               />
             );

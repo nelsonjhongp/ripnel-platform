@@ -58,6 +58,10 @@ When designing or reviewing UI, ensure alignment with:
 - Keep explicit SQL.
 - Prefer small modular files over large mixed controllers.
 
+> **Excepciones al patron routes/controller/service/repo:**
+> - `health` no tiene `service.js` ni `repo.js` — es un endpoint trivial de 1 query (`SELECT NOW()`). La excepcion es intencional.
+> - `notifications` no tiene `repo.js` — su `service.js` (514L) agrega queries de otros modulos. La extraccion a `notifications.repo.js` queda como deuda tecnica.
+
 ## Frontend stack
 
 - Next.js 16
@@ -452,6 +456,8 @@ Current mounted route groups in backend:
 - `GET|POST|PATCH /api/cash/*` (cash register: open, close, history, admin control)
 - `GET /api/dashboard/*`
 - `GET /api/home/*`
+- `GET /api/notifications/*`
+- `POST /api/chatbot/*`
 
 ## Current business modules visible in UI
 
@@ -845,7 +851,7 @@ El modulo `ventas` es la referencia canonica (Tier 3 completado, score ~0 actual
 
 ## Hardening checklist (ventas modulo)
 
-Refactor completado en Junio 2026 — ver `docs/sales-hardening-plan.md` para el plan completo.
+Refactor completado en Junio 2026.
 
 | Fase | Estado | Descripcion |
 |------|--------|-------------|
@@ -872,6 +878,29 @@ usePosSale()
 
 El archivo `pos-messages.ts` usa español sin tildes por convencion. Toda string visible al usuario debe residir en `pos-messages.ts` o `sales-history-messages.ts`, nunca hardcodeada.
 
+### Estado de hardening por modulo
+
+> **Component inventory detallado:** `docs/frontend-component-inventory.md` — matriz de componentes x modulo, deprecados, referencias canonicas y anti-patrones.
+
+| Modulo | Hardening | Tipo | Componentes clave | -messages | -constants | -types | -utils | Notas |
+|--------|:---------:|------|-------------------|:---------:|:----------:|:------:|:------:|-------|
+| Ventas (POS) | ✅ Tier 3 | Formulario + Listado + Detalle | PosHeader, OpsSegmentedControl, SearchablePicker, OpsPanelSection, SalesWizardRail | ✅ | ✅ | ✅ | ✅ 5 files | Canonico. 9 hooks. |
+| Caja | ✅ | Estado + Listado + Admin + Detalle | PosHeader, OpsDialog, OpsPanelSection, OpsMetricCard, DashboardChartCard | ✅ | ✅ | ✅ | ✅ | Completo. 4 hooks. |
+| Clientes | ✅ | Listado CRUD | PosHeader, OpsDialog, OpsFormField, OpsSegmentedControl, AdminRowActionsMenu | ✅ | ✅ | ✅ | ✅ | Completo. Two-phase save. |
+| Postventa | ✅ Parcial | Listado + Detalle | PosHeader, OpsDialog, OpsFormField, SearchablePicker, INFO_BOX_XL | ✅ | ✅ | — | — | Dialogs extraidos. Faltan types/utils. |
+| Inventario | 🔄 Fase 6-7 | Listado + Detalle + Formulario | PosHeader, OpsDialog, OpsFormField, OpsQuantityStepper, INFO_BOX_XL | ✅ + adj | ✅ + adj | ✅ | — | Ajustes en progreso. |
+| Kardex | ✅ | Listado | PosHeader, DateFilterPicker, CHIP_ENTRY/EXIT/ADJUST | ✅ | ✅ | — | domain.ts | Completo. 5 color-mix locales sin migrar. |
+| Administracion | ❌ | Listado CRUD + Form | AdminFormPageShell, AdminRowActionsMenu, AdminConfirmModal, AdminCheckboxField | ❌ | ❌ | ❌ | ❌ | 6 archivos, 0 mensajes. color-mix inline. |
+| Productos | ❌ | — | — | ❌ | ❌ | ❌ | ❌ | 4 archivos. Sin auditar. |
+| Precios | ❌ | — | — | ❌ | ❌ | ❌ | ❌ | Modulo en `pricing/`. Sin auditar. |
+| Transferencias | ❌ | — | — | ❌ | ❌ | ❌ | ❌ | 9 archivos. Sin auditar. |
+| Dashboard | ❌ | — | — | ❌ | ❌ | — | lib/ | 1 archivo. Sin auditar. |
+| Inicio | ❌ | — | — | ❌ | ❌ | — | — | 1 archivo. Sin auditar. |
+| BI | — | — | — | — | — | — | — | Placeholder (redirect a `/panel`) |
+| Cuenta | ❌ | Settings | — | ❌ | ❌ | — | — | 2 archivos. Sin auditar. |
+| Catalogos | ❌ | Hub + Listado + Form | AdminFormPageShell, AdminRowActionsMenu, AdminConfirmModal | ❌ | ❌ | ❌ | — | 4 archivos. color-mix inline, chips inline. |
+| Notificaciones | ❌ | — | — | ❌ | ❌ | — | — | 1 archivo. Sin auditar. |
+
 ## Hardening checklist (inventario / stock modulo)
 
 Refactor iniciado en Junio 2026. Modulo compuesto por 5 pantallas: stock actual, detalle de producto, movimientos (kardex), ajustes (lista), ajustes (creacion).
@@ -883,8 +912,8 @@ Refactor iniciado en Junio 2026. Modulo compuesto por 5 pantallas: stock actual,
 | 3. Shared types (`inventory-summary-shared.ts`) | ✅ | Limpieza: removidos 8 tipos/funciones de tabs y vista por sede. 176→130 lineas. |
 | 4. Constants (`inventory-constants.ts`) | ✅ | Nuevo archivo. Re-export de `INFO_BOX_XL`, `ACCENT_HIGHLIGHT_PANEL`, etc. desde `ops-control-styles.ts`. |
 | 5. Pagina kardex (`/inventario/movimientos`) | ✅ | Hardening completo Junio 2026. `kardex-messages.ts` + `kardex-constants.ts` creados. `kardex-domain.ts` migrado de `lib/` a `kardex/`. Componente unificado (sin split `KardexPage`/`KardexPageContent`). 0 strings hardcodeados, 0 `color-mix()` inline. Auto-scope a sede default via `useAuth()`. Badge de sede en `PosHeader.meta` con `OpsStatusBadge`. Dropdown de sede condicional: solo visible si `availableLocations.length > 1`. Fechas con `DateFilterPicker` (estandar de la app) + restriccion cruzada (`max={dateTo}` / `min={dateFrom}`) + `max={todayStr}` en Hasta. Metricas homogeneas (4 conteos, no mezcla conteo/cantidad). `movement.movement_direction` del backend usado directo en render (sin re-resolver por fila). Filtros con URL-sync. Clear filters → sede default. Labels de dominio en `KARDEX.labels.{operation,origin,reference}` importados por `kardex-domain.ts`. Redirect desde inventory-detail-page verificado. |
-| 6. Pagina ajustes lista (`/inventario/ajustes`) | 🔲 | Pendiente: refactorizar con mensajes, revisar strings huerfanas. |
-| 7. Pagina ajustes creacion (`/inventario/ajustes/nuevo`) | 🔲 | Pendiente: refactorizar con mensajes. |
+| 6. Pagina ajustes lista (`/inventario/ajustes`) | 🔄 | En progreso: `adjustments-messages.ts` creado. Pendiente: refactorizar `inventory-adjustments-page.tsx`. |
+| 7. Pagina ajustes creacion (`/inventario/ajustes/nuevo`) | 🔄 | En progreso: `adjustments-constants.ts` y `adjustments-detail-page.tsx` creados. Pendiente: refactorizar `inventory-adjustments-create-page.tsx`. |
 | 8. Umbral `LOW_STOCK_THRESHOLD` | 🔲 | Pendiente: extraer de constante `3` en backend a configuracion por sede. Duplicado en 4 archivos backend. |
 | 9. Sistema de estados y notificaciones | ✅ | `active = TRUE` agregado en 7 queries (`inventory.repo.js` + `dashboard.repo.js`). URLs de notificaciones corregidas (`sin-stock`→`out`, `stock-bajo`→`low`). Labels de status centralizados en `inventory-messages.ts`. Desactivar producto (`active=false`) ahora lo oculta de inventario y detiene notificaciones — borrado logico real. |
 | 10. CSS y UX en detalle | ✅ | `opsControlClassName`: `focus-visible:ring-*` → `focus-visible:shadow-[...]` (eliminado borde azul de Tailwind en todos los selects/inputs ops). Matriz tallas/colores: `minWidth` 820→600px, padding reducido `px-4`→`px-3`, wrapper redundante eliminado. Feedback dimmer (`opacity-50`) al cambiar sede. |
@@ -900,7 +929,10 @@ apps/frontend/components/modules/inventory/
 ├── inventory-summary-shared.ts     ← tipos compartidos
 ├── inventory-adjustments-shared.ts ← tipos de ajustes (pendiente refactor)
 ├── inventory-adjustments-page.tsx  ← lista de ajustes (pendiente refactor)
-└── inventory-adjustments-create-page.tsx ← creacion de ajustes (pendiente refactor)
+├── inventory-adjustments-create-page.tsx ← creacion de ajustes (pendiente refactor)
+├── adjustments-messages.ts         ← ADJ.* strings centralizados (en progreso)
+├── adjustments-constants.ts        ← re-export de ops-control-styles (⚠️ 6 color-mix inline)
+└── adjustments-detail-page.tsx     ← detalle de ajuste (en progreso)
 
 apps/frontend/components/modules/kardex/
 ├── kardex-constants.ts            ← re-export de ops-control-styles + chips kardex
@@ -938,9 +970,22 @@ Revisar AGENTS.md seccion "Hardening checklist (inventario / stock modulo)".
 Fase actual: 6 — pagina ajustes lista (/inventario/ajustes).
 
 Tareas:
-1. Crear adjustments-messages.ts con strings centralizados
+1. Revisar `adjustments-messages.ts` existente, verificar cobertura de strings
 2. Refactorizar inventory-adjustments-page.tsx: usar mensajes, revisar strings huerfanas
 3. Revisar inventory-adjustments-shared.ts: limpiar tipos no usados
 
 No modificar los archivos ya refactorizados (inventory-page.tsx, inventory-detail-page.tsx, inventory-messages.ts, inventory-constants.ts, inventory-summary-shared.ts, kardex-page.tsx, kardex-messages.ts, kardex-constants.ts, kardex-domain.ts).
 ```
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+When the user types `/graphify`, invoke the `skill` tool with `skill: "graphify"` before doing anything else.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- Dirty graphify-out/ files are expected after hooks or incremental updates; dirty graph files are not a reason to skip graphify. Only skip graphify if the task is about stale or incorrect graph output, or the user explicitly says not to use it.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
