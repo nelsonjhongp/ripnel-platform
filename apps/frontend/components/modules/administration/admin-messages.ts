@@ -47,6 +47,7 @@ export const ADMIN = {
       },
       loadingM: "Cargando usuarios...",
       errorTitle: "Error al cargar usuarios",
+      emptyDb: "No hay usuarios registrados todavia.",
       empty: "No hay usuarios para este filtro.",
     },
     roles: {
@@ -107,7 +108,7 @@ export const ADMIN = {
     userCreateTitle: "Nuevo usuario",
     userCreateDesc: "Registra un nuevo usuario en el sistema.",
     userEditTitle: "Editar usuario",
-    userEditDesc: "Modifica los datos del usuario.",
+    userEditDesc: "Modifica los datos del perfil. Las sedes se gestionan con la accion Sedes del menu.",
     roleCreateTitle: "Nuevo rol",
     roleCreateDesc: "Los permisos se asignan al rol, no al usuario individual.",
     roleEditTitle: "Editar rol",
@@ -171,12 +172,11 @@ export const ADMIN = {
     operation: "Operacion",
     sections: {
       sedes: "Sedes",
-      sedesDesc: "Elige acceso y sede default.",
     },
     fullName: "Nombre completo",
     fullNamePlaceholder: "Nombre completo",
     username: "Usuario",
-    emailOptional: "Email opcional",
+    email: "Email",
     emailPlaceholder: "email@ejemplo.com",
     role: "Rol",
     rolePlaceholder: (loading: boolean, error: string | null) =>

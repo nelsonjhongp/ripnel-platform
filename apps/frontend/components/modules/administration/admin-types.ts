@@ -23,6 +23,7 @@ export type User = {
   role_name?: string | null
   active: boolean
   must_change_password?: boolean
+  password_changed_at?: string | null
   created_at: string
   updated_at: string
   temporary_password?: string

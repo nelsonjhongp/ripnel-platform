@@ -981,46 +981,154 @@ Refactor completado en Junio 2026. Modulo compuesto por 3 pantallas: usuarios, r
 | 12. Types/admin.ts | ✅ | `types/admin.ts` global eliminado. Tipos migrados a `admin-types.ts` local del modulo. |
 | 13. usePagination | ✅ | locations-page migrada de paginacion manual a `usePagination` hook (consistente con users y roles). |
 | 14. Verificacion | ✅ | TypeScript 0 errores. Lint 0 errores (2 warnings pre-existentes `useMemo` deps). |
+| 15. AlertTriangle duplicado | ✅ | Icono `AlertTriangle` removido del body de los 3 dialogos activate/inactivate (users, roles, locations). `description` prop ya comunica la accion. |
+| 16. user-locations-dialog | ✅ | Reconstruido con `OpsMultiSelectField` + `OpsSelect` (mismo patron que create user). Error clearing en interaccion. `defaultLocError` separado de errores de API. |
+| 17. Checkbox active en editar | ✅ | Checkbox "Usuario activo" removido del dialogo editar usuario. El cambio de estado se hace exclusivamente via el icono Power del menu de fila. |
+| 18. Strings y tipos | ✅ | `userEditDesc` mejorado. `sections.sedesDesc` no usado eliminado. `password_changed_at` agregado al tipo `User`. |
 
 ### Archivos del modulo administracion
 
 ```
 apps/frontend/components/modules/administration/
 ├── admin-constants.ts          ← re-export de ops-control-styles + LOCATION_TYPE_LABELS
-├── admin-messages.ts           ← ADMIN.* (todos los strings centralizados)
+├── admin-messages.ts           ← ADMIN.* (todos los strings centralizados, ~229L)
 ├── admin-types.ts              ← User, Role, Location, *FormState, *FormErrors, EMPTY_*_FORM
 ├── admin-utils.ts              ← validate*, build*Payload, to*FormState, map*SaveError, formatPermissionChip
-├── users-page.tsx              ← listado + OpsDialog crear/editar + OpsDialog sedes + dialog clave temporal
-├── roles-page.tsx              ← listado + OpsDialog crear/editar con RolePermissionPicker
-└── locations-page.tsx          ← listado + OpsDialog crear/editar
+├── users-page.tsx              ← listado + OpsDialog crear/editar + OpsDialog sedes + OpsDialog clave temporal + OpsDialog activate/inactivate
+├── user-form.tsx               ← formulario compartido crear/editar usuario (extraido de users-page)
+├── user-locations-dialog.tsx   ← OpsDialog asignacion de sedes con OpsMultiSelectField + OpsSelect
+├── roles-page.tsx              ← listado + OpsDialog crear/editar con RolePermissionPicker + OpsDialog activate/inactivate
+└── locations-page.tsx          ← listado + OpsDialog crear/editar + OpsDialog activate/inactivate
 ```
 
-### Patrones aplicados
+### Patrones canonicos del modulo
 
-- **Listado**: `PosHeader` + `OpsMetricInlineGroup` + `OpsSectionDivider` + `OpsTableBlock` + `OpsFiltersRow` + `OpsDataTable`. Igual que ventas historial, clientes, kardex, inventario.
-- **Dialogs**: `OpsDialog` con `size="lg"` (users, roles) o `size="sm"` (locations). Footer canonico con `LoaderCircle animate-spin` + texto por fase.
-- **Two-phase save**: `actionState: "idle" | "validating" | "saving"`. Local validation → server save. Error 409 mapeado al campo responsable.
-- **Per-field errors**: `*FormErrors` con keys opcionales. `OpsFormField error={errors?.campo}`. Errores limpiados al abrir dialog.
-- **Eliminacion logica**: `AdminConfirmModal` con `confirmTone="danger"` (inactivar) / `"accent"` (activar). PATCH `{ active: !active }`.
-- **Clave temporal**: OpsDialog dedicado con `code` + boton copy-to-clipboard + `Check` icon feedback.
-- **Mensajes**: `ADMIN.header.*`, `ADMIN.filters.*`, `ADMIN.table.*`, `ADMIN.dialog.*`, `ADMIN.toast.*`, `ADMIN.form.*`, `ADMIN.errors.*` — todos los strings visibles referencian `ADMIN.*`.
+#### 3 tipos de modal
+
+Toda operacion del modulo usa uno de estos 3 patrones de `OpsDialog`:
+
+| Tipo | Uso | Body | Footer | Ejemplo |
+|------|-----|------|--------|---------|
+| **Formulario** (create/edit) | Crear o editar entidad | `UserForm` / form inline con `OpsFormField`, `OpsSelect`, `opsInputCompact` | `outline` cancel + `accent` save con `LoaderCircle` + 3 fases | Crear/editar usuario, rol, sede |
+| **Confirmacion** (activate/inactivate) | Activar o inactivar | **Vacio** — solo `description` prop explica la accion. El boton `destructive` ya da senal visual de peligro | `outline` cancel + `destructive`\|`accent` confirm con `LoaderCircle` + `processing` text | Activar/inactivar usuario, rol, sede |
+| **Multi-select + default** (sedes) | Asignar sedes + default | `OpsMultiSelectField` + `OpsSelect` condicional, 2 canales de error (API + validacion), clear en interaccion | `outline` cancel + `accent` save con `LoaderCircle` + 3 fases | user-locations-dialog |
+
+**Regla de confirmacion:** El `AlertTriangle` icon NO va en el body del `OpsDialog`. La duplicacion `description` prop + icon en body es un anti-patron heredado del `AdminConfirmModal` deprecado. El `description` prop del `OpsDialog` ya renderiza el texto bajo el titulo via `DialogPrimitive.Description`.
+
+**`AdminConfirmModal` (deprecado):** definido en `components/admin/admin-ui.tsx:315`. No usar en codigo nuevo. Reemplazar por `OpsDialog` con patron de confirmacion (sin body children, solo `description` prop).
+
+#### Combo `OpsMultiSelectField` + `OpsSelect` para default
+
+Patron canonico para "seleccion multiple + designar un default":
+
+```tsx
+// 1. Multi-select de opciones
+const locationOptions = availableLocations.map((loc) => ({
+  value: loc.location_id,
+  label: loc.name,
+}))
+
+<OpsMultiSelectField
+  label={ADMIN.form.sections.sedes}
+  required
+  selectedValues={selectedLocationIds}
+  onToggle={toggleLocation}
+  options={locationOptions}
+  placeholder={ADMIN.form.sedesPlaceholder}
+  emptyMessage={ADMIN.form.sedesNoneActive}
+/>
+
+// 2. Default — visible solo cuando >1 seleccionados
+const defaultLocationOptions = availableLocations
+  .filter((loc) => selectedLocationIds.includes(loc.location_id))
+  .map((loc) => ({ value: loc.location_id, label: loc.name }))
+
+{selectedLocationIds.length > 1 ? (
+  <OpsFormField
+    label={ADMIN.form.sedesDefault}
+    error={defaultLocError}
+    density="compact"
+  >
+    <OpsSelect
+      value={defaultLocationId ?? ""}
+      onChange={(v) => {
+        setDefaultLocError(null)   // ← clear error en interaccion
+        setDefaultLocationId(v || null)
+      }}
+      placeholder={ADMIN.form.sedesDefaultPlaceholder(true)}
+      options={defaultLocationOptions}
+    />
+  </OpsFormField>
+) : null}
+```
+
+**Reglas del combo:**
+- Opciones del default son solo las seleccionadas en el multi-select
+- El default se oculta si hay 0 o 1 seleccionados (con 1, es implicito)
+- Errores de validacion (ej. "Elige una sede default") van en `error` prop del `OpsFormField` que envuelve al `OpsSelect`, no en el `OpsMultiSelectField`
+- Errores de API (carga/guardado) van como banner `INFO_BOX_MUTED` con tonos danger en el tope del body
+- Ambos tipos de error se limpian en interaccion (`toggleLocation`, `onChange` del `OpsSelect`)
+
+#### Maquina de estados 3 fases
+
+```ts
+type ActionState = "idle" | "validating" | "saving"
+
+const [actionState, setActionState] = useState<ActionState>("idle")
+const isBusy = actionState !== "idle"
+```
+
+| Fase | Significado | Boton |
+|------|------------|-------|
+| `idle` | Sin accion en curso. Botones habilitados | Texto normal (`"Guardar"`, `"Guardar cambios"`) |
+| `validating` | Validacion local + pre-save checks (sin DB write aun) | `<LoaderCircle animate-spin />` + `"Validando..."` |
+| `saving` | Ejecutando POST/PATCH/PUT | `<LoaderCircle animate-spin />` + `"Guardando..."` |
+
+En error de validacion o duplicate, reset a `"idle"`. Si el error es de API, tambien reset a `"idle"` en el `finally`.
+
+#### Errores per-field
+
+```ts
+type UserFormErrors = {
+  _form?: string           // cross-field o generico (API)
+  full_name?: string
+  username?: string
+  email?: string
+  role_id?: string
+  location_ids?: string
+  default_location_id?: string
+}
+```
+
+- `validate*Input(input, isEdit)` retorna `T | null`
+- `map*SaveError(error)` mapea 409 al campo responsable, resto a `_form`
+- Cada `OpsFormField` recibe su error individual: `<OpsFormField error={errors?.campo} />`
+- Errores se limpian en `useEffect` al abrir dialog (`Promise.resolve().then()`)
+- Errores tambien se limpian en interaccion (`onChange`, `toggleLocation`)
+
+#### Listado
+
+`PosHeader` + `OpsMetricInlineGroup` + `OpsSectionDivider` + `OpsTableBlock` + `OpsFiltersRow` + `OpsDataTable`. Igual que ventas historial, clientes, kardex, inventario.
+
+#### Mensajes
+
+`ADMIN.header.*`, `ADMIN.filters.*`, `ADMIN.table.*`, `ADMIN.dialog.*`, `ADMIN.toast.*`, `ADMIN.form.*`, `ADMIN.errors.*` — todos los strings visibles referencian `ADMIN.*`.
 
 ### Como continuar en otro chat
 
-Para continuar con la fase 6 (ajustes lista), usar este prompt:
+Para continuar con el modulo administracion, usar este prompt:
 
 ```
-Continuar hardening del modulo inventario/stock en RIPNEL.
-Revisar AGENTS.md seccion "Hardening checklist (inventario / stock modulo)".
-Fase actual: 6 — pagina ajustes lista (/inventario/ajustes).
+Continuar hardening del modulo administracion en RIPNEL.
+Revisar AGENTS.md seccion "Hardening checklist (administracion modulo)".
 
-Tareas:
-1. Revisar `adjustments-messages.ts` existente, verificar cobertura de strings
-2. Refactorizar inventory-adjustments-page.tsx: usar mensajes, revisar strings huerfanas
-3. Revisar inventory-adjustments-shared.ts: limpiar tipos no usados
-
-No modificar los archivos ya refactorizados (inventory-page.tsx, inventory-detail-page.tsx, inventory-messages.ts, inventory-constants.ts, inventory-summary-shared.ts, kardex-page.tsx, kardex-messages.ts, kardex-constants.ts, kardex-domain.ts).
+Pendientes (documentados, sin implementar):
+1. Backend: endpoint POST /api/users/:id/reset-password para regenerar clave temporal
+2. Frontend: accion "Regenerar clave" en AdminRowActionsMenu cuando must_change_password === true
+3. Evaluar mostrar sede default en fila de tabla (requiere backend incluya la info en GET /api/users)
 ```
+
+Los patrones canonicos (3 tipos de modal, combo OpsMultiSelectField + OpsSelect, 3 fases, per-field errors) ya estan documentados en la seccion "Patrones canonicos del modulo".
 
 ## Hardening checklist (productos modulo)
 
