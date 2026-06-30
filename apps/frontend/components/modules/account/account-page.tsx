@@ -7,6 +7,7 @@ import { useAuth } from "@/components/auth/AuthProvider"
 import { useVisualPreferences } from "@/components/appearance/VisualPreferencesProvider"
 import { OpsSelect } from "@/components/ui/ops-selection"
 import { appRoutes } from "@/lib/routes"
+import { ACC } from "./account-messages"
 import {
   AccountPageFrame,
   PanelSection,
@@ -52,32 +53,32 @@ export default function AccountPage() {
     savePreferences(pref)
   }
 
-  const roleName = user.role_name || "Sin rol"
+  const roleName = user.role_name || ACC.fields.noRole
 
   return (
-    <AccountPageFrame backHref="/inicio" title="Cuenta">
-      <PanelSection title="Informacion del usuario">
-        <ValueRow label="Nombre" value={user.full_name} />
-        <ValueRow label="Usuario" value={`@${user.username}`} />
-        <ValueRow label="Correo principal" value={user.email || "Sin correo registrado"} />
-        <ValueRow label="Rol" value={roleName} />
-        <ValueRow label="Estado" value={<span className="inline-flex items-center gap-1.5 text-emerald-600"><CheckCircle2 className="h-4 w-4" /> Sesion activa</span>} />
+    <AccountPageFrame backHref="/inicio" title={ACC.title}>
+      <PanelSection title={ACC.sections.userInfo}>
+        <ValueRow label={ACC.fields.name} value={user.full_name} />
+        <ValueRow label={ACC.fields.username} value={`@${user.username}`} />
+        <ValueRow label={ACC.fields.email} value={user.email || ACC.fields.noEmail} />
+        <ValueRow label={ACC.fields.role} value={roleName} />
+        <ValueRow label={ACC.fields.status} value={<span className="inline-flex items-center gap-1.5 text-emerald-600"><CheckCircle2 className="h-4 w-4" /> {ACC.fields.active}</span>} />
       </PanelSection>
 
-      <PanelSection title="Preferencias">
+      <PanelSection title={ACC.sections.preferences}>
         {locationOptions.length > 0 && (
           <div className="grid gap-3 border-t border-[var(--ops-border-strong)] px-4 py-[var(--ops-row-py)] md:grid-cols-[200px_minmax(0,1fr)] md:items-center">
-            <span className="text-sm font-medium text-[var(--ops-text)]">Sede operativa</span>
+            <span className="text-sm font-medium text-[var(--ops-text)]">{ACC.fields.operativeLocation}</span>
             <OpsSelect
               label=""
               value={currentLocationId}
-              options={[{ value: "", label: "Sin sede default" }, ...locationOptions]}
+              options={[{ value: "", label: ACC.fields.noDefaultLocation }, ...locationOptions]}
               onChange={handleLocationChange}
             />
           </div>
         )}
         <div className="grid gap-3 border-t border-[var(--ops-border-strong)] px-4 py-[var(--ops-row-py)] md:grid-cols-[200px_minmax(0,1fr)] md:items-center">
-          <span className="text-sm font-medium text-[var(--ops-text)]">Apariencia</span>
+          <span className="text-sm font-medium text-[var(--ops-text)]">{ACC.fields.appearance}</span>
           <OpsSelect
             label=""
             value={currentThemeChoice}
@@ -87,7 +88,7 @@ export default function AccountPage() {
         </div>
       </PanelSection>
 
-      <PanelSection title="Avanzado">
+      <PanelSection title={ACC.sections.advanced}>
         <Link
           href={appRoutes.accountSecurity}
           className="flex items-center justify-between border-t border-[var(--ops-border-strong)] px-4 py-[var(--ops-row-py)] transition hover:bg-[var(--ops-surface-muted)]"
@@ -97,8 +98,8 @@ export default function AccountPage() {
               <KeyRound className="h-4 w-4 text-[var(--ops-text-muted)]" />
             </span>
             <div>
-              <p className="text-sm font-medium text-[var(--ops-text)]">Seguridad</p>
-              <p className="text-xs text-[var(--ops-text-muted)]">Cambiar contrasena</p>
+              <p className="text-sm font-medium text-[var(--ops-text)]">{ACC.security.title}</p>
+              <p className="text-xs text-[var(--ops-text-muted)]">{ACC.security.description}</p>
             </div>
           </div>
           <ChevronRight className="h-4 w-4 text-[var(--ops-text-muted)]" />

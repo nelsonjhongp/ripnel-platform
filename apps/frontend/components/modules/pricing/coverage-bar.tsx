@@ -1,5 +1,7 @@
 "use client"
 
+import { COVERAGE_BAR_DANGER, COVERAGE_BAR_WARNING, COVERAGE_BAR_SUCCESS } from "./pricing-constants"
+
 export function CoverageBar({
   current,
   total,
@@ -13,9 +15,9 @@ export function CoverageBar({
     current === 0 ? "danger" : current === total ? "success" : "warning"
 
   const barColor = {
-    danger: "bg-[color:color-mix(in_srgb,#f43f5e_60%,transparent)]",
-    warning: "bg-[color:color-mix(in_srgb,#f59e0b_60%,transparent)]",
-    success: "bg-[color:color-mix(in_srgb,#10b981_60%,transparent)]",
+    danger: COVERAGE_BAR_DANGER,
+    warning: COVERAGE_BAR_WARNING,
+    success: COVERAGE_BAR_SUCCESS,
   }[variant]
 
   return (

@@ -4,6 +4,7 @@ import { PackageCheck } from "lucide-react"
 
 import { OpsActionLink } from "@/components/ui/ops-action-link"
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
+import { HOME } from "@/components/modules/home/home-messages"
 
 export interface CriticalStockRow {
   variant_id: string
@@ -33,12 +34,11 @@ export function HomeCriticalStockTable({
           <div className="flex items-center gap-2">
             <PackageCheck className="h-5 w-5 text-[var(--ops-text-muted)]" />
             <p className="text-sm font-semibold text-[var(--ops-text)]">
-              Stock sin novedades
+              {HOME.inventory.noNovelties}
             </p>
           </div>
           <p className="mt-1 text-[13px] text-[var(--ops-text-muted)]">
-            {emptyMessage ??
-              "No hay variantes en cero o bajo mínimo visibles para la sede activa."}
+            {emptyMessage ?? HOME.inventory.noCritical}
           </p>
         </div>
       </div>
@@ -51,16 +51,16 @@ export function HomeCriticalStockTable({
         <thead>
           <tr className="bg-[var(--ops-surface-muted)]">
             <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-              Producto
+              {HOME.inventory.productCol}
             </th>
             <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-              Variante
+              {HOME.inventory.variantCol}
             </th>
             <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-              Stock
+              {HOME.inventory.stockCol}
             </th>
             <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-              Acción
+              {HOME.inventory.actionCol}
             </th>
           </tr>
         </thead>
@@ -96,7 +96,7 @@ export function HomeCriticalStockTable({
                   tone="warning"
                   size="sm"
                 >
-                  Reponer
+                  {HOME.inventory.replenish}
                 </OpsActionLink>
               </td>
             </tr>

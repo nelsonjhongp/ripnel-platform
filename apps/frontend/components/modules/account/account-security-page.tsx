@@ -9,9 +9,11 @@ import {
   PanelSection,
   SettingsFormRow,
 } from "@/components/account/account-preferences-ui";
-import { AdminInlineMessage } from "@/components/admin/admin-ui";
+import { ProtectedLoadingPage } from "@/components/feedback/status-page";
 import { Button } from "@/components/ui/button";
+import { showSuccess, showError } from "@/lib/toast";
 import { appRoutes } from "@/lib/routes";
+import { ACC } from "./account-messages";
 import {
   InputGroup,
   InputGroupAddon,
@@ -37,7 +39,6 @@ export default function AccountSecurityPage() {
   const [form, setForm] = useState<PasswordForm>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -45,10 +46,9 @@ export default function AccountSecurityPage() {
   async function submitPassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setMessage(null);
 
     if (form.new_password !== form.confirm_password) {
-      setError("La confirmacion no coincide con la nueva contrasena.");
+      setError(ACC.security.mismatch);
       return;
     }
 
@@ -60,27 +60,21 @@ export default function AccountSecurityPage() {
         new_password: form.new_password,
       });
       setForm(emptyForm);
-      setMessage("Contrasena actualizada.");
+      showSuccess(ACC.security.success);
       router.replace("/inicio");
     } catch (changeError) {
-      setError(
-        changeError instanceof Error
-          ? changeError.message
-          : "No se pudo actualizar la contrasena."
-      );
+      const msg = changeError instanceof Error
+        ? changeError.message
+        : ACC.security.error;
+      setError(msg);
+      showError(msg);
     } finally {
       setSaving(false);
     }
   }
 
   if (loading) {
-    return (
-      <section className="ops-page min-h-screen px-4 py-6">
-        <div className="mx-auto max-w-3xl rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-6 shadow-sm">
-          <div className="text-sm font-medium text-[var(--ops-text-muted)]">Cargando cuenta...</div>
-        </div>
-      </section>
-    );
+    return <ProtectedLoadingPage title={ACC.security.loading} />;
   }
 
   if (!user) {
@@ -92,16 +86,15 @@ export default function AccountSecurityPage() {
   return (
     <AccountPageFrame
       backHref={isRequired ? undefined : appRoutes.account}
-      backLabel={isRequired ? undefined : "Volver a perfil"}
-      title="Seguridad"
+      backLabel={isRequired ? undefined : ACC.back}
+      title={ACC.sections.security}
     >
       <PanelSection
-        title="Cambio de contraseña"
-        description="Actualiza tu clave con el mismo patrón operativo del resto de la cuenta."
+        title={ACC.security.title}
         icon={KeyRound}
       >
         <form onSubmit={submitPassword}>
-          <SettingsFormRow label="Contrasena actual">
+          <SettingsFormRow label={ACC.security.currentPassword}>
             <InputGroup className="h-9 rounded-md border-[var(--ops-border-strong)] bg-[var(--ops-field)] shadow-none focus-within:border-[var(--ripnel-accent)] focus-within:ring-[color:var(--ripnel-accent-soft)]">
               <InputGroupInput
                 type={showCurrentPassword ? "text" : "password"}
@@ -119,7 +112,7 @@ export default function AccountSecurityPage() {
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => setShowCurrentPassword((value) => !value)}
-                  aria-label={showCurrentPassword ? "Ocultar contraseña actual" : "Mostrar contraseña actual"}
+                  aria-label={showCurrentPassword ? ACC.security.hideCurrent : ACC.security.showCurrent}
                   className="h-7 w-7 rounded-md text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)]"
                 >
                   {showCurrentPassword ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
@@ -129,8 +122,8 @@ export default function AccountSecurityPage() {
           </SettingsFormRow>
 
           <SettingsFormRow
-            label="Nueva contrasena"
-            detail="Minimo 10 caracteres, una letra y un numero."
+            label={ACC.security.newPassword}
+            detail={ACC.security.newPasswordHint}
           >
             <InputGroup className="h-9 rounded-md border-[var(--ops-border-strong)] bg-[var(--ops-field)] shadow-none focus-within:border-[var(--ripnel-accent)] focus-within:ring-[color:var(--ripnel-accent-soft)]">
               <InputGroupInput
@@ -150,7 +143,7 @@ export default function AccountSecurityPage() {
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => setShowNewPassword((value) => !value)}
-                  aria-label={showNewPassword ? "Ocultar nueva contraseña" : "Mostrar nueva contraseña"}
+                  aria-label={showNewPassword ? ACC.security.hideNew : ACC.security.showNew}
                   className="h-7 w-7 rounded-md text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)]"
                 >
                   {showNewPassword ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
@@ -159,7 +152,7 @@ export default function AccountSecurityPage() {
             </InputGroup>
           </SettingsFormRow>
 
-          <SettingsFormRow label="Confirmar">
+          <SettingsFormRow label={ACC.security.confirm}>
             <InputGroup className="h-9 rounded-md border-[var(--ops-border-strong)] bg-[var(--ops-field)] shadow-none focus-within:border-[var(--ripnel-accent)] focus-within:ring-[color:var(--ripnel-accent-soft)]">
               <InputGroupInput
                 type={showConfirmPassword ? "text" : "password"}
@@ -178,7 +171,7 @@ export default function AccountSecurityPage() {
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => setShowConfirmPassword((value) => !value)}
-                  aria-label={showConfirmPassword ? "Ocultar confirmación de contraseña" : "Mostrar confirmación de contraseña"}
+                  aria-label={showConfirmPassword ? ACC.security.hideConfirm : ACC.security.showConfirm}
                   className="h-7 w-7 rounded-md text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)]"
                 >
                   {showConfirmPassword ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
@@ -187,8 +180,9 @@ export default function AccountSecurityPage() {
             </InputGroup>
           </SettingsFormRow>
 
-          {error ? <AdminInlineMessage tone="danger">{error}</AdminInlineMessage> : null}
-          {message ? <AdminInlineMessage tone="success">{message}</AdminInlineMessage> : null}
+          {error ? (
+            <p className="px-4 py-2 text-sm font-medium text-[var(--ops-tone-danger-text)]">{error}</p>
+          ) : null}
 
           <div className="flex justify-end border-t border-[var(--ops-border-strong)] px-4 py-3">
             <Button
@@ -198,7 +192,7 @@ export default function AccountSecurityPage() {
               size="sm"
               className="h-9 rounded-md px-3.5 text-sm font-semibold"
             >
-              {saving ? "Guardando..." : "Actualizar contrasena"}
+              {saving ? ACC.security.saving : ACC.security.submit}
             </Button>
           </div>
         </form>

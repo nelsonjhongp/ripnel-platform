@@ -888,18 +888,18 @@ El archivo `pos-messages.ts` usa español sin tildes por convencion. Toda string
 | Caja | ✅ | Estado + Listado + Admin + Detalle | PosHeader, OpsDialog, OpsPanelSection, OpsMetricCard, DashboardChartCard | ✅ | ✅ | ✅ | ✅ | Completo. 4 hooks. |
 | Clientes | ✅ | Listado CRUD | PosHeader, OpsDialog, OpsFormField, OpsSegmentedControl, AdminRowActionsMenu | ✅ | ✅ | ✅ | ✅ | Completo. Two-phase save. |
 | Postventa | ✅ Parcial | Listado + Detalle | PosHeader, OpsDialog, OpsFormField, SearchablePicker, INFO_BOX_XL | ✅ | ✅ | — | — | Dialogs extraidos. Faltan types/utils. |
-| Inventario | 🔄 Fase 6-7 | Listado + Detalle + Formulario | PosHeader, OpsDialog, OpsFormField, OpsQuantityStepper, INFO_BOX_XL | ✅ + adj | ✅ + adj | ✅ | — | Ajustes en progreso. |
+| Inventario | ✅ | Listado + Detalle + Formulario | PosHeader, OpsDialog, OpsFormField, OpsQuantityStepper, INFO_BOX_XL | ✅ | ✅ | ✅ | shared.ts | Completo. 0 color-mix inline. 0 Admin* components. All strings centralised. |
 | Kardex | ✅ | Listado | PosHeader, DateFilterPicker, CHIP_ENTRY/EXIT/ADJUST | ✅ | ✅ | — | domain.ts | Completo. 5 color-mix locales sin migrar. |
-| Administracion | ❌ | Listado CRUD + Form | AdminFormPageShell, AdminRowActionsMenu, AdminConfirmModal, AdminCheckboxField | ❌ | ❌ | ❌ | ❌ | 6 archivos, 0 mensajes. color-mix inline. |
-| Productos | ❌ | — | — | ❌ | ❌ | ❌ | ❌ | 4 archivos. Sin auditar. |
-| Precios | ❌ | — | — | ❌ | ❌ | ❌ | ❌ | Modulo en `pricing/`. Sin auditar. |
-| Transferencias | ❌ | — | — | ❌ | ❌ | ❌ | ❌ | 9 archivos. Sin auditar. |
-| Dashboard | ❌ | — | — | ❌ | ❌ | — | lib/ | 1 archivo. Sin auditar. |
-| Inicio | ❌ | — | — | ❌ | ❌ | — | — | 1 archivo. Sin auditar. |
+| Administracion | ✅ | Listado CRUD x 3 | PosHeader, OpsDialog, OpsFormField, AdminRowActionsMenu, AdminConfirmModal, RolePermissionPicker | ✅ | ✅ | ✅ | ✅ | Completo. 3 paginas + 4 base. Dialogs unificados (sin /nuevo). Two-phase save + per-field errors. |
+| Productos | ✅ | Overview + Styles + Variants + Create | PosHeader, OpsDataTable, OpsDialog, OpsFormField, OpsSelect, AdminRowActionsMenu | ✅ | ✅ | ✅ | ✅ | Refactorizado. AdminModalShell→OpsDialog. 8 Admin* migrados. 0 color-mix inline. |
+| Precios | ✅ | Listado + Workspace + Reglas | PosHeader, OpsDataTable, OpsMetricInlineGroup, OpsSelect, OpsSearchField, CoverageBar | ✅ | ✅ | — | lib/ | Refactorizado. TooltipProvider removido. 0 color-mix inline. 0 strings hardcodeados. |
+| Transferencias | ✅ | Listado + Detalle + Request + Manage + History | PosHeader, OpsDialog, OpsPanelSection, OpsDataTable, Pagination | ✅ | ✅ | — | shared.tsx + hook | Refactorizado. 65 color-mix→ops-tone. 7 TooltipProvider removidos. 10 Admin* migrados. |
+| Inicio | ✅ | Dashboard | PosHeader, OpsMetricInlineGroup, OpsStatusBadge, INFO_BOX | ✅ | ✅ | — | — | Refactorizado. SURFACE_MUTED_30/52. Tildes fijadas. |
+| Dashboard | ✅ | Charts + Metricas | PosHeader, OpsMetricInlineGroup, DashboardChartCard, OpsPanelSection | ✅ | ✅ | — | lib/ | Refactorizado. SURFACE_MUTED_24 + CHART4_HIGHLIGHT_PANEL. 0 color-mix, 0 TooltipProvider. |
 | BI | — | — | — | — | — | — | — | Placeholder (redirect a `/panel`) |
-| Cuenta | ❌ | Settings | — | ❌ | ❌ | — | — | 2 archivos. Sin auditar. |
-| Catalogos | ❌ | Hub + Listado + Form | AdminFormPageShell, AdminRowActionsMenu, AdminConfirmModal | ❌ | ❌ | ❌ | — | 4 archivos. color-mix inline, chips inline. |
-| Notificaciones | ❌ | — | — | ❌ | ❌ | — | — | 1 archivo. Sin auditar. |
+| Cuenta | ✅ | Settings | PosHeader, OpsDialog, OpsFormField | ✅ | ✅ | — | — | Refactorizado. InlineMessage→toast. Tildes fijadas. |
+| Catalogos | ✅ | Hub + Listado + Form | PosHeader, OpsDialog, OpsFormField, OpsSelect, RowActionsMenu, AdminConfirmModal | ✅ | ✅ | ✅ | — | Refactorizado. AdminModalShell→OpsDialog. AdminField→OpsFormField. AdminInlineMessage removido. |
+| Notificaciones | ✅ | Listado | PosHeader, Button, OpsStatusBadge | ✅ | — | — | — | Refactorizado. raw button→Button. Tildes fijadas. TooltipProvider removido. |
 
 ## Hardening checklist (inventario / stock modulo)
 
@@ -912,8 +912,8 @@ Refactor iniciado en Junio 2026. Modulo compuesto por 5 pantallas: stock actual,
 | 3. Shared types (`inventory-summary-shared.ts`) | ✅ | Limpieza: removidos 8 tipos/funciones de tabs y vista por sede. 176→130 lineas. |
 | 4. Constants (`inventory-constants.ts`) | ✅ | Nuevo archivo. Re-export de `INFO_BOX_XL`, `ACCENT_HIGHLIGHT_PANEL`, etc. desde `ops-control-styles.ts`. |
 | 5. Pagina kardex (`/inventario/movimientos`) | ✅ | Hardening completo Junio 2026. `kardex-messages.ts` + `kardex-constants.ts` creados. `kardex-domain.ts` migrado de `lib/` a `kardex/`. Componente unificado (sin split `KardexPage`/`KardexPageContent`). 0 strings hardcodeados, 0 `color-mix()` inline. Auto-scope a sede default via `useAuth()`. Badge de sede en `PosHeader.meta` con `OpsStatusBadge`. Dropdown de sede condicional: solo visible si `availableLocations.length > 1`. Fechas con `DateFilterPicker` (estandar de la app) + restriccion cruzada (`max={dateTo}` / `min={dateFrom}`) + `max={todayStr}` en Hasta. Metricas homogeneas (4 conteos, no mezcla conteo/cantidad). `movement.movement_direction` del backend usado directo en render (sin re-resolver por fila). Filtros con URL-sync. Clear filters → sede default. Labels de dominio en `KARDEX.labels.{operation,origin,reference}` importados por `kardex-domain.ts`. Redirect desde inventory-detail-page verificado. |
-| 6. Pagina ajustes lista (`/inventario/ajustes`) | 🔄 | En progreso: `adjustments-messages.ts` creado. Pendiente: refactorizar `inventory-adjustments-page.tsx`. |
-| 7. Pagina ajustes creacion (`/inventario/ajustes/nuevo`) | 🔄 | En progreso: `adjustments-constants.ts` y `adjustments-detail-page.tsx` creados. Pendiente: refactorizar `inventory-adjustments-create-page.tsx`. |
+| 6. Pagina ajustes lista (`/inventario/ajustes`) | ✅ | `inventory-adjustments-page.tsx` refactorizado: PosHeader, OpsMetricInlineGroup, OpsFiltersRow, OpsDataTable, URL-sync, auto-scope. 0 strings hardcodeados. |
+| 7. Pagina ajustes creacion (`/inventario/ajustes/nuevo`) | ✅ | `inventory-adjustments-create-page.tsx` (1049L) refactorizado: OpsFormField, OpsSelect, SearchablePicker, OpsDialog, two-phase save. `adjustments-detail-page.tsx` (501L) con patron canonico (INFO_BOX_XL + grid + OpsPanelSection). `adjustment-summary-stage.tsx` extraido. 0 color-mix inline. TypeScript OK. |
 | 8. Umbral `LOW_STOCK_THRESHOLD` | 🔲 | Pendiente: extraer de constante `3` en backend a configuracion por sede. Duplicado en 4 archivos backend. |
 | 9. Sistema de estados y notificaciones | ✅ | `active = TRUE` agregado en 7 queries (`inventory.repo.js` + `dashboard.repo.js`). URLs de notificaciones corregidas (`sin-stock`→`out`, `stock-bajo`→`low`). Labels de status centralizados en `inventory-messages.ts`. Desactivar producto (`active=false`) ahora lo oculta de inventario y detiene notificaciones — borrado logico real. |
 | 10. CSS y UX en detalle | ✅ | `opsControlClassName`: `focus-visible:ring-*` → `focus-visible:shadow-[...]` (eliminado borde azul de Tailwind en todos los selects/inputs ops). Matriz tallas/colores: `minWidth` 820→600px, padding reducido `px-4`→`px-3`, wrapper redundante eliminado. Feedback dimmer (`opacity-50`) al cambiar sede. |
@@ -927,12 +927,13 @@ apps/frontend/components/modules/inventory/
 ├── inventory-page.tsx              ← pagina principal (vista unica, sin tabs)
 ├── inventory-detail-page.tsx       ← detalle de producto (patron canonico)
 ├── inventory-summary-shared.ts     ← tipos compartidos
-├── inventory-adjustments-shared.ts ← tipos de ajustes (pendiente refactor)
-├── inventory-adjustments-page.tsx  ← lista de ajustes (pendiente refactor)
-├── inventory-adjustments-create-page.tsx ← creacion de ajustes (pendiente refactor)
-├── adjustments-messages.ts         ← ADJ.* strings centralizados (en progreso)
-├── adjustments-constants.ts        ← re-export de ops-control-styles (⚠️ 6 color-mix inline)
-└── adjustments-detail-page.tsx     ← detalle de ajuste (en progreso)
+├── inventory-adjustments-shared.ts ← tipos de ajustes
+├── inventory-adjustments-page.tsx  ← lista de ajustes (refactorizado)
+├── inventory-adjustments-create-page.tsx ← creacion de ajustes (refactorizado)
+├── adjustments-messages.ts         ← ADJ.* strings centralizados
+├── adjustments-constants.ts        ← re-export de ops-control-styles
+├── adjustments-detail-page.tsx     ← detalle de ajuste (refactorizado)
+└── adjustment-summary-stage.tsx    ← resumen sidebar (extraido)
 
 apps/frontend/components/modules/kardex/
 ├── kardex-constants.ts            ← re-export de ops-control-styles + chips kardex
@@ -960,6 +961,50 @@ apps/frontend/components/modules/kardex/
 - **Clear filters**: resetea a sede default del usuario, no a `"ALL"`. Si hay contexto de navegacion (`reference_type`/`reference_id`), navega a `pathname` limpio.
 - **Mensajes**: `KARDEX.header.*`, `KARDEX.filters.*`, `KARDEX.columns.*`, `KARDEX.table.*`, `KARDEX.metrics.*`, `KARDEX.labels.{operation,origin,reference}` — todos los strings visibles referencian `KARDEX.*`.
 
+## Hardening checklist (administracion modulo)
+
+Refactor completado en Junio 2026. Modulo compuesto por 3 pantallas: usuarios, roles, ubicaciones (sedes).
+
+| Fase | Estado | Descripcion |
+|------|--------|-------------|
+| 1. Archivos base | ✅ | `admin-messages.ts`, `admin-types.ts`, `admin-constants.ts`, `admin-utils.ts` creados. Todos los strings, tipos, constantes y validaciones centralizados. |
+| 2. OpsDialog | ✅ | `AdminModalShell` (deprecado) migrado a `OpsDialog` en los 3 modulos. Footer canonico: `flex-col-reverse gap-2 sm:flex-row sm:justify-end` + `outline` + `accent`. `description` prop siempre presente. |
+| 3. OpsFormField | ✅ | `AdminField` + `AdminInput` migrado a `OpsFormField` + `opsInputCompact`. Label, required asterisk, error per-field via `data-field-error`. |
+| 4. Two-phase save | ✅ | `idle` → `validating` → `saving` → `idle` en los 3 modulos. `LoaderCircle animate-spin` + texto distinto por fase. Boton `disabled` cuando `actionState !== "idle"`. |
+| 5. Per-field errors | ✅ | `UserFormErrors`, `RoleFormErrors`, `LocationFormErrors` con keys opcionales por campo. `validate*Input()` retorna errors o `null`. Errores se limpian al abrir dialog (`useEffect` + `Promise.resolve().then()`). |
+| 6. Error mapping | ✅ | `mapUserSaveError`, `mapRoleSaveError`, `mapLocationSaveError` mapean 409 (duplicate) al campo responsable. `_form` para errores genericos. |
+| 7. Toasts | ✅ | `showSuccess` / `showError` desde `lib/toast.ts`. Eliminado `successMessage` state persistente en locations. |
+| 8. Rutas /nuevo eliminadas | ✅ | `users-create-page.tsx`, `roles-create-page.tsx`, `locations-create-page.tsx` eliminados. Rutas `/nuevo` eliminadas. Crear y editar unificados en un solo OpsDialog por modulo. |
+| 9. Clave temporal | ✅ | `window.alert` reemplazado por OpsDialog dedicado con `code` + boton copy-to-clipboard. |
+| 10. color-mix() inline | ✅ | Eliminado. Tokens `--ops-tone-warning-*` y `--ops-tone-danger-*` usados via `INFO_BOX_MUTED` + clases de borde/bg. |
+| 11. TooltipProvider | ✅ | Wrapper redundante eliminado de los 3 modulos (SidebarShell ya provee TooltipProvider global). |
+| 12. Types/admin.ts | ✅ | `types/admin.ts` global eliminado. Tipos migrados a `admin-types.ts` local del modulo. |
+| 13. usePagination | ✅ | locations-page migrada de paginacion manual a `usePagination` hook (consistente con users y roles). |
+| 14. Verificacion | ✅ | TypeScript 0 errores. Lint 0 errores (2 warnings pre-existentes `useMemo` deps). |
+
+### Archivos del modulo administracion
+
+```
+apps/frontend/components/modules/administration/
+├── admin-constants.ts          ← re-export de ops-control-styles + LOCATION_TYPE_LABELS
+├── admin-messages.ts           ← ADMIN.* (todos los strings centralizados)
+├── admin-types.ts              ← User, Role, Location, *FormState, *FormErrors, EMPTY_*_FORM
+├── admin-utils.ts              ← validate*, build*Payload, to*FormState, map*SaveError, formatPermissionChip
+├── users-page.tsx              ← listado + OpsDialog crear/editar + OpsDialog sedes + dialog clave temporal
+├── roles-page.tsx              ← listado + OpsDialog crear/editar con RolePermissionPicker
+└── locations-page.tsx          ← listado + OpsDialog crear/editar
+```
+
+### Patrones aplicados
+
+- **Listado**: `PosHeader` + `OpsMetricInlineGroup` + `OpsSectionDivider` + `OpsTableBlock` + `OpsFiltersRow` + `OpsDataTable`. Igual que ventas historial, clientes, kardex, inventario.
+- **Dialogs**: `OpsDialog` con `size="lg"` (users, roles) o `size="sm"` (locations). Footer canonico con `LoaderCircle animate-spin` + texto por fase.
+- **Two-phase save**: `actionState: "idle" | "validating" | "saving"`. Local validation → server save. Error 409 mapeado al campo responsable.
+- **Per-field errors**: `*FormErrors` con keys opcionales. `OpsFormField error={errors?.campo}`. Errores limpiados al abrir dialog.
+- **Eliminacion logica**: `AdminConfirmModal` con `confirmTone="danger"` (inactivar) / `"accent"` (activar). PATCH `{ active: !active }`.
+- **Clave temporal**: OpsDialog dedicado con `code` + boton copy-to-clipboard + `Check` icon feedback.
+- **Mensajes**: `ADMIN.header.*`, `ADMIN.filters.*`, `ADMIN.table.*`, `ADMIN.dialog.*`, `ADMIN.toast.*`, `ADMIN.form.*`, `ADMIN.errors.*` — todos los strings visibles referencian `ADMIN.*`.
+
 ### Como continuar en otro chat
 
 Para continuar con la fase 6 (ajustes lista), usar este prompt:
@@ -975,6 +1020,92 @@ Tareas:
 3. Revisar inventory-adjustments-shared.ts: limpiar tipos no usados
 
 No modificar los archivos ya refactorizados (inventory-page.tsx, inventory-detail-page.tsx, inventory-messages.ts, inventory-constants.ts, inventory-summary-shared.ts, kardex-page.tsx, kardex-messages.ts, kardex-constants.ts, kardex-domain.ts).
+```
+
+## Hardening checklist (productos modulo)
+
+Refactor completado en Junio 2026. Modulo compuesto por 4 pantallas: overview, estilos, variantes, creacion.
+
+| Fase | Estado | Descripcion |
+|------|--------|-------------|
+| 1. products-messages.ts | ✅ | Expandido de 66L a 280L. Cobertura completa de overview, styles, variants, create, status, warnings. |
+| 2. products-constants.ts | ✅ | Nuevo archivo. STATUS_DOT_* (6 variantes), WARNING_CHIP_*, MSG_BOX_*, VARIANT_WARNING_*. |
+| 3. products-overview-page.tsx | ✅ | TooltipProvider removido. Nested TooltipProvider eliminado. 150+ strings → PRODUCTS.*. 11 color-mix → constants/ops-tone. |
+| 4. styles-page.tsx | ✅ | 8 Admin* migrados: AdminModalShell→OpsDialog, AdminField→OpsFormField, AdminInput→opsInputCompact, AdminTextarea→textarea, AdminCheckboxField→raw, AdminFormActionsBar→canonical footer, AdminActionButton→Button, AdminInlineMessage→toast, AdminConfirmModal→OpsDialog. Two-phase save. |
+| 5. variants-page.tsx | ✅ | AdminCheckboxOption→custom checkbox. AdminConfirmModal→OpsDialog. successMessage→showSuccess toast. 5 color-mix→constants. |
+| 6. product-create-page.tsx | ✅ | AdminInlineMessage→styled div. color-mix→DUPLICATE_WARNING_TEXT. Strings→PRODUCTS.*. |
+| 7. Verificacion | ✅ | TypeScript 0 errores. |
+
+### Archivos del modulo productos
+
+```
+apps/frontend/components/modules/products/
+├── products-messages.ts          ← PRODUCTS.*, ~280L
+├── products-constants.ts         ← STATUS_DOT_*, WARNING_CHIP_*, MSG_BOX_*
+├── products-types.ts             ← tipos de formulario (sin cambios)
+├── products-utils.ts             ← utilidades (sin cambios)
+├── products-overview-page.tsx    ← listado maestro
+├── styles-page.tsx               ← estilos CRUD (refactorizado)
+├── variants-page.tsx             ← variantes CRUD (refactorizado)
+├── product-create-dialog.tsx     ← dialogo de creacion (ya limpio)
+├── product-create-form.tsx       ← formulario de creacion (color-mix fix)
+└── product-create-page.tsx       ← pagina de creacion standalone (refactorizada)
+```
+
+### Como continuar en otro chat (productos)
+
+```
+Continuar trabajo en modulo productos de RIPNEL.
+
+Tareas pendientes:
+1. Evaluar si product-create-page.tsx (standalone) es ruta muerta vs product-create-dialog.tsx (dialogo)
+2. Revisar products-utils.ts para posibles splits por dominio (>237L)
+```
+
+## Hardening checklist (transferencias modulo)
+
+Refactor completado en Junio 2026. Modulo compuesto por 7 pantallas: listado, detalle, request, manage, history, pendientes + hook compartido.
+
+| Fase | Estado | Descripcion |
+|------|--------|-------------|
+| 1. transfers-messages.ts | ✅ | Creado desde 0. ~250 keys cubriendo header, status, scope, queue, actions, filters, table, detail, request, manage, history, validation, toast. |
+| 2. transfers-constants.ts | ✅ | Creado desde 0. TRANS_STATUS_* (5 vars), TRANS_QUEUE_* (3 vars), TRANS_STAGE_* (4 vars) — reemplazan 65 color-mix inline. |
+| 3. transfers-shared.tsx | ✅ | 23 color-mix→TRANS_STATUS_*/TRANS_QUEUE_*/TRANS_STAGE_*. TRANSFER_ACTION_CONFIG strings→TRANS.actionConfig.*. Format functions→TRANS.*. |
+| 4. transfers-request-ui.tsx | ✅ | 22 color-mix→ops-tone. 50+ strings→TRANS.request.*. Tildes fijadas. |
+| 5. transfers-request-page.tsx | ✅ | TooltipProvider removido. AdminInlineMessage→styled div. 3 section+h2→OpsPanelSection. color-mix→ops-tone. Strings→TRANS.*. |
+| 6. transfers-manage-page.tsx | ✅ | AdminInlineMessage→styled div. AdminTextarea→textarea. 2 color-mix→ops-tone. Strings→TRANS.manage.*. |
+| 7. transfers-list-page.tsx | ✅ | 3 TooltipProvider removidos. AdminConfirmModal→OpsDialog. AdminInlineMessage→styled div. 1 color-mix→ops-tone. Strings→TRANS.list.*/table.*. |
+| 8. transfers-history-page.tsx | ✅ | 2 TooltipProvider wrappers removidos. Strings→TRANS.history.*/filters.*. |
+| 9. transfers-detail-page.tsx | ✅ | TooltipProvider removido. AdminConfirmModal→OpsDialog. AdminInlineMessage→styled div. 13 color-mix→ops-tone. Strings→TRANS.detail.*. |
+| 10. use-transfer-draft.ts | ✅ | 15 strings→TRANS.validation.*/toast.*. successMessage→showSuccess toast. |
+| 11. Verificacion | ✅ | TypeScript 0 errores. |
+
+### Archivos del modulo transferencias
+
+```
+apps/frontend/components/modules/transfers/
+├── transfers-messages.ts         ← TRANS.*, ~250 keys
+├── transfers-constants.ts        ← TRANS_STATUS_*, TRANS_QUEUE_*, TRANS_STAGE_*
+├── transfers-shared.tsx          ← tipos, format functions, action config (refactorizado)
+├── transfers-request-ui.tsx      ← request form UI (refactorizado)
+├── transfers-request-page.tsx    ← request page wrapper (refactorizado)
+├── transfers-pending-page.tsx    ← placeholder (7L, sin cambios)
+├── transfers-manage-page.tsx     ← manage page (refactorizado)
+├── transfers-list-page.tsx       ← inbox list (refactorizado)
+├── transfers-history-page.tsx    ← history list (refactorizado)
+├── transfers-detail-page.tsx     ← detail page (refactorizado)
+└── use-transfer-draft.ts        ← hook (refactorizado)
+```
+
+### Como continuar en otro chat (transferencias)
+
+```
+Continuar trabajo en modulo transferencias de RIPNEL.
+Revisar AGENTS.md seccion "Hardening checklist (transferencias modulo)".
+
+Tareas pendientes:
+1. transfers-pending-page.tsx (7L) es placeholder — evaluar si necesita contenido real
+2. Verificar integracion de TRANSFER_ACTION_CONFIG description functions con TRANS.actionConfig.*
 ```
 
 ## graphify

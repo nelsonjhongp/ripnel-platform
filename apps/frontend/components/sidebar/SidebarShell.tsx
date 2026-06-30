@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation"
 import { AppSidebar } from "./AppSidebar"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
+import { Search } from "lucide-react"
+import { openCommandPalette } from "@/components/ui/command-palette"
 import { useAuth } from "@/components/auth/AuthProvider"
 import { TopbarNotifications } from "@/components/notifications"
 import {
@@ -216,6 +218,18 @@ export function SidebarShell({
             </div>
 
             <div className="flex items-center justify-end gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={openCommandPalette}
+                className="h-8 gap-2 rounded-lg px-2.5 text-[var(--ops-text-muted)] hover:text-[var(--ops-text)]"
+                aria-label="Buscar pagina"
+              >
+                <Search className="h-4 w-4" />
+                <kbd className="hidden items-center gap-0.5 rounded border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-1 text-[10px] font-semibold text-[var(--ops-text-muted)] sm:inline-flex">
+                  Ctrl K
+                </kbd>
+              </Button>
               <TopbarNotifications />
               {actions.length > 0 ? (
                 <div className="flex flex-wrap items-center justify-end gap-2">

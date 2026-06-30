@@ -1,13 +1,12 @@
 "use client"
 
 import { useCallback, useMemo, useState } from "react"
-import { LoaderCircle, RefreshCw, Save } from "lucide-react"
+import { LoaderCircle, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DateFilterPicker } from "@/components/ui/date-filter-picker"
 import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group"
 import { OpsSectionDivider, OpsTableBlock, OpsTableWrap } from "@/components/ui/ops-page-shell"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import {
   createPricingRule,
@@ -17,6 +16,8 @@ import {
 import { formatDate } from "@/lib/date-utils";
 import type { PricingRuleRow } from "@/lib/prices-types"
 import { useApiGet } from "@/hooks/use-api-get"
+import { PRICE } from "./pricing-messages"
+import { MSG_BOX_SUCCESS, MSG_BOX_ERROR, opsInputCompact, opsFieldLabelClassName } from "./pricing-constants"
 
 function createRuleDraft(rule: PricingRuleRow | null) {
   if (!rule) {
@@ -94,46 +95,39 @@ export function PricingRulesPage() {
 
       refetch()
       setDraft(null)
-      setMessage("Regla mayorista guardada correctamente")
+      setMessage(PRICE.rules.messages.saved)
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "No se pudo guardar la regla")
+      setSubmitError(err instanceof Error ? err.message : PRICE.rules.messages.saveError)
     } finally {
       setSubmitting(false)
     }
   }
 
   return (
-    <TooltipProvider delayDuration={120}>
+    <>
       <PosHeader
-        eyebrow="Precios"
-        title="Regla mayorista"
+        eyebrow={PRICE.header.rules.eyebrow}
+        title={PRICE.header.rules.title}
         actions={
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                onClick={handleRefresh}
-                disabled={loading}
-                aria-label="Actualizar"
-                className="rounded-lg"
-              >
-                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top" sideOffset={8}>
-              Actualizar
-            </TooltipContent>
-          </Tooltip>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            onClick={handleRefresh}
+            disabled={loading}
+            aria-label={PRICE.header.refresh}
+            className="rounded-lg"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </Button>
         }
       />
 
       <OpsMetricInlineGroup
         items={[
-          { label: "Reglas", value: rules.length },
-          { label: "Minimo mayorista", value: wholesaleRule?.min_qty ?? 0, tone: "accent" },
-          { label: "Activa", value: wholesaleRule?.active ? "Si" : "No", tone: wholesaleRule?.active ? "success" : "default" },
+          { label: PRICE.rules.metrics.rules, value: rules.length },
+          { label: PRICE.rules.metrics.wholesaleMin, value: wholesaleRule?.min_qty ?? 0, tone: "accent" },
+          { label: PRICE.rules.metrics.active, value: wholesaleRule?.active ? PRICE.rules.metrics.yes : PRICE.rules.metrics.no, tone: wholesaleRule?.active ? "success" : "default" },
         ]}
       />
 
@@ -142,21 +136,21 @@ export function PricingRulesPage() {
           <section className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-5">
             <div className="grid gap-4 md:grid-cols-2">
               <div>
-                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  Cantidad minima
+                <label className={opsFieldLabelClassName}>
+                  {PRICE.rules.form.minQty}
                 </label>
                 <input
                   type="number"
                   min="1"
                   value={formState.minQty}
                   onChange={(event) => updateDraft((current) => ({ ...current, minQty: event.target.value }))}
-                  className="sales-field h-10 w-full rounded-lg px-3 text-sm text-[var(--ops-text)] outline-none"
+                  className={opsInputCompact}
                 />
               </div>
 
               <div>
-                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  Estado
+                <label className={opsFieldLabelClassName}>
+                  {PRICE.rules.form.status}
                 </label>
                 <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-[var(--ops-text)]">
                   <input
@@ -165,34 +159,34 @@ export function PricingRulesPage() {
                     onChange={(event) => updateDraft((current) => ({ ...current, active: event.target.checked }))}
                     className="h-4 w-4 rounded border-[var(--ops-border-strong)] accent-[var(--ripnel-accent)]"
                   />
-                  Regla activa
+                  {PRICE.rules.form.activeLabel}
                 </label>
               </div>
 
               <DateFilterPicker
-                label="Vigente desde"
+                label={PRICE.rules.form.validFrom}
                 value={formState.validFrom}
                 onChange={(value) => updateDraft((current) => ({ ...current, validFrom: value }))}
-                ariaLabel="Vigente desde"
+                ariaLabel={PRICE.rules.form.validFrom}
               />
 
               <DateFilterPicker
-                label="Vigente hasta"
+                label={PRICE.rules.form.validTo}
                 value={formState.validTo}
                 onChange={(value) => updateDraft((current) => ({ ...current, validTo: value }))}
-                ariaLabel="Vigente hasta"
+                ariaLabel={PRICE.rules.form.validTo}
                 min={formState.validFrom || undefined}
               />
             </div>
 
             {message ? (
-              <div className="mt-4 rounded-lg border border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] px-3 py-2 text-sm text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]">
+              <div className={`mt-4 rounded-lg px-3 py-2 text-sm ${MSG_BOX_SUCCESS}`}>
                 {message}
               </div>
             ) : null}
 
             {submitError ? (
-              <div className="mt-4 rounded-lg border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-3 py-2 text-sm text-[color:color-mix(in_srgb,#be123c_74%,var(--ops-text))]">
+              <div className={`mt-4 rounded-lg px-3 py-2 text-sm ${MSG_BOX_ERROR}`}>
                 {submitError}
               </div>
             ) : null}
@@ -209,13 +203,10 @@ export function PricingRulesPage() {
                 {submitting ? (
                   <>
                     <LoaderCircle className="h-4 w-4 animate-spin" />
-                    Guardando...
+                    {PRICE.rules.form.saving}
                   </>
                 ) : (
-                  <>
-                    <Save className="h-4 w-4" />
-                    Guardar regla
-                  </>
+                  PRICE.rules.form.save
                 )}
               </Button>
             </div>
@@ -226,10 +217,10 @@ export function PricingRulesPage() {
               <table className="w-full border-collapse">
                 <thead className="bg-[var(--ops-surface-muted)]">
                   <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                    <th className="px-4 py-3">Regla</th>
-                    <th className="px-4 py-3">Minimo</th>
-                    <th className="px-4 py-3">Vigencia</th>
-                    <th className="px-4 py-3">Estado</th>
+                    <th className="px-4 py-3">{PRICE.rules.table.columns.rule}</th>
+                    <th className="px-4 py-3">{PRICE.rules.table.columns.min}</th>
+                    <th className="px-4 py-3">{PRICE.rules.table.columns.validity}</th>
+                    <th className="px-4 py-3">{PRICE.rules.table.columns.status}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
@@ -239,7 +230,7 @@ export function PricingRulesPage() {
                         colSpan={4}
                         className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
                       >
-                        Cargando reglas...
+                        {PRICE.rules.table.loading}
                       </td>
                     </tr>
                   ) : rules.length === 0 ? (
@@ -248,7 +239,7 @@ export function PricingRulesPage() {
                         colSpan={4}
                         className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
                       >
-                        No hay reglas registradas.
+                        {PRICE.rules.table.empty}
                       </td>
                     </tr>
                   ) : (
@@ -265,11 +256,11 @@ export function PricingRulesPage() {
                         </td>
                         <td className="px-4 py-[var(--ops-row-py)] align-top text-sm text-[var(--ops-text-muted)]">
                           {formatDate(rule.valid_from)} -{" "}
-                          {rule.valid_to ? formatDate(rule.valid_to) : "Sin fin"}
+                          {rule.valid_to ? formatDate(rule.valid_to) : PRICE.rules.table.noEnd}
                         </td>
                         <td className="px-4 py-[var(--ops-row-py)] align-top">
                           <OpsStatusBadge tone={rule.active ? "success" : "neutral"}>
-                            {rule.active ? "Activa" : "Inactiva"}
+                            {rule.active ? PRICE.rules.table.active : PRICE.rules.table.inactive}
                           </OpsStatusBadge>
                         </td>
                       </tr>
@@ -281,6 +272,6 @@ export function PricingRulesPage() {
           </OpsTableBlock>
         </div>
       </OpsSectionDivider>
-    </TooltipProvider>
+    </>
   )
 }

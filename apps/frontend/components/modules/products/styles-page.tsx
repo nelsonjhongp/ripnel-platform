@@ -13,23 +13,14 @@ import {
   RotateCcw,
   Shapes,
 } from "lucide-react";
-import {
-  AdminActionButton,
-  AdminCheckboxField,
-  AdminConfirmModal,
-  AdminField,
-  AdminFormActionsBar,
-  AdminInlineMessage,
-  AdminInput,
-  AdminModalShell,
-  AdminRowActionsMenu,
-  AdminTextarea,
-} from "@/components/admin/admin-ui";
+import { AdminRowActionsMenu } from "@/components/admin/admin-ui";
 import { apiFetchData } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/date-utils";
 import { Button } from "@/components/ui/button";
+import { OpsDialog } from "@/components/ui/ops-dialog";
 import { OpsEmptyState } from "@/components/ui/ops-empty-state";
+import { OpsFormField } from "@/components/ui/ops-form-field";
 import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import {
   OpsFiltersRow,
@@ -44,15 +35,16 @@ import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { OpsReadonlyFieldState, OpsSelect } from "@/components/ui/ops-selection";
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
 import { ProductCreateDialog } from "./product-create-dialog";
 import { PRODUCTS } from "./products-messages";
+import { opsInputCompact } from "./products-constants";
 import { PRODUCT_DESCRIPTION_MAX_LENGTH } from "./products-utils";
 import type { CatalogItem, StatusFilter } from "@/types/products";
+import { showSuccess, showError } from "@/lib/toast";
 
 type StyleItem = {
   style_id: string;
@@ -74,9 +66,9 @@ type FormState = {
 };
 
 const STATUS_OPTIONS = [
-  { value: "all", label: "Todos" },
-  { value: "active", label: "Activos" },
-  { value: "inactive", label: "Inactivos" },
+  { value: "all", label: PRODUCTS.styles.filters.statusOptions.all },
+  { value: "active", label: PRODUCTS.styles.filters.statusOptions.active },
+  { value: "inactive", label: PRODUCTS.styles.filters.statusOptions.inactive },
 ] as const;
 
 const initialFormState: FormState = {
@@ -112,9 +104,7 @@ export function StylesPage({
   const [styles, setStyles] = useState<StyleItem[]>([]);
   const [garmentTypes, setGarmentTypes] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [editingStyleId, setEditingStyleId] = useState<string | null>(null);
@@ -122,7 +112,10 @@ export function StylesPage({
   const [pendingStatusStyle, setPendingStatusStyle] = useState<StyleItem | null>(null);
   const [togglingStyleId, setTogglingStyleId] = useState<string | null>(null);
   const [formState, setFormState] = useState<FormState>(initialFormState);
+  const [actionState, setActionState] = useState<"idle" | "validating" | "saving">("idle");
   const hasAppliedInitialSelection = useRef(false);
+
+  const isBusy = actionState !== "idle";
 
   async function loadData() {
     setLoading(true);
@@ -136,7 +129,7 @@ export function StylesPage({
       setError(
         requestError instanceof Error
           ? requestError.message
-          : "No se pudo cargar estilos"
+          : PRODUCTS.styles.loadError
       );
     } finally {
       setLoading(false);
@@ -212,7 +205,7 @@ export function StylesPage({
     setEditingStyleId(null);
     setFormState(initialFormState);
     setError(null);
-    setSuccessMessage(null);
+    setActionState("idle");
   }
 
   function updateStyleInList(nextStyle: StyleItem) {
@@ -229,13 +222,10 @@ export function StylesPage({
       active: style.active,
     });
     setError(null);
-    setSuccessMessage(null);
   }
 
   async function handleToggleActive(style: StyleItem) {
     setTogglingStyleId(style.style_id);
-    setError(null);
-    setSuccessMessage(null);
 
     try {
       const data = await apiFetchData<StyleItem>(`/api/styles/${style.style_id}`, {
@@ -256,16 +246,16 @@ export function StylesPage({
         }));
       }
 
-      setSuccessMessage(
+      showSuccess(
         data.active
-          ? "Style activado correctamente."
-          : "Style inactivado correctamente."
+          ? PRODUCTS.styles.toast.activated
+          : PRODUCTS.styles.toast.deactivated
       );
     } catch (requestError) {
-      setError(
+      showError(
         requestError instanceof Error
           ? requestError.message
-          : "No se pudo actualizar el style"
+          : PRODUCTS.styles.saveError
       );
     } finally {
       setTogglingStyleId(null);
@@ -279,9 +269,16 @@ export function StylesPage({
       return;
     }
 
-    setSubmitting(true);
+    setActionState("validating");
     setError(null);
-    setSuccessMessage(null);
+
+    if (!formState.name.trim()) {
+      setError(PRODUCTS.form.errors.nameRequired);
+      setActionState("idle");
+      return;
+    }
+
+    setActionState("saving");
 
     try {
       const data = await apiFetchData<StyleItem>(`/api/styles/${editingStyleId}`, {
@@ -296,362 +293,372 @@ export function StylesPage({
         }),
       });
       updateStyleInList(data);
-      setSuccessMessage("Style actualizado correctamente.");
+      showSuccess(PRODUCTS.styles.toast.updated);
       resetForm();
     } catch (requestError) {
       setError(
         requestError instanceof Error
           ? requestError.message
-          : "No se pudo actualizar el style"
+          : PRODUCTS.styles.saveError
       );
     } finally {
-      setSubmitting(false);
+      setActionState("idle");
     }
   }
 
   return (
-    <TooltipProvider delayDuration={120}>
-      <OpsPageShell width="wide">
-        <PosHeader
-          eyebrow="Productos"
-          title="Estilos de producto"
-          actions={
-            <>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon-sm"
-                    onClick={loadData}
-                    disabled={loading}
-                    aria-label="Actualizar estilos"
-                    className="rounded-lg"
-                  >
-                    <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top" sideOffset={8}>
-                  Actualizar
-                </TooltipContent>
-              </Tooltip>
-              <Button
-                type="button"
-                variant="accent"
-                size="sm"
-                className="rounded-lg"
-                onClick={() => setCreateOpen(true)}
-              >
-                <Plus className="h-4 w-4" />
-                {PRODUCTS.actions.newProduct}
-              </Button>
-            </>
-          }
-        />
-
-        <OpsMetricInlineGroup
-          items={[
-            { label: "Styles base", value: styles.length },
-            { label: "Activos", value: activeCount, tone: "success" },
-            { label: "Inactivos", value: inactiveCount, tone: "warning" },
-          ]}
-        />
-
-        <OpsSectionDivider className="space-y-4">
-          <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_auto]">
-            <OpsSearchField
-              value={search}
-              onChange={(value) => {
-                setSearch(value);
-                setPage(1);
-              }}
-              placeholder="Buscar por style, código o tipo de prenda"
-              ariaLabel="Buscar styles"
-            />
-
-            <OpsSelect
-              label="Estado"
-              value={statusFilter}
-              options={STATUS_OPTIONS}
-              onChange={(value) => {
-                setStatusFilter(value as "all" | "active" | "inactive");
-                setPage(1);
-              }}
-            />
-
+    <OpsPageShell width="wide">
+      <PosHeader
+        eyebrow={PRODUCTS.header.eyebrow}
+        title={PRODUCTS.styles.header.title}
+        actions={
+          <>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   type="button"
-                  onClick={clearFilters}
-                  disabled={!hasActiveFilters}
                   variant="outline"
                   size="icon-sm"
-                  className="h-10 w-10 rounded-lg"
-                  aria-label="Limpiar filtros"
+                  onClick={loadData}
+                  disabled={loading}
+                  aria-label={PRODUCTS.styles.actions.refresh}
+                  className="rounded-lg"
                 >
-                  <RotateCcw className="h-4 w-4" />
+                  <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="top" sideOffset={8}>
-                Limpiar filtros
+                {PRODUCTS.actions.refresh}
               </TooltipContent>
             </Tooltip>
-          </OpsFiltersRow>
+            <Button
+              type="button"
+              variant="accent"
+              size="sm"
+              className="rounded-lg"
+              onClick={() => setCreateOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              {PRODUCTS.actions.newProduct}
+            </Button>
+          </>
+        }
+      />
 
-          <OpsTableWrap minWidth="1120px">
-            <div className="ops-surface-muted grid grid-cols-[1.35fr_0.92fr_0.86fr_0.86fr_0.78fr_1.16fr] gap-x-3 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-              <span>Style</span>
-              <span>Tipo</span>
-              <span>Tallas</span>
-              <span>Colores</span>
-              <span>Estado</span>
-              <span>Acciones</span>
-            </div>
+      <OpsMetricInlineGroup
+        items={[
+          { label: PRODUCTS.styles.metrics.stylesBase, value: styles.length },
+          { label: PRODUCTS.metrics.activeStyles, value: activeCount, tone: "success" },
+          { label: PRODUCTS.metrics.inactiveStyles, value: inactiveCount, tone: "warning" },
+        ]}
+      />
 
-            <div className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-              {loading ? (
-                <div className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                  <LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />
-                  Cargando styles…
-                </div>
-              ) : paginatedStyles.length === 0 ? (
-                <OpsEmptyState
-                  variant="compact"
-                  description={
-                    styles.length
-                      ? "No se encontraron styles con los filtros aplicados."
-                      : "Aun no hay styles registrados."
-                  }
-                />
-              ) : (
-                paginatedStyles.map((style) => (
-                  <div
-                    key={style.style_id}
-                    className={cn(
-                      "grid grid-cols-[1.35fr_0.92fr_0.86fr_0.86fr_0.78fr_1.16fr] gap-x-3 px-4 py-[var(--ops-row-py)] transition hover:bg-[var(--ops-surface-muted)]",
-                      !style.active && "opacity-75"
-                    )}
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                        {style.name}
-                      </p>
-                      <div className="mt-1 flex items-center gap-2">
-                        <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                          {style.style_code || "Sin código"}
-                        </span>
-                        <span className="text-[11px] text-[var(--ops-text-muted)]">
-                          {formatDate(style.created_at)}
-                        </span>
-                      </div>
-                      {style.description ? (
-                        <p className="mt-1 truncate text-[11px] text-[var(--ops-text-muted)]">
-                          {style.description}
-                        </p>
-                      ) : null}
-                    </div>
+      <OpsSectionDivider className="space-y-4">
+        <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_auto]">
+          <OpsSearchField
+            value={search}
+            onChange={(value) => {
+              setSearch(value);
+              setPage(1);
+            }}
+            placeholder={PRODUCTS.styles.filters.searchPlaceholder}
+            ariaLabel={PRODUCTS.styles.filters.searchAriaLabel}
+          />
 
-                    <div className="text-sm text-[var(--ops-text)]">{style.garment_type_name}</div>
-                    <div className="text-sm text-[var(--ops-text)]">{style.size_codes.length}</div>
-                    <div className="text-sm text-[var(--ops-text)]">{style.color_codes.length}</div>
+          <OpsSelect
+            label="Estado"
+            value={statusFilter}
+            options={STATUS_OPTIONS}
+            onChange={(value) => {
+              setStatusFilter(value as "all" | "active" | "inactive");
+              setPage(1);
+            }}
+          />
 
-                    <div>
-                      <OpsStatusBadge tone={style.active ? "success" : "neutral"}>
-                        {style.active ? "Activo" : "Inactivo"}
-                      </OpsStatusBadge>
-                    </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                onClick={clearFilters}
+                disabled={!hasActiveFilters}
+                variant="outline"
+                size="icon-sm"
+                className="h-10 w-10 rounded-lg"
+                aria-label={PRODUCTS.actions.clearFilters}
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top" sideOffset={8}>
+              {PRODUCTS.actions.clearFilters}
+            </TooltipContent>
+          </Tooltip>
+        </OpsFiltersRow>
 
-                    <AdminRowActionsMenu
-                      ariaLabel={`Acciones para ${style.name}`}
-                      items={[
-                        {
-                          label: "Editar",
-                          icon: <PencilLine className="h-4 w-4" />,
-                          onSelect: () => handleEdit(style),
-                        },
-                        {
-                          label: "Variantes",
-                          icon: <Shapes className="h-4 w-4" />,
-                          onSelect: () =>
-                            router.push(
-                              `/productos/variantes?style_id=${encodeURIComponent(style.style_id)}`
-                            ),
-                        },
-                        {
-                          label: "Precios",
-                          icon: <ReceiptText className="h-4 w-4" />,
-                          onSelect: () =>
-                            router.push(
-                              `/precios/crear?style_id=${encodeURIComponent(style.style_id)}`
-                            ),
-                        },
-                        {
-                          label: style.active ? "Inactivar" : "Activar",
-                          icon: <Power className="h-4 w-4" />,
-                          tone: style.active ? "danger" : "neutral",
-                          disabled: togglingStyleId === style.style_id,
-                          onSelect: () => setPendingStatusStyle(style),
-                        },
-                      ]}
-                    />
-                  </div>
-                ))
-              )}
-            </div>
-          </OpsTableWrap>
+        <OpsTableWrap minWidth="1120px">
+          <div className="ops-surface-muted grid grid-cols-[1.35fr_0.92fr_0.86fr_0.86fr_0.78fr_1.16fr] gap-x-3 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
+            <span>{PRODUCTS.styles.table.columns.style}</span>
+            <span>{PRODUCTS.styles.table.columns.type}</span>
+            <span>{PRODUCTS.styles.table.columns.sizes}</span>
+            <span>{PRODUCTS.styles.table.columns.colors}</span>
+            <span>{PRODUCTS.styles.table.columns.status}</span>
+            <span>{PRODUCTS.styles.table.columns.actions}</span>
+          </div>
 
-          {!loading ? (
-            <OpsTableFooter>
-              <span className="ops-secondary-text text-[var(--ops-text-muted)]">
-                {filteredStyles.length === 0
-                  ? "0 resultados"
-                  : `${firstVisible}-${lastVisible} de ${filteredStyles.length}`}
-              </span>
-              <Pagination
-                page={safeCurrentPage}
-                totalPages={totalPages}
-                onPageChange={setPage}
-                className="self-end md:self-auto"
-              />
-            </OpsTableFooter>
-          ) : null}
-        </OpsSectionDivider>
-
-        {editingStyleId ? (
-          <AdminModalShell
-            title="Editar style"
-            onClose={resetForm}
-            widthClass="max-w-3xl"
-          >
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <AdminField label="Nombre">
-                <AdminInput
-                  value={formState.name}
-                  onChange={(event) =>
-                    setFormState((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                  placeholder="Polo oversize básico"
-                  required
-                />
-              </AdminField>
-
-              <AdminField label="Código">
-                <OpsReadonlyFieldState
-                  value={styles.find((style) => style.style_id === editingStyleId)?.style_code || ""}
-                  placeholder="Sin código"
-                />
-              </AdminField>
-
-              <AdminField label="Tipo de prenda">
-                <OpsReadonlyFieldState
-                  value={
-                    garmentTypes.find(
-                      (item) =>
-                        String(item.garment_type_id || "") ===
-                        styles.find((style) => style.style_id === editingStyleId)?.garment_type_id
-                    )?.name || ""
-                  }
-                  placeholder="Sin tipo"
-                />
-              </AdminField>
-
-              <AdminField label="Descripción">
-                <AdminTextarea
-                  value={formState.description}
-                  onChange={(event) =>
-                    setFormState((current) => ({
-                      ...current,
-                      description: event.target.value,
-                    }))
-                  }
-                  maxLength={PRODUCT_DESCRIPTION_MAX_LENGTH}
-                  placeholder="Notas internas del style"
-                />
-                <div className="mt-1 flex justify-end">
-                  <span className="text-[11px] font-medium tabular-nums text-[var(--ops-text-muted)]">
-                    {PRODUCTS.form.descriptionCounter(
-                      formState.description.length,
-                      PRODUCT_DESCRIPTION_MAX_LENGTH
-                    )}
-                  </span>
-                </div>
-              </AdminField>
-
-              <AdminCheckboxField
-                label="Style activo"
-                checked={formState.active}
-                onChange={(checked) =>
-                  setFormState((current) => ({
-                    ...current,
-                    active: checked,
-                  }))
+          <div className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+            {loading ? (
+              <div className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                <LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />
+                {PRODUCTS.styles.table.loading}
+              </div>
+            ) : paginatedStyles.length === 0 ? (
+              <OpsEmptyState
+                variant="compact"
+                description={
+                  styles.length
+                    ? PRODUCTS.styles.empty.withFilters
+                    : PRODUCTS.styles.empty.noData
                 }
               />
-
-              {error ? <AdminInlineMessage tone="danger">{error}</AdminInlineMessage> : null}
-              {successMessage ? (
-                <AdminInlineMessage tone="success">{successMessage}</AdminInlineMessage>
-              ) : null}
-
-              <AdminFormActionsBar>
-                <AdminActionButton type="button" onClick={resetForm}>
-                  Cancelar
-                </AdminActionButton>
-                <AdminActionButton type="submit" tone="accent" disabled={submitting}>
-                  {submitting ? (
-                    <>
-                      <LoaderCircle className="h-4 w-4 animate-spin" />
-                      Guardando...
-                    </>
-                  ) : (
-                    <>
-                      <PencilLine className="h-4 w-4" />
-                      Guardar cambios
-                    </>
+            ) : (
+              paginatedStyles.map((style) => (
+                <div
+                  key={style.style_id}
+                  className={cn(
+                    "grid grid-cols-[1.35fr_0.92fr_0.86fr_0.86fr_0.78fr_1.16fr] gap-x-3 px-4 py-[var(--ops-row-py)] transition hover:bg-[var(--ops-surface-muted)]",
+                    !style.active && "opacity-75"
                   )}
-                </AdminActionButton>
-              </AdminFormActionsBar>
-            </form>
-          </AdminModalShell>
-        ) : null}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
+                      {style.name}
+                    </p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                        {style.style_code || PRODUCTS.styles.table.noCode}
+                      </span>
+                      <span className="text-[11px] text-[var(--ops-text-muted)]">
+                        {formatDate(style.created_at)}
+                      </span>
+                    </div>
+                    {style.description ? (
+                      <p className="mt-1 truncate text-[11px] text-[var(--ops-text-muted)]">
+                        {style.description}
+                      </p>
+                    ) : null}
+                  </div>
 
-        <AdminConfirmModal
-          open={Boolean(pendingStatusStyle)}
-          title={pendingStatusStyle?.active ? "Inactivar style" : "Activar style"}
-          description={
-            pendingStatusStyle
-              ? pendingStatusStyle.active
-                ? `Inactivarás ${pendingStatusStyle.name}.`
-                : `Activarás ${pendingStatusStyle.name}.`
-              : ""
-          }
-          confirmLabel={pendingStatusStyle?.active ? "Inactivar" : "Activar"}
-          confirmTone={pendingStatusStyle?.active ? "danger" : "accent"}
-          busy={Boolean(
-            pendingStatusStyle && togglingStyleId === pendingStatusStyle.style_id
-          )}
-          onCancel={() => setPendingStatusStyle(null)}
-          onConfirm={() => {
-            if (pendingStatusStyle) {
-              void handleToggleActive(pendingStatusStyle);
-            }
-          }}
-        />
-        <ProductCreateDialog
-          open={createOpen}
-          onOpenChange={setCreateOpen}
-          onCreated={(style) => {
-            void Promise.resolve().then(loadData);
-            router.push(
-              `/productos/variantes?style_id=${encodeURIComponent(style.style_id)}`
-            );
-          }}
-        />
-      </OpsPageShell>
-    </TooltipProvider>
+                  <div className="text-sm text-[var(--ops-text)]">{style.garment_type_name}</div>
+                  <div className="text-sm text-[var(--ops-text)]">{style.size_codes.length}</div>
+                  <div className="text-sm text-[var(--ops-text)]">{style.color_codes.length}</div>
+
+                  <div>
+                    <OpsStatusBadge tone={style.active ? "success" : "neutral"}>
+                      {style.active ? "Activo" : PRODUCTS.statusLabels.inactive}
+                    </OpsStatusBadge>
+                  </div>
+
+                  <AdminRowActionsMenu
+                    ariaLabel={`Acciones para ${style.name}`}
+                    items={[
+                      {
+                        label: PRODUCTS.actions.edit,
+                        icon: <PencilLine className="h-4 w-4" />,
+                        onSelect: () => handleEdit(style),
+                      },
+                      {
+                        label: PRODUCTS.actions.variants,
+                        icon: <Shapes className="h-4 w-4" />,
+                        onSelect: () =>
+                          router.push(
+                            `/productos/variantes?style_id=${encodeURIComponent(style.style_id)}`
+                          ),
+                      },
+                      {
+                        label: PRODUCTS.actions.prices,
+                        icon: <ReceiptText className="h-4 w-4" />,
+                        onSelect: () =>
+                          router.push(
+                            `/precios/crear?style_id=${encodeURIComponent(style.style_id)}`
+                          ),
+                      },
+                      {
+                        label: style.active ? PRODUCTS.actions.deactivate : PRODUCTS.actions.activate,
+                        icon: <Power className="h-4 w-4" />,
+                        tone: style.active ? "danger" : "neutral",
+                        disabled: togglingStyleId === style.style_id,
+                        onSelect: () => setPendingStatusStyle(style),
+                      },
+                    ]}
+                  />
+                </div>
+              ))
+            )}
+          </div>
+        </OpsTableWrap>
+
+        {!loading ? (
+          <OpsTableFooter>
+            <span className="ops-secondary-text text-[var(--ops-text-muted)]">
+              {filteredStyles.length === 0
+                ? PRODUCTS.styles.table.zeroResults
+                : `${firstVisible}-${lastVisible} de ${filteredStyles.length}`}
+            </span>
+            <Pagination
+              page={safeCurrentPage}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              className="self-end md:self-auto"
+            />
+          </OpsTableFooter>
+        ) : null}
+      </OpsSectionDivider>
+
+      <OpsDialog
+        open={!!editingStyleId}
+        onOpenChange={(open) => { if (!open) resetForm(); }}
+        title={PRODUCTS.styles.dialog.title}
+        description={PRODUCTS.styles.dialog.title}
+        size="lg"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <OpsFormField label={PRODUCTS.form.name} density="compact">
+            <input
+              value={formState.name}
+              onChange={(event) =>
+                setFormState((current) => ({
+                  ...current,
+                  name: event.target.value,
+                }))
+              }
+              placeholder={PRODUCTS.form.namePlaceholder}
+              className={opsInputCompact}
+            />
+          </OpsFormField>
+
+          <OpsFormField label={PRODUCTS.styles.dialog.codeLabel} density="compact">
+            <OpsReadonlyFieldState
+              value={styles.find((style) => style.style_id === editingStyleId)?.style_code || ""}
+              placeholder={PRODUCTS.styles.dialog.noCodePlaceholder}
+            />
+          </OpsFormField>
+
+          <OpsFormField label={PRODUCTS.form.garmentType} density="compact">
+            <OpsReadonlyFieldState
+              value={
+                garmentTypes.find(
+                  (item) =>
+                    String(item.garment_type_id || "") ===
+                    styles.find((style) => style.style_id === editingStyleId)?.garment_type_id
+                )?.name || ""
+              }
+              placeholder={PRODUCTS.styles.dialog.noTypePlaceholder}
+            />
+          </OpsFormField>
+
+          <OpsFormField label={PRODUCTS.form.description} density="compact">
+            <textarea
+              value={formState.description}
+              onChange={(event) =>
+                setFormState((current) => ({
+                  ...current,
+                  description: event.target.value,
+                }))
+              }
+              maxLength={PRODUCT_DESCRIPTION_MAX_LENGTH}
+              rows={3}
+              placeholder={PRODUCTS.styles.dialog.descriptionPlaceholder}
+              className={opsInputCompact}
+            />
+            <div className="mt-1 flex justify-end">
+              <span className="text-[11px] font-medium tabular-nums text-[var(--ops-text-muted)]">
+                {PRODUCTS.form.descriptionCounter(
+                  formState.description.length,
+                  PRODUCT_DESCRIPTION_MAX_LENGTH
+                )}
+              </span>
+            </div>
+          </OpsFormField>
+
+          <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-[var(--ops-text)]">
+            <input
+              type="checkbox"
+              checked={formState.active}
+              onChange={(e) =>
+                setFormState((current) => ({
+                  ...current,
+                  active: e.target.checked,
+                }))
+              }
+              className="h-4 w-4 rounded border-[var(--ops-border-strong)] text-[var(--ripnel-accent)] focus:ring-[var(--ripnel-accent)]"
+            />
+            {PRODUCTS.styles.dialog.activeLabel}
+          </label>
+
+          {error ? (
+            <div className="rounded-lg border border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] px-4 py-3 text-sm text-[var(--ops-tone-danger-text)]">
+              {error}
+            </div>
+          ) : null}
+
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={resetForm} disabled={isBusy}>
+              {PRODUCTS.create.cancel}
+            </Button>
+            <Button variant="accent" type="submit" disabled={isBusy}>
+              {actionState === "validating" ? (
+                <><LoaderCircle className="h-4 w-4 animate-spin" /> Validando...</>
+              ) : actionState === "saving" ? (
+                <><LoaderCircle className="h-4 w-4 animate-spin" /> {PRODUCTS.styles.dialog.saving}</>
+              ) : (
+                PRODUCTS.styles.dialog.submit
+              )}
+            </Button>
+          </div>
+        </form>
+      </OpsDialog>
+
+      <OpsDialog
+        open={!!pendingStatusStyle}
+        onOpenChange={(open) => { if (!open) setPendingStatusStyle(null); }}
+        title={pendingStatusStyle?.active ? PRODUCTS.styles.confirmModal.deactivateTitle : PRODUCTS.styles.confirmModal.activateTitle}
+        description={
+          pendingStatusStyle
+            ? pendingStatusStyle.active
+              ? PRODUCTS.styles.confirmModal.deactivateDesc(pendingStatusStyle.name)
+              : PRODUCTS.styles.confirmModal.activateDesc(pendingStatusStyle.name)
+            : ""
+        }
+        size="sm"
+      >
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button variant="outline" onClick={() => setPendingStatusStyle(null)}>
+            {PRODUCTS.create.cancel}
+          </Button>
+          <Button
+            variant={pendingStatusStyle?.active ? "destructive" : "accent"}
+            onClick={() => { if (pendingStatusStyle) void handleToggleActive(pendingStatusStyle); }}
+            disabled={Boolean(pendingStatusStyle && togglingStyleId === pendingStatusStyle.style_id)}
+          >
+            {togglingStyleId ? (
+              <><LoaderCircle className="h-4 w-4 animate-spin" /> {pendingStatusStyle?.active ? PRODUCTS.actions.deactivate : PRODUCTS.actions.activate}...</>
+            ) : (
+              pendingStatusStyle?.active ? PRODUCTS.actions.deactivate : PRODUCTS.actions.activate
+            )}
+          </Button>
+        </div>
+      </OpsDialog>
+
+      <ProductCreateDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={(style) => {
+          void Promise.resolve().then(loadData);
+          router.push(
+            `/productos/variantes?style_id=${encodeURIComponent(style.style_id)}`
+          );
+        }}
+      />
+    </OpsPageShell>
   );
 }

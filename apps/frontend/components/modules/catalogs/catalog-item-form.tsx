@@ -1,19 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
 import { LoaderCircle, Save } from "lucide-react";
 import type { CatalogRecord } from "@/lib/api-catalogs";
-import {
-  AdminActionButton,
-  AdminCheckboxField,
-  AdminField,
-  AdminFormActionsBar,
-  AdminInlineMessage,
-  AdminInput,
-  AdminTextarea,
-} from "@/components/admin/admin-ui";
+import { OpsFormField } from "@/components/ui/ops-form-field";
 import { OpsReadonlyFieldState } from "@/components/ui/ops-selection";
+import { opsInputCompact } from "@/components/ui/ops-control-styles";
+import { Button } from "@/components/ui/button";
+import { INFO_BOX_MUTED, CUSTOMER_TYPE_PILL } from "./catalogs-constants";
+import { CAT } from "./catalogs-messages";
 import type { CatalogFieldConfig } from "@/lib/product-master-metadata";
 
 function normalizeValue(value: unknown) {
@@ -30,11 +25,8 @@ export type CatalogItemFormProps = {
   readOnlyFieldKeys: string[];
   submitting: boolean;
   error: string | null;
-  successMessage: string | null;
   onSubmit: (body: Record<string, unknown>) => Promise<void>;
   onCancel?: () => void;
-  cancelLabel?: string;
-  cancelHref?: string;
 };
 
 export function CatalogItemForm({
@@ -47,11 +39,8 @@ export function CatalogItemForm({
   readOnlyFieldKeys,
   submitting,
   error,
-  successMessage,
   onSubmit,
   onCancel,
-  cancelLabel = "Cancelar",
-  cancelHref,
 }: CatalogItemFormProps) {
   const [formState, setFormState] = useState<Record<string, string | boolean>>(initialValues);
 
@@ -115,19 +104,29 @@ export function CatalogItemForm({
 
         if (isReadonly) {
           return (
-            <AdminField key={field.key} label={field.label} hint={field.helper}>
+            <OpsFormField
+              key={field.key}
+              label={field.label}
+              hint={field.helper}
+              density="compact"
+            >
               <OpsReadonlyFieldState
                 value={String(formState[field.key] || "")}
                 placeholder={field.placeholder ?? undefined}
               />
-            </AdminField>
+            </OpsFormField>
           );
         }
 
         return (
-          <AdminField key={field.key} label={field.label} hint={field.helper}>
+          <OpsFormField
+            key={field.key}
+            label={field.label}
+            hint={field.helper}
+            density="compact"
+          >
             {field.type === "textarea" ? (
-              <AdminTextarea
+              <textarea
                 value={String(formState[field.key] || "")}
                 onChange={(event) =>
                   setFormState((current) => ({
@@ -136,10 +135,10 @@ export function CatalogItemForm({
                   }))
                 }
                 placeholder={field.placeholder}
-                className="min-h-24"
+                className={`${opsInputCompact} min-h-24 resize-y`}
               />
             ) : (
-              <AdminInput
+              <input
                 type={field.type}
                 value={String(formState[field.key] || "")}
                 onChange={(event) =>
@@ -149,38 +148,41 @@ export function CatalogItemForm({
                   }))
                 }
                 placeholder={field.placeholder}
+                className={opsInputCompact}
               />
             )}
-          </AdminField>
+          </OpsFormField>
         );
       })}
 
       {duplicateCandidates.length ? (
         exactDuplicate ? (
-          <AdminInlineMessage tone="warning">
-            <p className="font-medium">
-              Ya existe un registro con ese nombre o codigo.
+          <div className={`${INFO_BOX_MUTED} border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)]`}>
+            <p className="text-sm font-medium text-[var(--ops-tone-warning-text)]">
+              {CAT.form.duplicateWarning}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               {duplicateCandidates.map((item) => (
                 <span
                   key={String(item[idKey] || item.name || item.code)}
-                  className="inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]"
+                  className={CUSTOMER_TYPE_PILL}
                 >
                   {String(item.name || "-")}
                   {item.code ? ` · ${String(item.code)}` : ""}
                 </span>
               ))}
             </div>
-          </AdminInlineMessage>
+          </div>
         ) : (
-          <div className="rounded-lg border border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] px-4 py-3 text-sm text-[var(--ops-text-muted)]">
-            <p className="font-medium">Coincidencias encontradas.</p>
+          <div className={INFO_BOX_MUTED}>
+            <p className="text-sm font-medium text-[var(--ops-text)]">
+              {CAT.form.matchesFound}
+            </p>
             <div className="mt-2 flex flex-wrap gap-2">
               {duplicateCandidates.map((item) => (
                 <span
                   key={String(item[idKey] || item.name || item.code)}
-                  className="inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]"
+                  className={CUSTOMER_TYPE_PILL}
                 >
                   {String(item.name || "-")}
                   {item.code ? ` · ${String(item.code)}` : ""}
@@ -191,49 +193,54 @@ export function CatalogItemForm({
         )
       ) : null}
 
-      <AdminCheckboxField
-        label={mode === "edit" ? "Mantener registro activo" : "Crear como registro activo"}
-        checked={Boolean(formState.active)}
-        onChange={(checked) =>
-          setFormState((current) => ({
-            ...current,
-            active: checked,
-          }))
-        }
-      />
+      <label className="flex items-center gap-2.5 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={Boolean(formState.active)}
+          onChange={(event) =>
+            setFormState((current) => ({
+              ...current,
+              active: event.target.checked,
+            }))
+          }
+          className="h-4 w-4 rounded border-[var(--ops-border-strong)] accent-[var(--ripnel-accent)]"
+        />
+        <span className="text-sm text-[var(--ops-text)]">
+          {mode === "edit" ? CAT.form.keepActive : CAT.form.createActive}
+        </span>
+      </label>
 
       {error ? (
-        <AdminInlineMessage tone="danger">{error}</AdminInlineMessage>
+        <p className="text-sm font-medium text-[var(--ops-tone-danger-text)]">{error}</p>
       ) : null}
 
-      {successMessage ? (
-        <AdminInlineMessage tone="success">{successMessage}</AdminInlineMessage>
-      ) : null}
-
-      <AdminFormActionsBar>
-        {cancelHref ? (
-          <AdminActionButton type="button" tone="neutral" asChild>
-            <Link href={cancelHref}>{cancelLabel}</Link>
-          </AdminActionButton>
-        ) : (
-          <AdminActionButton type="button" tone="neutral" onClick={onCancel} disabled={submitting}>
-            {cancelLabel}
-          </AdminActionButton>
-        )}
-        <AdminActionButton type="submit" tone="accent" disabled={submitting}>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onCancel}
+          disabled={submitting}
+        >
+          {CAT.form.cancel}
+        </Button>
+        <Button
+          type="submit"
+          variant="accent"
+          disabled={submitting}
+        >
           {submitting ? (
             <>
               <LoaderCircle className="h-4 w-4 animate-spin" />
-              Guardando...
+              {CAT.form.saving}
             </>
           ) : (
             <>
               <Save className="h-4 w-4" />
-              {mode === "edit" ? "Guardar cambios" : "Crear registro"}
+              {mode === "edit" ? CAT.form.saveChanges : CAT.form.create}
             </>
           )}
-        </AdminActionButton>
-      </AdminFormActionsBar>
+        </Button>
+      </div>
     </form>
   );
 }

@@ -16,10 +16,6 @@ import {
 
 import { useSidebarTopbarBreadcrumbs } from "@/components/sidebar/SidebarShell";
 import {
-  AdminConfirmModal,
-  AdminInlineMessage,
-} from "@/components/admin/admin-ui";
-import {
   ErrorPage,
   ForbiddenPage,
   LoadingPage,
@@ -34,7 +30,7 @@ import {
 } from "@/components/ui/ops-page-shell";
 import { Pagination } from "@/components/ui/pagination";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ApiError, apiFetch, type ApiEnvelope, unwrapApiData } from "@/lib/api";
 import { useApiGet } from "@/hooks/use-api-get";
 import { appRoutes } from "@/lib/routes";
@@ -51,6 +47,8 @@ import {
   type TransferSummary,
 } from "./transfers-shared";
 import { formatDateTime } from "@/lib/date-utils";
+import { TRANS } from "./transfers-messages";
+import { OpsDialog } from "@/components/ui/ops-dialog";
 
 type TransferStatus = TransferDetail["status"];
 type TimelineState = "complete" | "current" | "pending" | "cancelled";
@@ -85,12 +83,18 @@ function getTimelineState(
 
 function getTimelineIconClasses(state: TimelineState) {
   if (state === "complete")
-    return "border-[color:color-mix(in_srgb,#10b981_36%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_16%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_82%,var(--ops-text))]";
+    return "border-[var(--ops-tone-success-border)] bg-[var(--ops-tone-success-bg)] text-[var(--ops-tone-success-text)]";
   if (state === "current")
-    return "border-[color:color-mix(in_srgb,var(--ripnel-accent)_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_90%,var(--ops-surface))] text-[var(--ripnel-accent-hover)]";
+    return "border-[var(--ops-tone-accent-border)] bg-[var(--ops-tone-accent-bg)] text-[var(--ripnel-accent-hover)]";
   if (state === "cancelled")
-    return "border-[color:color-mix(in_srgb,#e11d48_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#e11d48_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#be123c_84%,var(--ops-text))]";
+    return "border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] text-[var(--ops-tone-danger-text)]";
   return "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]";
+}
+
+function toneToButtonVariant(tone: "danger" | "accent" | "neutral"): "accent" | "destructive" | "outline" {
+  if (tone === "danger") return "destructive";
+  if (tone === "neutral") return "outline";
+  return "accent";
 }
 
 function getLinePendingValue(status: TransferStatus, line: TransferLineDetail) {
@@ -137,7 +141,7 @@ export function TransferDetailPage({
           )
             .then(unwrapApiData)
             .catch((err) => {
-              setPageError(err instanceof Error ? err : new Error("No se pudo cargar la transferencia."));
+              setPageError(err instanceof Error ? err : new Error(TRANS.detail.loadError));
               throw err;
             });
         }
@@ -149,13 +153,13 @@ export function TransferDetailPage({
     transfer
       ? [
           { label: "Inicio", href: appRoutes.home },
-          { label: "Transferencias", href: appRoutes.transfers },
-          { label: transfer.transfer_number || "Transferencia" },
+          { label: TRANS.header.eyebrow, href: appRoutes.transfers },
+          { label: transfer.transfer_number || TRANS.header.detailTitle },
         ]
       : [
           { label: "Inicio", href: appRoutes.home },
-          { label: "Transferencias", href: appRoutes.transfers },
-          { label: "Transferencia" },
+          { label: TRANS.header.eyebrow, href: appRoutes.transfers },
+          { label: TRANS.header.detailTitle },
         ]
   );
 
@@ -232,8 +236,8 @@ export function TransferDetailPage({
     return (
       <LoadingPage
         variant="ops"
-        title="Cargando detalle de transferencia"
-        description="Recuperando datos operativos de la transferencia."
+        title={TRANS.detail.loading}
+        description={TRANS.detail.recovering}
       />
     );
   }
@@ -250,8 +254,8 @@ export function TransferDetailPage({
     return (
       <ErrorPage
         variant="ops"
-        title="No pudimos abrir el detalle de transferencia"
-        description={pageError?.message || "La transferencia solicitada no está disponible para esta sede."}
+        title={TRANS.detail.noDataTitle}
+        description={pageError?.message || TRANS.detail.noDataDesc}
       />
     );
   }
@@ -259,7 +263,7 @@ export function TransferDetailPage({
   const timelineItems = [
     {
       key: "requested" as const,
-      label: "Solicitada",
+      label: TRANS.status.requested,
       user: transfer.created_by_name,
       date: transfer.created_at,
       Icon: ClipboardList,
@@ -267,7 +271,7 @@ export function TransferDetailPage({
     },
     {
       key: "approved" as const,
-      label: "Aprobada",
+      label: TRANS.status.approved,
       user: transfer.approved_by_name,
       date: transfer.approved_at,
       Icon: CheckCircle2,
@@ -275,7 +279,7 @@ export function TransferDetailPage({
     },
     {
       key: "shipped" as const,
-      label: "Despachada",
+      label: TRANS.status.shipped,
       user: transfer.shipped_by_name,
       date: transfer.shipped_at,
       Icon: Truck,
@@ -283,7 +287,7 @@ export function TransferDetailPage({
     },
     {
       key: "received" as const,
-      label: "Recibida",
+      label: TRANS.status.received,
       user: transfer.received_by_name,
       date: transfer.received_at,
       Icon: Package,
@@ -293,7 +297,7 @@ export function TransferDetailPage({
       ? [
           {
             key: "cancelled" as const,
-            label: "Cancelada",
+            label: TRANS.status.cancelled,
             user: transfer.cancelled_by_name,
             date: transfer.cancelled_at,
             Icon: XCircle,
@@ -307,10 +311,10 @@ export function TransferDetailPage({
     <OpsPageShell width="wide" className="pb-28">
       <div className="space-y-1">
         <PosHeader
-          eyebrow="Transferencias"
+          eyebrow={TRANS.header.eyebrow}
           title={
             <span className="flex items-center gap-2.5">
-              {transfer.transfer_number || "Transferencia"}
+              {transfer.transfer_number || TRANS.header.detailTitle}
               <span
                 className={cn(
                   "inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
@@ -330,82 +334,80 @@ export function TransferDetailPage({
           }
           meta={
             <span className="text-xs text-[var(--ops-text-muted)]">
-              Creada por {transfer.created_by_name || "Sin usuario"} &middot;{" "}
+              {TRANS.detail.createdBy} {transfer.created_by_name || "Sin usuario"} &middot;{" "}
               {formatDateTime(transfer.created_at)} &middot;{" "}
               {transfer.next_step
                 ? `Siguiente: ${formatTransferNextStep(transfer.next_step)}`
-                : "Flujo completado"}
+                : TRANS.detail.completedFlow}
             </span>
           }
           actions={
-            <TooltipProvider>
-              <div className="flex items-center gap-2">
-                <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
-                  <Link href={appRoutes.transfers}>
-                    <ArrowLeft className="h-3.5 w-3.5" />
-                    Volver
-                  </Link>
-                </Button>
+            <div className="flex items-center gap-2">
+              <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
+                <Link href={appRoutes.transfers}>
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  {TRANS.header.back}
+                </Link>
+              </Button>
 
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    className="rounded-lg"
+                    onClick={() => refetch()}
+                    aria-label={TRANS.header.refresh}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{TRANS.header.refresh}</TooltipContent>
+              </Tooltip>
+
+              {secondaryActions.map((action) => (
+                <Button
+                  key={action}
+                  type="button"
+                  variant={action === "cancel" ? "destructive" : "outline"}
+                  size="sm"
+                  className="rounded-lg px-3"
+                  disabled={busyAction === action}
+                  onClick={() => setPendingAction(action)}
+                >
+                  {busyAction === action ? (
+                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    TRANSFER_ACTION_CONFIG[action].icon
+                  )}
+                  {formatTransferPrimaryAction(action)}
+                </Button>
+              ))}
+
+              {movementsPending ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon-sm"
-                      className="rounded-lg"
-                      onClick={() => refetch()}
-                      aria-label="Actualizar detalle"
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" />
-                    </Button>
+                    <span className="inline-flex">
+                      <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
+                        <Link href={movementsHref}>
+                          <Package className="h-3.5 w-3.5" />
+                          {TRANS.detail.movements}
+                        </Link>
+                      </Button>
+                    </span>
                   </TooltipTrigger>
-                  <TooltipContent>Actualizar detalle</TooltipContent>
+                  <TooltipContent>{TRANS.detail.noMovements}</TooltipContent>
                 </Tooltip>
-
-                {secondaryActions.map((action) => (
-                  <Button
-                    key={action}
-                    type="button"
-                    variant={action === "cancel" ? "destructive" : "outline"}
-                    size="sm"
-                    className="rounded-lg px-3"
-                    disabled={busyAction === action}
-                    onClick={() => setPendingAction(action)}
-                  >
-                    {busyAction === action ? (
-                      <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      TRANSFER_ACTION_CONFIG[action].icon
-                    )}
-                    {formatTransferPrimaryAction(action)}
-                  </Button>
-                ))}
-
-                {movementsPending ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="inline-flex">
-                        <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
-                          <Link href={movementsHref}>
-                            <Package className="h-3.5 w-3.5" />
-                            Movimientos
-                          </Link>
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>Sin movimientos generados todavía.</TooltipContent>
-                  </Tooltip>
-                ) : (
-                  <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
-                    <Link href={movementsHref}>
-                      <Package className="h-3.5 w-3.5" />
-                      Movimientos
-                    </Link>
-                  </Button>
-                )}
-              </div>
-            </TooltipProvider>
+              ) : (
+                <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
+                  <Link href={movementsHref}>
+                    <Package className="h-3.5 w-3.5" />
+                    {TRANS.detail.movements}
+                  </Link>
+                </Button>
+              )}
+            </div>
           }
         />
 
@@ -417,8 +419,12 @@ export function TransferDetailPage({
         ) : null}
       </div>
 
-      {notice ? <AdminInlineMessage tone="success">{notice}</AdminInlineMessage> : null}
-      {actionError ? <AdminInlineMessage tone="danger">{actionError}</AdminInlineMessage> : null}
+      {notice ? (
+        <div className="rounded-lg border border-[var(--ops-tone-success-border)] bg-[var(--ops-tone-success-bg)] px-4 py-3 text-sm text-[var(--ops-tone-success-text)]">{notice}</div>
+      ) : null}
+      {actionError ? (
+        <div className="rounded-lg border border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] px-4 py-3 text-sm text-[var(--ops-tone-danger-text)]">{actionError}</div>
+      ) : null}
 
       <OpsSectionDivider className="space-y-5">
         <div className="flex w-full items-center gap-0">
@@ -443,9 +449,9 @@ export function TransferDetailPage({
                       item.state === "current"
                         ? "text-[var(--ripnel-accent-hover)]"
                         : isCancelled
-                          ? "text-[color:color-mix(in_srgb,#be123c_84%,var(--ops-text))]"
+                          ? "text-[var(--ops-tone-danger-text)]"
                           : item.state === "complete"
-                            ? "text-[color:color-mix(in_srgb,#047857_88%,var(--ops-text))]"
+                            ? "text-[var(--ops-tone-success-text)]"
                             : "text-[var(--ops-text-muted)]"
                     )}
                   >
@@ -458,7 +464,7 @@ export function TransferDetailPage({
                     </span>
                   ) : (
                     <span className="hidden text-[10px] text-[var(--ops-text-muted)] sm:block">
-                      Pendiente
+                      {TRANS.detail.pending}
                     </span>
                   )}
                 </div>
@@ -473,17 +479,17 @@ export function TransferDetailPage({
         <div>
           <p className="text-xs text-[var(--ops-text-muted)]">
             <span className="font-semibold text-[var(--ops-text)]">{totals.lines}</span>{" "}
-            {totals.lines === 1 ? "producto" : "productos"} solicitados &middot;{" "}
+            {totals.lines === 1 ? TRANS.metrics.lines.slice(0, -1) : TRANS.metrics.lines} solicitados &middot;{" "}
             <span className="font-semibold text-[var(--ops-text)]">{totals.requested}</span>{" "}
-            {totals.requested === 1 ? "unidad" : "unidades"} &middot;{" "}
-            <span className="font-semibold text-[color:color-mix(in_srgb,#059669_82%,var(--ops-text))]">
+            {totals.requested === 1 ? TRANS.metrics.units.slice(0, -1) : TRANS.metrics.units} &middot;{" "}
+            <span className="font-semibold text-[var(--ops-tone-success-text)]">
               {totals.received}
             </span>{" "}
-            recibidas &middot;{" "}
-            <span className="font-semibold text-[color:color-mix(in_srgb,#d97706_82%,var(--ops-text))]">
+            {TRANS.metrics.received} &middot;{" "}
+            <span className="font-semibold text-[var(--ops-tone-warning-text)]">
               {totals.shipped}
             </span>{" "}
-            despachadas
+            {TRANS.metrics.shipped}
           </p>
         </div>
 
@@ -492,12 +498,12 @@ export function TransferDetailPage({
             <table className="w-full border-collapse">
               <thead className="bg-[var(--ops-surface-muted)]">
                 <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  <th className="px-4 py-3">Producto</th>
+                  <th className="px-4 py-3">{TRANS.table.columns.products}</th>
                   <th className="px-4 py-3">Variante</th>
-                  <th className="px-4 py-3 text-right">Solicitado</th>
-                  <th className="px-4 py-3 text-right">Despachado</th>
-                  <th className="px-4 py-3 text-right">Recibido</th>
-                  <th className="px-4 py-3 text-right">Pendiente</th>
+                  <th className="px-4 py-3 text-right">{TRANS.table.columns.requested}</th>
+                  <th className="px-4 py-3 text-right">{TRANS.table.columns.shipped}</th>
+                  <th className="px-4 py-3 text-right">{TRANS.metrics.received}</th>
+                  <th className="px-4 py-3 text-right">{TRANS.detail.pending}</th>
                   {hasLineNotes ? <th className="px-4 py-3">Notas</th> : null}
                 </tr>
               </thead>
@@ -505,7 +511,7 @@ export function TransferDetailPage({
                 {paginatedLines.length === 0 ? (
                   <tr>
                     <td colSpan={hasLineNotes ? 7 : 6} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                      No hay productos en esta transferencia.
+                      {TRANS.detail.noProducts}
                     </td>
                   </tr>
                 ) : (
@@ -562,10 +568,10 @@ export function TransferDetailPage({
                   })
                 )}
               </tbody>
-              <tfoot className="bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))]">
+              <tfoot className="bg-[var(--ops-surface-muted)]">
                 <tr className="border-t border-[var(--ops-border-strong)] text-sm font-semibold text-[var(--ops-text)]">
                   <td className="px-4 py-3 text-right" colSpan={2}>
-                    Totales
+                    {TRANS.detail.totals}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">{totals.requested}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{totals.shipped}</td>
@@ -596,26 +602,41 @@ export function TransferDetailPage({
         </OpsTableBlock>
       </OpsSectionDivider>
 
-      <AdminConfirmModal
+      <OpsDialog
         open={Boolean(pendingAction)}
-        title={pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction].confirmLabel : "Confirmar acción"}
+        onOpenChange={(open) => { if (!open) setPendingAction(null); }}
+        title={pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction].confirmLabel : TRANS.detail.confirmAction}
         description={pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction].description(transfer as unknown as TransferSummary) : ""}
-        confirmLabel={pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction].confirmLabel : "Confirmar"}
-        confirmTone={pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction].tone : "accent"}
-        busy={Boolean(pendingAction && busyAction === pendingAction)}
-        onCancel={() => setPendingAction(null)}
-        onConfirm={() => {
-          if (!pendingAction) return;
-          void handleTransferAction(pendingAction);
-          setPendingAction(null);
-        }}
-      />
+        size="sm"
+      >
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button variant="outline" onClick={() => setPendingAction(null)}>Cancelar</Button>
+          <Button
+            variant={pendingAction ? toneToButtonVariant(TRANSFER_ACTION_CONFIG[pendingAction].tone) : "accent"}
+            disabled={Boolean(pendingAction && busyAction === pendingAction)}
+            onClick={() => {
+              if (!pendingAction) return;
+              void handleTransferAction(pendingAction);
+              setPendingAction(null);
+            }}
+          >
+            {pendingAction && busyAction === pendingAction ? (
+              <span className="inline-flex items-center gap-2">
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+                {TRANSFER_ACTION_CONFIG[pendingAction].confirmLabel}
+              </span>
+            ) : pendingAction ? (
+              TRANSFER_ACTION_CONFIG[pendingAction].confirmLabel
+            ) : TRANS.detail.confirmAction}
+          </Button>
+        </div>
+      </OpsDialog>
 
       {primaryAction || visibleActions.includes("cancel") ? (
         <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-4 py-3 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] md:left-[var(--sidebar-width)] md:pl-6 md:pr-8">
           <div className="mx-auto flex max-w-[1380px] items-center justify-between">
             <p className="hidden text-sm text-[var(--ops-text-muted)] md:block">
-              {transfer.transfer_number || "Transferencia"} &middot;{" "}
+              {transfer.transfer_number || TRANS.header.detailTitle} &middot;{" "}
               {transfer.from_location_name} &rarr; {transfer.to_location_name}
             </p>
             <div className="flex items-center gap-3">

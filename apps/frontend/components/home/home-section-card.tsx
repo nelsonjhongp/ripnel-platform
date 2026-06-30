@@ -2,6 +2,7 @@ import Link from "next/link"
 import { ArrowUpRight, Info } from "lucide-react"
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { HOME } from "@/components/modules/home/home-messages"
 
 export function HomeSectionCard({
   eyebrow,
@@ -35,7 +36,7 @@ export function HomeSectionCard({
                 <button
                   type="button"
                   className="mt-5 inline-flex h-5 w-5 items-center justify-center rounded-full text-[var(--ops-text-muted)] transition hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)]"
-                  aria-label="Más información"
+                  aria-label={HOME.moreInfo}
                 >
                   <Info className="h-4 w-4" />
                 </button>

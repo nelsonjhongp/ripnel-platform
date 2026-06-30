@@ -5,6 +5,21 @@ import {
   ShieldCheck,
   X,
 } from "lucide-react"
+import { TRANS } from "./transfers-messages"
+import {
+  TRANS_STATUS_REQUESTED,
+  TRANS_STATUS_APPROVED,
+  TRANS_STATUS_SHIPPED,
+  TRANS_STATUS_RECEIVED,
+  TRANS_STATUS_CANCELLED,
+  TRANS_QUEUE_SELECTED,
+  TRANS_QUEUE_RECEIPT,
+  TRANS_QUEUE_DEFAULT,
+  TRANS_STAGE_OPEN,
+  TRANS_STAGE_APPROVAL,
+  TRANS_STAGE_DISPATCH,
+  TRANS_STAGE_RECEIPT,
+} from "./transfers-constants"
 
 export type TransferStatus = "requested" | "approved" | "shipped" | "received" | "cancelled";
 export type TransferScope = "current" | "network";
@@ -134,13 +149,13 @@ export const TRANSFER_SCOPE_OPTIONS: ReadonlyArray<{
 }> = [
   {
     value: "current",
-    label: "Sede activa",
-    helper: "Enfoca solicitudes y acciones en la sede seleccionada.",
+    label: TRANS.scope.current,
+    helper: TRANS.scope.currentHelper,
   },
   {
     value: "network",
-    label: "Red asignada",
-    helper: "Amplía la vista a todas las sedes asignadas a tu usuario.",
+    label: TRANS.scope.network,
+    helper: TRANS.scope.networkHelper,
   },
 ];
 
@@ -148,30 +163,20 @@ export const TRANSFER_QUEUE_OPTIONS: ReadonlyArray<{
   value: TransferQueueKey;
   label: string;
 }> = [
-  { value: "open_for_store", label: "Abiertas para mi sede" },
-  { value: "pending_approval", label: "Por aprobar" },
-  { value: "pending_dispatch", label: "Por despachar" },
-  { value: "pending_receipts", label: "Por recibir" },
+  { value: "open_for_store", label: TRANS.queue.openForStore },
+  { value: "pending_approval", label: TRANS.queue.pendingApproval },
+  { value: "pending_dispatch", label: TRANS.queue.pendingDispatch },
+  { value: "pending_receipts", label: TRANS.queue.pendingReceipts },
 ];
 
 export function formatTransferStatus(status: TransferStatus) {
-  if (status === "requested") {
-    return "Solicitada";
+  switch (status) {
+    case "requested": return TRANS.status.requested;
+    case "approved": return TRANS.status.approved;
+    case "shipped": return TRANS.status.shipped;
+    case "received": return TRANS.status.received;
+    default: return TRANS.status.cancelled;
   }
-
-  if (status === "approved") {
-    return "Aprobada";
-  }
-
-  if (status === "shipped") {
-    return "Despachada";
-  }
-
-  if (status === "received") {
-    return "Recibida";
-  }
-
-  return "Cancelada";
 }
 
 export function formatTransferQueueLabel(queue: TransferQueueKey) {
@@ -179,88 +184,75 @@ export function formatTransferQueueLabel(queue: TransferQueueKey) {
 }
 
 export function formatTransferQueueShortLabel(queue: TransferQueueKey) {
-  if (queue === "open_for_store") return "Abiertas";
-  if (queue === "pending_approval") return "Aprobar";
-  if (queue === "pending_dispatch") return "Despachar";
-  return "Recibir";
+  switch (queue) {
+    case "open_for_store": return TRANS.queue.openForStoreShort;
+    case "pending_approval": return TRANS.queue.pendingApprovalShort;
+    case "pending_dispatch": return TRANS.queue.pendingDispatchShort;
+    case "pending_receipts": return TRANS.queue.pendingReceiptsShort;
+  }
 }
 
 export function formatTransferPendingStage(stage: TransferPendingStage) {
-  if (stage === "open_for_store") return "Abierta";
-  if (stage === "pending_approval") return "Por aprobar";
-  if (stage === "pending_dispatch") return "Por despachar";
-  return "Por recibir";
+  switch (stage) {
+    case "open_for_store": return TRANS.queue.openForStoreStage;
+    case "pending_approval": return TRANS.queue.pendingApprovalStage;
+    case "pending_dispatch": return TRANS.queue.pendingDispatchStage;
+    case "pending_receipts": return TRANS.queue.pendingReceiptsStage;
+  }
 }
 
 export function formatTransferNextStep(nextStep: TransferNextStep) {
-  if (nextStep === "approval") return "Aprobación";
-  if (nextStep === "dispatch") return "Despacho";
-  if (nextStep === "receipt") return "Recepción";
-  if (nextStep === "completed") return "Completada";
-  return "Cancelada";
+  switch (nextStep) {
+    case "approval": return TRANS.nextStep.approval;
+    case "dispatch": return TRANS.nextStep.dispatch;
+    case "receipt": return TRANS.nextStep.receipt;
+    case "completed": return TRANS.nextStep.completed;
+    default: return TRANS.nextStep.cancelled;
+  }
 }
 
 export function formatTransferPrimaryAction(action: keyof TransferAvailableActions | null) {
-  if (action === "approve") return "Aprobar";
-  if (action === "ship") return "Despachar";
-  if (action === "receive") return "Recepcionar";
-  if (action === "cancel") return "Cancelar";
-  return "Ver detalle";
+  switch (action) {
+    case "approve": return TRANS.primaryAction.approve;
+    case "ship": return TRANS.primaryAction.ship;
+    case "receive": return TRANS.primaryAction.receive;
+    case "cancel": return TRANS.primaryAction.cancel;
+    default: return TRANS.primaryAction.viewDetail;
+  }
 }
 
 export function formatTransferScopeRole(scopeRole: TransferScopeRole) {
-  if (scopeRole === "source") return "Origen";
-  if (scopeRole === "destination") return "Destino";
-  if (scopeRole === "network") return "Red";
-  return "Seguimiento";
+  switch (scopeRole) {
+    case "source": return TRANS.scope.source;
+    case "destination": return TRANS.scope.destination;
+    case "network": return TRANS.scope.network;
+    default: return TRANS.scope.observer;
+  }
 }
 
 export function getTransferStatusClasses(status: TransferStatus) {
-  if (status === "requested") {
-    return "border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_66%,var(--ops-surface))] text-[var(--ops-text-muted)]";
+  switch (status) {
+    case "requested": return TRANS_STATUS_REQUESTED;
+    case "approved": return TRANS_STATUS_APPROVED;
+    case "shipped": return TRANS_STATUS_SHIPPED;
+    case "received": return TRANS_STATUS_RECEIVED;
+    default: return TRANS_STATUS_CANCELLED;
   }
-
-  if (status === "approved") {
-    return "border-[color:color-mix(in_srgb,var(--ripnel-accent)_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_86%,var(--ops-surface))] text-[var(--ripnel-accent-hover)]";
-  }
-
-  if (status === "shipped") {
-    return "border-[color:color-mix(in_srgb,#f59e0b_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] text-[color:color-mix(in_srgb,#d97706_72%,var(--ops-text))]";
-  }
-
-  if (status === "received") {
-    return "border-[color:color-mix(in_srgb,#10b981_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_82%,var(--ops-text))]";
-  }
-
-  return "border-[color:color-mix(in_srgb,#e11d48_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#e11d48_8%,var(--ops-surface))] text-[color:color-mix(in_srgb,#e11d48_82%,var(--ops-text))]";
 }
 
 export function getTransferQueueClasses(queue: TransferQueueKey, selected: boolean) {
-  if (selected) {
-    return "border-[color:color-mix(in_srgb,var(--ripnel-accent)_34%,var(--ops-border-strong))] bg-[var(--ripnel-accent-soft)] text-[var(--ripnel-accent-hover)]";
-  }
-
-  if (queue === "pending_receipts") {
-    return "border-[var(--ops-border-strong)] bg-[var(--ops-surface)] text-[color:color-mix(in_srgb,#b45309_82%,var(--ops-text))] hover:bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))]";
-  }
-
-  return "border-[var(--ops-border-strong)] bg-[var(--ops-surface)] text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)]";
+  if (selected) return TRANS_QUEUE_SELECTED;
+  if (queue === "pending_receipts") return TRANS_QUEUE_RECEIPT;
+  return TRANS_QUEUE_DEFAULT;
 }
 
 export function getTransferPendingStageClasses(stage: TransferPendingStage) {
-  if (stage === "open_for_store") {
-    return "border-[color:color-mix(in_srgb,var(--ripnel-accent)_26%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_82%,var(--ops-surface))] text-[var(--ripnel-accent-hover)]";
+  switch (stage) {
+    case "open_for_store": return TRANS_STAGE_OPEN;
+    case "pending_approval": return TRANS_STAGE_APPROVAL;
+    case "pending_dispatch": return TRANS_STAGE_DISPATCH;
+    case "pending_receipts": return TRANS_STAGE_RECEIPT;
   }
-
-  if (stage === "pending_approval") {
-    return "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]";
-  }
-
-  if (stage === "pending_dispatch") {
-    return "border-[color:color-mix(in_srgb,#f59e0b_24%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] text-[color:color-mix(in_srgb,#b45309_80%,var(--ops-text))]";
-  }
-
-  return "border-[color:color-mix(in_srgb,#10b981_24%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_10%,var(--ops-surface))] text-[color:color-mix(in_srgb,#047857_84%,var(--ops-text))]";
 }
 
 export function getTransferQueueCount(inbox: TransferInboxResponse["counts"], queue: TransferQueueKey) {
@@ -347,65 +339,64 @@ export const TRANSFER_ACTION_CONFIG: Record<
   TransferActionConfig
 > = {
   approve: {
-    label: "Aprobar",
-    confirmLabel: "Aprobar solicitud",
-    successMessage: "Solicitud aprobada para despacho.",
-    busyMessage: "Aprobando...",
+    label: TRANS.actionConfig.approve.label,
+    confirmLabel: TRANS.actionConfig.approve.confirmLabel,
+    successMessage: TRANS.actionConfig.approve.success,
+    busyMessage: TRANS.actionConfig.approve.busy,
     path: (transferId) => `/api/transfers/${transferId}/approve`,
     icon: <ShieldCheck className="h-3.5 w-3.5" />,
     tone: "accent",
     description: (transfer) => (
       <>
-        La transferencia <strong>{transfer.transfer_number || "sin número"}</strong> quedará lista
+        La transferencia <strong>{transfer.transfer_number || "sin numero"}</strong> quedara lista
         para despacho desde <strong>{transfer.from_location_name}</strong>.
       </>
     ),
   },
   ship: {
-    label: "Despachar",
-    confirmLabel: "Despachar transferencia",
-    successMessage: "Transferencia despachada.",
-    busyMessage: "Despachando...",
+    label: TRANS.actionConfig.ship.label,
+    confirmLabel: TRANS.actionConfig.ship.confirmLabel,
+    successMessage: TRANS.actionConfig.ship.success,
+    busyMessage: TRANS.actionConfig.ship.busy,
     path: (transferId) => `/api/transfers/${transferId}/ship`,
     icon: <SendHorizonal className="h-3.5 w-3.5" />,
     tone: "accent",
     description: (transfer) => (
       <>
-        La transferencia <strong>{transfer.transfer_number || "sin número"}</strong> descontará
-        stock del origen y quedará lista para recepción en{" "}
+        La transferencia <strong>{transfer.transfer_number || "sin numero"}</strong> descontara
+        stock del origen y quedara lista para recepcion en{" "}
         <strong>{transfer.to_location_name}</strong>.
       </>
     ),
   },
   receive: {
-    label: "Recibir",
-    confirmLabel: "Confirmar recepción",
-    successMessage: "Transferencia recepcionada.",
-    busyMessage: "Recepcionando...",
+    label: TRANS.actionConfig.receive.label,
+    confirmLabel: TRANS.actionConfig.receive.confirmLabel,
+    successMessage: TRANS.actionConfig.receive.success,
+    busyMessage: TRANS.actionConfig.receive.busy,
     path: (transferId) => `/api/transfers/${transferId}/receive`,
     icon: <CheckCheck className="h-3.5 w-3.5" />,
     tone: "accent",
     description: (transfer) => (
       <>
-        La transferencia <strong>{transfer.transfer_number || "sin número"}</strong> ingresará
+        La transferencia <strong>{transfer.transfer_number || "sin numero"}</strong> ingresara
         stock en <strong>{transfer.to_location_name}</strong>.
       </>
     ),
   },
   cancel: {
-    label: "Cancelar",
-    confirmLabel: "Cancelar transferencia",
-    successMessage: "Transferencia cancelada.",
-    busyMessage: "Cancelando...",
+    label: TRANS.actionConfig.cancel.label,
+    confirmLabel: TRANS.actionConfig.cancel.confirmLabel,
+    successMessage: TRANS.actionConfig.cancel.success,
+    busyMessage: TRANS.actionConfig.cancel.busy,
     path: (transferId) => `/api/transfers/${transferId}/cancel`,
     icon: <X className="h-3.5 w-3.5" />,
     tone: "danger",
     description: (transfer) => (
       <>
-        La transferencia <strong>{transfer.transfer_number || "sin número"}</strong> quedará
-        anulada y no continuará el flujo entre sedes.
+        La transferencia <strong>{transfer.transfer_number || "sin numero"}</strong> quedara
+        anulada y no continuara el flujo entre sedes.
       </>
     ),
   },
 }
-

@@ -735,7 +735,7 @@ export function InventoryAdjustmentsCreatePage() {
               meta={
                 draftLines.length > 0 ? (
                   <span className="text-xs text-[var(--ops-text-muted)]">
-                    {draftTotals.lines} lineas · {draftTotals.withDiff} con diferencia · {draftTotals.noChange} sin cambio
+                    {ADJ.create.draftMeta(draftTotals.lines, draftTotals.withDiff, draftTotals.noChange)}
                   </span>
                 ) : null
               }

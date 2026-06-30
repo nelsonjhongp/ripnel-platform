@@ -3,13 +3,14 @@ import Link from "next/link"
 import { Inbox } from "lucide-react"
 
 import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group"
+import { HOME } from "@/components/modules/home/home-messages"
 import type { HomeOverview } from "./home-types"
 
 function flowLabel(flow: string) {
-  if (flow === "receipt") return "Por recibir"
-  if (flow === "approve") return "Por aprobar"
-  if (flow === "dispatch") return "Por despachar"
-  return "Solicitud"
+  if (flow === "receipt") return HOME.transfer.byReceive
+  if (flow === "approve") return HOME.transfer.byApprove
+  if (flow === "dispatch") return HOME.transfer.byDispatch
+  return HOME.transfer.request
 }
 
 function flowTone(flow: string) {
@@ -38,22 +39,22 @@ export function HomeTransferRequests({
       <OpsMetricInlineGroup
         items={[
           {
-            label: "Abiertas",
+            label: HOME.transfer.openLabel,
             value: section.counts.open_for_store_count,
             tone: "accent",
           },
           {
-            label: "Por aprobar",
+            label: HOME.transfer.byApprove,
             value: section.counts.pending_approval_count,
             tone: section.counts.pending_approval_count === 0 ? "default" : "accent",
           },
           {
-            label: "Por despachar",
+            label: HOME.transfer.byDispatch,
             value: section.counts.pending_dispatch_count,
             tone: "warning",
           },
           {
-            label: "Por recibir",
+            label: HOME.transfer.byReceive,
             value: section.counts.pending_receipts_count,
             tone: section.counts.pending_receipts_count === 0 ? "default" : "accent",
           },
@@ -89,7 +90,7 @@ export function HomeTransferRequests({
         <div className="mt-3 flex items-center gap-2 rounded-lg border border-dashed border-[var(--ops-border-soft)] px-3 py-3">
           <Inbox className="h-4 w-4 text-[var(--ops-text-muted)] shrink-0" />
           <p className="text-[13px] text-[var(--ops-text-muted)]">
-            Sin movimientos entre tiendas
+            {HOME.transfer.noTransfers}
           </p>
         </div>
       ) : null}

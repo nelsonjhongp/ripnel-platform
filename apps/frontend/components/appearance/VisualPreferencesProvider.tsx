@@ -10,7 +10,7 @@ import {
 } from "react"
 
 export type ThemeMode = "light" | "dark"
-export type ThemePreset = "violet" | "slate" | "stone" | "graphite"
+export type ThemePreset = "slate" | "stone" | "graphite"
 
 export type VisualPreferences = {
   themeMode: ThemeMode

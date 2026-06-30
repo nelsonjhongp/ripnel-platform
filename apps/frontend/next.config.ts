@@ -145,6 +145,21 @@ const nextConfig: NextConfig = {
         destination: "/transferencias/recepciones",
         permanent: false,
       },
+      {
+        source: "/administracion/usuarios/nuevo",
+        destination: "/administracion/usuarios",
+        permanent: false,
+      },
+      {
+        source: "/administracion/roles/nuevo",
+        destination: "/administracion/roles",
+        permanent: false,
+      },
+      {
+        source: "/administracion/ubicaciones/nuevo",
+        destination: "/administracion/ubicaciones",
+        permanent: false,
+      },
     ];
   },
 };

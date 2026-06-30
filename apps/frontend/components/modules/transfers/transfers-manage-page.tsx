@@ -13,10 +13,6 @@ import { useApiGet } from "@/hooks/use-api-get";
 import { useTransferCapabilities } from "@/hooks/use-transfer-capabilities";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { Button } from "@/components/ui/button";
-import {
-  AdminInlineMessage,
-  AdminTextarea,
-} from "@/components/admin/admin-ui";
 import { OpsSelect } from "@/components/ui/ops-selection";
 import {
   OpsPageShell,
@@ -26,6 +22,7 @@ import {
 } from "@/components/ui/ops-page-shell";
 import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import { useTransferDraft } from "./use-transfer-draft";
+import { TRANS } from "./transfers-messages";
 
 type Location = {
   location_id: string;
@@ -149,8 +146,8 @@ export function TransfersManagePage() {
     return (
       <LoadingPage
         variant="ops"
-        title="Preparando transferencia"
-        description="Validando tu sede activa y los permisos operativos para este flujo."
+        title={TRANS.pending.preparing}
+        description={TRANS.pending.validatingLocation}
       />
     );
   }
@@ -162,35 +159,41 @@ export function TransfersManagePage() {
   return (
     <OpsPageShell width="wide">
       <PosHeader
-        eyebrow="Transferencias"
-        title="Registrar transferencia"
+        eyebrow={TRANS.header.eyebrow}
+        title={TRANS.header.manageTitle}
       />
 
       <OpsMetricInlineGroup
         items={[
-          { label: "Lineas", value: totals.lines, tone: "accent" },
-          { label: "Unidades", value: totals.units, tone: "default" },
-          { label: "Disponibles", value: totals.availableVariants, tone: "warning" },
+          { label: TRANS.metrics.lines, value: totals.lines, tone: "accent" },
+          { label: TRANS.metrics.units, value: totals.units, tone: "default" },
+          { label: TRANS.metrics.available, value: totals.availableVariants, tone: "warning" },
         ]}
       />
 
       <OpsSectionDivider>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error ? <AdminInlineMessage tone="danger">{error}</AdminInlineMessage> : null}
+          {error ? (
+            <div className="rounded-lg border border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] px-4 py-3 text-sm text-[var(--ops-tone-danger-text)]">
+              {error}
+            </div>
+          ) : null}
           {successMessage ? (
-            <AdminInlineMessage tone="success">{successMessage}</AdminInlineMessage>
+            <div className="rounded-lg border border-[var(--ops-tone-success-border)] bg-[var(--ops-tone-success-bg)] px-4 py-3 text-sm text-[var(--ops-tone-success-text)]">
+              {successMessage}
+            </div>
           ) : null}
 
           <section className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-5">
             <div className="grid gap-4 xl:grid-cols-[0.92fr_0.92fr_1.16fr]">
               <div className="space-y-1.5">
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  Origen
+                  {TRANS.request.originLabel}
                 </label>
                 <OpsSelect
                   value={originId}
                   onValueChange={setOriginId}
-                  placeholder="Selecciona una sede"
+                  placeholder={TRANS.request.selectOrigin}
                   options={originOptions}
                   disabled={loadingLocations}
                 />
@@ -198,12 +201,12 @@ export function TransfersManagePage() {
 
               <div className="space-y-1.5">
                 <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  Destino
+                  {TRANS.request.destinationLabel}
                 </label>
                 <OpsSelect
                   value={destinationId}
                   onValueChange={setDestinationId}
-                  placeholder="Selecciona una sede"
+                  placeholder={TRANS.request.selectDestination}
                   options={destinationOptions}
                   disabled={loadingLocations || !originId}
                 />
@@ -214,15 +217,15 @@ export function TransfersManagePage() {
                   htmlFor="transfer-notes"
                   className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]"
                 >
-                  Notas
+                  {TRANS.manage.notesLabel}
                 </label>
-                <AdminTextarea
+                <textarea
                   id="transfer-notes"
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
                   rows={3}
-                  placeholder="Motivo operativo del traslado"
-                  className="min-h-[92px]"
+                  placeholder={TRANS.manage.notesPlaceholder}
+                  className="min-h-[92px] w-full resize-y rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2 text-sm outline-none"
                 />
               </div>
             </div>
@@ -235,10 +238,10 @@ export function TransfersManagePage() {
                   <Boxes className="h-4 w-4 text-[var(--ops-text-muted)]" />
                   <div>
                     <h2 className="text-sm font-semibold text-[var(--ops-text)]">
-                      Stock disponible en origen
+                      {TRANS.manage.stockSection}
                     </h2>
                     <p className="text-xs text-[var(--ops-text-muted)]">
-                      Variantes con stock positivo listas para agregar.
+                      {TRANS.manage.stockHelp}
                     </p>
                   </div>
                 </div>
@@ -248,11 +251,11 @@ export function TransfersManagePage() {
                 <table className="w-full border-collapse">
                   <thead className="bg-[var(--ops-surface-muted)]">
                     <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                      <th className="px-4 py-3">Variante</th>
+                      <th className="px-4 py-3">{TRANS.table.columns.products}</th>
                       <th className="px-4 py-3">Detalle</th>
-                      <th className="px-4 py-3 text-right">Disponible</th>
-                      <th className="px-4 py-3">Cantidad</th>
-                      <th className="px-4 py-3 text-right">Agregar</th>
+                      <th className="px-4 py-3 text-right">{TRANS.metrics.available}</th>
+                      <th className="px-4 py-3">{TRANS.manage.qtyLabel}</th>
+                      <th className="px-4 py-3 text-right">{TRANS.manage.add}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
@@ -262,7 +265,7 @@ export function TransfersManagePage() {
                           colSpan={5}
                           className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
                         >
-                          Selecciona un origen para ver el stock disponible.
+                          {TRANS.manage.selectOrigin}
                         </td>
                       </tr>
                     ) : loadingInventory ? (
@@ -272,7 +275,7 @@ export function TransfersManagePage() {
                           className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
                         >
                           <LoaderCircle className="mr-2 inline-block h-5 w-5 animate-spin" />
-                          Cargando stock...
+                          {TRANS.manage.loadingStock}
                         </td>
                       </tr>
                     ) : availableInventory.length === 0 ? (
@@ -281,7 +284,7 @@ export function TransfersManagePage() {
                           colSpan={5}
                           className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
                         >
-                          No hay stock disponible en el origen seleccionado.
+                          {TRANS.manage.noStock}
                         </td>
                       </tr>
                     ) : (
@@ -324,7 +327,7 @@ export function TransfersManagePage() {
                                   [item.variant_id]: event.target.value,
                                 }))
                               }
-                              placeholder="Cant."
+                              placeholder={TRANS.manage.qtyLabel}
                               className="sales-field h-9 w-24 rounded-lg px-2 py-1 text-center text-sm"
                             />
                           </td>
@@ -338,7 +341,7 @@ export function TransfersManagePage() {
                               className="rounded-lg px-3"
                             >
                               <Plus className="h-3.5 w-3.5" />
-                              Agregar
+                              {TRANS.manage.add}
                             </Button>
                           </td>
                         </tr>
@@ -355,15 +358,15 @@ export function TransfersManagePage() {
                   <ArrowRightLeft className="h-4 w-4 text-[var(--ops-text-muted)]" />
                   <div>
                     <h2 className="text-sm font-semibold text-[var(--ops-text)]">
-                      Líneas de la transferencia
+                      {TRANS.manage.draftSection}
                     </h2>
                     <p className="text-xs text-[var(--ops-text-muted)]">
-                      Borrador listo para registrar.
+                      {TRANS.pending.draftReady}
                     </p>
                   </div>
                 </div>
-                <span className="inline-flex items-center rounded-full border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
-                  Draft
+                <span className="inline-flex items-center rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ops-text-muted)]">
+                  Borrador
                 </span>
               </div>
 
@@ -371,10 +374,10 @@ export function TransfersManagePage() {
                 <table className="w-full border-collapse">
                   <thead className="bg-[var(--ops-surface-muted)]">
                     <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                      <th className="px-4 py-3">Variante</th>
+                      <th className="px-4 py-3">{TRANS.table.columns.products}</th>
                       <th className="px-4 py-3 text-right">Stock</th>
-                      <th className="px-4 py-3">Cantidad</th>
-                      <th className="px-4 py-3 text-right">Quitar</th>
+                      <th className="px-4 py-3">{TRANS.manage.qtyLabel}</th>
+                      <th className="px-4 py-3 text-right">{TRANS.manage.removeLine}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
@@ -384,7 +387,7 @@ export function TransfersManagePage() {
                           colSpan={4}
                           className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]"
                         >
-                          Aún no agregas variantes a la transferencia.
+                          {TRANS.manage.draftEmpty}
                         </td>
                       </tr>
                     ) : (
@@ -428,8 +431,8 @@ export function TransfersManagePage() {
                               variant="ghost"
                               size="icon-sm"
                               onClick={() => removeLine(line.variant_id)}
-                              className="rounded-lg text-[var(--ops-text-muted)] hover:text-[color:color-mix(in_srgb,#e11d48_82%,var(--ops-text))]"
-                              aria-label="Quitar linea"
+                              className="rounded-lg text-[var(--ops-text-muted)] hover:text-[var(--ops-tone-danger-text)]"
+                              aria-label={TRANS.manage.removeLine}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
@@ -443,7 +446,7 @@ export function TransfersManagePage() {
 
               <div className="flex flex-col gap-3 border-t border-[var(--ops-border-strong)] pt-4 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-sm text-[var(--ops-text-muted)]">
-                  {totals.lines} líneas y {totals.units} unidades en borrador
+                  {TRANS.manage.summaryLines(totals.lines, totals.units)}
                 </span>
                 <Button
                   type="submit"
@@ -462,7 +465,7 @@ export function TransfersManagePage() {
                   ) : (
                     <ArrowRightLeft className="h-4 w-4" />
                   )}
-                  Crear transferencia en borrador
+                  {TRANS.manage.createDraft}
                 </Button>
               </div>
             </OpsTableBlock>

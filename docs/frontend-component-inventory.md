@@ -143,7 +143,7 @@ Cada patron tiene una implementacion de referencia. Nuevos modulos deben seguir 
 | Inventario | Si `inventory-messages.ts` + `adjustments-messages.ts` | Si | Si | Parcial | N/A |
 | Kardex | Si `kardex-messages.ts` | Si `kardex-constants.ts` | Si `kardex-domain.ts` | En domain | N/A |
 | Productos | Si `products-messages.ts` | No dedicado; usa `ops-control-styles.ts` | Si `products-types.ts` | Si `products-utils.ts` | N/A |
-| Administracion | No | No | No | No | N/A |
+| Administracion | Si `admin-messages.ts` | Si `admin-constants.ts` | Si `admin-types.ts` | Si `admin-utils.ts` | N/A |
 | Catalogos | No | No | No | No | N/A |
 
 ---
@@ -154,8 +154,9 @@ Cada patron tiene una implementacion de referencia. Nuevos modulos deben seguir 
 
 | Archivo | Hallazgo | Severidad |
 |---------|----------|:---------:|
-| `users-page.tsx`, `roles-page.tsx`, `locations-page.tsx` | `color-mix()` inline y strings hardcodeados | Critica |
-| Los 6 archivos | Sin `-constants.ts`, sin `-types.ts`, sin `-utils.ts` | Critica |
+| ~~`users-page.tsx`, `roles-page.tsx`, `locations-page.tsx`~~ | ~~`color-mix()` inline y strings hardcodeados~~ — Resuelto Junio 2026 | ~~Critica~~ |
+| ~~Los 6 archivos~~ | ~~Sin `-constants.ts`, sin `-types.ts`, sin `-utils.ts`~~ — Resuelto Junio 2026 | ~~Critica~~ |
+| Refactor completado | `admin-messages.ts`, `admin-types.ts`, `admin-constants.ts`, `admin-utils.ts` creados. `AdminModalShell` migrado a `OpsDialog`. Two-phase save + per-field errors. Rutas `/nuevo` eliminadas (dialogs unificados). `window.alert` reemplazado por dialog de clave temporal con copy-to-clipboard. | ✅ |
 
 ### Catalogos
 
@@ -227,6 +228,7 @@ Cada patron tiene una implementacion de referencia. Nuevos modulos deben seguir 
 
 | Fecha | Cambios |
 |-------|---------|
+| 2026-06-29 | Administracion refactorizado: `admin-messages.ts`, `admin-types.ts`, `admin-constants.ts`, `admin-utils.ts` creados. `AdminModalShell` → `OpsDialog`. Two-phase save + per-field errors. Rutas `/nuevo` eliminadas. 6 archivos → 7 (4 base + 3 paginas). |
 | 2026-06-29 | Productos agregado a la matriz; `Nuevo producto` queda como referencia de modal operativo con alta completa, validaciones por campo y multiseleccion reusable. |
 | 2026-06-29 | Alta de producto documentada como referencia de multiseleccion: `OpsMultiSelectMenu`, `OpsSelectionChip removeMode="chip"`, `OpsToggleChip` y `OpsColorSwatch`. |
 | 2026-06-26 | Creacion inicial. Matriz de modulos frontend auditados. |
