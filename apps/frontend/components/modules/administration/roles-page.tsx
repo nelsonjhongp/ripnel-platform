@@ -18,7 +18,6 @@ import { usePagination } from "@/hooks/use-pagination"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Button } from "@/components/ui/button"
 import {
-  AdminConfirmModal,
   AdminRowActionsMenu,
 } from "@/components/admin/admin-ui"
 import { OpsSelect } from "@/components/ui/ops-selection"
@@ -527,22 +526,49 @@ export default function RolesPage() {
         </div>
       </OpsDialog>
 
-      <AdminConfirmModal
+      <OpsDialog
         open={Boolean(activeChangeRole)}
+        onOpenChange={(open) => { if (!open) setActiveChangeRole(null) }}
         title={activeChangeRole?.active ? ADMIN.dialog.roleActiveTitle : ADMIN.dialog.roleInactiveTitle}
         description={
-          activeChangeRole ? (
-            <span>
-              {ADMIN.dialog.roleActiveDesc(activeChangeRole.name, activeChangeRole.active)}
-            </span>
-          ) : null
+          activeChangeRole
+            ? ADMIN.dialog.roleActiveDesc(activeChangeRole.name, activeChangeRole.active)
+            : undefined
         }
-        confirmLabel={activeChangeRole?.active ? ADMIN.dialog.confirmInactivate : ADMIN.dialog.confirmActivate}
-        confirmTone={activeChangeRole?.active ? "danger" : "accent"}
-        busy={savingActiveChange}
-        onCancel={() => setActiveChangeRole(null)}
-        onConfirm={() => void confirmRoleActiveChange()}
-      />
+        size="sm"
+        bodyClassName="px-5 py-5"
+        footer={
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-lg px-4"
+              onClick={() => setActiveChangeRole(null)}
+              disabled={savingActiveChange}
+            >
+              {ADMIN.dialog.cancel}
+            </Button>
+            <Button
+              variant={activeChangeRole?.active ? "destructive" : "accent"}
+              size="sm"
+              className="rounded-lg px-4"
+              onClick={() => void confirmRoleActiveChange()}
+              disabled={savingActiveChange}
+            >
+              {savingActiveChange ? (
+                <span className="inline-flex items-center gap-2">
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                  {ADMIN.dialog.processing}
+                </span>
+              ) : activeChangeRole?.active ? (
+                ADMIN.dialog.confirmInactivate
+              ) : (
+                ADMIN.dialog.confirmActivate
+              )}
+            </Button>
+          </div>
+        }
+      >{null}</OpsDialog>
     </OpsPageShell>
   )
 }
