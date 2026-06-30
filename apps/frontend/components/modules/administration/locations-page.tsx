@@ -1,564 +1,509 @@
-"use client";
+"use client"
 
-import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react"
 import {
+  LoaderCircle,
   PencilLine,
   Plus,
   Power,
   RefreshCw,
   RotateCcw,
-} from "lucide-react";
-import { apiFetchData } from "@/lib/api";
-import { useApiGet } from "@/hooks/use-api-get";
-import { activeBadgeLabel } from "@/lib/badge-utils";
-import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
-import { PAGE_SIZE } from "@/lib/constants";
-import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
+} from "lucide-react"
+import { apiFetchData } from "@/lib/api"
+import { useApiGet } from "@/hooks/use-api-get"
+import { activeBadgeLabel } from "@/lib/badge-utils"
+import { showSuccess, showError } from "@/lib/toast"
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
+import { usePagination } from "@/hooks/use-pagination"
+import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
+import { Button } from "@/components/ui/button"
 import {
-  AdminActionButton,
-  AdminCheckboxField,
   AdminConfirmModal,
-  AdminField,
-  AdminInput,
-  AdminInlineMessage,
-  AdminModalShell,
   AdminRowActionsMenu,
-} from "@/components/admin/admin-ui";
-import { OpsSelect } from "@/components/ui/ops-selection";
-import { Button } from "@/components/ui/button";
-import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
+} from "@/components/admin/admin-ui"
+import { OpsSelect } from "@/components/ui/ops-selection"
+import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group"
 import {
   OpsFiltersRow,
   OpsPageShell,
   OpsSearchField,
   OpsSectionDivider,
   OpsTableBlock,
-} from "@/components/ui/ops-page-shell";
-import { OpsDataTable } from "@/components/ui/ops-data-table";
-import { Pagination } from "@/components/ui/pagination";
+} from "@/components/ui/ops-page-shell"
+import { OpsDataTable } from "@/components/ui/ops-data-table"
+import { Pagination } from "@/components/ui/pagination"
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { OpsEmptyState } from "@/components/ui/ops-empty-state";
+} from "@/components/ui/tooltip"
+import { OpsDialog } from "@/components/ui/ops-dialog"
+import { OpsFormField } from "@/components/ui/ops-form-field"
+import { opsInputCompact, INFO_BOX_MUTED } from "@/components/ui/ops-control-styles"
+import { OpsEmptyState } from "@/components/ui/ops-empty-state"
 
-type LocationItem = {
-  location_id: string;
-  name: string;
-  code: string | null;
-  type: "store" | "warehouse" | "workshop" | "third_party";
-  address: string | null;
-  active: boolean;
-  created_at: string;
-  updated_at: string;
-};
+import {
+  type Location,
+  type LocationFormState,
+  type LocationFormErrors,
+  EMPTY_LOCATION_FORM,
+  LOCATION_TYPE_OPTIONS,
+} from "./admin-types"
+import { ADMIN } from "./admin-messages"
+import { LOCATION_TYPE_LABELS } from "./admin-constants"
+import {
+  validateLocationInput,
+  buildLocationCreatePayload,
+  buildLocationEditPayload,
+  toLocationFormState,
+  mapLocationSaveError,
+} from "./admin-utils"
 
-type FormState = {
-  name: string;
-  type: LocationItem["type"];
-  address: string;
-  active: boolean;
-};
-
-const initialFormState: FormState = {
-  name: "",
-  type: "store",
-  address: "",
-  active: true,
-};
-
-const locationTypeOptions = [
-  { value: "store", label: "Tienda" },
-  { value: "warehouse", label: "Almacén" },
-  { value: "workshop", label: "Taller" },
-  { value: "third_party", label: "Tercero" },
-] as const;
-
-const locationTypeLabels: Record<LocationItem["type"], string> = {
-  store: "Tienda",
-  warehouse: "Almacén",
-  workshop: "Taller",
-  third_party: "Tercero",
-};
+type ActionState = "idle" | "validating" | "saving"
 
 export default function LocationsPage() {
   const { data: locationsData, loading, error: loadError, refetch } = useApiGet(
-    () => apiFetchData<LocationItem[]>("/api/locations", { cache: "no-store" }),
-    []
-  );
-  const locations = locationsData || [];
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
-  const [typeFilter, setTypeFilter] = useState<"all" | LocationItem["type"]>("all");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [showModal, setShowModal] = useState(false);
-  const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
-  const [formState, setFormState] = useState<FormState>(initialFormState);
-  const [activeChangeLocation, setActiveChangeLocation] = useState<LocationItem | null>(null);
-  const [savingActiveChange, setSavingActiveChange] = useState(false);
+    () => apiFetchData<Location[]>("/api/locations", { cache: "no-store" }),
+    [],
+  )
+  const locations = locationsData || []
 
-  const activeCount = locations.filter((location) => location.active).length;
-  const storeCount = locations.filter((location) => location.type === "store").length;
-  const warehouseCount = locations.filter((location) => location.type === "warehouse").length;
+  const [search, setSearch] = useState("")
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all")
+  const [typeFilter, setTypeFilter] = useState<"all" | Location["type"]>("all")
+
+  const [showModal, setShowModal] = useState(false)
+  const [editingLocationId, setEditingLocationId] = useState<string | null>(null)
+  const [formState, setFormState] = useState<LocationFormState>(EMPTY_LOCATION_FORM)
+  const [formErrors, setFormErrors] = useState<LocationFormErrors | null>(null)
+  const [actionState, setActionState] = useState<ActionState>("idle")
+
+  const [activeChangeLocation, setActiveChangeLocation] = useState<Location | null>(null)
+  const [savingActiveChange, setSavingActiveChange] = useState(false)
+
+  const isEdit = Boolean(editingLocationId)
+  const isBusy = actionState !== "idle"
+
+  useEffect(() => {
+    if (showModal) {
+      void Promise.resolve().then(() => {
+        setFormErrors(null)
+        setActionState("idle")
+      })
+    }
+  }, [showModal])
+
+  const activeCount = locations.filter((l) => l.active).length
+  const storeCount = locations.filter((l) => l.type === "store").length
+  const warehouseCount = locations.filter((l) => l.type === "warehouse").length
 
   const filteredLocations = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-
+    const normalizedSearch = search.trim().toLowerCase()
     return locations.filter((location) => {
       const matchesStatus =
         statusFilter === "all" ||
         (statusFilter === "active" && location.active) ||
-        (statusFilter === "inactive" && !location.active);
-      const matchesType = typeFilter === "all" || location.type === typeFilter;
+        (statusFilter === "inactive" && !location.active)
+      const matchesType = typeFilter === "all" || location.type === typeFilter
+      if (!matchesStatus || !matchesType) return false
+      if (!normalizedSearch) return true
+      return [location.name, location.code, location.address, LOCATION_TYPE_LABELS[location.type]]
+        .filter((v) => v !== null && v !== undefined)
+        .some((v) => String(v).toLowerCase().includes(normalizedSearch))
+    })
+  }, [locations, search, statusFilter, typeFilter])
 
-      if (!matchesStatus || !matchesType) return false;
-      if (!normalizedSearch) return true;
+  const { paginatedItems: paginatedLocations, totalPages, safePage, firstVisible, lastVisible, setPage } =
+    usePagination(filteredLocations)
 
-      return [location.name, location.code, location.address, locationTypeLabels[location.type]]
-        .filter((value) => value !== null && value !== undefined)
-        .some((value) => String(value).toLowerCase().includes(normalizedSearch));
-    });
-  }, [locations, search, statusFilter, typeFilter]);
+  const hasActiveFilters = Boolean(search.trim()) || statusFilter !== "all" || typeFilter !== "all"
 
-  const totalPages = Math.max(1, Math.ceil(filteredLocations.length / PAGE_SIZE));
-  const safePage = Math.min(currentPage, totalPages);
-
-  const paginatedLocations = useMemo(() => {
-    const start = (safePage - 1) * PAGE_SIZE;
-    return filteredLocations.slice(start, start + PAGE_SIZE);
-  }, [filteredLocations, safePage]);
-
-  const firstVisible =
-    paginatedLocations.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
-  const lastVisible = firstVisible + paginatedLocations.length - 1;
-
-  const hasActiveFilters =
-    Boolean(search.trim()) || statusFilter !== "all" || typeFilter !== "all";
-
-  function resetForm() {
-    setEditingLocationId(null);
-    setFormState(initialFormState);
+  function openCreateModal() {
+    setEditingLocationId(null)
+    setFormState(EMPTY_LOCATION_FORM)
+    setFormErrors(null)
+    setActionState("idle")
+    setShowModal(true)
   }
 
-  function openEditModal(location: LocationItem) {
-    setEditingLocationId(location.location_id);
-    setFormState({
-      name: location.name,
-      type: location.type,
-      address: location.address || "",
-      active: location.active,
-    });
-    setError(null);
-    setSuccessMessage(null);
-    setShowModal(true);
+  function openEditModal(location: Location) {
+    setEditingLocationId(location.location_id)
+    setFormState(toLocationFormState(location))
+    setFormErrors(null)
+    setActionState("idle")
+    setShowModal(true)
   }
 
   function closeModal() {
-    setShowModal(false);
-    resetForm();
+    setShowModal(false)
+    setEditingLocationId(null)
+    setFormState(EMPTY_LOCATION_FORM)
+    setFormErrors(null)
+    setActionState("idle")
+  }
+
+  async function saveLocation() {
+    const validation = validateLocationInput(formState, isEdit)
+    if (validation) {
+      setFormErrors(validation)
+      return
+    }
+
+    setActionState("validating")
+    setFormErrors(null)
+
+    try {
+      setActionState("saving")
+      if (editingLocationId) {
+        await apiFetchData<Location>(`/api/locations/${editingLocationId}`, {
+          method: "PATCH",
+          body: JSON.stringify(buildLocationEditPayload(formState)),
+        })
+        showSuccess(ADMIN.toast.locationUpdated)
+      } else {
+        await apiFetchData<Location>("/api/locations", {
+          method: "POST",
+          body: JSON.stringify(buildLocationCreatePayload(formState)),
+        })
+        showSuccess(ADMIN.toast.locationCreated)
+      }
+      closeModal()
+      refetch()
+    } catch (error) {
+      const mapped = mapLocationSaveError(error)
+      setFormErrors(mapped)
+      if (mapped._form) {
+        showError(ADMIN.toast.locationSaveError, mapped._form)
+      }
+    } finally {
+      setActionState("idle")
+    }
   }
 
   async function confirmLocationActiveChange() {
-    if (!activeChangeLocation) {
-      return;
-    }
+    if (!activeChangeLocation) return
 
-    setError(null);
-    setSuccessMessage(null);
-    setSavingActiveChange(true);
-
+    setSavingActiveChange(true)
     try {
-      const data = await apiFetchData<LocationItem>(`/api/locations/${activeChangeLocation.location_id}`, {
+      await apiFetchData<Location>(`/api/locations/${activeChangeLocation.location_id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({ active: !activeChangeLocation.active }),
-      });
-      refetch();
-
-      if (editingLocationId === activeChangeLocation.location_id) {
-        setFormState((current) => ({ ...current, active: data.active }));
-      }
-
-      setSuccessMessage(data.active ? "Ubicación activada." : "Ubicación inactivada.");
-      setActiveChangeLocation(null);
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error ? requestError.message : "No se pudo actualizar la ubicación"
-      );
+      })
+      showSuccess(activeChangeLocation.active ? ADMIN.toast.locationDeactivated : ADMIN.toast.locationActivated)
+      setActiveChangeLocation(null)
+      refetch()
+    } catch (error) {
+      showError(ADMIN.toast.locationSaveError, error instanceof Error ? error.message : "")
     } finally {
-      setSavingActiveChange(false);
-    }
-  }
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSubmitting(true);
-    setError(null);
-    setSuccessMessage(null);
-
-    try {
-      const isEditing = Boolean(editingLocationId);
-      const data = await apiFetchData<LocationItem>(
-        isEditing ? `/api/locations/${editingLocationId}` : "/api/locations",
-        {
-          method: isEditing ? "PATCH" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            isEditing
-              ? {
-                  name: formState.name,
-                  address: formState.address.trim() || null,
-                  active: formState.active,
-                }
-              : {
-                  name: formState.name,
-                  type: formState.type,
-                  code: null,
-                  address: formState.address.trim() || null,
-                  active: formState.active,
-                }
-          ),
-        }
-      );
-
-      if (isEditing) {
-        refetch();
-        setSuccessMessage("Ubicación actualizada.");
-      } else {
-        refetch();
-        setSuccessMessage("Ubicación creada.");
-      }
-
-      closeModal();
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : editingLocationId
-          ? "No se pudo actualizar la ubicación"
-          : "No se pudo crear la ubicación"
-      );
-    } finally {
-      setSubmitting(false);
+      setSavingActiveChange(false)
     }
   }
 
   function clearFilters() {
-    setSearch("");
-    setStatusFilter("all");
-    setTypeFilter("all");
-    setCurrentPage(1);
-  }
-
-  function handleSearchChange(value: string) {
-    setSearch(value);
-    setCurrentPage(1);
+    setSearch("")
+    setStatusFilter("all")
+    setTypeFilter("all")
+    setPage(1)
   }
 
   return (
-    <TooltipProvider delayDuration={120}>
-      <OpsPageShell width="wide">
-          <PosHeader
-            eyebrow="Administración"
-            title="Sedes operativas"
-            actions={
-              <div className="flex items-center gap-2">
-                <Button asChild variant="accent" size="sm" className="rounded-lg">
-                  <Link href="/administracion/ubicaciones/nuevo">
-                    <Plus className="h-3.5 w-3.5" />
-                    Nueva sede
-                  </Link>
-                </Button>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon-sm"
-                      className="rounded-lg"
-                      onClick={refetch}
-                      aria-label="Recargar"
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" sideOffset={8}>
-                    Recargar
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            }
-          />
-
-          <OpsMetricInlineGroup
-            items={[
-              { label: "Total sedes", value: locations.length },
-              { label: "Tiendas", value: storeCount, tone: "accent" },
-              { label: "Almacenes", value: warehouseCount, tone: "accent" },
-              { label: "Activas", value: activeCount, tone: "success" },
-            ]}
-          />
-
-          <OpsSectionDivider>
-            <OpsTableBlock>
-            <OpsFiltersRow className="lg:grid-cols-[minmax(0,1.2fr)_0.92fr_auto]">
-              <OpsSearchField
-                value={search}
-                onChange={handleSearchChange}
-                placeholder="Buscar por nombre, código o dirección"
-                ariaLabel="Buscar ubicaciones"
-              />
-
-              <OpsSelect
-                label="Tipo"
-                value={typeFilter}
-                options={[
-                  { value: "all", label: "Todos los tipos" },
-                  ...locationTypeOptions.map((o) => ({ value: o.value, label: o.label })),
-                ]}
-                onChange={(v) => { setTypeFilter(v as "all" | LocationItem["type"]); setCurrentPage(1); }}
-              />
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    onClick={clearFilters}
-                    disabled={!hasActiveFilters}
-                    variant="outline"
-                    size="icon-sm"
-                    className="h-10 w-10 rounded-lg"
-                    aria-label="Limpiar filtros"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top" sideOffset={8}>
-                  Limpiar filtros
-                </TooltipContent>
-              </Tooltip>
-            </OpsFiltersRow>
-
-            {loadError || error ? (
-              <div role="alert" aria-live="polite" className="rounded-lg border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-4 py-2.5 text-sm text-[color:color-mix(in_srgb,#be123c_74%,var(--ops-text))]">
-                {loadError || error}
-              </div>
-            ) : null}
-
-            {successMessage ? (
-              <div role="status" aria-live="polite" className="rounded-lg border border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] px-4 py-2.5 text-sm text-[color:color-mix(in_srgb,#047857_74%,var(--ops-text))]">
-                {successMessage}
-              </div>
-            ) : null}
-
-            {!loading && !loadError && !error && locations.length === 0 ? (
-              <OpsEmptyState variant="compact" description="Aún no hay ubicaciones registradas." />
-            ) : (
-              <OpsDataTable
-                columns={[
-                  { key: "nombre", header: "Nombre" },
-                  { key: "codigo", header: "Código" },
-                  { key: "tipo", header: "Tipo" },
-                  { key: "direccion", header: "Dirección" },
-                  { key: "estado", header: "Estado" },
-                  { key: "acciones", header: "", className: "w-10" },
-                ]}
-                minWidth="820px"
-                loading={loading}
-                loadingMessage="Cargando ubicaciones..."
-                error={loadError || error}
-                errorTitle="Error al cargar ubicaciones"
-                isEmpty={locations.length > 0 && paginatedLocations.length === 0}
-                emptyMessage="No hay resultados para este filtro."
-                footer={
-                  <>
-                    <span className="text-sm tabular-nums text-[var(--ops-text-muted)]">
-                      {filteredLocations.length === 0
-                        ? "0 resultados"
-                        : `${firstVisible}-${lastVisible} de ${filteredLocations.length}`}
-                    </span>
-
-                    <Pagination
-                      page={safePage}
-                      totalPages={totalPages}
-                      onPageChange={setCurrentPage}
-                      className="self-end md:self-auto"
-                    />
-                  </>
-                }
-              >
-                {paginatedLocations.map((location) => (
-                  <tr
-                    key={location.location_id}
-                    className="transition hover:bg-[var(--ops-surface-muted)]"
-                  >
-                    <td className="px-4 py-[var(--ops-row-py)]">
-                      <p className="text-sm font-semibold text-[var(--ops-text)]">
-                        {location.name}
-                      </p>
-                    </td>
-                    <td className="px-4 py-[var(--ops-row-py)]">
-                      <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--ops-text-muted)] tabular-nums">
-                        {location.code || "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-[var(--ops-row-py)]">
-                      <span className="inline-block rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]">
-                        {locationTypeLabels[location.type]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-[var(--ops-row-py)]">
-                      <span className="text-sm text-[var(--ops-text)]">
-                        {location.address || "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-[var(--ops-row-py)]">
-                      <OpsStatusBadge tone={location.active ? "success" : "neutral"}>
-                        {activeBadgeLabel(location.active)}
-                      </OpsStatusBadge>
-                    </td>
-                    <td className="w-[4.5rem] px-4 py-[var(--ops-row-py)]">
-                      <AdminRowActionsMenu
-                        ariaLabel={`Acciones para ${location.name}`}
-                        items={[
-                          {
-                            label: "Editar",
-                            icon: <PencilLine className="h-3.5 w-3.5" />,
-                            onSelect: () => openEditModal(location),
-                          },
-                          {
-                            label: location.active ? "Inactivar" : "Activar",
-                            icon: <Power className="h-3.5 w-3.5" />,
-                            tone: location.active ? "danger" : "neutral",
-                            onSelect: () => setActiveChangeLocation(location),
-                          },
-                        ]}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </OpsDataTable>
-            )}
-            </OpsTableBlock>
-          </OpsSectionDivider>
-
-        {showModal ? (
-          <AdminModalShell
-            title={editingLocationId ? "Editar sede" : "Nueva sede"}
-            onClose={closeModal}
-            widthClass="max-w-md"
-            footer={
-              <div className="flex items-center gap-3">
-                <AdminActionButton
+    <OpsPageShell width="wide">
+      <PosHeader
+        eyebrow={ADMIN.header.locationsEyebrow}
+        title={ADMIN.header.locationsTitle}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button
+              variant="accent"
+              size="sm"
+              className="rounded-lg"
+              onClick={openCreateModal}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {ADMIN.actions.newLocation}
+            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
                   type="button"
-                  onClick={closeModal}
-                  className="flex-1"
+                  variant="outline"
+                  size="icon-sm"
+                  className="rounded-lg"
+                  onClick={refetch}
+                  aria-label={ADMIN.actions.refreshLocations}
                 >
-                  Cancelar
-                </AdminActionButton>
-                <AdminActionButton
-                  type="submit"
-                  form="location-edit-form"
-                  tone="accent"
-                  disabled={submitting}
-                  className="flex-1"
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={8}>
+                {ADMIN.actions.refreshLocations}
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        }
+      />
+
+      <OpsMetricInlineGroup
+        items={[
+          { label: ADMIN.metrics.total, value: locations.length },
+          { label: ADMIN.metrics.stores, value: storeCount, tone: "accent" },
+          { label: ADMIN.metrics.warehouses, value: warehouseCount, tone: "accent" },
+          { label: ADMIN.metrics.activeLocations, value: activeCount, tone: "success" },
+        ]}
+      />
+
+      <OpsSectionDivider>
+        <OpsTableBlock>
+          <OpsFiltersRow className="lg:grid-cols-[minmax(0,1.2fr)_0.92fr_auto]">
+            <OpsSearchField
+              value={search}
+              onChange={(value) => { setSearch(value); setPage(1) }}
+              placeholder={ADMIN.filters.searchLocations}
+              ariaLabel={ADMIN.filters.searchLocationsAria}
+            />
+            <OpsSelect
+              label={ADMIN.filters.typeLabel}
+              value={typeFilter}
+              options={[
+                { value: "all", label: ADMIN.filters.allTypes },
+                ...LOCATION_TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+              ]}
+              onChange={(v) => { setTypeFilter(v as "all" | Location["type"]); setPage(1) }}
+            />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={clearFilters}
+                  disabled={!hasActiveFilters}
+                  variant="outline"
+                  size="icon-sm"
+                  className="h-10 w-10 rounded-lg"
+                  aria-label={ADMIN.filters.clear}
                 >
-                  {submitting ? "Guardando..." : editingLocationId ? "Guardar cambios" : "Crear sede"}
-                </AdminActionButton>
-              </div>
-            }
-          >
-              <form id="location-edit-form" onSubmit={handleSubmit} className="space-y-5">
-                {error ? <AdminInlineMessage tone="danger">{error}</AdminInlineMessage> : null}
-                {successMessage ? <AdminInlineMessage tone="success">{successMessage}</AdminInlineMessage> : null}
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={8}>
+                {ADMIN.filters.clear}
+              </TooltipContent>
+            </Tooltip>
+          </OpsFiltersRow>
 
-                <AdminField label="Nombre">
-                  <AdminInput
-                    value={formState.name}
-                    onChange={(event) =>
-                      setFormState((current) => ({
-                        ...current,
-                        name: event.target.value,
-                      }))
-                    }
-                    placeholder="Tienda Centro"
-                    autoComplete="off"
-                    required
-                  />
-                </AdminField>
+          {loadError ? (
+            <div className={`${INFO_BOX_MUTED} border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] text-[var(--ops-tone-danger-text)]`}>
+              {loadError}
+            </div>
+          ) : null}
 
-                <AdminField label="Tipo">
-                  <OpsSelect
-                    value={formState.type}
-                    onValueChange={(value) =>
-                      setFormState((current) => ({
-                        ...current,
-                        type: value as LocationItem["type"],
-                      }))
-                    }
-                    placeholder="Selecciona un tipo"
-                    options={locationTypeOptions.map((option) => ({ value: option.value, label: option.label }))}
-                    disabled={editingLocationId !== null}
+          {!loading && !loadError && locations.length === 0 ? (
+            <OpsEmptyState variant="compact" description={ADMIN.table.locations.noLocations} />
+          ) : (
+            <OpsDataTable
+              columns={[
+                { key: "nombre", header: ADMIN.table.locations.columns.nombre },
+                { key: "codigo", header: ADMIN.table.locations.columns.codigo },
+                { key: "tipo", header: ADMIN.table.locations.columns.tipo },
+                { key: "direccion", header: ADMIN.table.locations.columns.direccion },
+                { key: "estado", header: ADMIN.table.locations.columns.estado },
+                { key: "acciones", header: ADMIN.table.locations.columns.acciones, className: "w-10" },
+              ]}
+              minWidth="820px"
+              loading={loading}
+              loadingMessage={ADMIN.table.locations.loadingM}
+              error={loadError}
+              errorTitle={ADMIN.table.locations.errorTitle}
+              isEmpty={locations.length > 0 && paginatedLocations.length === 0}
+              emptyMessage={ADMIN.table.locations.empty}
+              footer={
+                <>
+                  <span className="text-sm tabular-nums text-[var(--ops-text-muted)]">
+                    {filteredLocations.length === 0
+                      ? "0 resultados"
+                      : `${firstVisible}-${lastVisible} de ${filteredLocations.length}`}
+                  </span>
+                  <Pagination
+                    page={safePage}
+                    totalPages={totalPages}
+                    onPageChange={setPage}
+                    className="self-end md:self-auto"
                   />
-                </AdminField>
+                </>
+              }
+            >
+              {paginatedLocations.map((location) => (
+                <tr key={location.location_id} className="transition hover:bg-[var(--ops-surface-muted)]">
+                  <td className="px-4 py-[var(--ops-row-py)]">
+                    <p className="text-sm font-semibold text-[var(--ops-text)]">
+                      {location.name}
+                    </p>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)]">
+                    <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-[var(--ops-text-muted)] tabular-nums">
+                      {location.code || ADMIN.fallback.dash}
+                    </span>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)]">
+                    <span className="inline-block rounded-full border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]">
+                      {LOCATION_TYPE_LABELS[location.type]}
+                    </span>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)]">
+                    <span className="text-sm text-[var(--ops-text)]">
+                      {location.address || ADMIN.fallback.dash}
+                    </span>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)]">
+                    <OpsStatusBadge tone={location.active ? "success" : "neutral"}>
+                      {activeBadgeLabel(location.active)}
+                    </OpsStatusBadge>
+                  </td>
+                  <td className="w-[4.5rem] px-4 py-[var(--ops-row-py)]">
+                    <AdminRowActionsMenu
+                      ariaLabel={ADMIN.actions.actionsFor(location.name)}
+                      items={[
+                        {
+                          label: ADMIN.actions.edit,
+                          icon: <PencilLine className="h-3.5 w-3.5" />,
+                          onSelect: () => openEditModal(location),
+                        },
+                        {
+                          label: location.active ? ADMIN.actions.inactivate : ADMIN.actions.activate,
+                          icon: <Power className="h-3.5 w-3.5" />,
+                          tone: location.active ? "danger" : "neutral",
+                          onSelect: () => setActiveChangeLocation(location),
+                        },
+                      ]}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </OpsDataTable>
+          )}
+        </OpsTableBlock>
+      </OpsSectionDivider>
 
-                <AdminField label="Dirección">
-                  <AdminInput
-                    value={formState.address}
-                    onChange={(event) =>
-                      setFormState((current) => ({
-                        ...current,
-                        address: event.target.value,
-                      }))
-                    }
-                    placeholder="Av. Ejemplo 123, Lima"
-                    autoComplete="off"
-                  />
-                </AdminField>
-
-                <AdminField label="Estado">
-                  <AdminCheckboxField
-                    label="Sede activa"
-                    checked={formState.active}
-                    onChange={(checked) =>
-                      setFormState((current) => ({
-                        ...current,
-                        active: checked,
-                      }))
-                    }
-                  />
-                </AdminField>
-              </form>
-          </AdminModalShell>
-        ) : null}
-        <AdminConfirmModal
-          open={Boolean(activeChangeLocation)}
-          title={activeChangeLocation?.active ? "Inactivar sede" : "Activar sede"}
-          description={
-            activeChangeLocation ? (
-              <>
-                Vas a {activeChangeLocation.active ? "inactivar" : "activar"} la sede{" "}
-                <span className="font-semibold text-[var(--ops-text)]">
-                  {activeChangeLocation.name}
+      <OpsDialog
+        open={showModal}
+        onOpenChange={(open) => { if (!open) closeModal() }}
+        title={isEdit ? ADMIN.dialog.locationEditTitle : ADMIN.dialog.locationCreateTitle}
+        description={isEdit ? ADMIN.dialog.locationEditDesc : ADMIN.dialog.locationCreateDesc}
+        size="sm"
+        bodyClassName="max-h-[80vh] overflow-y-auto px-5 py-5 md:px-6"
+        footer={
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-lg px-4"
+              onClick={closeModal}
+              disabled={isBusy}
+            >
+              {ADMIN.dialog.cancel}
+            </Button>
+            <Button
+              variant="accent"
+              size="sm"
+              className="rounded-lg px-4"
+              onClick={() => void saveLocation()}
+              disabled={isBusy}
+            >
+              {actionState === "validating" ? (
+                <span className="inline-flex items-center gap-2">
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                  {ADMIN.dialog.validating}
                 </span>
-                .
-              </>
-            ) : null
-          }
-          confirmLabel={activeChangeLocation?.active ? "Inactivar" : "Activar"}
-          confirmTone={activeChangeLocation?.active ? "danger" : "accent"}
-          busy={savingActiveChange}
-          onCancel={() => setActiveChangeLocation(null)}
-          onConfirm={() => void confirmLocationActiveChange()}
-        />
-      </OpsPageShell>
-    </TooltipProvider>
-  );
+              ) : actionState === "saving" ? (
+                <span className="inline-flex items-center gap-2">
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                  {ADMIN.dialog.saving}
+                </span>
+              ) : (
+                isEdit ? ADMIN.dialog.saveLocationEdit : ADMIN.dialog.saveLocation
+              )}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {formErrors?._form ? (
+            <div className={`${INFO_BOX_MUTED} border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] text-[var(--ops-tone-danger-text)]`}>
+              {formErrors._form}
+            </div>
+          ) : null}
+
+          <OpsFormField label={ADMIN.form.name} required error={formErrors?.name} density="compact">
+            <input
+              type="text"
+              value={formState.name}
+              onChange={(e) => setFormState((c) => ({ ...c, name: e.target.value }))}
+              placeholder={ADMIN.form.namePlaceholder}
+              autoComplete="off"
+              required
+              className={opsInputCompact}
+            />
+          </OpsFormField>
+
+          <OpsFormField
+            label={ADMIN.form.type}
+            required
+            error={formErrors?.type}
+            hint={isEdit ? ADMIN.form.typeDisabledHint : undefined}
+            density="compact"
+          >
+            <OpsSelect
+              value={formState.type}
+              onValueChange={(value) =>
+                setFormState((c) => ({ ...c, type: value as LocationFormState["type"] }))
+              }
+              placeholder={ADMIN.form.typePlaceholder}
+              options={LOCATION_TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+              disabled={isEdit}
+            />
+          </OpsFormField>
+
+          <OpsFormField label={ADMIN.form.address} density="compact">
+            <input
+              type="text"
+              value={formState.address}
+              onChange={(e) => setFormState((c) => ({ ...c, address: e.target.value }))}
+              placeholder={ADMIN.form.addressPlaceholder}
+              autoComplete="off"
+              className={opsInputCompact}
+            />
+          </OpsFormField>
+
+          <OpsFormField label={ADMIN.form.state} density="compact">
+            <label className="inline-flex cursor-pointer select-none items-center gap-2">
+              <input
+                type="checkbox"
+                checked={formState.active}
+                onChange={(e) => setFormState((c) => ({ ...c, active: e.target.checked }))}
+                className="m-0 h-[0.9375rem] w-[0.9375rem] cursor-pointer rounded-[0.25rem] accent-[var(--ripnel-accent)]"
+              />
+              <span className="text-[0.8125rem] leading-none text-[var(--ops-text-muted)]">
+                {ADMIN.form.locationActiveLabel}
+              </span>
+            </label>
+          </OpsFormField>
+        </div>
+      </OpsDialog>
+
+      <AdminConfirmModal
+        open={Boolean(activeChangeLocation)}
+        title={activeChangeLocation?.active ? ADMIN.dialog.locationActiveTitle : ADMIN.dialog.locationInactiveTitle}
+        description={
+          activeChangeLocation ? (
+            <span>
+              {ADMIN.dialog.locationActiveDesc(activeChangeLocation.name, activeChangeLocation.active)}
+            </span>
+          ) : null
+        }
+        confirmLabel={activeChangeLocation?.active ? ADMIN.dialog.confirmInactivate : ADMIN.dialog.confirmActivate}
+        confirmTone={activeChangeLocation?.active ? "danger" : "accent"}
+        busy={savingActiveChange}
+        onCancel={() => setActiveChangeLocation(null)}
+        onConfirm={() => void confirmLocationActiveChange()}
+      />
+    </OpsPageShell>
+  )
 }

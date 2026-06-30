@@ -135,6 +135,8 @@ export const ADJ = {
       action: "Agregar",
     },
     draftSection: "Conteo y diferencias",
+    draftMeta: (lines: number, withDiff: number, noChange: number) =>
+      `${lines} lineas · ${withDiff} con diferencia · ${noChange} sin cambio`,
     draftHint: "Conteo fisico antes de guardar el borrador.",
     emptyDraft: "Aun no agregas variantes al ajuste.",
     removeColumnHeader: "Quitar",

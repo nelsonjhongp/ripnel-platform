@@ -10,25 +10,38 @@ type PaletteItem = {
   keywords?: string[]
 }
 
+let openPaletteFn: (() => void) | null = null
+
+export function openCommandPalette() {
+  openPaletteFn?.()
+}
+
 const PALETTE_ITEMS: PaletteItem[] = [
   { label: "Inicio", href: "/inicio", keywords: ["home", "inicio"] },
   { label: "Dashboard", href: "/panel", keywords: ["dashboard", "panel", "bi"] },
   { label: "Nueva venta", href: "/ventas/nueva", keywords: ["venta", "pos", "punto de venta", "vender"] },
   { label: "Historial de ventas", href: "/ventas/historial", keywords: ["historial", "ventas"] },
   { label: "Postventa", href: "/postventa", keywords: ["cambio", "devolucion", "anulacion"] },
-  { label: "Caja", href: "/caja", keywords: ["caja", "cash", "apertura", "cierre"] },
+  { label: "Caja del dia", href: "/caja", keywords: ["caja", "cash", "apertura", "cierre"] },
+  { label: "Historial de caja", href: "/caja/historial", keywords: ["historial", "caja", "sesiones"] },
+  { label: "Control de cajas", href: "/caja/control", keywords: ["control", "admin", "cajas"] },
   { label: "Clientes", href: "/clientes", keywords: ["clientes", "customer"] },
   { label: "Stock actual", href: "/inventario", keywords: ["stock", "inventario", "inventory"] },
   { label: "Movimientos de stock", href: "/inventario/movimientos", keywords: ["movimientos", "kardex"] },
+  { label: "Ajustes de inventario", href: "/inventario/ajustes", keywords: ["ajustes", "inventario", "stock"] },
   { label: "Transferencias", href: "/transferencias", keywords: ["transferencias", "transfers"] },
   { label: "Solicitar transferencia", href: "/transferencias/solicitar", keywords: ["solicitar", "reposicion"] },
-  { label: "Catálogos", href: "/catalogos", keywords: ["catalogos", "tallas", "colores"] },
+  { label: "Recepciones pendientes", href: "/transferencias/recepciones", keywords: ["recepciones", "pendientes"] },
+  { label: "Historial de transferencias", href: "/transferencias/historial", keywords: ["historial", "transferencias"] },
+  { label: "Catalogos", href: "/catalogos", keywords: ["catalogos", "tallas", "colores"] },
   { label: "Productos", href: "/productos", keywords: ["productos", "styles", "variants"] },
   { label: "Precios", href: "/precios", keywords: ["precios", "pricing"] },
   { label: "Usuarios", href: "/administracion/usuarios", keywords: ["usuarios", "users"] },
   { label: "Roles", href: "/administracion/roles", keywords: ["roles"] },
   { label: "Ubicaciones", href: "/administracion/ubicaciones", keywords: ["ubicaciones", "sedes", "locations"] },
   { label: "Cuenta", href: "/cuenta", keywords: ["cuenta", "perfil", "account"] },
+  { label: "Seguridad", href: "/cuenta/seguridad", keywords: ["seguridad", "contrasena", "password"] },
+  { label: "Notificaciones", href: "/notificaciones", keywords: ["notificaciones", "alertas"] },
 ]
 
 export function CommandPalette() {
@@ -79,6 +92,16 @@ export function CommandPalette() {
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [open, onClose])
+
+  useEffect(() => {
+    openPaletteFn = () => {
+      setActiveIndex(0)
+      setOpen(true)
+    }
+    return () => {
+      openPaletteFn = null
+    }
+  }, [])
 
   useEffect(() => {
     if (open) {

@@ -36,6 +36,18 @@ export const INFO_BOX_XL =
 export const SURFACE_MUTED_BG =
   "bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_82%,var(--ops-surface))]"
 
+/** Fondo muted muy sutil (30%) — contenedores de prioridades y tablas home */
+export const SURFACE_MUTED_30 =
+  "bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_30%,var(--ops-surface))]"
+
+/** Fondo muted moderado (52%) — tarjetas de ultima venta */
+export const SURFACE_MUTED_52 =
+  "bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_52%,var(--ops-surface))]"
+
+/** Fondo muted suave (24%) — sub-paneles dentro de cards de operacion */
+export const SURFACE_MUTED_24 =
+  "bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_24%,var(--ops-surface))]"
+
 /** Panel destacado con borde y fondo en tono acento — para totales */
 export const ACCENT_HIGHLIGHT_PANEL =
   "rounded-lg border border-[color:color-mix(in_srgb,var(--ripnel-accent)_24%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_78%,var(--ops-surface))]"
@@ -95,6 +107,10 @@ export const CHIP_CONFIRMED =
 /** Chip semantico — estado cancelado (red) — inventory adjustments */
 export const CHIP_CANCELLED =
   "border-[color:color-mix(in_srgb,#e11d48_38%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#e11d48_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#e11d48_82%,var(--ops-text))]"
+
+/** Chip semantico — salida de stock (amber suave) — kardex */
+export const CHIP_EXIT =
+  "border-[color:color-mix(in_srgb,#f59e0b_28%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_10%,var(--ops-surface))] text-[color:color-mix(in_srgb,#d97706_72%,var(--ops-text))]"
 
 /** Texto de diferencia positiva (green) — inventory adjustments */
 export const DIFF_POSITIVE =

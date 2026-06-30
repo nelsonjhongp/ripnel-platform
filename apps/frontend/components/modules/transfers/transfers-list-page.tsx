@@ -12,11 +12,7 @@ import {
   Download,
 } from "lucide-react";
 
-import {
-  AdminConfirmModal,
-  AdminInlineMessage,
-  AdminRowActionsMenu,
-} from "@/components/admin/admin-ui";
+import { AdminRowActionsMenu } from "@/components/admin/admin-ui";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ForbiddenPage, InlineStatusCard, LoadingPage } from "@/components/feedback/status-page";
 import { apiFetch, type ApiEnvelope, unwrapApiData } from "@/lib/api";
@@ -30,6 +26,7 @@ import { exportToCsv } from "@/lib/export-csv";
 import { Button } from "@/components/ui/button";
 import { OpsSelect } from "@/components/ui/ops-selection";
 import { Pagination } from "@/components/ui/pagination";
+import { OpsDialog } from "@/components/ui/ops-dialog";
 import {
   OpsFiltersRow,
   OpsPageShell,
@@ -43,7 +40,6 @@ import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
@@ -58,6 +54,7 @@ import {
   type TransferPendingStage,
   type TransferScope,
 } from "./transfers-shared";
+import { TRANS } from "./transfers-messages";
 
 type TransferRecord = TransferInboxItem;
 type TransferRowAction = TransferActionKey | "detail";
@@ -86,56 +83,56 @@ function matchesTransferQuery(transfer: TransferRecord, normalizedQuery: string)
 function getVisibleStateCopy(transfer: TransferRecord) {
   if (transfer.status === "requested") {
     return {
-      title: transfer.pending_stage === "pending_approval" ? "Por aprobar" : "Solicitada",
-      subtitle: "Esperando aprobación",
+      title: transfer.pending_stage === "pending_approval" ? TRANS.list.stateLabels.pendingApproval : TRANS.list.stateLabels.requested,
+      subtitle: TRANS.list.stateLabels.waitingApproval,
     };
   }
 
   if (transfer.status === "approved") {
     return {
-      title: "Por despachar",
-      subtitle: "Aprobada",
+      title: TRANS.list.stateLabels.pendingDispatch,
+      subtitle: TRANS.list.stateLabels.approved,
     };
   }
 
   if (transfer.status === "shipped") {
     return {
-      title: "Por recibir",
-      subtitle: "Enviada",
+      title: TRANS.list.stateLabels.pendingReceipt,
+      subtitle: TRANS.list.stateLabels.shipped,
     };
   }
 
   if (transfer.status === "received") {
     return {
-      title: "Recibida",
-      subtitle: "Completada",
+      title: TRANS.list.stateLabels.received,
+      subtitle: TRANS.list.stateLabels.completed,
     };
   }
 
   return {
-    title: "Cancelada",
-    subtitle: "Sin operación pendiente",
+    title: TRANS.list.stateLabels.cancelled,
+    subtitle: TRANS.list.stateLabels.noPending,
   };
 }
 
 function getTransferContextCopy(transfer: TransferRecord) {
   if (transfer.status === "requested") {
-    return `Para ${transfer.to_location_name}`;
+    return TRANS.list.transferContext.outbound;
   }
 
   if (transfer.status === "approved") {
-    return `Desde ${transfer.from_location_name}`;
+    return TRANS.list.transferContext.outbound;
   }
 
   if (transfer.status === "shipped") {
-    return `Hacia ${transfer.to_location_name}`;
+    return TRANS.list.transferContext.inbound;
   }
 
   if (transfer.status === "received") {
-    return `En ${transfer.to_location_name}`;
+    return TRANS.list.transferContext.inbound;
   }
 
-  return "Documento cancelado";
+  return TRANS.status.cancelled;
 }
 
 function getTransferUnitsTotal(transfer: TransferRecord) {
@@ -213,7 +210,7 @@ function buildSecondaryMenuItems(
 
   if (primaryAction !== "detail") {
     items.push({
-      label: "Ver detalle",
+      label: TRANS.header.viewDetail,
       icon: <Eye className="h-3.5 w-3.5" />,
       onSelect: () => router.push(`/transferencias/${transfer.transfer_id}`),
     });
@@ -255,23 +252,7 @@ function buildQueueRows(
 }
 
 function getQueueEmptyMessage(queue: TransferPendingStage) {
-  if (queue === "open_for_store") {
-    return "No hay solicitudes abiertas hacia tu sede en este momento.";
-  }
-
-  if (queue === "pending_approval") {
-    return "No hay solicitudes pendientes por aprobar para esta sede.";
-  }
-
-  if (queue === "pending_dispatch") {
-    return "No hay solicitudes aprobadas pendientes por despachar.";
-  }
-
-  if (queue === "pending_receipts") {
-    return "No hay transferencias pendientes de recepción.";
-  }
-
-  return "No hay transferencias pendientes de recepción.";
+  return TRANS.table.empty;
 }
 
 export function TransfersListPage({
@@ -330,7 +311,7 @@ export function TransfersListPage({
     } catch (requestError) {
       const msg = requestError instanceof Error
         ? requestError.message
-        : `No se pudo ejecutar la acción ${TRANSFER_ACTION_CONFIG[action].label.toLowerCase()}`
+        : TRANS.detail.loadError
       setActionError(msg);
       showError(TRANSFER_ACTION_CONFIG[action].label, msg)
     } finally {
@@ -362,8 +343,8 @@ export function TransfersListPage({
     return (
       <LoadingPage
         variant="ops"
-        title="Preparando transferencias"
-        description="Validando la sede activa, las colas operativas y las acciones disponibles para cada documento."
+        title={TRANS.pending.preparing}
+        description={TRANS.pending.validatingLocation}
       />
     );
   }
@@ -374,7 +355,7 @@ export function TransfersListPage({
 
   function handleExport() {
     const allRows = queueRows
-    const headers = ["Nro", "Origen", "Destino", "Estado", "Flujo", "Solicitadas", "Enviadas", "Acción pendiente", "Última actualización"]
+    const headers = TRANS.detail.csvHeaders
     const rows = allRows.map((t) => [
       t.transfer_number || "-",
       `${t.from_location_name} (${t.from_location_code})`,
@@ -386,65 +367,61 @@ export function TransfersListPage({
       getVisibleStateCopy(t).title,
       t.happened_at ? (() => { const p = formatDateTimeParts(t.happened_at); return `${p.date} ${p.time}` })() : t.updated_at ? (() => { const p = formatDateTimeParts(t.updated_at); return `${p.date} ${p.time}` })() : "-",
     ])
-    exportToCsv("transferencias", headers, rows)
+    exportToCsv("transferencias", headers.split(","), rows)
   }
 
   return (
     <OpsPageShell width="wide" className="max-w-[1320px]">
       <PosHeader
-        eyebrow="Transferencias"
-        title="Transferencias"
+        eyebrow={TRANS.header.eyebrow}
+        title={TRANS.header.title}
         actions={
           <>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon-sm"
-                    className="rounded-lg"
-                    onClick={handleExport}
-                    disabled={queueRows.length === 0}
-                    aria-label="Exportar CSV"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" sideOffset={8}>
-                  Exportar CSV
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  className="rounded-lg"
+                  onClick={handleExport}
+                  disabled={queueRows.length === 0}
+                  aria-label={TRANS.detail.exportCsv}
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={8}>
+                {TRANS.detail.exportCsv}
+              </TooltipContent>
+            </Tooltip>
             <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
-              <Link href={appRoutes.transferHistory}>Historial</Link>
+              <Link href={appRoutes.transferHistory}>{TRANS.header.historyTitle}</Link>
             </Button>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    onClick={() => refetch()}
-                    disabled={loading}
-                    className="rounded-lg"
-                    aria-label="Actualizar transferencias"
-                  >
-                    {loading ? (
-                      <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-3.5 w-3.5" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Actualizar transferencias</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => refetch()}
+                  disabled={loading}
+                  className="rounded-lg"
+                  aria-label={TRANS.header.refresh}
+                >
+                  {loading ? (
+                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{TRANS.header.refresh}</TooltipContent>
+            </Tooltip>
             {transferCapabilities.requestCreate && (
               <Button asChild variant="accent" size="sm" className="rounded-lg px-3">
                 <Link href={appRoutes.transferRequest}>
                   <Plus className="h-4 w-4" />
-                  Solicitar transferencia
+                  {TRANS.header.requestTitle}
                 </Link>
               </Button>
             )}
@@ -461,12 +438,12 @@ export function TransfersListPage({
                 setQuery(value);
                 setCurrentPage(1);
               }}
-              placeholder={`Buscar en ${formatTransferQueueLabel(selectedQueue).toLowerCase()} por N° o sede`}
+              placeholder={`${TRANS.filters.searchPlaceholder}`}
               ariaLabel="Buscar transferencias"
             />
 
             <OpsSelect
-              label="Vista"
+              label={TRANS.filters.viewLabel}
               value={selectedQueue}
               options={TRANSFER_QUEUE_OPTIONS}
               onChange={(value) => {
@@ -478,7 +455,7 @@ export function TransfersListPage({
 
             {transferCapabilities.manage ? (
               <OpsSelect
-                label="Alcance"
+                label={TRANS.filters.scopeLabel}
                 value={scope}
                 options={TRANSFER_SCOPE_OPTIONS}
                 onChange={(value) => {
@@ -490,64 +467,62 @@ export function TransfersListPage({
             ) : (
               <div className="flex items-end">
                 <div className="sales-field flex h-10 w-full items-center rounded-lg px-3 text-sm text-[var(--ops-text)]">
-                  {inbox?.context.active_location?.location_name || "Sede activa"}
+                  {inbox?.context.active_location?.location_name || TRANS.filters.locationLabel}
                 </div>
               </div>
             )}
 
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    onClick={() => {
-                      setActionError(null);
-                      setNotice(null);
-                      setQuery("");
-                      setSelectedQueue(defaultQueue);
-                      setScope("current");
-                      setCurrentPage(1);
-                    }}
-                    disabled={!hasActiveFilters}
-                    className="rounded-lg"
-                    aria-label="Limpiar filtros"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Limpiar filtros</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => {
+                    setActionError(null);
+                    setNotice(null);
+                    setQuery("");
+                    setSelectedQueue(defaultQueue);
+                    setScope("current");
+                    setCurrentPage(1);
+                  }}
+                  disabled={!hasActiveFilters}
+                  className="rounded-lg"
+                  aria-label={TRANS.header.clearFilters}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{TRANS.header.clearFilters}</TooltipContent>
+            </Tooltip>
           </OpsFiltersRow>
 
           <OpsTableWrap minWidth="1120px">
             <table className="w-full border-collapse">
               <thead className="bg-[var(--ops-surface-muted)]">
                 <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  <th className="px-4 py-3">Transferencia</th>
-                  <th className="px-4 py-3">Origen</th>
-                  <th className="px-4 py-3">Destino</th>
-                  <th className="px-4 py-3">Estado</th>
-                  <th className="px-4 py-3">Productos</th>
-                  <th className="px-4 py-3 text-right">Unidades</th>
+                  <th className="px-4 py-3">{TRANS.table.columns.number}</th>
+                  <th className="px-4 py-3">{TRANS.table.columns.origin}</th>
+                  <th className="px-4 py-3">{TRANS.table.columns.destination}</th>
+                  <th className="px-4 py-3">{TRANS.table.columns.status}</th>
+                  <th className="px-4 py-3">{TRANS.table.columns.products}</th>
+                  <th className="px-4 py-3 text-right">{TRANS.table.columns.units}</th>
                   <th className="px-4 py-3 text-right">Pendiente</th>
-                  <th className="px-4 py-3">Actualizada</th>
-                  <th className="px-4 py-3 text-right">Acción</th>
+                  <th className="px-4 py-3">{TRANS.table.columns.lastUpdate}</th>
+                  <th className="px-4 py-3 text-right">{TRANS.table.columns.actions}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
                 {loading ? (
                   <tr>
                     <td colSpan={9} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                      Cargando transferencias...
+                      {TRANS.table.loading}
                     </td>
                   </tr>
                 ) : error || actionError ? (
                   <tr>
                     <td colSpan={9} className="px-4 py-6">
                       <InlineStatusCard
-                        title="No pudimos cargar transferencias"
+                        title={TRANS.detail.loadError}
                         description={actionError || error || ""}
                         tone="danger"
                         variant="ops"
@@ -557,9 +532,7 @@ export function TransfersListPage({
                 ) : filteredRows.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                      {queueRows.length === 0
-                        ? getQueueEmptyMessage(selectedQueue)
-                        : "No encontramos transferencias con ese criterio."}
+                      {TRANS.table.empty}
                     </td>
                   </tr>
                 ) : (
@@ -597,7 +570,7 @@ export function TransfersListPage({
                               href={`/transferencias/${transfer.transfer_id}`}
                               className="inline-flex rounded-md text-sm font-semibold text-[var(--ops-text)] transition hover:text-[var(--ripnel-accent-hover)]"
                             >
-                              {transfer.transfer_number || "Sin número"}
+                              {transfer.transfer_number || TRANS.table.noNumber}
                             </Link>
                             <p className="text-[13px] text-[var(--ops-text-muted)]">
                               {getTransferContextCopy(transfer)}
@@ -632,7 +605,7 @@ export function TransfersListPage({
                               pendingUnits === null
                                 ? "text-[var(--ops-text-muted)]"
                                 : pendingUnits === 0
-                                  ? "text-[color:color-mix(in_srgb,#059669_78%,var(--ops-text))]"
+                                  ? "text-[var(--ops-tone-success-text)]"
                                   : "text-[var(--ops-text)]"
                             }`}
                           >
@@ -653,7 +626,7 @@ export function TransfersListPage({
                           <div className="flex justify-end gap-2">
                             {primaryAction === "detail" ? (
                               <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
-                                <Link href={`/transferencias/${transfer.transfer_id}`}>Ver detalle</Link>
+                                <Link href={`/transferencias/${transfer.transfer_id}`}>{TRANS.header.viewDetail}</Link>
                               </Button>
                             ) : (
                               <Button
@@ -675,7 +648,7 @@ export function TransfersListPage({
                             {menuItems.length > 0 ? (
                               <AdminRowActionsMenu
                                 items={menuItems}
-                                ariaLabel={`Acciones para ${transfer.transfer_number || "transferencia"}`}
+                                ariaLabel={`Acciones para ${transfer.transfer_number || TRANS.header.title}`}
                               />
                             ) : null}
                           </div>
@@ -688,12 +661,16 @@ export function TransfersListPage({
             </table>
           </OpsTableWrap>
 
-          {notice ? <AdminInlineMessage tone="success">{notice}</AdminInlineMessage> : null}
+          {notice ? (
+            <div className="rounded-lg border border-[var(--ops-tone-success-border)] bg-[var(--ops-tone-success-bg)] px-4 py-3 text-sm text-[var(--ops-tone-success-text)]">
+              {notice}
+            </div>
+          ) : null}
 
           <OpsTableFooter>
             <span className="text-sm text-[var(--ops-text-muted)]">
               {filteredRows.length === 0
-                ? "0 resultados"
+                ? TRANS.table.zeroResults
                 : `${firstVisible}-${lastVisible} de ${filteredRows.length}`}
             </span>
             <Pagination
@@ -706,33 +683,43 @@ export function TransfersListPage({
         </OpsTableBlock>
       </OpsSectionDivider>
 
-      <AdminConfirmModal
+      <OpsDialog
         open={Boolean(pendingAction)}
-        title={pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction.action].confirmLabel : "Confirmar acción"}
-        description={
-          pendingAction
-            ? TRANSFER_ACTION_CONFIG[pendingAction.action].description(pendingAction.transfer)
-            : ""
-        }
-        confirmLabel={pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction.action].confirmLabel : "Confirmar"}
-        confirmTone={pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction.action].tone || "accent" : "accent"}
-        busy={
-          Boolean(
-            pendingAction &&
-              busyAction?.transferId === pendingAction.transfer.transfer_id &&
-              busyAction.action === pendingAction.action
-          )
-        }
-        onCancel={() => setPendingAction(null)}
-        onConfirm={() => {
-          if (!pendingAction) {
-            return;
-          }
-
-          void handleTransferAction(pendingAction.action, pendingAction.transfer.transfer_id);
-          setPendingAction(null);
-        }}
-      />
+        onOpenChange={(open) => { if (!open) setPendingAction(null) }}
+        title={pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction.action].confirmLabel : ""}
+        description={pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction.action].description(pendingAction.transfer) : ""}
+        size="sm"
+      >
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button variant="outline" onClick={() => setPendingAction(null)}>
+            Cancelar
+          </Button>
+          <Button
+            variant={
+              pendingAction && TRANSFER_ACTION_CONFIG[pendingAction.action].tone === "danger"
+                ? "destructive"
+                : "accent"
+            }
+            disabled={Boolean(
+              pendingAction &&
+                busyAction?.transferId === pendingAction.transfer.transfer_id &&
+                busyAction.action === pendingAction.action
+            )}
+            onClick={() => {
+              if (!pendingAction) return
+              void handleTransferAction(pendingAction.action, pendingAction.transfer.transfer_id)
+              setPendingAction(null)
+            }}
+          >
+            {pendingAction &&
+            busyAction?.transferId === pendingAction.transfer.transfer_id &&
+            busyAction.action === pendingAction.action ? (
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+            ) : null}
+            {pendingAction ? TRANSFER_ACTION_CONFIG[pendingAction.action].confirmLabel : "Confirmar"}
+          </Button>
+        </div>
+      </OpsDialog>
     </OpsPageShell>
   );
 }

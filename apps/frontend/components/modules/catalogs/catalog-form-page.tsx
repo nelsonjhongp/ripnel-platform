@@ -5,11 +5,11 @@ import { useState } from "react";
 import { LoaderCircle } from "lucide-react";
 import { fetchCatalogItems, createCatalogItem } from "@/lib/api-catalogs";
 import { useApiGet } from "@/hooks/use-api-get";
-import type { CatalogRecord } from "@/lib/api-catalogs";
 import { AdminFormPageShell } from "@/components/admin/admin-form-page-shell";
-import { AdminInlineMessage } from "@/components/admin/admin-ui";
+import { Button } from "@/components/ui/button";
 import { CatalogItemForm, buildInitialState } from "./catalog-item-form";
 import type { CatalogFieldConfig } from "@/lib/product-master-metadata";
+import { CAT } from "./catalogs-messages";
 
 type CatalogFormPageProps = {
   catalogLabel: string;
@@ -48,7 +48,7 @@ export function CatalogFormPage({
       setError(
         requestError instanceof Error
           ? requestError.message
-          : "No se pudo crear el registro"
+          : CAT.formPage.errorCreate
       );
     } finally {
       setSubmitting(false);
@@ -61,25 +61,29 @@ export function CatalogFormPage({
 
   return (
     <AdminFormPageShell
-      eyebrow="Catálogos"
-      title={`Nuevo ${catalogLabel.toLowerCase()}`}
+      eyebrow={CAT.hub.eyebrow}
+      title={`${CAT.crud.createTitle} ${catalogLabel.toLowerCase()}`}
       backHref={catalogRoute}
     >
       {loading ? (
         <div className="flex min-h-40 items-center justify-center text-sm text-[var(--ops-text-muted)]">
           <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
-          Cargando formulario...
+          {CAT.formPage.loadingForm}
         </div>
       ) : loadError ? (
         <div className="space-y-3">
-          <AdminInlineMessage tone="danger">{loadError}</AdminInlineMessage>
-          <button
+          <p className="rounded-lg border border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] px-4 py-3 text-sm font-medium text-[var(--ops-tone-danger-text)]">
+            {loadError}
+          </p>
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
+            className="rounded-lg"
             onClick={() => refetch()}
-            className="inline-flex rounded-lg border border-[var(--ops-border-strong)] px-3 py-2 text-sm font-medium text-[var(--ops-text)] transition hover:bg-[var(--ops-surface-muted)]"
           >
-            Reintentar carga
-          </button>
+            {CAT.formPage.retry}
+          </Button>
         </div>
       ) : (
         <CatalogItemForm
@@ -92,9 +96,8 @@ export function CatalogFormPage({
           readOnlyFieldKeys={readOnlyFieldKeys}
           submitting={submitting}
           error={error}
-          successMessage={null}
           onSubmit={handleSubmit}
-          cancelHref={catalogRoute}
+          onCancel={() => router.push(catalogRoute)}
         />
       )}
     </AdminFormPageShell>

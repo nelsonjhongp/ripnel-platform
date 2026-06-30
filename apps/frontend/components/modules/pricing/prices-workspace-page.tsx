@@ -12,7 +12,6 @@ import {
 import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group"
 import { DateFilterPicker } from "@/components/ui/date-filter-picker"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
   createPrice,
   fetchPriceWorkspace,
@@ -26,6 +25,8 @@ import type {
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import { cn } from "@/lib/utils"
 import { useApiGet } from "@/hooks/use-api-get"
+import { PRICE } from "./pricing-messages"
+import { MSG_BOX_SUCCESS, MSG_BOX_ERROR, EMPTY_STATE_SURFACE, WORKSPACE_SELECTED_ROW, opsInputCompact, opsFieldLabelClassName } from "./pricing-constants"
 
 function getTodayInputValue() {
   const current = new Date()
@@ -36,7 +37,7 @@ function getTodayInputValue() {
 }
 
 function priceTypeLabel(priceType: PriceType) {
-  return priceType === "retail" ? "Minorista" : "Mayorista"
+  return priceType === "retail" ? PRICE.workspace.retailLabel : PRICE.workspace.wholesaleLabel
 }
 
 const NEW_PRICE_RECORD_ID = "__new__"
@@ -205,13 +206,13 @@ export function PricesWorkspacePage() {
 
       refetch()
       setSelectedPriceRecordId(savedRow.style_size_price_id)
-      setSubmitMessage("Precio creado correctamente")
+      setSubmitMessage(PRICE.workspace.messages.created)
     } catch (err) {
       const msg = err instanceof Error ? err.message : ""
       setSubmitError(
         msg.includes("already exists")
-          ? "Ya existe un precio para esta combinacion y fecha. Cambia la fecha de inicio o usa otra vigencia."
-          : msg || "No se pudo guardar el precio"
+          ? PRICE.workspace.messages.duplicateError
+          : msg || PRICE.workspace.messages.saveError
       )
     } finally {
       setSubmitting(false)
@@ -219,46 +220,39 @@ export function PricesWorkspacePage() {
   }
 
   return (
-    <TooltipProvider delayDuration={120}>
+    <>
       <PosHeader
-        eyebrow="Precios"
-        title="Gestion de precios"
+        eyebrow={PRICE.header.workspace.eyebrow}
+        title={PRICE.header.workspace.title}
         actions={
           <>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon-sm"
-                  onClick={handleRefreshWorkspace}
-                  disabled={workspaceLoading}
-                  aria-label="Actualizar"
-                  className="rounded-lg"
-                >
-                  <RefreshCw
-                    className={`h-4 w-4 ${
-                      workspaceLoading ? "animate-spin" : ""
-                    }`}
-                  />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top" sideOffset={8}>
-                Actualizar
-              </TooltipContent>
-            </Tooltip>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              onClick={handleRefreshWorkspace}
+              disabled={workspaceLoading}
+              aria-label={PRICE.header.refresh}
+              className="rounded-lg"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${
+                  workspaceLoading ? "animate-spin" : ""
+                }`}
+              />
+            </Button>
 
             <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
               <Link href="/precios">
               <ArrowLeft className="h-4 w-4" />
-              Volver
+              {PRICE.header.back}
               </Link>
             </Button>
 
             <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
               <Link href="/precios/reglas">
                 <Settings2 className="h-4 w-4" />
-                Reglas
+                {PRICE.header.rulesLink}
               </Link>
             </Button>
           </>
@@ -271,10 +265,10 @@ export function PricesWorkspacePage() {
           {workspace ? (
             <OpsMetricInlineGroup
               items={[
-                { label: "Tallas", value: workspace.product.configured_size_count },
-                { label: "Retail cubierto", value: workspace.product.retail_sizes_covered_count, tone: "accent" },
-                { label: "Mayorista cubierto", value: workspace.product.wholesale_sizes_covered_count },
-                { label: "Stock", value: workspace.product.total_stock_qty, tone: workspace.product.total_stock_qty > 0 ? "success" : "default" },
+                { label: PRICE.workspace.metrics.sizes, value: workspace.product.configured_size_count },
+                { label: PRICE.workspace.metrics.retailCovered, value: workspace.product.retail_sizes_covered_count, tone: "accent" },
+                { label: PRICE.workspace.metrics.wholesaleCovered, value: workspace.product.wholesale_sizes_covered_count },
+                { label: PRICE.workspace.metrics.stock, value: workspace.product.total_stock_qty, tone: workspace.product.total_stock_qty > 0 ? "success" : "default" },
               ]}
             />
           ) : null}
@@ -283,7 +277,7 @@ export function PricesWorkspacePage() {
             {workspaceLoading ? (
               <div className="flex min-h-48 items-center justify-center text-sm text-[var(--ops-text-muted)]">
                 <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
-                Cargando workspace...
+                {PRICE.workspace.loading}
               </div>
             ) : workspaceError ? (
               <div className="rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-4 py-8 text-sm text-[var(--ops-text-muted)]">
@@ -298,7 +292,7 @@ export function PricesWorkspacePage() {
                         {workspace.product.name}
                       </p>
                       <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                        {workspace.product.style_code || "Sin código"}
+                        {workspace.product.style_code || PRICE.workspace.noCode}
                       </p>
                     </div>
 
@@ -308,10 +302,10 @@ export function PricesWorkspacePage() {
                     <table className="w-full border-collapse">
                       <thead className="bg-[var(--ops-surface-muted)]">
                         <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                           <th className="px-4 py-3">Talla</th>
-                           <th className="px-4 py-3">Retail</th>
-                           <th className="px-4 py-3">Mayorista</th>
-                           <th className="px-4 py-3">Estado</th>
+                           <th className="px-4 py-3">{PRICE.workspace.columns.size}</th>
+                           <th className="px-4 py-3">{PRICE.workspace.columns.retail}</th>
+                           <th className="px-4 py-3">{PRICE.workspace.columns.wholesale}</th>
+                           <th className="px-4 py-3">{PRICE.workspace.columns.status}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
@@ -322,7 +316,7 @@ export function PricesWorkspacePage() {
                             <tr
                               key={size.size_id}
                               className={cn(
-                                selected && "bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_72%,var(--ops-surface))]"
+                                selected && WORKSPACE_SELECTED_ROW
                               )}
                             >
                               <td className="px-4 py-[var(--ops-row-py)] align-top">
@@ -330,7 +324,7 @@ export function PricesWorkspacePage() {
                                   {size.code}
                                 </p>
                                 <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">
-                                  {size.name || "Sin nombre"}
+                                  {size.name || PRICE.workspace.noSizeName}
                                 </p>
                               </td>
                               <td className="px-4 py-[var(--ops-row-py)]">
@@ -351,7 +345,7 @@ export function PricesWorkspacePage() {
                                     className="rounded-lg border-dashed text-[var(--ops-text-muted)] opacity-80 min-w-[120px]"
                                     onClick={() => handleSelectPriceLane(size.size_id, "retail")}
                                   >
-                                    Sin precio
+                                    {PRICE.workspace.sinPrecio}
                                     <Plus className="h-3.5 w-3.5" />
                                   </Button>
                                 )}
@@ -374,20 +368,20 @@ export function PricesWorkspacePage() {
                                     className="rounded-lg border-dashed text-[var(--ops-text-muted)] opacity-80 min-w-[120px]"
                                     onClick={() => handleSelectPriceLane(size.size_id, "wholesale")}
                                   >
-                                    Sin precio
+                                    {PRICE.workspace.sinPrecio}
                                     <Plus className="h-3.5 w-3.5" />
                                   </Button>
                                 )}
                               </td>
                               <td className="px-4 py-[var(--ops-row-py)]">
                                 {size.has_current_retail_price && size.has_current_wholesale_price ? (
-                                  <OpsStatusBadge tone="success">Completo</OpsStatusBadge>
+                                  <OpsStatusBadge tone="success">{PRICE.workspace.complete}</OpsStatusBadge>
                                 ) : !size.has_current_retail_price && !size.has_current_wholesale_price ? (
-                                  <OpsStatusBadge tone="danger">Faltan precios</OpsStatusBadge>
+                                  <OpsStatusBadge tone="danger">{PRICE.workspace.missingPrices}</OpsStatusBadge>
                                 ) : !size.has_current_retail_price ? (
-                                  <OpsStatusBadge tone="warning">Falta retail</OpsStatusBadge>
+                                  <OpsStatusBadge tone="warning">{PRICE.workspace.missingRetail}</OpsStatusBadge>
                                 ) : (
-                                  <OpsStatusBadge tone="warning">Falta mayorista</OpsStatusBadge>
+                                  <OpsStatusBadge tone="warning">{PRICE.workspace.missingWholesale}</OpsStatusBadge>
                                 )}
                               </td>
                             </tr>
@@ -410,7 +404,7 @@ export function PricesWorkspacePage() {
                       }`}
                     >
                       <ShoppingBag className="h-3.5 w-3.5" />
-                      Minorista
+                      {PRICE.workspace.retailLabel}
                     </button>
                     <button
                       type="button"
@@ -422,13 +416,13 @@ export function PricesWorkspacePage() {
                       }`}
                     >
                       <Building2 className="h-3.5 w-3.5" />
-                      Mayorista
+                      {PRICE.workspace.wholesaleLabel}
                     </button>
                   </div>
 
                   <div className="mt-4 border-t border-[var(--ops-border-strong)] pt-4">
                     <h3 className="text-base font-semibold text-[var(--ops-text)]">
-                      {selectedSize ? `Talla ${selectedSize.code}` : "Selecciona una talla"}
+                      {selectedSize ? `${PRICE.workspace.columns.size} ${selectedSize.code}` : PRICE.workspace.selectSize}
                     </h3>
                     {selectedSize ? (
                       <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
@@ -447,18 +441,18 @@ export function PricesWorkspacePage() {
                                 {formatCurrency(selectedRow.price)}
                               </p>
                               <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)] space-y-0.5">
-                                <p>Desde {formatDate(selectedRow.start_date)}</p>
+                                <p>{PRICE.workspace.fromDate(formatDate(selectedRow.start_date))}</p>
                                 {selectedRow.end_date ? (
-                                  <p>Hasta {formatDate(selectedRow.end_date)}</p>
+                                  <p>{PRICE.workspace.toDate(formatDate(selectedRow.end_date))}</p>
                                 ) : null}
                               </div>
                               <OpsStatusBadge tone={selectedRow.active ? "success" : "neutral"}>
-                                {selectedRow.active ? "Activo" : "Inactivo"}
+                                {selectedRow.active ? PRICE.workspace.active : PRICE.workspace.inactive}
                               </OpsStatusBadge>
                             </div>
                           ) : (
-                            <div className="rounded-lg border border-dashed border-[var(--ops-border-soft)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-4 py-4 text-center text-xs text-[var(--ops-text-muted)]">
-                              Sin registro de vigencia
+                            <div className={`rounded-lg border border-dashed border-[var(--ops-border-soft)] px-4 py-4 text-center text-xs text-[var(--ops-text-muted)] ${EMPTY_STATE_SURFACE}`}>
+                              {PRICE.workspace.noValidity}
                             </div>
                           )}
 
@@ -467,11 +461,11 @@ export function PricesWorkspacePage() {
                             onClick={handleStartNewRecord}
                             className="cursor-pointer text-xs font-semibold text-[var(--ripnel-accent-hover)] transition hover:text-[var(--ripnel-accent)]"
                           >
-                            + Nuevo registro
+                            {PRICE.workspace.newRecordBtn}
                           </button>
 
                           {submitMessage ? (
-                            <div className="rounded-lg border border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] px-3 py-2 text-sm text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]">
+                            <div className={`rounded-lg px-3 py-2 text-sm ${MSG_BOX_SUCCESS}`}>
                               {submitMessage}
                             </div>
                           ) : null}
@@ -479,7 +473,7 @@ export function PricesWorkspacePage() {
                       ) : (
                         <>
                           <div>
-                            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                            <label className={opsFieldLabelClassName}>
                               Precio
                             </label>
                             <input
@@ -490,27 +484,27 @@ export function PricesWorkspacePage() {
                               onChange={(event) => setPriceInput(event.target.value)}
                               placeholder={
                                 selectedPriceType === "retail" && selectedSize?.current_retail_price != null
-                                  ? `Actual: S/. ${selectedSize.current_retail_price.toFixed(2)}`
+                                  ? PRICE.workspace.currentPrice(selectedSize.current_retail_price.toFixed(2))
                                   : selectedPriceType === "wholesale" && selectedSize?.current_wholesale_price != null
-                                    ? `Actual: S/. ${selectedSize.current_wholesale_price.toFixed(2)}`
-                                    : "0.00"
+                                    ? PRICE.workspace.currentPrice(selectedSize.current_wholesale_price.toFixed(2))
+                                    : PRICE.workspace.pricePlaceholder
                               }
-                              className="sales-field h-10 w-full rounded-lg px-3 text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
+                              className={opsInputCompact}
                             />
                           </div>
 
                           <div className="space-y-3">
                             <DateFilterPicker
-                              label="Inicio"
+                              label={PRICE.workspace.startDateLabel}
                               value={startDateInput}
                               onChange={setStartDateInput}
-                              ariaLabel="Fecha de inicio"
+                              ariaLabel={PRICE.workspace.startDateAria}
                             />
                             <DateFilterPicker
-                              label="Fin"
+                              label={PRICE.workspace.endDateLabel}
                               value={endDateInput}
                               onChange={setEndDateInput}
-                              ariaLabel="Fecha de fin"
+                              ariaLabel={PRICE.workspace.endDateAria}
                               min={startDateInput || undefined}
                             />
                           </div>
@@ -522,17 +516,17 @@ export function PricesWorkspacePage() {
                               onChange={(event) => setActiveInput(event.target.checked)}
                               className="h-4 w-4 rounded border-[var(--ops-border-strong)] accent-[var(--ripnel-accent)]"
                             />
-                            Registro activo
+                            {PRICE.workspace.activeLabel}
                           </label>
 
                           {submitMessage ? (
-                            <div className="rounded-lg border border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] px-3 py-2 text-sm text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]">
+                            <div className={`rounded-lg px-3 py-2 text-sm ${MSG_BOX_SUCCESS}`}>
                               {submitMessage}
                             </div>
                           ) : null}
 
                           {submitError ? (
-                            <div className="rounded-lg border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-3 py-2 text-sm text-[color:color-mix(in_srgb,#be123c_74%,var(--ops-text))]">
+                            <div className={`rounded-lg px-3 py-2 text-sm ${MSG_BOX_ERROR}`}>
                               {submitError}
                             </div>
                           ) : null}
@@ -553,12 +547,12 @@ export function PricesWorkspacePage() {
                             {submitting ? (
                               <>
                                 <LoaderCircle className="h-4 w-4 animate-spin" />
-                                Guardando...
+                                {PRICE.workspace.saving}
                               </>
                             ) : (
                               <>
                                 <Save className="h-4 w-4" />
-                                Crear precio
+                                {PRICE.workspace.create}
                               </>
                             )}
                           </Button>
@@ -567,7 +561,7 @@ export function PricesWorkspacePage() {
                     </div>
                   ) : (
                     <div className="mt-4 rounded-lg border border-dashed border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-4 py-8 text-center text-sm text-[var(--ops-text-muted)]">
-                      Selecciona una talla para editar.
+                      {PRICE.workspace.selectSizeHint}
                     </div>
                   )}
                 </aside>
@@ -577,9 +571,9 @@ export function PricesWorkspacePage() {
         </>
       ) : (
         <div className="flex min-h-48 items-center justify-center text-sm text-[var(--ops-text-muted)]">
-          Redirigiendo al listado de precios...
+          {PRICE.header.redirecting}
         </div>
       )}
-    </TooltipProvider>
+    </>
   )
 }

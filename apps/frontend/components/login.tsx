@@ -208,7 +208,7 @@ export default function LoginRipnel() {
             {submitting ? (
               <>
                 <LoaderCircle className="h-4 w-4 animate-spin" />
-                <span>{LOGIN.form.submitting}</span>
+                <span>{submitPhase === "redirecting" ? LOGIN.form.redirecting : LOGIN.form.submitting}</span>
               </>
             ) : (
               <span>{LOGIN.form.submit}</span>

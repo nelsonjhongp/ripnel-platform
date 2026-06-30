@@ -10,6 +10,7 @@ export const LOGIN = {
     passwordPlaceholder: "Ingresa tu contrasena",
     submit: "Iniciar sesion",
     submitting: "Ingresando...",
+    redirecting: "Redirigiendo...",
     showPassword: "Mostrar contrasena",
     hidePassword: "Ocultar contrasena",
   },

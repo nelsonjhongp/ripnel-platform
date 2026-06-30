@@ -185,7 +185,6 @@ export function LoadingPage({
       title={title}
       description={description}
       variant={variant}
-      primaryAction={{ href: "/inicio", label: "Volver al inicio" }}
     />
   );
 }

@@ -3,7 +3,6 @@
 import { FormEvent, useEffect, useId, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LoaderCircle, Save } from "lucide-react";
-import { AdminInlineMessage } from "@/components/admin/admin-ui";
 import { ApiEnvelope, apiFetch, unwrapApiData } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +10,7 @@ import { OpsSelect } from "@/components/ui/ops-selection";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import type { CatalogItem } from "@/types/products";
 import { PRODUCTS } from "./products-messages";
+import { DUPLICATE_WARNING_TEXT, opsInputCompact } from "./products-constants";
 import {
   buildProductNameDuplicateIndex,
   findDuplicateProductName,
@@ -95,8 +95,8 @@ export function ProductCreatePage() {
         if (!cancelled) {
           setError(
             requestError instanceof Error
-              ? `No se pudo cargar catalogos: ${requestError.message}`
-              : "No se pudo cargar catalogos para crear el producto"
+              ? `${PRODUCTS.create.loadError}: ${requestError.message}`
+              : PRODUCTS.create.loadError
           );
         }
       } finally {
@@ -150,7 +150,7 @@ export function ProductCreatePage() {
       setError(
         requestError instanceof Error
           ? requestError.message
-          : "No se pudo crear el producto"
+          : PRODUCTS.create.saveError
       );
       setSubmitting(false);
     }
@@ -159,18 +159,22 @@ export function ProductCreatePage() {
   return (
     <section className="ops-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
       <div className="mx-auto flex max-w-3xl flex-col gap-4">
-        <PosHeader eyebrow="Productos" title="Nuevo producto" />
+        <PosHeader eyebrow={PRODUCTS.header.eyebrow} title={PRODUCTS.create.title} />
 
-        {error ? <AdminInlineMessage tone="danger">{error}</AdminInlineMessage> : null}
+        {error ? (
+          <div className="rounded-lg border border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] px-4 py-3 text-sm text-[var(--ops-tone-danger-text)]">
+            {error}
+          </div>
+        ) : null}
 
         <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-5 shadow-sm">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1.5 md:col-span-2">
               <label
                 htmlFor={nameId}
-                className="text-sm font-semibold text-[var(--ops-text)]"
+                className={opsInputCompact ? "text-sm font-semibold text-[var(--ops-text)]" : ""}
               >
-                Nombre
+                {PRODUCTS.form.name}
               </label>
               <Input
                 id={nameId}
@@ -178,12 +182,12 @@ export function ProductCreatePage() {
                 onChange={(event) =>
                   setFormState((current) => ({ ...current, name: event.target.value }))
                 }
-                placeholder="Ej. Polo oversize básico"
+                placeholder={PRODUCTS.form.namePlaceholder}
                 className="h-10 rounded-lg"
                 required
               />
               {duplicatedStyle ? (
-                <p className="text-xs font-medium text-[color:color-mix(in_srgb,#b45309_74%,var(--ops-text))]">
+                <p className={`text-xs font-medium ${DUPLICATE_WARNING_TEXT}`}>
                   {PRODUCTS.form.errors.duplicateName}
                 </p>
               ) : null}
@@ -191,7 +195,7 @@ export function ProductCreatePage() {
 
             <div className="space-y-1.5">
               <label className="text-sm font-semibold text-[var(--ops-text)]">
-                Tipo de prenda
+                {PRODUCTS.form.garmentType}
               </label>
               <OpsSelect
                 value={formState.garment_type_id}
@@ -201,7 +205,7 @@ export function ProductCreatePage() {
                     garment_type_id: value,
                   }))
                 }
-                placeholder="Seleccionar"
+                placeholder={PRODUCTS.form.garmentTypePlaceholder}
                 options={garmentTypes.map((item) => ({
                   value: getItemId(item, ["garment_type_id"]),
                   label: String(item.name || item.code || ""),
@@ -214,7 +218,7 @@ export function ProductCreatePage() {
                 htmlFor={descriptionId}
                 className="text-sm font-semibold text-[var(--ops-text)]"
               >
-                Descripción
+                {PRODUCTS.form.description}
               </label>
               <textarea
                 id={descriptionId}
@@ -227,8 +231,8 @@ export function ProductCreatePage() {
                 }
                 rows={1}
                 maxLength={PRODUCT_DESCRIPTION_MAX_LENGTH}
-                placeholder="Opcional"
-                className="min-h-9 w-full resize-y rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2 text-sm outline-none"
+                placeholder={PRODUCTS.form.descriptionPlaceholder}
+                className={opsInputCompact + " min-h-9 resize-y"}
               />
               <div className="flex justify-end">
                 <span className="text-[11px] font-medium tabular-nums text-[var(--ops-text-muted)]">
@@ -243,7 +247,7 @@ export function ProductCreatePage() {
 
           <div className="flex flex-col gap-3 border-t border-[var(--ops-border-soft)] pt-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-[var(--ops-text-muted)]">
-              El producto se crea como borrador y luego se completa con variantes, precios y stock.
+              {PRODUCTS.create.helperText}
             </p>
             <Button
               type="submit"
@@ -260,12 +264,12 @@ export function ProductCreatePage() {
               {submitting ? (
                 <>
                   <LoaderCircle className="h-4 w-4 animate-spin" />
-                  Creando...
+                  {PRODUCTS.create.saving}
                 </>
               ) : (
                 <>
                   <Save className="h-4 w-4" />
-                  Crear producto
+                  {PRODUCTS.create.submit}
                 </>
               )}
             </Button>

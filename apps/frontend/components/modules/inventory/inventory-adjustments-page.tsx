@@ -29,7 +29,6 @@ import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { apiFetchData } from "@/lib/api";
@@ -226,7 +225,7 @@ export function InventoryAdjustmentsPage() {
   }
 
   return (
-    <TooltipProvider delayDuration={120}>
+    <>
       {!canManageAdjustments ? (
         <ForbiddenPage variant="ops" />
       ) : (
@@ -288,7 +287,7 @@ export function InventoryAdjustmentsPage() {
                     setPage(1);
                   }}
                   placeholder={ADJ.filters.searchPlaceholder}
-                  ariaLabel="Buscar ajustes de inventario"
+                  ariaLabel={ADJ.filters.searchAriaLabel}
                 />
 
                 <OpsSelect
@@ -447,6 +446,6 @@ export function InventoryAdjustmentsPage() {
           </OpsSectionDivider>
         </OpsPageShell>
       )}
-    </TooltipProvider>
+    </>
   );
 }

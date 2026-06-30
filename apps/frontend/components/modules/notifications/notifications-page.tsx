@@ -14,20 +14,22 @@ import { OpsMetricInlineGroup, type OpsMetricInlineGroupItem } from "@/component
 import { OpsSectionHeader } from "@/components/ui/ops-section-header"
 import { OpsSegmentedControl } from "@/components/ui/ops-segmented-control"
 import { OpsSelect, type OpsOption } from "@/components/ui/ops-selection"
+import { Button } from "@/components/ui/button"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { formatDateTime } from "@/lib/date-utils"
 import { apiFetch } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { useApiGet } from "@/hooks/use-api-get"
+import { NOTIF } from "./notifications-messages"
 
 import type { TopbarNotificationsResponse, TopbarNotificationItem } from "@/components/notifications/NotificationsProvider"
 
 type ModuleMeta = { label: string; Icon: LucideIcon; tone: "accent" | "warning" | "neutral" }
 
 const MODULE_META: Record<string, ModuleMeta> = {
-  cash: { label: "Caja", Icon: Store, tone: "accent" },
-  transfers: { label: "Transferencias", Icon: Truck, tone: "neutral" },
-  inventory: { label: "Inventario", Icon: Package, tone: "neutral" },
+  cash: { label: NOTIF.modules.cash, Icon: Store, tone: "accent" },
+  transfers: { label: NOTIF.modules.transfers, Icon: Truck, tone: "neutral" },
+  inventory: { label: NOTIF.modules.inventory, Icon: Package, tone: "neutral" },
 }
 
 const SEVERITY_TONES: Record<string, "danger" | "warning" | "neutral"> = {
@@ -37,22 +39,22 @@ const SEVERITY_TONES: Record<string, "danger" | "warning" | "neutral"> = {
 }
 
 const SEVERITY_LABELS: Record<string, string> = {
-  danger: "Crítica",
-  warning: "Atención",
-  default: "Info",
+  danger: NOTIF.severity.danger,
+  warning: NOTIF.severity.warning,
+  default: NOTIF.severity.default,
 }
 
 const TABLE_COLUMNS: OpsDataTableColumn[] = [
-  { key: "alerta", header: "Alerta" },
-  { key: "modulo", header: "Módulo" },
-  { key: "severidad", header: "Severidad" },
-  { key: "fecha", header: "Fecha" },
+  { key: "alerta", header: NOTIF.table.columns.alert },
+  { key: "modulo", header: NOTIF.table.columns.module },
+  { key: "severidad", header: NOTIF.table.columns.severity },
+  { key: "fecha", header: NOTIF.table.columns.date },
 ]
 
 const SEVERITY_SEGMENT_OPTIONS = [
-  { value: "all" as const, label: "Todas" },
-  { value: "danger" as const, label: "Críticas" },
-  { value: "warning" as const, label: "Atención" },
+  { value: "all" as const, label: NOTIF.filters.allSeverity },
+  { value: "danger" as const, label: NOTIF.filters.critical },
+  { value: "warning" as const, label: NOTIF.filters.attention },
 ]
 
 export function NotificationsPage() {
@@ -80,7 +82,7 @@ export function NotificationsPage() {
 
   const moduleFilterOptions: OpsOption[] = useMemo(() => {
     const seen = new Set<string>()
-    const options: OpsOption[] = [{ value: "all", label: "Todos" }]
+    const options: OpsOption[] = [{ value: "all", label: NOTIF.filters.all }]
 
     for (const item of items) {
       if (seen.has(item.module)) continue
@@ -101,7 +103,7 @@ export function NotificationsPage() {
     const metrics: OpsMetricInlineGroupItem[] = [
       {
         key: "total",
-        label: "Total",
+        label: NOTIF.metrics.total,
         value: summary.total,
         icon: <Bell className="h-3.5 w-3.5" />,
         tone: "accent",
@@ -111,7 +113,7 @@ export function NotificationsPage() {
     if (summary.danger_count > 0) {
       metrics.push({
         key: "danger",
-        label: "Críticas",
+        label: NOTIF.metrics.critical,
         value: summary.danger_count,
         icon: <AlertTriangle className="h-3.5 w-3.5" />,
         tone: "warning",
@@ -121,7 +123,7 @@ export function NotificationsPage() {
     if (summary.warning_count > 0) {
       metrics.push({
         key: "warning",
-        label: "Atención",
+        label: NOTIF.metrics.attention,
         value: summary.warning_count,
         icon: <Info className="h-3.5 w-3.5" />,
         tone: "default",
@@ -140,15 +142,16 @@ export function NotificationsPage() {
         eyebrow="Centro de alertas"
         title="Alertas operativas"
         actions={
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="sm"
             onClick={refetch}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--ops-border-strong)] px-3 py-1.5 text-sm font-semibold text-[var(--ops-text-muted)] transition hover:text-[var(--ops-text)] disabled:opacity-50"
+            className="rounded-lg px-3"
           >
             <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-            Actualizar
-          </button>
+            {NOTIF.header.refresh}
+          </Button>
         }
       />
 
@@ -160,7 +163,7 @@ export function NotificationsPage() {
         <OpsSectionDivider>
           <OpsSectionHeader
             icon={<SlidersHorizontal className="h-4 w-4" />}
-            title="Filtros"
+            title={NOTIF.filters.title}
           />
           <div className="mt-3">
             <OpsTableBlock>
@@ -174,7 +177,7 @@ export function NotificationsPage() {
                   variant="switch"
                 />
                 <OpsSelect
-                  label="Módulo"
+                  label={NOTIF.filters.module}
                   value={filterModule}
                   options={moduleFilterOptions}
                   onChange={setFilterModule}
@@ -191,7 +194,7 @@ export function NotificationsPage() {
           loading={loading}
           error={error}
           isEmpty={showEmpty}
-          emptyMessage="No hay alertas operativas pendientes para tu sede activa en este momento."
+          emptyMessage={NOTIF.table.empty}
         >
           {filtered.map((item) => {
             const meta = MODULE_META[item.module]

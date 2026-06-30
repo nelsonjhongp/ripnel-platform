@@ -31,12 +31,22 @@ import { Pagination } from "@/components/ui/pagination";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ProductCreateDialog } from "./product-create-dialog";
 import { PRODUCTS } from "./products-messages";
+import {
+  STATUS_DOT_INACTIVE,
+  STATUS_DOT_DRAFT,
+  STATUS_DOT_PENDING_VARIANTS,
+  STATUS_DOT_PENDING_PRICES,
+  STATUS_DOT_READY_NO_STOCK,
+  STATUS_DOT_READY,
+  WARNING_CHIP_WHOLESALE,
+  WARNING_CHIP_STOCK_NO_RETAIL,
+  SURFACE_MUTED_BG,
+} from "./products-constants";
 import type { ProductStatus } from "@/types/products";
 
 type ProductSizeStock = {
@@ -96,34 +106,28 @@ type ProductsResponse = {
 
 const STATUS_META: Record<ProductStatus, { label: string; className: string }> = {
   inactive: {
-    label: "Inactivo",
-    className:
-      "border-[color:color-mix(in_srgb,#94a3b8_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#94a3b8_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#475569_74%,var(--ops-text))]",
+    label: PRODUCTS.statusLabels.inactive,
+    className: STATUS_DOT_INACTIVE,
   },
   draft: {
-    label: "Borrador",
-    className:
-      "border-[color:color-mix(in_srgb,#334155_60%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#1e293b_90%,var(--ops-surface))] text-[color:color-mix(in_srgb,#f1f5f9_94%,var(--ops-text))]",
+    label: PRODUCTS.statusLabels.draft,
+    className: STATUS_DOT_DRAFT,
   },
   pending_variants: {
-    label: "Faltan variantes",
-    className:
-      "border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#d97706_74%,var(--ops-text))]",
+    label: PRODUCTS.statusLabels.pendingVariants,
+    className: STATUS_DOT_PENDING_VARIANTS,
   },
   pending_prices: {
-    label: "Faltan precios",
-    className:
-      "border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#e11d48_74%,var(--ops-text))]",
+    label: PRODUCTS.statusLabels.pendingPrices,
+    className: STATUS_DOT_PENDING_PRICES,
   },
   ready_no_stock: {
-    label: "Sin stock",
-    className:
-      "border-[color:color-mix(in_srgb,#3b82f6_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#3b82f6_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#2563eb_74%,var(--ops-text))]",
+    label: PRODUCTS.statusLabels.readyNoStock,
+    className: STATUS_DOT_READY_NO_STOCK,
   },
   ready: {
-    label: "Listo",
-    className:
-      "border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] text-[color:color-mix(in_srgb,#059669_74%,var(--ops-text))]",
+    label: PRODUCTS.statusLabels.ready,
+    className: STATUS_DOT_READY,
   },
 };
 
@@ -215,7 +219,7 @@ export function ProductsOverviewPage({
       setError(
         requestError instanceof Error
           ? requestError.message
-          : "No se pudo cargar el resumen de productos"
+          : PRODUCTS.table.errorTitle
       );
     } finally {
       setLoading(false);
@@ -245,283 +249,276 @@ export function ProductsOverviewPage({
   const hasActiveFilters = deferredSearch !== "" || filterMode !== "all";
 
   return (
-    <TooltipProvider delayDuration={120}>
-      <OpsPageShell width="wide">
-          <PosHeader
-            eyebrow="Productos"
-            title="Maestro de producto"
-            actions={
-              <>
+    <OpsPageShell width="wide">
+      <PosHeader
+        eyebrow={PRODUCTS.header.eyebrow}
+        title={PRODUCTS.header.overviewTitle}
+        actions={
+          <>
+            <Button
+              type="button"
+              variant="accent"
+              size="sm"
+              className="rounded-lg px-3"
+              onClick={() => setCreateOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              {PRODUCTS.actions.newProduct}
+            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <Button
                   type="button"
-                  variant="accent"
-                  size="sm"
-                  className="rounded-lg px-3"
-                  onClick={() => setCreateOpen(true)}
+                  variant="outline"
+                  size="icon-sm"
+                  className="rounded-lg"
+                  onClick={loadProducts}
+                  disabled={loading || !effectiveLocationId}
+                  aria-label={PRODUCTS.actions.refresh}
                 >
-                  <Plus className="h-4 w-4" />
-                  {PRODUCTS.actions.newProduct}
+                  <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
                 </Button>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon-sm"
-                      className="rounded-lg"
-                      onClick={loadProducts}
-                      disabled={loading || !effectiveLocationId}
-                      aria-label="Actualizar"
-                    >
-                      <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" sideOffset={8}>Actualizar</TooltipContent>
-                </Tooltip>
-              </>
-            }
+              </TooltipTrigger>
+              <TooltipContent side="bottom" sideOffset={8}>{PRODUCTS.actions.refresh}</TooltipContent>
+            </Tooltip>
+          </>
+        }
+      />
+
+      <OpsMetricInlineGroup items={[
+        { label: PRODUCTS.metrics.totalStyles, value: totalItems },
+        { label: PRODUCTS.metrics.ready, value: readyCount, tone: "success" },
+        { label: PRODUCTS.metrics.pending, value: pendingCount, tone: "warning" },
+      ]} />
+
+      <OpsSectionDivider className="space-y-4">
+        <OpsFiltersRow>
+          <OpsSearchField
+            value={search}
+            onChange={(value) => {
+              setSearch(value);
+              setPage(1);
+            }}
+            placeholder={PRODUCTS.filters.searchPlaceholder}
+            ariaLabel={PRODUCTS.filters.searchAriaLabel}
           />
 
-          <OpsMetricInlineGroup items={[
-            { label: "Total estilos", value: totalItems },
-            { label: "Listos", value: readyCount, tone: "success" },
-            { label: "Pendientes", value: pendingCount, tone: "warning" },
-          ]} />
+          <OpsSelect
+            label="Filtro"
+            value={filterMode}
+            options={[
+              { value: "all", label: PRODUCTS.filters.all },
+              { value: "attention", label: PRODUCTS.filters.pendingCompletion },
+              { value: "ready", label: PRODUCTS.metrics.ready },
+              { value: "inactive", label: PRODUCTS.filters.inactive },
+            ]}
+            onChange={(v) => {
+              setFilterMode(v as FilterMode);
+              setPage(1);
+            }}
+          />
 
-          <OpsSectionDivider className="space-y-4">
-            <OpsFiltersRow>
-              <OpsSearchField
-                value={search}
-                onChange={(value) => {
-                  setSearch(value);
+          <OpsSelect
+            label="Sede activa"
+            value={effectiveLocationId}
+            options={locationAssignments.map((assignment) => ({
+              value: assignment.location_id,
+              label: `${assignment.location.name}${assignment.is_default ? PRODUCTS.filters.defaultSuffix : ""}`,
+            }))}
+            onChange={(v) => {
+              setSelectedLocationId(v);
+              setPage(1);
+            }}
+          />
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setFilterMode("all");
                   setPage(1);
                 }}
-                placeholder="Buscar por nombre, SKU o tipo de prenda"
-                ariaLabel="Buscar productos"
-              />
-
-              <OpsSelect
-                label="Filtro"
-                value={filterMode}
-                options={[
-                  { value: "all", label: "Todos" },
-                  { value: "attention", label: "Por completar" },
-                  { value: "ready", label: "Listos" },
-                  { value: "inactive", label: "Inactivos" },
-                ]}
-                onChange={(v) => {
-                  setFilterMode(v as FilterMode);
-                  setPage(1);
-                }}
-              />
-
-              <OpsSelect
-                label="Sede activa"
-                value={effectiveLocationId}
-                options={locationAssignments.map((assignment) => ({
-                  value: assignment.location_id,
-                  label: `${assignment.location.name}${assignment.is_default ? " · Predeterminada" : ""}`,
-                }))}
-                onChange={(v) => {
-                  setSelectedLocationId(v);
-                  setPage(1);
-                }}
-              />
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      setSearch("");
-                      setFilterMode("all");
-                      setPage(1);
-                    }}
-                    disabled={!hasActiveFilters}
-                    variant="outline"
-                    size="icon-sm"
-                    className="h-10 w-10 rounded-lg"
-                    aria-label="Limpiar filtros"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top" sideOffset={8}>
-                  Limpiar filtros
-                </TooltipContent>
-              </Tooltip>
-            </OpsFiltersRow>
-
-            {!effectiveLocationId && !locationAssignments.length ? (
-              <div className="mt-4 rounded-lg p-8 text-center">
-                <h3 className="text-lg font-semibold text-[var(--ops-text)]">No hay sede operativa</h3>
-                <p className="mt-2 text-sm leading-6 text-[var(--ops-text-muted)]">
-                  Asigna al menos una sede al usuario para ver stock por talla.
-                </p>
-              </div>
-            ) : (
-              <OpsDataTable
-                columns={[
-                  { key: "producto", header: "Producto" },
-                  { key: "sku", header: "Codigo" },
-                  { key: "tipo", header: "Cobertura" },
-                  { key: "tallas", header: "Tallas" },
-                  { key: "stock", header: "Stock" },
-                  { key: "estado", header: "Estado" },
-                  { key: "acciones", header: "", className: "text-right" },
-                ]}
-                minWidth="1080px"
-                loading={loading}
-                loadingMessage="Cargando productos..."
-                error={!loading ? error : null}
-                errorTitle="No pudimos cargar productos"
-                isEmpty={!loading && !error && products.length === 0}
-                emptyMessage={
-                  totalItems
-                    ? "No hay styles para este filtro. Prueba otra busqueda, sede o filtro."
-                    : "La sede activa no tiene productos para los criterios seleccionados."
-                }
-                footer={
-                  !loading && totalItems > 0 ? (
-                    <>
-                      <span className="text-[var(--ops-text-muted)]">
-                        {firstVisible}-{visibleTo} de {totalItems}
-                      </span>
-                      <Pagination
-                        page={safePage}
-                        totalPages={totalPages}
-                        onPageChange={setPage}
-                        className="self-end md:self-auto"
-                      />
-                    </>
-                  ) : undefined
-                }
+                disabled={!hasActiveFilters}
+                variant="outline"
+                size="icon-sm"
+                className="h-10 w-10 rounded-lg"
+                aria-label={PRODUCTS.actions.clearFilters}
               >
-                {products.map((product) => {
-                  const statusMeta = STATUS_META[product.status];
-                  const visibleSizeStock = getVisibleSizeStock(product.size_stock || []);
-                  const extraSizes = (product.size_stock || []).slice(visibleSizeStock.length);
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top" sideOffset={8}>
+              {PRODUCTS.actions.clearFilters}
+            </TooltipContent>
+          </Tooltip>
+        </OpsFiltersRow>
 
-                  return (
-                    <tr
-                      key={product.style_id}
-                      className="transition hover:bg-[var(--ops-surface-muted)]"
-                    >
-                      <td className="px-4 py-[var(--ops-row-py)]">
-                        <p className="text-sm font-semibold text-[var(--ops-text)]">{product.name}</p>
-                        <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">{product.garment_type_name}</p>
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)]">
-                        <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">{product.style_code || "—"}</span>
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)]">
-                        <div className="space-y-1 text-[11px] text-[var(--ops-text-muted)]">
-                          <p>Retail: {product.retail_sizes_covered_count}/{product.configured_size_count}</p>
-                          <p>Mayorista: {product.wholesale_sizes_covered_count}/{product.configured_size_count}</p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)]">
-                        <div className="flex flex-wrap gap-1">
-                          {visibleSizeStock.length ? (
-                            <>
-                              {visibleSizeStock.map((size) => (
-                                <span
-                                  key={`${product.style_id}-${size.size_id}`}
-                                  className="inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text)]"
-                                >
-                                  {size.size_code}: {size.qty}
+        {!effectiveLocationId && !locationAssignments.length ? (
+          <div className="mt-4 rounded-lg p-8 text-center">
+            <h3 className="text-lg font-semibold text-[var(--ops-text)]">{PRODUCTS.table.noLocationTitle}</h3>
+            <p className="mt-2 text-sm leading-6 text-[var(--ops-text-muted)]">
+              {PRODUCTS.table.noLocationDesc}
+            </p>
+          </div>
+        ) : (
+          <OpsDataTable
+            columns={[
+              { key: "producto", header: PRODUCTS.table.columns.product },
+              { key: "sku", header: PRODUCTS.table.columns.code },
+              { key: "tipo", header: PRODUCTS.table.columns.coverage },
+              { key: "tallas", header: PRODUCTS.table.columns.sizes },
+              { key: "stock", header: PRODUCTS.table.columns.stock },
+              { key: "estado", header: PRODUCTS.table.columns.status },
+              { key: "acciones", header: "", className: "text-right" },
+            ]}
+            minWidth="1080px"
+            loading={loading}
+            loadingMessage={PRODUCTS.table.loading}
+            error={!loading ? error : null}
+            errorTitle={PRODUCTS.table.errorTitle}
+            isEmpty={!loading && !error && products.length === 0}
+            emptyMessage={PRODUCTS.table.empty}
+            footer={
+              !loading && totalItems > 0 ? (
+                <>
+                  <span className="text-[var(--ops-text-muted)]">
+                    {firstVisible}-{visibleTo} de {totalItems}
+                  </span>
+                  <Pagination
+                    page={safePage}
+                    totalPages={totalPages}
+                    onPageChange={setPage}
+                    className="self-end md:self-auto"
+                  />
+                </>
+              ) : undefined
+            }
+          >
+            {products.map((product) => {
+              const statusMeta = STATUS_META[product.status];
+              const visibleSizeStock = getVisibleSizeStock(product.size_stock || []);
+              const extraSizes = (product.size_stock || []).slice(visibleSizeStock.length);
+
+              return (
+                <tr
+                  key={product.style_id}
+                  className="transition hover:bg-[var(--ops-surface-muted)]"
+                >
+                  <td className="px-4 py-[var(--ops-row-py)]">
+                    <p className="text-sm font-semibold text-[var(--ops-text)]">{product.name}</p>
+                    <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">{product.garment_type_name}</p>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)]">
+                    <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">{product.style_code || PRODUCTS.table.fallbackDash}</span>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)]">
+                    <div className="space-y-1 text-[11px] text-[var(--ops-text-muted)]">
+                      <p>{PRODUCTS.table.coverageLabels.retail} {product.retail_sizes_covered_count}/{product.configured_size_count}</p>
+                      <p>{PRODUCTS.table.coverageLabels.wholesale} {product.wholesale_sizes_covered_count}/{product.configured_size_count}</p>
+                    </div>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)]">
+                    <div className="flex flex-wrap gap-1">
+                      {visibleSizeStock.length ? (
+                        <>
+                          {visibleSizeStock.map((size) => (
+                            <span
+                              key={`${product.style_id}-${size.size_id}`}
+                              className={`inline-flex rounded-full border border-[var(--ops-border-strong)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text)] ${SURFACE_MUTED_BG}`}
+                            >
+                              {size.size_code}: {size.qty}
+                            </span>
+                          ))}
+                          {extraSizes.length > 0 ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className={`inline-flex cursor-help rounded-full border border-[var(--ops-border-strong)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)] ${SURFACE_MUTED_BG}`}>
+                                  +{extraSizes.length}
                                 </span>
-                              ))}
-                              {extraSizes.length > 0 ? (
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className="inline-flex cursor-help rounded-full border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]">
-                                        +{extraSizes.length}
-                                      </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent
-                                      side="top"
-                                      sideOffset={8}
-                                      className="max-w-64 text-left"
-                                    >
-                                      {formatExtraSizes(extraSizes)}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              ) : null}
-                            </>
-                          ) : (
-                            <span className="text-sm text-[var(--ops-text-muted)]">Sin tallas</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)]">
-                        <p className="text-sm font-semibold">{product.total_stock_qty}</p>
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)]">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span
-                            className={cn(
-                              "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold",
-                              statusMeta.className
-                            )}
-                          >
-                            {statusMeta.label}
-                          </span>
-                          {product.missing_wholesale_size_count > 0 ? (
-                            <span className="inline-flex rounded-full border border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[color:color-mix(in_srgb,#d97706_74%,var(--ops-text))]">
-                              May.
-                            </span>
+                              </TooltipTrigger>
+                              <TooltipContent
+                                side="top"
+                                sideOffset={8}
+                                className="max-w-64 text-left"
+                              >
+                                {formatExtraSizes(extraSizes)}
+                              </TooltipContent>
+                            </Tooltip>
                           ) : null}
-                          {product.warnings.stock_without_retail_price ? (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[color:color-mix(in_srgb,#e11d48_74%,var(--ops-text))]">
-                              <CircleAlert className="h-3 w-3" />
-                              Stock sin retail
-                            </span>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td className="px-4 py-[var(--ops-row-py)]">
-                        <AdminRowActionsMenu
-                          ariaLabel={`Acciones para ${product.name}`}
-                          items={[
-                            {
-                              label: "Editar style",
-                              icon: <PencilLine className="h-4 w-4" />,
-                              onSelect: () =>
-                                router.push(buildStyleHref("/productos/estilos", product.style_id)),
-                            },
-                            {
-                              label: "Variantes",
-                              icon: <Shapes className="h-4 w-4" />,
-                              onSelect: () =>
-                                router.push(buildStyleHref("/productos/variantes", product.style_id)),
-                            },
-                            {
-                              label: "Precios",
-                              icon: <ReceiptText className="h-4 w-4" />,
-                              onSelect: () =>
-                                router.push(
-                                  buildStyleHref("/precios/crear", product.style_id)
-                                ),
-                            },
-                            {
-                              label: "Historial",
-                              icon: <Eye className="h-4 w-4" />,
-                              onSelect: () =>
-                                router.push(
-                                  buildStyleHref("/precios", product.style_id)
-                                ),
-                            },
-                          ]}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </OpsDataTable>
-            )}
+                        </>
+                      ) : (
+                        <span className="text-sm text-[var(--ops-text-muted)]">{PRODUCTS.table.noSizes}</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)]">
+                    <p className="text-sm font-semibold">{product.total_stock_qty}</p>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)]">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span
+                        className={cn(
+                          "inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold",
+                          statusMeta.className
+                        )}
+                      >
+                        {statusMeta.label}
+                      </span>
+                      {product.missing_wholesale_size_count > 0 ? (
+                        <span className={WARNING_CHIP_WHOLESALE}>
+                          {PRODUCTS.warnings.wholesaleShort}
+                        </span>
+                      ) : null}
+                      {product.warnings.stock_without_retail_price ? (
+                        <span className={WARNING_CHIP_STOCK_NO_RETAIL}>
+                          <CircleAlert className="h-3 w-3" />
+                          {PRODUCTS.warnings.stockWithoutRetail}
+                        </span>
+                      ) : null}
+                    </div>
+                  </td>
+                  <td className="px-4 py-[var(--ops-row-py)]">
+                    <AdminRowActionsMenu
+                      ariaLabel={`Acciones para ${product.name}`}
+                      items={[
+                        {
+                          label: PRODUCTS.actions.editStyle,
+                          icon: <PencilLine className="h-4 w-4" />,
+                          onSelect: () =>
+                            router.push(buildStyleHref("/productos/estilos", product.style_id)),
+                        },
+                        {
+                          label: PRODUCTS.actions.variants,
+                          icon: <Shapes className="h-4 w-4" />,
+                          onSelect: () =>
+                            router.push(buildStyleHref("/productos/variantes", product.style_id)),
+                        },
+                        {
+                          label: PRODUCTS.actions.prices,
+                          icon: <ReceiptText className="h-4 w-4" />,
+                          onSelect: () =>
+                            router.push(
+                              buildStyleHref("/precios/crear", product.style_id)
+                            ),
+                        },
+                        {
+                          label: PRODUCTS.actions.history,
+                          icon: <Eye className="h-4 w-4" />,
+                          onSelect: () =>
+                            router.push(
+                              buildStyleHref("/precios", product.style_id)
+                            ),
+                        },
+                      ]}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+          </OpsDataTable>
+        )}
       </OpsSectionDivider>
       <ProductCreateDialog
         open={createOpen}
@@ -531,7 +528,6 @@ export function ProductsOverviewPage({
           router.push(buildStyleHref("/productos/variantes", style.style_id));
         }}
       />
-      </OpsPageShell>
-    </TooltipProvider>
+    </OpsPageShell>
   );
 }

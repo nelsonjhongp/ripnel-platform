@@ -29,7 +29,6 @@ import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -42,6 +41,7 @@ import {
   type TransferSummary,
 } from "./transfers-shared";
 import { formatDateTime } from "@/lib/date-utils";
+import { TRANS } from "./transfers-messages";
 
 type TransferHistoryStatus = "closed" | "received" | "cancelled";
 
@@ -57,13 +57,13 @@ const HISTORY_STATUS_OPTIONS: ReadonlyArray<{
   },
   {
     value: "received",
-    label: "Recibidas",
-    helper: "Solo documentos cuyo flujo terminó en recepción.",
+    label: TRANS.filters.historyStatusReceived,
+    helper: TRANS.history.statusReceivedHelper,
   },
   {
     value: "cancelled",
-    label: "Canceladas",
-    helper: "Solo documentos anulados antes de cerrar el movimiento.",
+    label: TRANS.filters.historyStatusCancelled,
+    helper: TRANS.history.statusCancelledHelper,
   },
 ];
 
@@ -149,8 +149,8 @@ export function TransfersHistoryPage() {
     return (
       <LoadingPage
         variant="ops"
-        title="Preparando historial"
-        description="Consultando transferencias cerradas para la sede activa y la red asignada."
+        title={TRANS.history.preparing}
+        description={TRANS.history.loading}
       />
     );
   }
@@ -162,51 +162,49 @@ export function TransfersHistoryPage() {
   return (
     <OpsPageShell width="wide" className="max-w-[1320px]">
       <PosHeader
-        eyebrow="Transferencias"
-        title="Historial de transferencias"
+        eyebrow={TRANS.header.eyebrow}
+        title={TRANS.header.historyTitle}
         actions={
           <>
             <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
-              <Link href={appRoutes.transfers}>Volver a bandeja</Link>
+              <Link href={appRoutes.transfers}>{TRANS.history.backToInbox}</Link>
             </Button>
             {transferCapabilities.requestCreate ? (
               <Button asChild variant="accent" size="sm" className="rounded-lg px-3">
                 <Link href={appRoutes.transferRequest}>
                   <Plus className="h-4 w-4" />
-                  Solicitar transferencia
+                  {TRANS.header.requestTitle}
                 </Link>
               </Button>
             ) : null}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    onClick={() => { setDebouncedQuery(query); refetch(); }}
-                    disabled={loading}
-                    className="rounded-lg"
-                    aria-label="Actualizar historial"
-                  >
-                    {loading ? (
-                      <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-3.5 w-3.5" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Actualizar historial</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={() => { setDebouncedQuery(query); refetch(); }}
+                  disabled={loading}
+                  className="rounded-lg"
+                  aria-label={TRANS.header.refresh}
+                >
+                  {loading ? (
+                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{TRANS.header.refresh}</TooltipContent>
+            </Tooltip>
           </>
         }
       />
 
       <OpsMetricInlineGroup
         items={[
-          { label: "Recibidas", value: receivedCount, tone: "accent" },
-          { label: "Canceladas", value: cancelledCount, tone: "default" },
-          { label: "Consulta actual", value: items.length, tone: "warning" },
+          { label: TRANS.metrics.received, value: receivedCount, tone: "accent" },
+          { label: TRANS.filters.historyStatusCancelled, value: cancelledCount, tone: "default" },
+          { label: TRANS.filters.historyDefaultOption, value: items.length, tone: "warning" },
         ]}
       />
 
@@ -219,12 +217,12 @@ export function TransfersHistoryPage() {
                 setQuery(value);
                 setCurrentPage(1);
               }}
-              placeholder="Buscar por número, origen o destino"
+              placeholder={TRANS.filters.searchPlaceholder}
               ariaLabel="Buscar transferencias cerradas"
             />
 
             <OpsSelect
-              label="Estado"
+              label={TRANS.filters.statusLabel}
               value={status}
               options={HISTORY_STATUS_OPTIONS}
               onChange={(value) => {
@@ -235,7 +233,7 @@ export function TransfersHistoryPage() {
 
             {transferCapabilities.manage ? (
               <OpsSelect
-                label="Alcance"
+                label={TRANS.filters.scopeLabel}
                 value={scope}
                 options={TRANSFER_SCOPE_OPTIONS}
                 onChange={(value) => {
@@ -246,13 +244,13 @@ export function TransfersHistoryPage() {
             ) : (
               <div className="flex items-end">
                 <div className="sales-field flex h-10 w-full items-center rounded-lg px-3 text-sm text-[var(--ops-text-muted)]">
-                  Sede activa
+                  {TRANS.filters.locationLabel}
                 </div>
               </div>
             )}
 
             <DateFilterPicker
-              label="Fecha desde"
+              label={TRANS.filters.dateFromLabel}
               value={dateFrom}
               onChange={(value) => {
                 setDateFrom(value);
@@ -263,7 +261,7 @@ export function TransfersHistoryPage() {
             />
 
             <DateFilterPicker
-              label="Fecha hasta"
+              label={TRANS.filters.dateToLabel}
               value={dateTo}
               onChange={(value) => {
                 setDateTo(value);
@@ -273,43 +271,41 @@ export function TransfersHistoryPage() {
               min={dateFrom || undefined}
             />
 
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    onClick={clearFilters}
-                    disabled={!hasActiveFilters}
-                    className="rounded-lg"
-                    aria-label="Limpiar filtros"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Limpiar filtros</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  onClick={clearFilters}
+                  disabled={!hasActiveFilters}
+                  className="rounded-lg"
+                  aria-label={TRANS.header.clearFilters}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{TRANS.header.clearFilters}</TooltipContent>
+            </Tooltip>
           </OpsFiltersRow>
 
           <OpsTableWrap minWidth="1120px">
             <table className="w-full border-collapse">
               <thead className="bg-[var(--ops-surface-muted)]">
                 <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                  <th className="px-4 py-3">Documento</th>
+                  <th className="px-4 py-3">{TRANS.table.columns.number}</th>
                   <th className="px-4 py-3">Ruta</th>
-                  <th className="px-4 py-3">Estado</th>
+                  <th className="px-4 py-3">{TRANS.table.columns.status}</th>
                   <th className="px-4 py-3">Cierre</th>
-                  <th className="px-4 py-3 text-right">Unidades</th>
-                  <th className="px-4 py-3">Última actividad</th>
-                  <th className="px-4 py-3 text-right">Acciones</th>
+                  <th className="px-4 py-3 text-right">{TRANS.table.columns.units}</th>
+                  <th className="px-4 py-3">{TRANS.table.columns.lastUpdate}</th>
+                  <th className="px-4 py-3 text-right">{TRANS.table.columns.actions}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
                 {loading ? (
                   <tr>
                     <td colSpan={7} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                      Cargando historial...
+                      {TRANS.table.loading}
                     </td>
                   </tr>
                 ) : error ? (
@@ -326,7 +322,7 @@ export function TransfersHistoryPage() {
                 ) : paginatedItems.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                      No encontramos transferencias cerradas con ese criterio.
+                      {TRANS.table.emptyHistory}
                     </td>
                   </tr>
                 ) : (
@@ -350,7 +346,7 @@ export function TransfersHistoryPage() {
                               href={`/transferencias/${transfer.transfer_id}`}
                               className="inline-flex rounded-md text-sm font-semibold text-[var(--ops-text)] transition hover:text-[var(--ripnel-accent-hover)]"
                             >
-                              {transfer.transfer_number || "Sin número"}
+                              {transfer.transfer_number || TRANS.table.noNumber}
                             </Link>
                             <p className="text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
                               {formatTransferScopeRole(transfer.scope_role)}
@@ -387,7 +383,7 @@ export function TransfersHistoryPage() {
                               : transfer.qty_requested_total}
                           </p>
                           <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                            {transfer.status === "received" ? "Recibidas" : "Solicitadas"}
+                            {transfer.status === "received" ? TRANS.metrics.received : TRANS.metrics.requested}
                           </p>
                         </td>
                         <td className="px-4 py-[var(--ops-row-py)] align-top">
@@ -397,7 +393,7 @@ export function TransfersHistoryPage() {
                         </td>
                         <td className="px-4 py-[var(--ops-row-py)] align-top text-right">
                           <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
-                            <Link href={`/transferencias/${transfer.transfer_id}`}>Ver detalle</Link>
+                            <Link href={`/transferencias/${transfer.transfer_id}`}>{TRANS.header.viewDetail}</Link>
                           </Button>
                         </td>
                       </tr>
@@ -410,7 +406,7 @@ export function TransfersHistoryPage() {
 
           <OpsTableFooter>
             <span className="text-sm text-[var(--ops-text-muted)]">
-              {items.length === 0 ? "0 resultados" : `${firstVisible}-${lastVisible} de ${items.length}`}
+              {items.length === 0 ? TRANS.table.zeroResults : `${firstVisible}-${lastVisible} de ${items.length}`}
             </span>
             <Pagination
               page={safePage}

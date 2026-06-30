@@ -138,7 +138,7 @@ function ProductColorMultiSelect({
   const uniqueColorToggle = (
     <label
       className={cn(
-        "flex h-9 shrink-0 select-none items-center gap-2 rounded-lg border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-3 text-[0.8125rem] font-medium text-[var(--ops-text-muted)] transition",
+        "flex h-9 shrink-0 select-none items-center gap-2 rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] px-3 text-[0.8125rem] font-medium text-[var(--ops-text-muted)] transition",
         uniqueColorDisabled
           ? "cursor-not-allowed opacity-60"
           : "cursor-pointer hover:bg-[var(--ops-surface)] hover:text-[var(--ops-text)]",

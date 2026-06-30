@@ -11,9 +11,10 @@ import {
   RotateCcw,
   Download,
 } from "lucide-react";
-import { AdminConfirmModal, AdminInlineMessage, AdminModalShell, AdminRowActionsMenu } from "@/components/admin/admin-ui";
+import { AdminConfirmModal, AdminRowActionsMenu } from "@/components/admin/admin-ui";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { Button } from "@/components/ui/button";
+import { OpsDialog } from "@/components/ui/ops-dialog";
 import { OpsSelect } from "@/components/ui/ops-selection";
 import {
   OpsFiltersRow,
@@ -28,7 +29,6 @@ import { Pagination } from "@/components/ui/pagination";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { usePagination } from "@/hooks/use-pagination";
@@ -41,6 +41,8 @@ import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
 import { activeBadgeLabel } from "@/lib/badge-utils";
 import { showSuccess, showError } from "@/lib/toast";
 import { exportToCsv } from "@/lib/export-csv";
+import { CUSTOMER_TYPE_PILL } from "./catalogs-constants";
+import { CAT } from "./catalogs-messages";
 import { CatalogItemForm, buildInitialState } from "./catalog-item-form";
 
 type CatalogCrudPageProps = {
@@ -58,7 +60,7 @@ type CatalogCrudPageProps = {
 };
 
 function formatValue(value: unknown) {
-  if (typeof value === "boolean") return value ? "Si" : "No";
+  if (typeof value === "boolean") return value ? CAT.crud.yes : CAT.crud.no;
   if (value === null || value === undefined || value === "") return "-";
   return String(value);
 }
@@ -68,8 +70,8 @@ function getItemId(item: CatalogRecord, idKey: string) {
 }
 
 function buildDisplayName(item: CatalogRecord | null) {
-  if (!item) return "registro";
-  return String(item.name || item.code || "registro");
+  if (!item) return CAT.crud.fallbackName;
+  return String(item.name || item.code || CAT.crud.fallbackName);
 }
 
 function toInitialValues(item: CatalogRecord, fields: CatalogFieldConfig[]) {
@@ -96,7 +98,6 @@ export function CatalogCrudPage({
   entityLabel,
   duplicateStrategy,
 }: CatalogCrudPageProps) {
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [pendingToggleItem, setPendingToggleItem] = useState<CatalogRecord | null>(null);
@@ -104,7 +105,6 @@ export function CatalogCrudPage({
   const [editingItem, setEditingItem] = useState<CatalogRecord | null>(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
-  const [mutationError, setMutationError] = useState<string | null>(null);
 
   const { data, loading, error, refetch } = useApiGet(
     () => fetchCatalogItems(endpoint),
@@ -138,25 +138,15 @@ export function CatalogCrudPage({
     if (!pendingToggleItem) return;
 
     setToggling(true);
-    setMutationError(null);
-    setSuccessMessage(null);
 
     try {
       const result = await updateCatalogItem(endpoint, getItemId(pendingToggleItem, idKey), {
         active: !pendingToggleItem.active,
       });
-      setSuccessMessage(
-        result.active ? "Registro activado correctamente." : "Registro inactivado correctamente."
-      );
-      showSuccess(result.active ? "Registro activado" : "Registro inactivado")
+      showSuccess(result.active ? CAT.toast.activated : CAT.toast.deactivated);
       void refetch();
     } catch (requestError) {
-      setMutationError(
-        requestError instanceof Error
-          ? requestError.message
-          : "No se pudo actualizar el estado"
-      );
-      showError("Error", requestError instanceof Error ? requestError.message : "No se pudo actualizar el estado")
+      showError(CAT.toast.errorTitle, requestError instanceof Error ? requestError.message : CAT.toast.errorState);
     } finally {
       setToggling(false);
       setPendingToggleItem(null);
@@ -180,18 +170,14 @@ export function CatalogCrudPage({
     setEditError(null);
 
     try {
-      const result = await updateCatalogItem(endpoint, getItemId(editingItem, idKey), body);
-      setSuccessMessage("Registro actualizado correctamente.");
-      showSuccess("Actualizado", "Registro actualizado correctamente.")
+      await updateCatalogItem(endpoint, getItemId(editingItem, idKey), body);
+      showSuccess(CAT.toast.updated);
       setEditingItem(null);
       void refetch();
     } catch (requestError) {
-      setEditError(
-        requestError instanceof Error
-          ? requestError.message
-          : "No se pudo actualizar el registro"
-      );
-      showError("Error al guardar", requestError instanceof Error ? requestError.message : "No se pudo actualizar el registro")
+      const message = requestError instanceof Error ? requestError.message : CAT.toast.errorSave;
+      setEditError(message);
+      showError(CAT.toast.saveErrorTitle, message);
     } finally {
       setEditSubmitting(false);
     }
@@ -202,296 +188,292 @@ export function CatalogCrudPage({
     .map((field) => field.key);
 
   function handleExport() {
-    const csvHeaders = ["Código", "Nombre", ...listFields.map((f) => f.label), "Activo"]
+    const csvHeaders = [CAT.crud.csvCode, CAT.crud.csvName, ...listFields.map((f) => f.label), CAT.crud.csvActive];
     const csvRows = items.map((item) => [
       (item as Record<string, unknown>).code ? String((item as Record<string, unknown>).code) : "-",
       String((item as Record<string, unknown>).name || "-"),
       ...listFields.map((f) => formatValue((item as Record<string, unknown>)[f.key])),
-      item.active ? "Sí" : "No",
-    ])
-    exportToCsv(entityLabel.toLowerCase(), csvHeaders, csvRows)
+      item.active ? CAT.crud.yes : CAT.crud.no,
+    ]);
+    exportToCsv(entityLabel.toLowerCase(), csvHeaders, csvRows);
   }
 
   return (
-    <TooltipProvider delayDuration={120}>
-      <OpsPageShell width="wide">
-        <PosHeader
-          eyebrow={eyebrow}
-          title={title}
-          actions={
-            <>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon-sm"
-                    className="rounded-lg"
-                    onClick={handleExport}
-                    disabled={items.length === 0}
-                    aria-label="Exportar CSV"
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top" sideOffset={8}>
-                  Exportar CSV
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon-sm"
-                     className="rounded-lg"
-                     onClick={() => refetch()}
-                     disabled={loading}
-                    aria-label="Actualizar"
-                  >
-                    <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top" sideOffset={8}>
-                  Actualizar
-                </TooltipContent>
-              </Tooltip>
-              <Button asChild variant="accent" size="sm" className="rounded-lg">
-                <Link href={`${catalogRoute}/nuevo`}>
-                  <Plus className="h-4 w-4" />
-                  Nuevo registro
-                </Link>
-              </Button>
-            </>
-          }
-        />
+    <OpsPageShell width="wide">
+      <PosHeader
+        eyebrow={eyebrow}
+        title={title}
+        actions={
+          <>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  className="rounded-lg"
+                  onClick={handleExport}
+                  disabled={items.length === 0}
+                  aria-label={CAT.crud.exportCsv}
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={8}>
+                {CAT.crud.exportCsv}
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  className="rounded-lg"
+                  onClick={() => refetch()}
+                  disabled={loading}
+                  aria-label={CAT.crud.refresh}
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={8}>
+                {CAT.crud.refresh}
+              </TooltipContent>
+            </Tooltip>
+            <Button asChild variant="accent" size="sm" className="rounded-lg">
+              <Link href={`${catalogRoute}/nuevo`}>
+                <Plus className="h-4 w-4" />
+                {CAT.crud.newRecord}
+              </Link>
+            </Button>
+          </>
+        }
+      />
 
-        <OpsSectionDivider>
-          <OpsTableBlock>
-            <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_auto]">
-              <OpsSearchField
-                value={search}
-                onChange={(value) => {
-                  setSearch(value);
-                  setPage(1);
-                }}
-                placeholder="Buscar por nombre, codigo o detalle"
-                ariaLabel="Buscar registros"
-              />
+      <OpsSectionDivider>
+        <OpsTableBlock>
+          <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_auto]">
+            <OpsSearchField
+              value={search}
+              onChange={(value) => {
+                setSearch(value);
+                setPage(1);
+              }}
+              placeholder={CAT.crud.searchPlaceholder}
+              ariaLabel={CAT.crud.searchAria}
+            />
 
-              <OpsSelect
-                label="Estado"
-                value={statusFilter}
-                options={[
-                  { value: "all", label: "Todos" },
-                  { value: "active", label: "Activos" },
-                  { value: "inactive", label: "Inactivos" },
-                ]}
-                onChange={(v) => { setStatusFilter(v as "all" | "active" | "inactive"); setPage(1); }}
-              />
+            <OpsSelect
+              label={CAT.crud.statusLabel}
+              value={statusFilter}
+              options={[
+                { value: "all", label: CAT.crud.statusAll },
+                { value: "active", label: CAT.crud.statusActive },
+                { value: "inactive", label: CAT.crud.statusInactive },
+              ]}
+              onChange={(v) => { setStatusFilter(v as "all" | "active" | "inactive"); setPage(1); }}
+            />
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon-sm"
-                    className="h-10 w-10 rounded-lg"
-                    onClick={() => {
-                      setSearch("");
-                      setStatusFilter("all");
-                      setPage(1);
-                    }}
-                    disabled={!hasActiveFilters}
-                    aria-label="Limpiar filtros"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top" sideOffset={8}>
-                  Limpiar filtros
-                </TooltipContent>
-              </Tooltip>
-            </OpsFiltersRow>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  className="h-10 w-10 rounded-lg"
+                  onClick={() => {
+                    setSearch("");
+                    setStatusFilter("all");
+                    setPage(1);
+                  }}
+                  disabled={!hasActiveFilters}
+                  aria-label={CAT.crud.clearFilters}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={8}>
+                {CAT.crud.clearFilters}
+              </TooltipContent>
+            </Tooltip>
+          </OpsFiltersRow>
 
-            {error || mutationError ? (
-              <AdminInlineMessage tone="danger">{error || mutationError}</AdminInlineMessage>
-            ) : null}
+          {error ? (
+            <p className="rounded-lg border border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] px-4 py-3 text-sm font-medium text-[var(--ops-tone-danger-text)]">
+              {error}
+            </p>
+          ) : null}
 
-            {successMessage ? (
-              <AdminInlineMessage tone="success">{successMessage}</AdminInlineMessage>
-            ) : null}
-
-            <OpsTableWrap minWidth="920px">
-              <table className="w-full border-collapse">
-                <thead className="bg-[var(--ops-surface-muted)]">
-                  <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                    <th className="px-4 py-3">Registro</th>
-                    {listFields.map((field) => (
-                      <th key={field.key} className="px-4 py-3">{field.label}</th>
-                    ))}
-                    <th className="px-4 py-3">Estado</th>
-                    <th className="w-[3.5rem] px-4 py-3" />
+          <OpsTableWrap minWidth="920px">
+            <table className="w-full border-collapse">
+              <thead className="bg-[var(--ops-surface-muted)]">
+                <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                  <th className="px-4 py-3">{CAT.crud.columnRecord}</th>
+                  {listFields.map((field) => (
+                    <th key={field.key} className="px-4 py-3">{field.label}</th>
+                  ))}
+                  <th className="px-4 py-3">{CAT.crud.columnStatus}</th>
+                  <th className="w-[3.5rem] px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                {loading ? (
+                  <tr>
+                    <td colSpan={listFields.length + 3} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                      <LoaderCircle className="mr-2 inline-block h-5 w-5 animate-spin" />
+                      {CAT.crud.loading}
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={listFields.length + 3} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                        <LoaderCircle className="mr-2 inline-block h-5 w-5 animate-spin" />
-                        Cargando registros...
-                      </td>
-                    </tr>
-                  ) : filteredItems.length ? (
-                    paginatedItems.map((item, index) => (
-                      <tr
-                        key={String(item.code || item.name || index)}
-                        className={`transition hover:bg-[var(--ops-surface-muted)] ${!item.active ? "opacity-80" : ""}`}
-                      >
-                        <td className="px-4 py-[var(--ops-row-py)]">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                                {formatValue(item.name)}
-                              </p>
-                              {"code" in item && item.code ? (
-                                <span className="inline-flex rounded-full border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] px-2.5 py-1 text-[11px] font-semibold text-[var(--ops-text-muted)]">
-                                  {String(item.code)}
-                                </span>
-                              ) : null}
-                            </div>
-                            {item.created_at ? (
-                              <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                                {new Date(String(item.created_at)).toLocaleDateString("es-PE")}
-                              </p>
+                ) : filteredItems.length ? (
+                  paginatedItems.map((item, index) => (
+                    <tr
+                      key={String(item.code || item.name || index)}
+                      className={`transition hover:bg-[var(--ops-surface-muted)] ${!item.active ? "opacity-80" : ""}`}
+                    >
+                      <td className="px-4 py-[var(--ops-row-py)]">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
+                              {formatValue(item.name)}
+                            </p>
+                            {"code" in item && item.code ? (
+                              <span className={CUSTOMER_TYPE_PILL}>
+                                {String(item.code)}
+                              </span>
                             ) : null}
                           </div>
-                        </td>
-                        {listFields.map((field) => (
-                          <td key={field.key} className="px-4 py-[var(--ops-row-py)]">
-                            {field.render === "hex" ? (
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className="inline-flex h-4 w-4 shrink-0 rounded-[4px] border border-[color:var(--ops-border-strong)]"
-                                  style={{
-                                    backgroundColor: String(item[field.key] || "transparent"),
-                                  }}
-                                  aria-hidden="true"
-                                />
-                                <span className="truncate text-sm text-[var(--ops-text)]">
-                                  {formatValue(item[field.key])}
-                                </span>
-                              </div>
-                            ) : (
-                              <p className="truncate text-sm text-[var(--ops-text)]">
+                          {item.created_at ? (
+                            <p className="mt-1 text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                              {new Date(String(item.created_at)).toLocaleDateString("es-PE")}
+                            </p>
+                          ) : null}
+                        </div>
+                      </td>
+                      {listFields.map((field) => (
+                        <td key={field.key} className="px-4 py-[var(--ops-row-py)]">
+                          {field.render === "hex" ? (
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="inline-flex h-4 w-4 shrink-0 rounded-[4px] border border-[color:var(--ops-border-strong)]"
+                                style={{
+                                  backgroundColor: String(item[field.key] || "transparent"),
+                                }}
+                                aria-hidden="true"
+                              />
+                              <span className="truncate text-sm text-[var(--ops-text)]">
                                 {formatValue(item[field.key])}
-                              </p>
-                            )}
-                          </td>
-                        ))}
-                        <td className="px-4 py-[var(--ops-row-py)]">
-                          <OpsStatusBadge tone={item.active ? "success" : "neutral"}>
-                            {activeBadgeLabel(!!item.active)}
-                          </OpsStatusBadge>
+                              </span>
+                            </div>
+                          ) : (
+                            <p className="truncate text-sm text-[var(--ops-text)]">
+                              {formatValue(item[field.key])}
+                            </p>
+                          )}
                         </td>
-                        <td className="px-4 py-[var(--ops-row-py)]">
-                          <AdminRowActionsMenu
-                            ariaLabel={`Acciones para ${buildDisplayName(item)}`}
-                            items={[
-                              {
-                                label: "Editar",
-                                icon: <PencilLine className="h-3.5 w-3.5" />,
-                                onSelect: () => openEdit(item),
-                              },
-                              {
-                                label: item.active ? "Inactivar" : "Activar",
-                                icon: <Power className="h-3.5 w-3.5" />,
-                                tone: item.active ? "danger" : "neutral",
-                                onSelect: () => setPendingToggleItem(item),
-                              },
-                            ]}
-                          />
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={listFields.length + 3}>
-                        <OpsEmptyState
-                          variant="compact"
-                          description={items.length ? "No hay resultados para este filtro." : emptyDescription}
+                      ))}
+                      <td className="px-4 py-[var(--ops-row-py)]">
+                        <OpsStatusBadge tone={item.active ? "success" : "neutral"}>
+                          {activeBadgeLabel(!!item.active)}
+                        </OpsStatusBadge>
+                      </td>
+                      <td className="px-4 py-[var(--ops-row-py)]">
+                        <AdminRowActionsMenu
+                          ariaLabel={CAT.crud.actionsAria(buildDisplayName(item))}
+                          items={[
+                            {
+                              label: CAT.crud.edit,
+                              icon: <PencilLine className="h-3.5 w-3.5" />,
+                              onSelect: () => openEdit(item),
+                            },
+                            {
+                              label: item.active ? CAT.crud.inactivate : CAT.crud.activate,
+                              icon: <Power className="h-3.5 w-3.5" />,
+                              tone: item.active ? "danger" : "neutral",
+                              onSelect: () => setPendingToggleItem(item),
+                            },
+                          ]}
                         />
                       </td>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </OpsTableWrap>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={listFields.length + 3}>
+                      <OpsEmptyState
+                        variant="compact"
+                        description={items.length ? CAT.crud.noResults : emptyDescription}
+                      />
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </OpsTableWrap>
 
-            <OpsTableFooter>
-              <span className="text-sm text-[var(--ops-text-muted)]">
-                {filteredItems.length ? `${firstVisible}-${lastVisible} de ${filteredItems.length}` : "0 resultados"}
-              </span>
-              <Pagination
-                page={safePage}
-                totalPages={totalPages}
-                onPageChange={setPage}
-                className="self-end md:self-auto"
-              />
-            </OpsTableFooter>
-          </OpsTableBlock>
-        </OpsSectionDivider>
-
-        <AdminConfirmModal
-          open={Boolean(pendingToggleItem)}
-          title={pendingToggleItem?.active ? `Inactivar ${entityLabel}` : `Activar ${entityLabel}`}
-          description={
-            <>
-              Vas a {pendingToggleItem?.active ? "inactivar" : "activar"} a{" "}
-              <span className="font-semibold text-[var(--ops-text)]">
-                {buildDisplayName(pendingToggleItem)}
-              </span>
-              {pendingToggleItem?.code ? (
-                <>
-                  {" "}
-                  <span className="text-[var(--ops-text-muted)]">({pendingToggleItem.code})</span>
-                </>
-              ) : null}
-              .
-            </>
-          }
-          confirmLabel={pendingToggleItem?.active ? "Inactivar" : "Activar"}
-          confirmTone={pendingToggleItem?.active ? "danger" : "accent"}
-          busy={toggling}
-          onCancel={() => setPendingToggleItem(null)}
-          onConfirm={() => void handleToggleActive()}
-        />
-
-        {editingItem ? (
-          <AdminModalShell
-            title={`Editar ${buildDisplayName(editingItem)}`}
-            onClose={closeEdit}
-            widthClass="max-w-2xl"
-          >
-            <CatalogItemForm
-              catalogItems={items.filter(
-                (item) => getItemId(item, idKey) !== getItemId(editingItem, idKey)
-              )}
-              fields={fields}
-              idKey={idKey}
-              duplicateStrategy={duplicateStrategy}
-              mode="edit"
-              initialValues={toInitialValues(editingItem, fields)}
-              readOnlyFieldKeys={readOnlyFieldKeys}
-              submitting={editSubmitting}
-              error={editError}
-              successMessage={null}
-              onSubmit={handleEditSubmit}
-              onCancel={closeEdit}
+          <OpsTableFooter>
+            <span className="text-sm text-[var(--ops-text-muted)]">
+              {filteredItems.length ? `${firstVisible}-${lastVisible} de ${filteredItems.length}` : CAT.crud.zeroResults}
+            </span>
+            <Pagination
+              page={safePage}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              className="self-end md:self-auto"
             />
-          </AdminModalShell>
+          </OpsTableFooter>
+        </OpsTableBlock>
+      </OpsSectionDivider>
+
+      <AdminConfirmModal
+        open={Boolean(pendingToggleItem)}
+        title={pendingToggleItem?.active ? CAT.crud.inactivateTitle(entityLabel) : CAT.crud.activateTitle(entityLabel)}
+        description={
+          <>
+            {CAT.crud.toggleDescription(
+              pendingToggleItem?.active ? CAT.crud.inactivate.toLowerCase() : CAT.crud.activate.toLowerCase(),
+              buildDisplayName(pendingToggleItem)
+            )}
+            {pendingToggleItem?.code ? (
+              <>
+                {" "}
+                <span className="text-[var(--ops-text-muted)]">({pendingToggleItem.code})</span>
+              </>
+            ) : null}
+          </>
+        }
+        confirmLabel={pendingToggleItem?.active ? CAT.crud.inactivate : CAT.crud.activate}
+        confirmTone={pendingToggleItem?.active ? "danger" : "accent"}
+        busy={toggling}
+        onCancel={() => setPendingToggleItem(null)}
+        onConfirm={() => void handleToggleActive()}
+      />
+
+      <OpsDialog
+        open={Boolean(editingItem)}
+        onOpenChange={(open) => { if (!open) closeEdit(); }}
+        title={editingItem ? CAT.crud.editTitle(buildDisplayName(editingItem)) : CAT.crud.createTitle}
+        description={editingItem ? CAT.crud.editDescription(buildDisplayName(editingItem)) : CAT.crud.createDescription}
+        size="lg"
+      >
+        {editingItem ? (
+          <CatalogItemForm
+            catalogItems={items.filter(
+              (item) => getItemId(item, idKey) !== getItemId(editingItem, idKey)
+            )}
+            fields={fields}
+            idKey={idKey}
+            duplicateStrategy={duplicateStrategy}
+            mode="edit"
+            initialValues={toInitialValues(editingItem, fields)}
+            readOnlyFieldKeys={readOnlyFieldKeys}
+            submitting={editSubmitting}
+            error={editError}
+            onSubmit={handleEditSubmit}
+            onCancel={closeEdit}
+          />
         ) : null}
-      </OpsPageShell>
-    </TooltipProvider>
+      </OpsDialog>
+    </OpsPageShell>
   );
 }

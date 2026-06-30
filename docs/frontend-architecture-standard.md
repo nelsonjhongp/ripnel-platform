@@ -63,6 +63,7 @@ Rutas legacy actuales:
 - `/purchase-system`, `/purchase-system/[saleId]`, `/purchase-system/checkout` y `/purchase-system/checkout-payment` redirigen a `/ventas/nueva`.
 - `/transaction-history` redirige a `/ventas/historial`.
 - `/administracion/roles&usuarios` redirige a `/administracion/usuarios`.
+- `/administracion/usuarios/nuevo`, `/administracion/roles/nuevo` y `/administracion/ubicaciones/nuevo` redirigen a sus respectivos listados (dialogs unificados).
 - `/clientes/dashboards` redirige a `/bi?view=clientes`.
 - `/precios/listado-de-precios` redirige a `/precios`.
 - `/precios/crear-y-editar-precio` redirige a `/precios/crear` preservando `style_id`.

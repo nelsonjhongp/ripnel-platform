@@ -26,6 +26,7 @@ import type {
 } from "./transfers-shared"
 import { OpsLocationIcon } from "@/components/ui/ops-location-icon"
 import { OpsQuantityStepper } from "@/components/ui/ops-quantity-stepper"
+import { TRANS } from "./transfers-messages"
 
 const panelClass = "ops-surface rounded-xl border";
 const softPanelClass =
@@ -70,8 +71,8 @@ function ValidationItem({
       className={cn(
         "flex items-center gap-2 text-sm",
         ok
-          ? "text-[color:color-mix(in_srgb,#059669_88%,var(--ops-text))]"
-          : "text-[color:color-mix(in_srgb,#c96c1d_88%,var(--ops-text))]"
+          ? "text-[var(--ops-tone-success-text)]"
+          : "text-[var(--ops-tone-warning-text)]"
       )}
     >
       {ok ? <Check className="h-3.5 w-3.5 shrink-0" /> : <CircleAlert className="h-3.5 w-3.5 shrink-0" />}
@@ -99,24 +100,24 @@ export function RequestRouteField({
 }) {
   const selectedOrigin =
     originOptions.find((option) => option.value === originValue) || null;
-  const selectedOriginLabel = selectedOrigin?.label || "Seleccionar origen";
+  const selectedOriginLabel = selectedOrigin?.label || TRANS.request.selectOrigin;
   return (
     <section
       className={cn(
         panelClass,
-        "space-y-2.5 bg-[color:color-mix(in_srgb,var(--ops-surface)_96%,var(--ops-surface-muted))] p-4 sm:p-5"
+        "space-y-2.5 bg-[var(--ops-surface-muted)] p-4 sm:p-5"
       )}
     >
       <div className="flex flex-col gap-3 md:grid md:grid-cols-[minmax(0,1fr)_36px_minmax(0,1fr)] md:items-end">
         <div className="min-w-0 space-y-2">
-          <FieldLabel>Origen</FieldLabel>
+          <FieldLabel>{TRANS.request.originLabel}</FieldLabel>
           <OpsSelect
             value={originValue}
             onChange={onOriginChange}
-            placeholder="Seleccionar origen"
+            placeholder={TRANS.request.selectOrigin}
             options={originOptions.map((o) => ({ value: o.value, label: o.label }))}
             disabled={disabled}
-            className="sales-field sales-field-interactive flex min-h-12 w-full min-w-0 items-center justify-between gap-3 rounded-2xl border-[color:color-mix(in_srgb,var(--ops-border-strong)_88%,var(--ripnel-accent)_12%)] bg-[color:color-mix(in_srgb,var(--ops-surface)_98%,var(--ops-surface-muted))] px-4 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] focus-visible:outline-none"
+            className="sales-field sales-field-interactive flex min-h-12 w-full min-w-0 items-center justify-between gap-3 rounded-2xl border-[color:color-mix(in_srgb,var(--ops-border-strong)_88%,var(--ripnel-accent)_12%)] bg-[var(--ops-surface)] px-4 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] focus-visible:outline-none"
             triggerContent={(opt) => (
               <div className="flex min-w-0 items-center gap-3">
                 <OpsLocationIcon
@@ -136,8 +137,8 @@ export function RequestRouteField({
         </div>
 
         <div className="min-w-0 space-y-2">
-          <FieldLabel>Destino</FieldLabel>
-          <div className="sales-field flex min-h-12 w-full min-w-0 items-center justify-between gap-3 rounded-2xl border-[color:color-mix(in_srgb,var(--ops-border-strong)_88%,#86d6a8_18%)] bg-[color:color-mix(in_srgb,var(--ops-surface)_98%,var(--ops-surface-muted))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
+          <FieldLabel>{TRANS.request.destinationLabel}</FieldLabel>
+          <div className="sales-field flex min-h-12 w-full min-w-0 items-center justify-between gap-3 rounded-2xl border-[var(--ops-tone-success-border)] bg-[var(--ops-surface)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
             <div className="flex min-w-0 items-center gap-3">
               <OpsLocationIcon
                 type={destinationType}
@@ -146,8 +147,8 @@ export function RequestRouteField({
               <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
                 {destinationName}
               </p>
-              <span className="inline-flex shrink-0 items-center rounded-full border border-[color:color-mix(in_srgb,#86d6a8_58%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#dff8e7_92%,var(--ops-surface))] px-2.5 py-0.5 text-[11px] font-medium text-[color:color-mix(in_srgb,#4a9b67_82%,var(--ops-text))]">
-                Actual
+              <span className="inline-flex shrink-0 items-center rounded-full border border-[var(--ops-tone-success-border)] bg-[var(--ops-tone-success-bg)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--ops-tone-success-text)]">
+                {TRANS.scope.current}
               </span>
             </div>
           </div>
@@ -160,7 +161,7 @@ export function RequestRouteField({
 
       {hasDraftLines ? (
         <p className="text-[11px] text-[var(--ops-text-muted)]">
-          Si cambias el origen, se eliminarán las líneas agregadas.
+          {TRANS.request.changeOriginWarning}
         </p>
       ) : null}
     </section>
@@ -212,7 +213,7 @@ export function RequestProductComposer({
           label: color,
           helper: `${qty} u.`,
           trailing: (
-            <span className="text-[11px] font-semibold text-[color:color-mix(in_srgb,#059669_88%,var(--ops-text))]">
+            <span className="text-[11px] font-semibold text-[var(--ops-tone-success-text)]">
               {qty} u.
             </span>
           ),
@@ -304,38 +305,38 @@ export function RequestProductComposer({
             <h3 className="min-w-0 truncate text-xl font-semibold text-[var(--ops-text)]">
               {product.style_name}
             </h3>
-            <span className="inline-flex shrink-0 items-center rounded-full bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_92%,var(--ops-surface))] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ops-text-muted)]">
+            <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--ops-surface-muted)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ops-text-muted)]">
               {selectedVariant?.sku || product.secondary_code}
             </span>
           </div>
         </div>
 
         {duplicateMessage ? (
-          <div className="inline-flex shrink-0 items-center gap-1.5 self-start text-sm text-[color:color-mix(in_srgb,#dc2626_88%,var(--ops-text))] md:min-w-[280px] md:justify-end">
+          <div className="inline-flex shrink-0 items-center gap-1.5 self-start text-sm text-[var(--ops-tone-danger-text)] md:min-w-[280px] md:justify-end">
             <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
             <span className="whitespace-nowrap">{duplicateMessage}</span>
           </div>
         ) : null}
       </div>
 
-      <div className="space-y-4 rounded-2xl border border-[var(--ops-border-soft)] bg-[color:color-mix(in_srgb,var(--ops-surface)_98%,var(--ops-surface-muted))] p-4">
+      <div className="space-y-4 rounded-2xl border border-[var(--ops-border-soft)] bg-[var(--ops-surface)] p-4">
         <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
           <div className="space-y-1.5">
-            <FieldLabel>Color</FieldLabel>
+            <FieldLabel>{TRANS.request.colorLabel}</FieldLabel>
             <OpsSelect
               value={resolvedColor}
               onValueChange={(value) => {
                 setSelectedColor(value);
                 setSelectedSize("");
               }}
-              placeholder={lockedOriginId ? "Elegir color" : "Selecciona origen primero"}
+              placeholder={lockedOriginId ? TRANS.request.selectColor : TRANS.request.selectOriginFirst}
               options={colorOptions}
               disabled={!lockedOriginId || colorOptions.length === 0}
               triggerContent={(option) =>
                 option ? (
                   <span className="flex min-w-0 items-center justify-between gap-3">
                     <span className="truncate text-[var(--ops-text)]">{option.label}</span>
-                    <span className="shrink-0 text-[11px] font-semibold text-[color:color-mix(in_srgb,#059669_88%,var(--ops-text))]">
+                    <span className="shrink-0 text-[11px] font-semibold text-[var(--ops-tone-success-text)]">
                       {option.helper}
                     </span>
                   </span>
@@ -345,7 +346,7 @@ export function RequestProductComposer({
           </div>
 
           <div className="space-y-1.5">
-            <FieldLabel>Talla</FieldLabel>
+            <FieldLabel>{TRANS.request.sizeLabel}</FieldLabel>
             <div className="flex flex-wrap gap-2">
               {sizeOptions.length > 0 ? (
                 sizeOptions.map((sizeOption) => {
@@ -362,7 +363,7 @@ export function RequestProductComposer({
                         active
                           ? "border-[color:color-mix(in_srgb,var(--ripnel-accent)_42%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_86%,var(--ops-surface))] text-[var(--ripnel-accent-hover)]"
                         : sizeOption.disabled
-                            ? "cursor-not-allowed border-[var(--ops-border-soft)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_84%,var(--ops-surface))] text-[var(--ops-text-muted)] opacity-65"
+                            ? "cursor-not-allowed border-[var(--ops-border-soft)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)] opacity-65"
                             : "cursor-pointer border-[var(--ops-border-strong)] bg-[var(--ops-field)] text-[var(--ops-text)] hover:border-[var(--ripnel-accent)] hover:bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_38%,var(--ops-surface))]"
                       )}
                     >
@@ -374,7 +375,7 @@ export function RequestProductComposer({
                             ? "text-[var(--ripnel-accent-hover)]"
                             : sizeOption.disabled
                               ? "text-[var(--ops-text-muted)]"
-                              : "text-[color:color-mix(in_srgb,#059669_88%,var(--ops-text))]"
+                              : "text-[var(--ops-tone-success-text)]"
                         )}
                       >
                         {sizeOption.qty} u.
@@ -389,7 +390,7 @@ export function RequestProductComposer({
                     "flex min-h-10 items-center rounded-xl px-3 text-sm text-[var(--ops-text-muted)] sm:col-span-2 xl:col-span-3"
                   )}
                 >
-                  {lockedOriginId ? "Selecciona color" : "Selecciona origen primero"}
+                  {lockedOriginId ? TRANS.request.selectColor : TRANS.request.selectOriginFirst}
                 </div>
               )}
             </div>
@@ -400,7 +401,7 @@ export function RequestProductComposer({
           <div className="space-y-3">
             <div className="grid gap-3 md:grid-cols-[220px_minmax(0,1fr)] md:items-end">
               <div className="space-y-1.5">
-                <FieldLabel>Cantidad solicitada</FieldLabel>
+                <FieldLabel>{TRANS.request.qtyRequestedLabel}</FieldLabel>
                 <OpsQuantityStepper
                   value={normalizedQuantity}
                   onChange={(nextValue) =>
@@ -439,19 +440,19 @@ export function RequestProductComposer({
                 <p className="text-[11px] text-[var(--ops-text-muted)] md:text-right">
                   {selectedSource ? (
                     <>
-                      Máximo disponible:{" "}
-                      <span className="font-semibold text-[color:color-mix(in_srgb,#059669_88%,var(--ops-text))]">
+                      {TRANS.request.maxAvailable}{" "}
+                      <span className="font-semibold text-[var(--ops-tone-success-text)]">
                         {selectedSource.qty_available} u.
                       </span>
                     </>
                   ) : !resolvedColor ? (
-                    "Selecciona un color"
+                    TRANS.request.selectColor
                   ) : !resolvedSize ? (
-                    "Selecciona una talla"
+                    TRANS.request.selectSize
                   ) : !selectedVariant ? (
-                    "Variante no disponible"
+                    TRANS.request.variantNotAvailable
                   ) : (
-                    "Sin stock disponible en origen"
+                    TRANS.request.noStockAtOrigin
                   )}
                 </p>
 
@@ -467,7 +468,7 @@ export function RequestProductComposer({
                   className="h-10 rounded-lg px-4 md:shrink-0"
                 >
                   <Plus className="h-4 w-4" />
-                  Agregar línea
+                  {TRANS.request.addLine}
                 </Button>
               </div>
             </div>
@@ -533,12 +534,12 @@ export function RequestDraftTable({
             </colgroup>
             <thead className="sticky top-0 z-10 bg-[var(--ops-surface-muted)]">
               <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                <th className="px-4 py-3">Producto</th>
-                <th className="px-3 py-3">Color</th>
-                <th className="px-3 py-3">Talla</th>
-                <th className="px-3 py-3 text-right">Stock</th>
-                <th className="px-3 py-3 text-center">Cantidad</th>
-                <th className="px-2 py-3 text-center">Acción</th>
+                <th className="px-4 py-3">{TRANS.table.columns.products}</th>
+                <th className="px-3 py-3">{TRANS.request.colorLabel}</th>
+                <th className="px-3 py-3">{TRANS.request.sizeLabel}</th>
+                <th className="px-3 py-3 text-right">{TRANS.metrics.available}</th>
+                <th className="px-3 py-3 text-center">{TRANS.manage.qtyLabel}</th>
+                <th className="px-2 py-3 text-center">{TRANS.table.columns.actions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
@@ -548,7 +549,7 @@ export function RequestDraftTable({
                     colSpan={6}
                     className="px-4 py-12 text-center text-sm text-[var(--ops-text-muted)]"
                   >
-                    Aún no agregas productos a la transferencia.
+                    {TRANS.request.noProducts}
                   </td>
                 </tr>
               ) : (
@@ -608,8 +609,8 @@ export function RequestDraftTable({
                           size="icon-sm"
                           disabled={disabled}
                           onClick={() => onRemoveLine(line.variant_id)}
-                          className="rounded-lg text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)] hover:text-[color:color-mix(in_srgb,#e11d48_82%,var(--ops-text))]"
-                          aria-label="Quitar línea"
+                          className="rounded-lg text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-tone-danger-text)]"
+                          aria-label={TRANS.request.removeLine}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -705,9 +706,9 @@ export function DraftSummaryPanel({
   const validations = [
     { label: "Origen seleccionado", ok: submittedTransfer ? true : originSelected },
     { label: "Destino actual resuelto", ok: Boolean(activeDestinationName) },
-    { label: "Al menos una línea agregada", ok: submittedTransfer ? totals.lines > 0 : draftLines.length > 0 },
+    { label: "Al menos una linea agregada", ok: submittedTransfer ? totals.lines > 0 : draftLines.length > 0 },
     {
-      label: "Cantidades válidas",
+      label: "Cantidades validas",
       ok: submittedTransfer ? totals.lines > 0 : draftLines.length > 0 && allQuantitiesValid,
     },
   ];
@@ -716,9 +717,9 @@ export function DraftSummaryPanel({
   return (
     <aside className={cn(panelClass, "space-y-4 p-5")}>
       <section className="space-y-2">
-        <FieldLabel>Estado</FieldLabel>
+        <FieldLabel>{TRANS.request.status}</FieldLabel>
         <p className="text-sm font-semibold text-[var(--ops-text)]">
-          {submittedTransfer ? "Solicitud enviada correctamente" : "Borrador listo para revisión"}
+          {submittedTransfer ? TRANS.request.sentSuccess : TRANS.pending.draftReady}
         </p>
         {submittedTransfer?.transfer_number ? (
           <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--ripnel-accent-hover)]">
@@ -727,17 +728,17 @@ export function DraftSummaryPanel({
         ) : null}
         {submittedTransfer ? (
           <p className="text-sm text-[var(--ops-text-muted)]">
-            La solicitud quedó registrada y lista para seguimiento.
+            La solicitud quedo registrada y lista para seguimiento.
           </p>
         ) : null}
       </section>
 
       <section className="space-y-2 border-t border-[var(--ops-border-strong)] pt-4">
-        <FieldLabel>Ruta</FieldLabel>
+        <FieldLabel>{TRANS.request.route}</FieldLabel>
         <div className="flex items-center gap-2 text-sm">
           <OpsLocationIcon type={activeOriginType} className="h-4 w-4 shrink-0 text-[var(--ops-text)]" />
           <span className="min-w-0 truncate font-semibold text-[var(--ripnel-accent-hover)]">
-            {activeOriginName || "Seleccionar origen"}
+            {activeOriginName || TRANS.request.selectOrigin}
           </span>
           <ArrowRight className="h-4 w-4 shrink-0 text-[var(--ops-text)]" />
           <OpsLocationIcon type={activeDestinationType} className="h-4 w-4 shrink-0 text-[var(--ops-text)]" />
@@ -748,21 +749,21 @@ export function DraftSummaryPanel({
       </section>
 
       <section className="space-y-3 border-t border-[var(--ops-border-strong)] pt-4">
-        <FieldLabel>Total</FieldLabel>
+        <FieldLabel>{TRANS.request.total}</FieldLabel>
         <div className="space-y-2 text-sm">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[var(--ops-text-muted)]">Líneas</span>
+            <span className="text-[var(--ops-text-muted)]">{TRANS.request.lines}</span>
             <span className="font-semibold text-[var(--ops-text)]">{totals.lines}</span>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[var(--ops-text-muted)]">Unidades</span>
+            <span className="text-[var(--ops-text-muted)]">{TRANS.request.units}</span>
             <span className="font-semibold text-[var(--ops-text)]">{totals.units}</span>
           </div>
         </div>
       </section>
 
       <section className="space-y-3 border-t border-[var(--ops-border-strong)] pt-4">
-        <FieldLabel>Validaciones</FieldLabel>
+        <FieldLabel>{TRANS.request.validations}</FieldLabel>
         <div className="space-y-2">
           {validations.map((item) => (
             <ValidationItem key={item.label} label={item.label} ok={item.ok} />
@@ -777,7 +778,7 @@ export function DraftSummaryPanel({
               htmlFor="transfer-request-notes"
               className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]"
             >
-              Notas
+              {TRANS.request.notesLabel}
             </label>
             <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] px-3.5 py-3 text-sm text-[var(--ops-text)]">
               {activeNotes || "Sin notas"}
@@ -785,11 +786,11 @@ export function DraftSummaryPanel({
           </>
         ) : (
           <PresetTextField
-            label="Notas"
+            label={TRANS.request.notesLabel}
             value={notes}
             onChange={onNotesChange}
             presets={notePresets}
-            placeholder="Selecciona un motivo frecuente"
+            placeholder={TRANS.request.selectPreset}
             maxLength={notesMaxLength}
             onClear={onClearNotes}
             textareaRows={4}
@@ -807,7 +808,7 @@ export function DraftSummaryPanel({
             onClick={onStartNewRequest}
           >
             <Plus className="h-4 w-4" />
-            Nueva solicitud
+            {TRANS.header.requestTitle}
           </Button>
           <Button
             type="button"
@@ -816,7 +817,7 @@ export function DraftSummaryPanel({
             onClick={onViewSubmittedTransfer}
           >
             <ArrowUpRight className="h-4 w-4" />
-            Ver detalle
+            {TRANS.header.viewDetail}
           </Button>
         </div>
       ) : (
@@ -828,7 +829,7 @@ export function DraftSummaryPanel({
           onClick={onSubmit}
         >
           {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
-          Enviar solicitud de transferencia
+          {TRANS.request.submitRequest}
         </Button>
       )}
     </aside>

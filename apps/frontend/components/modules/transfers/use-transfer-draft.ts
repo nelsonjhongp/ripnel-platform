@@ -2,6 +2,8 @@ import { useCallback, useState } from "react";
 import type { ApiEnvelope } from "@/lib/api";
 import { apiFetch, unwrapApiData } from "@/lib/api";
 import type { DraftLine, RequestCandidateSource, RequestProductVariant, RequestProductGroup } from "./transfers-shared";
+import { TRANS } from "./transfers-messages";
+import { showSuccess } from "@/lib/toast";
 
 type InventoryItem = {
   location_id: string;
@@ -53,7 +55,6 @@ export function useTransferDraft({
   const [pendingQuantities, setPendingQuantities] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [submittedTransfer, setSubmittedTransfer] = useState<{
     transfer_id: string;
     transfer_number: string | null;
@@ -66,18 +67,20 @@ export function useTransferDraft({
   } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const successMessage = null as string | null;
+
   const addLine = useCallback(
     (item: InventoryItem, rawQty?: string) => {
       const qtyValue = rawQty ?? pendingQuantities[item.variant_id] ?? "";
       const qtyRequested = Number(qtyValue);
 
       if (!Number.isInteger(qtyRequested) || qtyRequested <= 0) {
-        setError("La cantidad solicitada debe ser un entero mayor a cero");
+        setError(TRANS.validation.qtyIntegerPositive);
         return;
       }
 
       if (qtyRequested > item.qty) {
-        setError("La cantidad solicitada no puede exceder el stock disponible");
+        setError(TRANS.validation.qtyExceedsStock);
         return;
       }
 
@@ -96,20 +99,20 @@ export function useTransferDraft({
     ) => {
       if (!selectedRequestProduct) {
         setDuplicateDraftVariant(null);
-        setError("No se pudo identificar el producto seleccionado.");
+        setError(TRANS.validation.noProductIdentified);
         return;
       }
 
       if (originId && originId !== source.location_id) {
         setDuplicateDraftVariant(null);
-        setError("Esta solicitud ya quedo ligada a otra sede origen. Cambia el origen para continuar.");
+        setError(TRANS.validation.originChanged);
         return;
       }
 
       if (draftLines.some((line) => line.variant_id === variant.variant_id)) {
         setDuplicateDraftVariant({
           variantId: variant.variant_id,
-          message: "Esta variante ya está agregada en el borrador.",
+          message: TRANS.validation.duplicateVariant,
           token: Date.now(),
         });
         setError(null);
@@ -118,13 +121,13 @@ export function useTransferDraft({
 
       if (!Number.isInteger(qtyRequested) || qtyRequested <= 0) {
         setDuplicateDraftVariant(null);
-        setError("La cantidad solicitada debe ser un entero mayor a cero");
+        setError(TRANS.validation.qtyIntegerPositive);
         return;
       }
 
       if (qtyRequested > source.qty_available) {
         setDuplicateDraftVariant(null);
-        setError("La cantidad solicitada no puede exceder el stock visible de esa sede.");
+        setError(TRANS.validation.qtyExceedsVisible);
         return;
       }
 
@@ -199,7 +202,6 @@ export function useTransferDraft({
       setSubmittedTransfer(null);
       setSubmittedSummary(null);
       setError(null);
-      setSuccessMessage(null);
 
       try {
         const targetDestinationId = isStoreRequestMode
@@ -209,16 +211,16 @@ export function useTransferDraft({
         if (!fromLocationId || !targetDestinationId) {
           throw new Error(
             isStoreRequestMode
-              ? "Debes definir una sede origen y una sede destino operativa."
-              : "Debes seleccionar origen y destino"
+              ? TRANS.validation.originRequired
+              : TRANS.validation.originDestRequired
           );
         }
 
         if (!draftLines.length) {
           throw new Error(
             isStoreRequestMode
-              ? "Debes agregar al menos una variante a la solicitud."
-              : "Debes agregar al menos una variante a la transferencia"
+              ? TRANS.validation.atLeastOneVariant
+              : TRANS.validation.atLeastOneVariantManage
           );
         }
 
@@ -241,10 +243,10 @@ export function useTransferDraft({
 
         const transferNumber = data.transfer_number || null;
 
-        setSuccessMessage(
+        showSuccess(
           isStoreRequestMode
-            ? `Solicitud de transferencia ${transferNumber || "creada"} enviada correctamente.`
-            : `Transferencia ${transferNumber || "creada"} registrada correctamente.`
+            ? TRANS.toast.sent(transferNumber || "creada")
+            : TRANS.toast.registered(transferNumber || "creada")
         );
         setSubmittedTransfer({
           transfer_id: data.transfer_id,
@@ -275,12 +277,12 @@ export function useTransferDraft({
 
         setError(
           isNetworkError
-            ? "No se pudo conectar para enviar la solicitud. Intenta nuevamente."
+            ? TRANS.toast.connectionError
             : requestError instanceof Error
               ? requestError.message
             : isStoreRequestMode
-              ? "No se pudo enviar la solicitud de transferencia"
-              : "No se pudo crear la transferencia"
+              ? TRANS.toast.sendError
+              : TRANS.toast.createError
         );
       } finally {
         setSubmitting(false);
@@ -302,7 +304,6 @@ export function useTransferDraft({
     setDraftLines([]);
     setPendingQuantities({});
     setOriginId("");
-    setSuccessMessage(null);
     setSubmittedTransfer(null);
     setSubmittedSummary(null);
     setDuplicateDraftVariant(null);
@@ -312,7 +313,6 @@ export function useTransferDraft({
   const clearDraftLines = useCallback(() => {
     setDraftLines([]);
     setPendingQuantities({});
-    setSuccessMessage(null);
     setSubmittedTransfer(null);
     setSubmittedSummary(null);
     setDuplicateDraftVariant(null);
@@ -327,7 +327,6 @@ export function useTransferDraft({
     setDraftLines([]);
     setPendingQuantities({});
     setNotes("");
-    setSuccessMessage(null);
     setSubmittedTransfer(null);
     setSubmittedSummary(null);
     setDuplicateDraftVariant(null);
@@ -346,7 +345,6 @@ export function useTransferDraft({
     error,
     setError,
     successMessage,
-    setSuccessMessage,
     submittedTransfer,
     submittedSummary,
     duplicateDraftVariant,

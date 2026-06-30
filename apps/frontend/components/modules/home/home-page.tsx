@@ -34,6 +34,14 @@ import { apiFetch } from "@/lib/api";
 import { formatDate, formatDateTime } from "@/lib/date-utils";
 import { formatCurrency } from "@/lib/format-utils";
 import { appRoutes } from "@/lib/routes";
+import { HOME } from "./home-messages";
+import {
+  SURFACE_MUTED_30,
+  SURFACE_MUTED_52,
+  CASH_CONSISTENT_BADGE,
+  CASH_INCONSISTENT_BADGE,
+  CASH_NO_SUMMARY_BADGE,
+} from "./home-constants";
 
 function buildHeaderMetadata(
   locationName: string,
@@ -63,9 +71,9 @@ function resolveHeaderActionIcon(href: string) {
 }
 
 function formatCashState(status: "open" | "closed" | null | undefined) {
-  if (status === "open") return "Caja abierta";
-  if (status === "closed") return "Caja cerrada";
-  return "Sin apertura";
+  if (status === "open") return HOME.cash.open;
+  if (status === "closed") return HOME.cash.closed;
+  return HOME.cash.noOpening;
 }
 
 const priorityIconMap: Record<string, React.ReactNode> = {
@@ -89,13 +97,13 @@ const priorityToneMap: Record<string, "danger" | "warning" | "accent"> = {
 };
 
 const priorityCtaMap: Record<string, string> = {
-  "cash-open": "Abrir caja",
-  "request-replenishment": "Crear solicitud",
-  "low-stock": "Ver stock",
-  "transfer-receive": "Recepcionar",
-  "transfer-approve": "Aprobar",
-  "transfer-ship": "Despachar",
-  "cash-difference": "Revisar caja",
+  "cash-open": HOME.priorities.cta.cashOpen,
+  "request-replenishment": HOME.priorities.cta.replenishment,
+  "low-stock": HOME.priorities.cta.lowStock,
+  "transfer-receive": HOME.priorities.cta.transferReceive,
+  "transfer-approve": HOME.priorities.cta.transferApprove,
+  "transfer-ship": HOME.priorities.cta.transferShip,
+  "cash-difference": HOME.priorities.cta.cashDiff,
 };
 
 const quickActionIconMap: Record<string, React.ReactNode> = {
@@ -166,7 +174,7 @@ export default function InicioPage() {
     } else if (overview.capabilities.sales) {
       pushAction({
         key: "quick-sale",
-        label: "Venta rápida",
+        label: HOME.sales.quickSale,
         href: appRoutes.purchaseSystem,
         icon: <ShoppingCart className="h-4 w-4" />,
         variant: "accent",
@@ -176,7 +184,7 @@ export default function InicioPage() {
     if (overview.capabilities.admin && has("dashboard.view")) {
       pushAction({
         key: "manager-panel",
-        label: "Ver panel",
+        label: HOME.viewPanel,
         href: appRoutes.dashboard,
         icon: <ShieldCheck className="h-4 w-4" />,
         variant: "outline",
@@ -213,8 +221,8 @@ export default function InicioPage() {
     return (
       <LoadingPage
         variant="ops"
-        title="Preparando tu inicio"
-        description="Estamos reuniendo ventas, caja, solicitudes entre tiendas e indicadores de tu sede activa."
+        title={HOME.header.loadingTitle}
+        description={HOME.header.loadingDesc}
       />
     );
   }
@@ -223,10 +231,8 @@ export default function InicioPage() {
     return (
       <ErrorPage
         variant="ops"
-        title="No pudimos abrir tu inicio"
-        description={
-          error || "El inicio personalizado no está disponible en este momento."
-        }
+        title={HOME.header.errorTitle}
+        description={error || HOME.header.errorFallback}
       />
     );
   }
@@ -235,8 +241,8 @@ export default function InicioPage() {
     <section className="sales-page min-h-screen px-4 py-[var(--ops-page-py)] md:px-8">
       <div className="mx-auto max-w-[1180px] space-y-6">
         <HomeHeader
-          eyebrow="Inicio"
-          title="Inicio operativo"
+          eyebrow={HOME.header.eyebrow}
+          title={HOME.header.title}
           metadata={headerMetadata}
           actions={headerActions}
         />
@@ -246,11 +252,11 @@ export default function InicioPage() {
             <div className="flex items-center gap-2">
               <CircleAlert className="h-4 w-4 text-[var(--ripnel-accent)]" />
               <h2 className="text-base font-semibold text-[var(--ops-text)]">
-                Pendientes de hoy
+                {HOME.priorities.title}
               </h2>
             </div>
 
-            <div className="overflow-hidden rounded-xl border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_30%,var(--ops-surface))]">
+            <div className={`overflow-hidden rounded-xl border border-[var(--ops-border-strong)] ${SURFACE_MUTED_30}`}>
               {overview.priorities.map((item) => (
                 <div
                   key={item.key}
@@ -264,7 +270,7 @@ export default function InicioPage() {
                     }
                     title={item.title}
                     description={item.description}
-                    ctaLabel={priorityCtaMap[item.key] ?? "Resolver"}
+                    ctaLabel={priorityCtaMap[item.key] ?? HOME.priorities.resolve}
                     href={item.href}
                     tone={
                       priorityToneMap[item.key] ??
@@ -282,7 +288,7 @@ export default function InicioPage() {
           {personalSales?.visible && (
             <OpsMetricCard
               icon={<BarChart3 className="h-4 w-4" />}
-              label="Ventas hoy"
+              label={HOME.sales.todayLabel}
               value={personalSales.today.sale_count}
               detail={formatCurrency(personalSales.today.total_amount)}
               tone="accent"
@@ -293,9 +299,9 @@ export default function InicioPage() {
           {cashSection?.visible && (
             <OpsMetricCard
               icon={<Wallet className="h-4 w-4" />}
-              label="Caja"
+              label={HOME.cash.label}
               value={formatCashState(cashSection.closing?.status)}
-              state={!cashSection.closing ? "Accion requerida" : undefined}
+              state={!cashSection.closing ? HOME.cash.actionRequired : undefined}
               tone={
                 !cashSection.closing
                   ? "warning"
@@ -310,9 +316,9 @@ export default function InicioPage() {
           {inventorySection?.visible && (
             <OpsMetricCard
               icon={<TriangleAlert className="h-4 w-4" />}
-              label="Stock critico"
-              value={`${inventorySection.zero_stock_count} en cero`}
-              detail={`${inventorySection.low_stock_count} bajo minimo`}
+              label={HOME.inventory.criticalStock}
+              value={`${inventorySection.zero_stock_count} ${HOME.inventory.inZero}`}
+              detail={`${inventorySection.low_stock_count} ${HOME.inventory.belowMin}`}
               tone="danger"
               href={
                 inventorySection.zero_stock_count > 0
@@ -327,13 +333,13 @@ export default function InicioPage() {
           {transferSection?.visible && (
             <OpsMetricCard
               icon={<ArrowLeftRight className="h-4 w-4" />}
-              label="Transferencias"
-              value={`${transferSection.counts.open_for_store_count + transferSection.counts.pending_receipts_count} pendientes`}
+              label={HOME.transfer.label}
+              value={`${transferSection.counts.open_for_store_count + transferSection.counts.pending_receipts_count} ${HOME.transfer.pending}`}
               detail={
                 transferSection.counts.open_for_store_count === 0 &&
                 transferSection.counts.pending_receipts_count === 0
-                  ? "Sin movimientos"
-                  : `${transferSection.counts.open_for_store_count} abiertas`
+                  ? HOME.transfer.noMovements
+                  : `${transferSection.counts.open_for_store_count} ${HOME.transfer.open}`
               }
               tone="neutral"
               href={buildTransferListRoute()}
@@ -345,7 +351,7 @@ export default function InicioPage() {
           <section className="space-y-3">
             <div className="flex items-center gap-2">
               <h2 className="text-base font-semibold text-[var(--ops-text)]">
-                Acciones rápidas
+                {HOME.quickActions.title}
               </h2>
             </div>
 
@@ -375,14 +381,14 @@ export default function InicioPage() {
                   <div className="flex items-center gap-2">
                     <ShoppingCart className="h-4 w-4 text-[var(--ripnel-accent)]" />
                     <h2 className="text-base font-semibold text-[var(--ops-text)]">
-                      Mi actividad comercial
+                      {HOME.sales.sectionTitle}
                     </h2>
                   </div>
                   <Link
                     href={appRoutes.transactionHistory}
                     className="text-[13px] font-medium text-[var(--ripnel-accent)] transition hover:underline"
                   >
-                    Ver ventas
+                    {HOME.sales.viewSales}
                   </Link>
                 </div>
 
@@ -390,21 +396,21 @@ export default function InicioPage() {
                   <div className="grid gap-2 sm:grid-cols-3">
                     <OpsMetricCard
                       icon={<ShoppingCart className="h-4 w-4" />}
-                      label="Ventas hoy"
+                      label={HOME.sales.todayLabel}
                       value={personalSales.today.sale_count}
                       tone="accent"
                       className="px-3 py-3"
                     />
                     <OpsMetricCard
                       icon={<BarChart3 className="h-4 w-4" />}
-                      label="Semana"
+                      label={HOME.sales.weekLabel}
                       value={personalSales.week.sale_count}
                       tone={personalSales.week.sale_count === 0 ? "neutral" : "info"}
                       className="px-3 py-3"
                     />
                     <OpsMetricCard
                       icon={<Wallet className="h-4 w-4" />}
-                      label="Facturado hoy"
+                      label={HOME.sales.todayInvoiced}
                       value={formatCurrency(personalSales.today.total_amount)}
                       tone="accent"
                       className="px-3 py-3"
@@ -413,19 +419,19 @@ export default function InicioPage() {
 
                   <div className="mt-3">
                     {personalSales.last_sale ? (
-                      <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_52%,var(--ops-surface))] px-4 py-3">
+                      <div className={`rounded-xl border border-[var(--ops-border-strong)] ${SURFACE_MUTED_52} px-4 py-3`}>
                         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                          Ultima venta confirmada
+                          {HOME.sales.lastSale}
                         </p>
                         <div className="mt-2 flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="text-sm font-semibold text-[var(--ops-text)]">
                               {personalSales.last_sale.sale_number ||
-                                "Venta registrada"}
+                                HOME.sales.noSaleNumber}
                             </p>
                             <p className="mt-1 truncate text-sm text-[var(--ops-text-muted)]">
                               {personalSales.last_sale.customer_name_text ||
-                                "Cliente general"}
+                                HOME.sales.genericCustomer}
                             </p>
                             <p className="mt-1 text-[13px] text-[var(--ops-text-muted)]">
                               {formatDateTime(
@@ -443,8 +449,8 @@ export default function InicioPage() {
                     ) : (
                       <OpsEmptyState
                         variant="compact"
-                        title="Sin ventas personales todavía"
-                        description="Cuando confirmes una venta en tu sede activa, aparecerá aquí como referencia rápida."
+                        title={HOME.sales.noSalesTitle}
+                        description={HOME.sales.noSalesDesc}
                       />
                     )}
                   </div>
@@ -458,14 +464,14 @@ export default function InicioPage() {
                   <div className="flex items-center gap-2">
                     <Wallet className="h-4 w-4 text-[var(--ripnel-accent)]" />
                     <h2 className="text-base font-semibold text-[var(--ops-text)]">
-                      Caja de mi sede
+                      {HOME.cash.sectionTitle}
                     </h2>
                   </div>
                   <Link
                     href={appRoutes.cash}
                     className="text-[13px] font-medium text-[var(--ripnel-accent)] transition hover:underline"
                   >
-                    Ver caja
+                    {HOME.cash.viewCash}
                   </Link>
                 </div>
 
@@ -473,55 +479,55 @@ export default function InicioPage() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                        Estado de jornada
+                        {HOME.cash.shiftStatus}
                       </p>
                       <p className="mt-1 text-lg font-semibold text-[var(--ops-text)]">
                         {formatCashState(cashSection.closing?.status)}
                       </p>
                       <p className="mt-1 text-sm text-[var(--ops-text-muted)]">
                         {!cashSection.closing
-                          ? "Conviene aperturar antes de apoyarte en los totales del dia."
+                          ? HOME.cash.noClosingHint
                           : cashConsistency?.is_consistent === false
-                            ? "Hay una diferencia entre ventas y pagos registrados."
-                            : "La sede ya tiene una sesion de caja activa o cerrada para hoy."}
+                            ? HOME.cash.inconsistentHint
+                            : HOME.cash.consistentHint}
                       </p>
                     </div>
 
                     <span
-                      className={`inline-flex rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] ${
+                      className={
                         !cashConsistency
-                          ? "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]"
+                          ? CASH_NO_SUMMARY_BADGE
                           : cashConsistency.is_consistent
-                            ? "border-emerald-300/70 bg-[color:color-mix(in_srgb,#22c55e_12%,var(--ops-surface))] text-emerald-700"
-                            : "border-amber-300/70 bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] text-amber-700"
-                      }`}
+                            ? CASH_CONSISTENT_BADGE
+                            : CASH_INCONSISTENT_BADGE
+                      }
                     >
                       {!cashConsistency
-                        ? "Sin resumen"
+                        ? HOME.cash.noSummary
                         : cashConsistency.is_consistent
-                          ? "Caja cuadra"
-                          : "Revisar diferencia"}
+                          ? HOME.cash.consistent
+                          : HOME.cash.reviewDiff}
                     </span>
                   </div>
 
                   <div className="mt-3 grid gap-2 sm:grid-cols-3">
                     <OpsMetricCard
                       icon={<ShoppingCart className="h-4 w-4" />}
-                      label="Ventas"
+                      label={HOME.cash.sales}
                       value={formatCurrency(cashConsistency?.sales_total)}
                       tone={cashConsistency ? "accent" : "neutral"}
                       className="px-3 py-3"
                     />
                     <OpsMetricCard
                       icon={<Wallet className="h-4 w-4" />}
-                      label="Pagos"
+                      label={HOME.cash.payments}
                       value={formatCurrency(cashConsistency?.payment_total)}
                       tone={cashConsistency ? "info" : "neutral"}
                       className="px-3 py-3"
                     />
                     <OpsMetricCard
                       icon={<CircleAlert className="h-4 w-4" />}
-                      label="Diferencia"
+                      label={HOME.cash.difference}
                       value={formatCurrency(cashConsistency?.difference)}
                       tone={
                         !cashConsistency
@@ -547,37 +553,37 @@ export default function InicioPage() {
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="h-4 w-4 text-[var(--ripnel-accent)]" />
                     <h2 className="text-base font-semibold text-[var(--ops-text)]">
-                      Vision gerencial
+                      {HOME.admin.sectionTitle}
                     </h2>
                   </div>
                   <Link
                     href={appRoutes.dashboard}
                     className="text-[13px] font-medium text-[var(--ripnel-accent)] transition hover:underline"
                   >
-                    Ir al panel
+                    {HOME.admin.goToPanel}
                   </Link>
                 </div>
 
                 <div className="grid gap-2 sm:grid-cols-3">
                   <OpsMetricCard
                     icon={<Users className="h-4 w-4" />}
-                    label="Usuarios activos"
+                    label={HOME.admin.activeUsers}
                     value={adminSection.active_user_count}
-                    detail={`${adminSection.active_location_count} sede(s)`}
+                    detail={HOME.admin.locationsDetail(adminSection.active_location_count)}
                     tone="accent"
                   />
                   <OpsMetricCard
                     icon={<Store className="h-4 w-4" />}
-                    label="Sedes asignadas"
+                    label={HOME.admin.assignedLocations}
                     value={adminSection.active_location_count}
-                    detail="Activas"
+                    detail={HOME.admin.activeDetail}
                     tone="info"
                   />
                   <OpsMetricCard
                     icon={<ClipboardList className="h-4 w-4" />}
-                    label="Solicitudes abiertas"
+                    label={HOME.admin.openRequests}
                     value={adminSection.pending_requests_count}
-                    detail="Red asignada"
+                    detail={HOME.admin.networkDetail}
                     tone="success"
                   />
                 </div>
@@ -590,18 +596,18 @@ export default function InicioPage() {
                   <div className="flex items-center gap-2">
                     <PackageSearch className="h-4 w-4 text-[var(--ripnel-accent)]" />
                     <h2 className="text-base font-semibold text-[var(--ops-text)]">
-                      Stock sensible
+                      {HOME.inventory.sensibleStock}
                     </h2>
                   </div>
                   <Link
                     href={`${appRoutes.inventory}?status=con-alertas`}
                     className="text-[13px] font-medium text-[var(--ripnel-accent)] transition hover:underline"
                   >
-                    Ver stock actual
+                    {HOME.inventory.viewStock}
                   </Link>
                 </div>
 
-                <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_30%,var(--ops-surface))]">
+                <div className={`rounded-xl border border-[var(--ops-border-strong)] ${SURFACE_MUTED_30}`}>
                   <HomeCriticalStockTable
                     items={inventorySection.critical_variants}
                     lowStockThreshold={inventorySection.low_stock_threshold}
@@ -618,14 +624,14 @@ export default function InicioPage() {
               <div className="flex items-center gap-2">
                 <ArrowLeftRight className="h-4 w-4 text-[var(--ripnel-accent)]" />
                 <h2 className="text-base font-semibold text-[var(--ops-text)]">
-                  Transferencias entre tiendas
+                  {HOME.transfer.sectionTitle}
                 </h2>
               </div>
               <Link
                 href={buildTransferListRoute()}
                 className="text-[13px] font-medium text-[var(--ripnel-accent)] transition hover:underline"
               >
-                Ver todas
+                {HOME.transfer.viewAll}
               </Link>
             </div>
 
@@ -642,8 +648,8 @@ export default function InicioPage() {
           <div className="rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-6">
             <OpsEmptyState
               variant="compact"
-              title="Sin indicadores visibles para tu sesión"
-              description="El inicio mostrará módulos operativos cuando tu usuario tenga sede activa y capacidades asociadas."
+              title={HOME.noContentTitle}
+              description={HOME.noContentDesc}
             />
           </div>
         )}

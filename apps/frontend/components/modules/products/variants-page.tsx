@@ -15,11 +15,7 @@ import {
   Save,
   Shirt,
 } from "lucide-react";
-import {
-  AdminCheckboxOption,
-  AdminConfirmModal,
-  AdminRowActionsMenu,
-} from "@/components/admin/admin-ui";
+import { AdminRowActionsMenu } from "@/components/admin/admin-ui";
 import { ApiEnvelope, apiFetch, unwrapApiData } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/date-utils";
@@ -40,11 +36,18 @@ import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { ProductStatus, StatusFilter, StyleBase } from "@/types/products";
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
+import { OpsDialog } from "@/components/ui/ops-dialog";
+import { showSuccess } from "@/lib/toast";
+import { PRODUCTS } from "./products-messages";
+import {
+  MSG_BOX_VARIANTS_ERROR,
+  VARIANT_WARNING_DANGER,
+  VARIANT_WARNING_WARNING,
+} from "./products-constants";
 
 type StyleItem = StyleBase & {
   configured_size_count: number;
@@ -140,9 +143,9 @@ const STYLE_PAGE_SIZE = 10;
 const VARIANT_PAGE_SIZE = 10;
 
 const STATUS_FILTER_OPTIONS = [
-  { value: "all", label: "Todos" },
-  { value: "active", label: "Activos" },
-  { value: "inactive", label: "Inactivos" },
+  { value: "all", label: PRODUCTS.variants.filters.statusOptions.all },
+  { value: "active", label: PRODUCTS.variants.filters.statusOptions.active },
+  { value: "inactive", label: PRODUCTS.variants.filters.statusOptions.inactive },
 ] as const;
 
 const initialFormState: VariantFormState = {
@@ -214,27 +217,12 @@ function variantStatusTone(status: StyleItem["status"]) {
 }
 
 function getStatusLabel(status: StyleItem["status"]) {
-  if (status === "pending_variants") {
-    return "Faltan variantes";
-  }
-
-  if (status === "pending_prices") {
-    return "Faltan precios";
-  }
-
-  if (status === "ready_no_stock") {
-    return "Listo sin stock";
-  }
-
-  if (status === "draft") {
-    return "Borrador";
-  }
-
-  if (status === "ready") {
-    return "Listo";
-  }
-
-  return "Inactivo";
+  if (status === "pending_variants") return PRODUCTS.statusLabels.pendingVariants
+  if (status === "pending_prices") return PRODUCTS.statusLabels.pendingPrices
+  if (status === "ready_no_stock") return PRODUCTS.statusLabels.readyNoStock
+  if (status === "draft") return PRODUCTS.statusLabels.draft
+  if (status === "ready") return PRODUCTS.statusLabels.ready
+  return PRODUCTS.statusLabels.inactive
 }
 
 export function VariantsPage({
@@ -261,7 +249,6 @@ export function VariantsPage({
   const [togglingVariantId, setTogglingVariantId] = useState<string | null>(null);
   const [pendingStatusVariant, setPendingStatusVariant] = useState<VariantItem | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const selectedStyleExists = useMemo(
     () => styles.some((style) => style.style_id === selectedStyleId),
     [selectedStyleId, styles]
@@ -291,7 +278,7 @@ export function VariantsPage({
       setError(
         requestError instanceof Error
           ? requestError.message
-          : "No se pudo cargar la base de Variantes"
+          : PRODUCTS.variants.loadError
       );
     } finally {
       setLoading(false);
@@ -317,7 +304,7 @@ export function VariantsPage({
       setError(
         requestError instanceof Error
           ? requestError.message
-          : "No se pudo cargar la configuracion del style"
+          : PRODUCTS.variants.configLoadError
       );
       setSelectedSnapshot(null);
       setSelectedWorkspace(null);
@@ -452,7 +439,6 @@ export function VariantsPage({
 
   function handleSelectStyle(styleId: string) {
     setSelectedStyleId(styleId);
-    setSuccessMessage(null);
     setError(null);
     setVariantSearch("");
     setVariantStatusFilter("all");
@@ -461,7 +447,6 @@ export function VariantsPage({
 
   function handleClearSelectedStyle() {
     setSelectedStyleId("");
-    setSuccessMessage(null);
     setError(null);
     resetVariantViewState();
     router.push("/productos/variantes");
@@ -477,7 +462,6 @@ export function VariantsPage({
 
     setSavingConfig(true);
     setError(null);
-    setSuccessMessage(null);
 
     try {
       await requestApiData<VariantSnapshot>(`/api/variants/styles/${resolvedSelectedStyleId}/config`, {
@@ -489,7 +473,7 @@ export function VariantsPage({
       });
 
       await loadStyleSnapshot(resolvedSelectedStyleId);
-      setSuccessMessage("Configuracion guardada correctamente.");
+      showSuccess("Configuracion guardada correctamente.");
       await loadBaseData();
     } catch (requestError) {
       setError(
@@ -509,7 +493,6 @@ export function VariantsPage({
 
     setGenerating(true);
     setError(null);
-    setSuccessMessage(null);
 
     try {
       const result = await requestApiData<{
@@ -522,7 +505,7 @@ export function VariantsPage({
 
       await loadStyleSnapshot(resolvedSelectedStyleId);
       await loadBaseData();
-      setSuccessMessage(
+      showSuccess(
         `Generacion completada. Se crearon ${result.created_count} variantes y ${result.existing_count} ya existian.`
       );
     } catch (requestError) {
@@ -539,7 +522,6 @@ export function VariantsPage({
   async function handleToggleVariantActive(variant: VariantItem) {
     setTogglingVariantId(variant.variant_id);
     setError(null);
-    setSuccessMessage(null);
 
     try {
       await requestApiData<VariantItem>(`/api/variants/${variant.variant_id}`, {
@@ -553,7 +535,7 @@ export function VariantsPage({
         await loadStyleSnapshot(resolvedSelectedStyleId);
       }
 
-      setSuccessMessage(
+      showSuccess(
         variant.active
           ? "Variante inactivada correctamente."
           : "Variante activada correctamente."
@@ -571,392 +553,419 @@ export function VariantsPage({
   }
 
   return (
-    <TooltipProvider delayDuration={120}>
-      <OpsPageShell width="wide">
-          <PosHeader
-            eyebrow="Productos"
-            title="Variantes de producto"
-            actions={
-              <>
-                {resolvedSelectedStyleId ? (
+    <OpsPageShell width="wide">
+        <PosHeader
+          eyebrow={PRODUCTS.header.eyebrow}
+          title={PRODUCTS.variants.header.title}
+          actions={
+            <>
+              {resolvedSelectedStyleId ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-lg"
+                  onClick={handleClearSelectedStyle}
+                >
+                  {PRODUCTS.actions.backToVariants}
+                </Button>
+              ) : null}
+              <Tooltip>
+                <TooltipTrigger asChild>
                   <Button
                     type="button"
                     variant="outline"
-                    size="sm"
+                    size="icon-sm"
+                    onClick={loadBaseData}
+                    disabled={loading}
+                    aria-label={PRODUCTS.variants.actions.refresh}
                     className="rounded-lg"
-                    onClick={handleClearSelectedStyle}
                   >
-                    Volver a variantes
+                    <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
                   </Button>
-                ) : null}
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={8}>
+                  {PRODUCTS.actions.refresh}
+                </TooltipContent>
+              </Tooltip>
+            </>
+          }
+        />
+
+        <OpsMetricInlineGroup items={[
+          { label: PRODUCTS.metrics.stylesBase, value: styles.length },
+          { label: PRODUCTS.metrics.readyCount, value: readyStylesCount, tone: "accent" },
+          { label: PRODUCTS.metrics.pendingCount, value: pendingStylesCount, tone: "warning" },
+        ]} />
+
+        <div className="space-y-5">
+          {!resolvedSelectedStyleId ? (
+            <OpsSectionDivider className="space-y-4">
+              <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_auto]">
+                <OpsSearchField
+                  value={styleSearch}
+                  onChange={(value) => {
+                    setStyleSearch(value);
+                    setStylePage(1);
+                  }}
+                  placeholder={PRODUCTS.variants.filters.searchPlaceholder}
+                  ariaLabel={PRODUCTS.variants.filters.searchAriaLabel}
+                />
+
+                <OpsSelect
+                  label={PRODUCTS.variants.table.columns.status}
+                  value={styleStatusFilter}
+                  options={STATUS_FILTER_OPTIONS}
+                  onChange={(v) => {
+                    setStyleStatusFilter(v as StatusFilter);
+                    setStylePage(1);
+                  }}
+                />
+
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       type="button"
+                      onClick={() => {
+                        setStyleSearch("");
+                        setStyleStatusFilter("all");
+                        setStylePage(1);
+                      }}
+                      disabled={!styleSearch.trim() && styleStatusFilter === "all"}
                       variant="outline"
                       size="icon-sm"
-                      onClick={loadBaseData}
-                      disabled={loading}
-                      aria-label="Actualizar variantes"
-                      className="rounded-lg"
+                      className="h-10 w-10 rounded-lg"
+                      aria-label={PRODUCTS.actions.clearFilters}
                     >
-                      <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                      <RotateCcw className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="top" sideOffset={8}>
-                    Actualizar
+                    {PRODUCTS.actions.clearFilters}
                   </TooltipContent>
                 </Tooltip>
-              </>
-            }
-          />
+              </OpsFiltersRow>
 
-          <OpsMetricInlineGroup items={[
-            { label: "Styles base", value: styles.length },
-            { label: "Listos", value: readyStylesCount, tone: "accent" },
-            { label: "Por completar", value: pendingStylesCount, tone: "warning" },
-          ]} />
-
-          <div className="space-y-5">
-            {!resolvedSelectedStyleId ? (
-              <OpsSectionDivider className="space-y-4">
-                <OpsFiltersRow className="lg:grid-cols-[1.45fr_0.84fr_auto]">
-                  <OpsSearchField
-                    value={styleSearch}
-                    onChange={(value) => {
-                      setStyleSearch(value);
-                      setStylePage(1);
-                    }}
-                    placeholder="Buscar por código, nombre o tipo"
-                    ariaLabel="Buscar styles para variantes"
-                  />
-
-                  <OpsSelect
-                    label="Estado"
-                    value={styleStatusFilter}
-                    options={STATUS_FILTER_OPTIONS}
-                    onChange={(v) => {
-                      setStyleStatusFilter(v as StatusFilter);
-                      setStylePage(1);
-                    }}
-                  />
-
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          setStyleSearch("");
-                          setStyleStatusFilter("all");
-                          setStylePage(1);
-                        }}
-                        disabled={!styleSearch.trim() && styleStatusFilter === "all"}
-                        variant="outline"
-                        size="icon-sm"
-                        className="h-10 w-10 rounded-lg"
-                        aria-label="Limpiar filtros"
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" sideOffset={8}>
-                      Limpiar filtros
-                    </TooltipContent>
-                  </Tooltip>
-                </OpsFiltersRow>
-
-                <OpsTableWrap minWidth="1080px">
-                    <table className="w-full border-collapse">
-                      <thead className="bg-[var(--ops-surface-muted)]">
-                        <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                          <th className="px-4 py-3">Style</th>
-                          <th className="px-4 py-3">Tipo</th>
-                          <th className="px-4 py-3">Variantes</th>
-                          <th className="px-4 py-3">Siguiente paso</th>
-                          <th className="px-4 py-3">Config.</th>
-                          <th className="px-4 py-3">Cobertura</th>
-                          <th className="px-4 py-3">Estado</th>
-                          <th className="px-4 py-3 text-right">Acciones</th>
+              <OpsTableWrap minWidth="1080px">
+                  <table className="w-full border-collapse">
+                    <thead className="bg-[var(--ops-surface-muted)]">
+                      <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                        <th className="px-4 py-3">{PRODUCTS.variants.table.columns.style}</th>
+                        <th className="px-4 py-3">{PRODUCTS.variants.table.columns.type}</th>
+                        <th className="px-4 py-3">{PRODUCTS.variants.table.columns.variants}</th>
+                        <th className="px-4 py-3">{PRODUCTS.variants.table.columns.nextStep}</th>
+                        <th className="px-4 py-3">{PRODUCTS.variants.table.columns.config}</th>
+                        <th className="px-4 py-3">{PRODUCTS.variants.table.columns.coverage}</th>
+                        <th className="px-4 py-3">{PRODUCTS.variants.table.columns.status}</th>
+                        <th className="px-4 py-3 text-right">{PRODUCTS.variants.table.columns.actions}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
+                      {loading ? (
+                        <tr>
+                          <td colSpan={8} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
+                            <LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />
+                            {PRODUCTS.variants.table.loading}
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-                        {loading ? (
-                          <tr>
-                            <td colSpan={8} className="px-4 py-10 text-center text-sm text-[var(--ops-text-muted)]">
-                              <LoaderCircle className="mx-auto mb-2 h-5 w-5 animate-spin" />
-                              Cargando styles…
+                      ) : paginatedStyles.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="px-4 py-10">
+                            <OpsEmptyState variant="compact" description={PRODUCTS.variants.empty.withFilters} />
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedStyles.map((style) => (
+                          <tr
+                            key={style.style_id}
+                            className={cn(
+                              "transition hover:bg-[var(--ops-surface-muted)]",
+                              !style.active && "opacity-75"
+                            )}
+                          >
+                            <td className="px-4 py-[var(--ops-row-py)]">
+                              <p className="truncate max-w-[200px] text-sm font-semibold text-[var(--ops-text)]">
+                                {style.name}
+                              </p>
+                              <div className="mt-1 flex items-center gap-2">
+                                <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--ripnel-accent-hover)]">
+                                  {style.style_code || PRODUCTS.variants.table.noCode}
+                                </span>
+                                <span className="text-[11px] text-[var(--ops-text-muted)]">
+                                  {formatDate(style.created_at)}
+                                </span>
+                              </div>
                             </td>
-                          </tr>
-                        ) : paginatedStyles.length === 0 ? (
-                          <tr>
-                            <td colSpan={8} className="px-4 py-10">
-                              <OpsEmptyState variant="compact" description="No hay styles para este filtro." />
+                            <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{style.garment_type_name}</td>
+                            <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                              {style.variant_count}/{style.expected_variant_count}
                             </td>
-                          </tr>
-                        ) : (
-                          paginatedStyles.map((style) => (
-                            <tr
-                              key={style.style_id}
-                              className={cn(
-                                "transition hover:bg-[var(--ops-surface-muted)]",
-                                !style.active && "opacity-75"
-                              )}
-                            >
-                              <td className="px-4 py-[var(--ops-row-py)]">
-                                <p className="truncate max-w-[200px] text-sm font-semibold text-[var(--ops-text)]">
-                                  {style.name}
-                                </p>
-                                <div className="mt-1 flex items-center gap-2">
-                                  <span className="text-[11px] uppercase tracking-[0.16em] text-[var(--ripnel-accent-hover)]">
-                                    {style.style_code || "Sin codigo"}
-                                  </span>
-                                  <span className="text-[11px] text-[var(--ops-text-muted)]">
-                                    {formatDate(style.created_at)}
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{style.garment_type_name}</td>
-                              <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                            <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                              {style.next_step_label}
+                            </td>
+                            <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                              <p>{style.configured_size_count} {PRODUCTS.form.sizes.toLowerCase()}</p>
+                              <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">
+                                {style.configured_color_count} {PRODUCTS.form.colors.toLowerCase()}
+                              </p>
+                            </td>
+                            <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
+                              <p>
                                 {style.variant_count}/{style.expected_variant_count}
-                              </td>
-                              <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
-                                {style.next_step_label}
-                              </td>
-                              <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
-                                <p>{style.configured_size_count} tallas</p>
-                                <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">
-                                  {style.configured_color_count} colores
-                                </p>
-                              </td>
-                              <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">
-                                <p>
-                                  {style.variant_count}/{style.expected_variant_count}
-                                </p>
-                                <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">
-                                  retail {style.retail_sizes_covered_count}/{style.configured_size_count}
-                                </p>
-                              </td>
-                              <td className="px-4 py-[var(--ops-row-py)]">
-                                <OpsStatusBadge tone={variantStatusTone(style.status)}>
-                                  {getStatusLabel(style.status)}
-                                </OpsStatusBadge>
-                              </td>
-                              <td className="px-4 py-[var(--ops-row-py)] text-right">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="rounded-lg px-3"
-                                  onClick={() => {
-                                    handleSelectStyle(style.style_id);
-                                    router.push(`/productos/variantes?style_id=${encodeURIComponent(style.style_id)}`);
-                                  }}
-                                >
-                                  Configurar
-                                </Button>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                </OpsTableWrap>
-
-                {!loading ? (
-                  <OpsTableFooter>
-                    <span className="ops-secondary-text text-[var(--ops-text-muted)]">
-                      {filteredStyles.length === 0
-                        ? "0 resultados"
-                        : `${styleFirstVisible}-${styleLastVisible} de ${filteredStyles.length}`}
-                    </span>
-                    <Pagination
-                      page={safeStylePage}
-                      totalPages={styleTotalPages}
-                      onPageChange={setStylePage}
-                      className="self-end md:self-auto"
-                    />
-                  </OpsTableFooter>
-                ) : null}
-              </OpsSectionDivider>
-            ) : null}
-
-            {resolvedSelectedStyleId ? (
-              <article className="ops-surface rounded-lg border p-4 md:p-5">
-                {loadingSelected ? (
-                  <div className="ops-text-muted flex min-h-56 items-center justify-center">
-                    <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
-                    Cargando configuracion…
-                  </div>
-                ) : selectedSnapshot ? (
-                  <div className="space-y-5">
-                    <div
-                      className={`border-b border-[var(--ops-border-strong)] pb-4 ${
-                        selectedSnapshot.style.active ? "" : "opacity-75"
-                      }`}
-                    >
-                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h2 className="ops-title text-xl font-semibold">
-                              {selectedSnapshot.style.name}
-                            </h2>
-                            {selectedSnapshot.style.style_code ? (
-                              <span className="ops-surface rounded-full border border-[color:var(--ops-border-soft)] px-3 py-1 text-xs font-semibold text-[var(--ops-text-muted)]">
-                                {selectedSnapshot.style.style_code}
-                              </span>
-                            ) : null}
-                            {selectedProduct ? (
-                              <OpsStatusBadge tone={variantStatusTone(selectedProduct.status)}>
-                                {getStatusLabel(selectedProduct.status)}
+                              </p>
+                              <p className="mt-1 text-[11px] text-[var(--ops-text-muted)]">
+                                {PRODUCTS.table.coverageLabels.retail} {style.retail_sizes_covered_count}/{style.configured_size_count}
+                              </p>
+                            </td>
+                            <td className="px-4 py-[var(--ops-row-py)]">
+                              <OpsStatusBadge tone={variantStatusTone(style.status)}>
+                                {getStatusLabel(style.status)}
                               </OpsStatusBadge>
-                            ) : null}
-                            <OpsStatusBadge tone={selectedSnapshot.style.active ? "success" : "neutral"}>
-                              {selectedSnapshot.style.active ? "Activo" : "Inactivo"}
-                            </OpsStatusBadge>
-                          </div>
-                          <div className="mt-3 grid gap-2 text-sm md:grid-cols-2 text-[var(--ops-text-muted)]">
-                            <p>
-                              <span className="font-medium text-[var(--ops-text)]">Tipo:</span>{" "}
-                              {selectedSnapshot.style.garment_type_name}
-                            </p>
-                            <p>
-                              <span className="font-medium text-[var(--ops-text)]">Siguiente paso:</span>{" "}
-                              {selectedProduct?.next_step_label || "Configurar variantes"}
-                            </p>
-                            <p>
-                              <span className="font-medium text-[var(--ops-text)]">Variantes:</span>{" "}
-                              {selectedSnapshot.summary.existing_count} /{" "}
-                              {selectedSnapshot.summary.total_possible}
-                            </p>
-                            {selectedProduct ? (
-                              <>
-                                <p>
-                                  <span className="font-medium text-[var(--ops-text)]">Retail:</span>{" "}
-                                  {selectedProduct.retail_sizes_covered_count} /{" "}
-                                  {selectedProduct.configured_size_count}
-                                </p>
-                                <p>
-                                  <span className="font-medium text-[var(--ops-text)]">Mayorista:</span>{" "}
-                                  {selectedProduct.wholesale_sizes_covered_count} /{" "}
-                                  {selectedProduct.configured_size_count}
-                                </p>
-                              </>
-                            ) : null}
-                          </div>
-                        </div>
-                        <Shirt className="h-10 w-10 text-[var(--ops-text-muted)]" />
-                      </div>
-                    </div>
+                            </td>
+                            <td className="px-4 py-[var(--ops-row-py)] text-right">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="rounded-lg px-3"
+                                onClick={() => {
+                                  handleSelectStyle(style.style_id);
+                                  router.push(`/productos/variantes?style_id=${encodeURIComponent(style.style_id)}`);
+                                }}
+                              >
+                                Configurar
+                              </Button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+              </OpsTableWrap>
 
-                    {selectedProduct ? (
+              {!loading ? (
+                <OpsTableFooter>
+                  <span className="ops-secondary-text text-[var(--ops-text-muted)]">
+                    {filteredStyles.length === 0
+                      ? PRODUCTS.variants.table.zeroResults
+                      : `${styleFirstVisible}-${styleLastVisible} de ${filteredStyles.length}`}
+                  </span>
+                  <Pagination
+                    page={safeStylePage}
+                    totalPages={styleTotalPages}
+                    onPageChange={setStylePage}
+                    className="self-end md:self-auto"
+                  />
+                </OpsTableFooter>
+              ) : null}
+            </OpsSectionDivider>
+          ) : null}
+
+          {resolvedSelectedStyleId ? (
+            <article className="ops-surface rounded-lg border p-4 md:p-5">
+              {loadingSelected ? (
+                <div className="ops-text-muted flex min-h-56 items-center justify-center">
+                  <LoaderCircle className="mr-2 h-5 w-5 animate-spin" />
+                  {PRODUCTS.variants.loadingConfig}
+                </div>
+              ) : selectedSnapshot ? (
+                <div className="space-y-5">
+                  <div
+                    className={`border-b border-[var(--ops-border-strong)] pb-4 ${
+                      selectedSnapshot.style.active ? "" : "opacity-75"
+                    }`}
+                  >
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
-                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                          <div className="space-y-3">
-                            <OpsMetricInlineGroup items={[
-                              {
-                                label: "Retail",
-                                value: `${selectedProduct.retail_sizes_covered_count}/${selectedProduct.configured_size_count}`,
-                                tone: "success",
-                              },
-                              {
-                                label: "Mayorista",
-                                value: `${selectedProduct.wholesale_sizes_covered_count}/${selectedProduct.configured_size_count}`,
-                                tone: "accent",
-                              },
-                              { label: "Stock", value: selectedProduct.total_stock_qty },
-                              { label: "Siguiente paso", value: selectedProduct.next_step_label },
-                            ]} />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h2 className="ops-title text-xl font-semibold">
+                            {selectedSnapshot.style.name}
+                          </h2>
+                          {selectedSnapshot.style.style_code ? (
+                            <span className="ops-surface rounded-full border border-[color:var(--ops-border-soft)] px-3 py-1 text-xs font-semibold text-[var(--ops-text-muted)]">
+                              {selectedSnapshot.style.style_code}
+                            </span>
+                          ) : null}
+                          {selectedProduct ? (
+                            <OpsStatusBadge tone={variantStatusTone(selectedProduct.status)}>
+                              {getStatusLabel(selectedProduct.status)}
+                            </OpsStatusBadge>
+                          ) : null}
+                          <OpsStatusBadge tone={selectedSnapshot.style.active ? "success" : "neutral"}>
+                            {selectedSnapshot.style.active ? "Activo" : PRODUCTS.statusLabels.inactive}
+                          </OpsStatusBadge>
+                        </div>
+                        <div className="mt-3 grid gap-2 text-sm md:grid-cols-2 text-[var(--ops-text-muted)]">
+                          <p>
+                            <span className="font-medium text-[var(--ops-text)]">{PRODUCTS.variants.detail.labels.type}</span>{" "}
+                            {selectedSnapshot.style.garment_type_name}
+                          </p>
+                          <p>
+                            <span className="font-medium text-[var(--ops-text)]">{PRODUCTS.variants.detail.labels.nextStep}</span>{" "}
+                            {selectedProduct?.next_step_label || "Configurar variantes"}
+                          </p>
+                          <p>
+                            <span className="font-medium text-[var(--ops-text)]">{PRODUCTS.variants.detail.labels.variants}</span>{" "}
+                            {selectedSnapshot.summary.existing_count} /{" "}
+                            {selectedSnapshot.summary.total_possible}
+                          </p>
+                          {selectedProduct ? (
+                            <>
+                              <p>
+                                <span className="font-medium text-[var(--ops-text)]">{PRODUCTS.variants.detail.labels.retail}</span>{" "}
+                                {selectedProduct.retail_sizes_covered_count} /{" "}
+                                {selectedProduct.configured_size_count}
+                              </p>
+                              <p>
+                                <span className="font-medium text-[var(--ops-text)]">{PRODUCTS.variants.detail.labels.wholesale}</span>{" "}
+                                {selectedProduct.wholesale_sizes_covered_count} /{" "}
+                                {selectedProduct.configured_size_count}
+                              </p>
+                            </>
+                          ) : null}
+                        </div>
+                      </div>
+                      <Shirt className="h-10 w-10 text-[var(--ops-text-muted)]" />
+                    </div>
+                  </div>
 
-                            <div className="flex flex-wrap gap-2">
-                              {selectedProduct.missing_retail_size_count > 0 ? (
-                                <span className="inline-flex items-center gap-1 rounded-full border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-2.5 py-1 text-xs font-semibold text-[color:color-mix(in_srgb,#e11d48_74%,var(--ops-text))]">
-                                  <CircleAlert className="h-3.5 w-3.5" />
-                                  Faltan {selectedProduct.missing_retail_size_count} tallas retail
-                                </span>
-                              ) : null}
-                              {selectedProduct.warnings.missing_wholesale_prices ? (
-                                <span className="inline-flex rounded-full border border-[color:color-mix(in_srgb,#f59e0b_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f59e0b_14%,var(--ops-surface))] px-2.5 py-1 text-xs font-semibold text-[color:color-mix(in_srgb,#d97706_74%,var(--ops-text))]">
-                                  Mayorista incompleto
-                                </span>
-                              ) : null}
-                              {selectedProduct.warnings.stock_without_retail_price ? (
-                                <span className="inline-flex items-center gap-1 rounded-full border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_14%,var(--ops-surface))] px-2.5 py-1 text-xs font-semibold text-[color:color-mix(in_srgb,#e11d48_74%,var(--ops-text))]">
-                                  <CircleAlert className="h-3.5 w-3.5" />
-                                  Stock sin precio retail
-                                </span>
-                              ) : null}
-                            </div>
-                          </div>
+                  {selectedProduct ? (
+                    <div>
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="space-y-3">
+                          <OpsMetricInlineGroup items={[
+                            {
+                              label: PRODUCTS.variants.detail.labels.retail,
+                              value: `${selectedProduct.retail_sizes_covered_count}/${selectedProduct.configured_size_count}`,
+                              tone: "success",
+                            },
+                            {
+                              label: PRODUCTS.variants.detail.labels.wholesale,
+                              value: `${selectedProduct.wholesale_sizes_covered_count}/${selectedProduct.configured_size_count}`,
+                              tone: "accent",
+                            },
+                            { label: PRODUCTS.table.columns.stock, value: selectedProduct.total_stock_qty },
+                            { label: PRODUCTS.variants.detail.labels.nextStep, value: selectedProduct.next_step_label },
+                          ]} />
 
                           <div className="flex flex-wrap gap-2">
-                            <Button asChild variant="accent" size="sm" className="rounded-lg px-3">
-                              <Link
-                                href={`/precios/crear?style_id=${encodeURIComponent(selectedProduct.style_id)}`}
-                              >
-                                Ir a precios
-                              </Link>
-                            </Button>
-                            <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
-                              <Link
-                                href={`/precios?style_id=${encodeURIComponent(selectedProduct.style_id)}`}
-                              >
-                                Ver historial
-                              </Link>
-                            </Button>
+                            {selectedProduct.missing_retail_size_count > 0 ? (
+                              <span className={VARIANT_WARNING_DANGER}>
+                                <CircleAlert className="h-3.5 w-3.5" />
+                                {PRODUCTS.warnings.missingRetailSizes(selectedProduct.missing_retail_size_count)}
+                              </span>
+                            ) : null}
+                            {selectedProduct.warnings.missing_wholesale_prices ? (
+                              <span className={VARIANT_WARNING_WARNING}>
+                                {PRODUCTS.warnings.wholesaleIncomplete}
+                              </span>
+                            ) : null}
+                            {selectedProduct.warnings.stock_without_retail_price ? (
+                              <span className={VARIANT_WARNING_DANGER}>
+                                <CircleAlert className="h-3.5 w-3.5" />
+                                {PRODUCTS.warnings.stockWithoutRetailPrice}
+                              </span>
+                            ) : null}
                           </div>
                         </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <Button asChild variant="accent" size="sm" className="rounded-lg px-3">
+                            <Link
+                              href={`/precios/crear?style_id=${encodeURIComponent(selectedProduct.style_id)}`}
+                            >
+                              {PRODUCTS.actions.goToPrices}
+                            </Link>
+                          </Button>
+                          <Button asChild variant="outline" size="sm" className="rounded-lg px-3">
+                            <Link
+                              href={`/precios?style_id=${encodeURIComponent(selectedProduct.style_id)}`}
+                            >
+                              {PRODUCTS.actions.viewHistory}
+                            </Link>
+                          </Button>
+                        </div>
                       </div>
-                    ) : null}
+                    </div>
+                  ) : null}
 
                 <form onSubmit={handleSaveConfig} className="space-y-5">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-3">
-                      <label className="text-sm font-semibold text-[var(--ops-text)]">Tallas</label>
-                      <span className="text-xs text-[var(--ops-text-muted)]">Obligatorio</span>
+                      <label className="text-sm font-semibold text-[var(--ops-text)]">{PRODUCTS.form.sizes}</label>
+                      <span className="text-xs text-[var(--ops-text-muted)]">{PRODUCTS.variants.config.mandatory}</span>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                       {visibleSizes.map((size) => (
-                        <AdminCheckboxOption
+                        <label
                           key={size.size_id}
-                          label={size.name}
-                          helper={size.active ? size.code : `${size.code} · inactiva`}
-                          checked={formState.sizeIds.includes(size.size_id)}
-                          onChange={() =>
-                            setFormState((current) => ({
-                              ...current,
-                              sizeIds: toggleValue(current.sizeIds, size.size_id),
-                            }))
-                          }
-                        />
+                          className={cn(
+                            "flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 transition",
+                            formState.sizeIds.includes(size.size_id)
+                              ? "border-[var(--ops-border-soft)] bg-[var(--ripnel-accent-soft)]"
+                              : "border-[var(--ops-border-soft)] bg-[var(--ops-surface)] hover:bg-[var(--ops-surface-muted)]"
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={formState.sizeIds.includes(size.size_id)}
+                            onChange={() =>
+                              setFormState((current) => ({
+                                ...current,
+                                sizeIds: toggleValue(current.sizeIds, size.size_id),
+                              }))
+                            }
+                            className="m-0 mt-0.5 h-[0.9375rem] w-[0.9375rem] cursor-pointer rounded-[0.25rem] accent-[var(--ripnel-accent)]"
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-medium text-[var(--ops-text)]">{size.name}</span>
+                            <span className="mt-0.5 block text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                              {size.active ? size.code : `${size.code}${PRODUCTS.variants.config.inactiveSizeSuffix}`}
+                            </span>
+                          </span>
+                        </label>
                       ))}
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-3">
-                      <label className="text-sm font-semibold text-[var(--ops-text)]">Colores</label>
+                      <label className="text-sm font-semibold text-[var(--ops-text)]">{PRODUCTS.form.colors}</label>
                       <span className="text-xs text-[var(--ops-text-muted)]">
-                        Si no eliges uno, se usara UNICO
+                        {PRODUCTS.variants.config.colorsHint}
                       </span>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                       {visibleColors.map((color) => (
-                        <AdminCheckboxOption
+                        <label
                           key={color.color_id}
-                          label={color.name}
-                          helper={
-                            color.active
-                              ? color.code || "Color"
-                              : `${color.code || "Color"} · inactivo`
-                          }
-                          checked={formState.colorIds.includes(color.color_id)}
-                          onChange={() =>
-                            setFormState((current) => ({
-                              ...current,
-                              colorIds: toggleValue(current.colorIds, color.color_id),
-                            }))
-                          }
-                        />
+                          className={cn(
+                            "flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 transition",
+                            formState.colorIds.includes(color.color_id)
+                              ? "border-[var(--ops-border-soft)] bg-[var(--ripnel-accent-soft)]"
+                              : "border-[var(--ops-border-soft)] bg-[var(--ops-surface)] hover:bg-[var(--ops-surface-muted)]"
+                          )}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={formState.colorIds.includes(color.color_id)}
+                            onChange={() =>
+                              setFormState((current) => ({
+                                ...current,
+                                colorIds: toggleValue(current.colorIds, color.color_id),
+                              }))
+                            }
+                            className="m-0 mt-0.5 h-[0.9375rem] w-[0.9375rem] cursor-pointer rounded-[0.25rem] accent-[var(--ripnel-accent)]"
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-medium text-[var(--ops-text)]">{color.name}</span>
+                            <span className="mt-0.5 block text-[11px] uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                              {color.active
+                                ? color.code || PRODUCTS.form.colorFallback
+                                : `${color.code || PRODUCTS.form.colorFallback}${PRODUCTS.variants.config.inactiveColorSuffix}`}
+                            </span>
+                          </span>
+                        </label>
                       ))}
                     </div>
                   </div>
@@ -964,7 +973,7 @@ export function VariantsPage({
                   <div className="grid gap-3 md:grid-cols-3">
                     <article className="rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] p-4">
                       <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                        Tallas elegidas
+                        {PRODUCTS.variants.config.chosenSizes}
                       </p>
                       <p className="mt-2 text-2xl font-semibold text-[var(--ops-text)]">
                         {formState.sizeIds.length}
@@ -972,7 +981,7 @@ export function VariantsPage({
                     </article>
                     <article className="rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] p-4">
                       <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                        Colores elegidos
+                        {PRODUCTS.variants.config.chosenColors}
                       </p>
                       <p className="mt-2 text-2xl font-semibold text-[var(--ops-text)]">
                         {formState.colorIds.length || 1}
@@ -980,7 +989,7 @@ export function VariantsPage({
                     </article>
                     <article className="rounded-2xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] p-4">
                       <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ops-text-muted)]">
-                        Combinaciones proyectadas
+                        {PRODUCTS.variants.config.projectedCombinations}
                       </p>
                       <p className="mt-2 text-2xl font-semibold text-[var(--ops-text)]">
                         {projectedCombinations}
@@ -989,14 +998,8 @@ export function VariantsPage({
                   </div>
 
                   {error ? (
-                    <div role="alert" aria-live="polite" className="rounded-xl border border-[color:color-mix(in_srgb,#f43f5e_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#f43f5e_10%,var(--ops-surface))] px-3 py-2 text-sm text-[color:color-mix(in_srgb,#e11d48_82%,var(--ops-text))]">
+                    <div role="alert" aria-live="polite" className={MSG_BOX_VARIANTS_ERROR}>
                       {error}
-                    </div>
-                  ) : null}
-
-                  {successMessage ? (
-                    <div role="status" aria-live="polite" className="rounded-xl border border-[color:color-mix(in_srgb,#10b981_34%,var(--ops-border-strong))] bg-[color:color-mix(in_srgb,#10b981_14%,var(--ops-surface))] px-3 py-2 text-sm text-[color:color-mix(in_srgb,#059669_82%,var(--ops-text))]">
-                      {successMessage}
                     </div>
                   ) : null}
 
@@ -1011,12 +1014,12 @@ export function VariantsPage({
                       {savingConfig ? (
                         <>
                           <LoaderCircle className="h-4 w-4 animate-spin" />
-                          Guardando…
+                          {PRODUCTS.variants.config.saving}
                         </>
                       ) : (
                         <>
                           <Save className="h-4 w-4" />
-                          Guardar configuracion
+                          {PRODUCTS.variants.config.saveConfig}
                         </>
                       )}
                     </Button>
@@ -1032,12 +1035,12 @@ export function VariantsPage({
                       {generating ? (
                         <>
                           <LoaderCircle className="h-4 w-4 animate-spin" />
-                          Generando…
+                          {PRODUCTS.variants.config.generating}
                         </>
                       ) : (
                         <>
                           <PackagePlus className="h-4 w-4" />
-                          Generar variantes faltantes
+                          {PRODUCTS.variants.config.generateVariants}
                         </>
                       )}
                     </Button>
@@ -1052,12 +1055,12 @@ export function VariantsPage({
                         setVariantSearch(value);
                         setVariantPage(1);
                       }}
-                      placeholder="Buscar por SKU, talla o color"
-                      ariaLabel="Buscar variantes"
+                      placeholder={PRODUCTS.variants.filters.variantSearchPlaceholder}
+                      ariaLabel={PRODUCTS.variants.filters.variantSearchAriaLabel}
                     />
 
                     <OpsSelect
-                      label="Estado"
+                      label={PRODUCTS.variants.variantTable.columns.status}
                       value={variantStatusFilter}
                       options={STATUS_FILTER_OPTIONS}
                       onChange={(v) => {
@@ -1079,13 +1082,13 @@ export function VariantsPage({
                           variant="outline"
                           size="icon-sm"
                           className="h-10 w-10 rounded-lg"
-                          aria-label="Limpiar filtros"
+                          aria-label={PRODUCTS.actions.clearFilters}
                         >
                           <RotateCcw className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent side="top" sideOffset={8}>
-                        Limpiar filtros
+                        {PRODUCTS.actions.clearFilters}
                       </TooltipContent>
                     </Tooltip>
                   </OpsFiltersRow>
@@ -1094,19 +1097,19 @@ export function VariantsPage({
                       <table className="w-full border-collapse">
                         <thead className="bg-[var(--ops-surface-muted)]">
                           <tr className="text-left text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
-                            <th className="px-4 py-3">Variante</th>
-                            <th className="px-4 py-3">Detalle</th>
-                            <th className="px-4 py-3">SKU</th>
-                            <th className="px-4 py-3">Barcode</th>
-                            <th className="px-4 py-3">Estado</th>
-                            <th className="px-4 py-3 text-right">Acciones</th>
+                            <th className="px-4 py-3">{PRODUCTS.variants.variantTable.columns.variant}</th>
+                            <th className="px-4 py-3">{PRODUCTS.variants.variantTable.columns.detail}</th>
+                            <th className="px-4 py-3">{PRODUCTS.variants.variantTable.columns.sku}</th>
+                            <th className="px-4 py-3">{PRODUCTS.variants.variantTable.columns.barcode}</th>
+                            <th className="px-4 py-3">{PRODUCTS.variants.variantTable.columns.status}</th>
+                            <th className="px-4 py-3 text-right">{PRODUCTS.variants.variantTable.columns.actions}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
                           {paginatedVariants.length === 0 ? (
                             <tr>
                               <td colSpan={6} className="px-4 py-10">
-                                <OpsEmptyState variant="compact" description="No hay variantes para este filtro." />
+                                <OpsEmptyState variant="compact" description={PRODUCTS.variants.variantTable.empty} />
                               </td>
                             </tr>
                           ) : (
@@ -1133,10 +1136,10 @@ export function VariantsPage({
                                   </p>
                                 </td>
                                 <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{variant.sku}</td>
-                                <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{variant.barcode || "Pendiente"}</td>
+                                <td className="px-4 py-[var(--ops-row-py)] text-sm text-[var(--ops-text)]">{variant.barcode || PRODUCTS.variants.variantTable.pendingBarcode}</td>
                                 <td className="px-4 py-[var(--ops-row-py)]">
                                   <OpsStatusBadge tone={variant.active ? "success" : "neutral"}>
-                                    {variant.active ? "Activa" : "Inactiva"}
+                                    {variant.active ? PRODUCTS.variants.statusLabels.active : PRODUCTS.variants.statusLabels.inactive}
                                   </OpsStatusBadge>
                                 </td>
                                 <td className="px-4 py-[var(--ops-row-py)] text-right">
@@ -1144,7 +1147,7 @@ export function VariantsPage({
                                     ariaLabel={`Acciones para ${variant.sku}`}
                                     items={[
                                       {
-                                        label: variant.active ? "Inactivar" : "Activar",
+                                        label: variant.active ? PRODUCTS.actions.deactivate : PRODUCTS.actions.activate,
                                         icon:
                                           togglingVariantId === variant.variant_id ? (
                                             <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -1168,7 +1171,7 @@ export function VariantsPage({
                   <OpsTableFooter>
                     <span className="ops-secondary-text text-[var(--ops-text-muted)]">
                       {filteredVariants.length === 0
-                        ? "0 resultados"
+                        ? PRODUCTS.variants.variantTable.zeroResults
                         : `${variantFirstVisible}-${variantLastVisible} de ${filteredVariants.length}`}
                     </span>
                     <Pagination
@@ -1184,41 +1187,47 @@ export function VariantsPage({
                   <div className="flex min-h-56 items-center justify-center rounded-3xl border border-dashed border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] p-8 text-center">
                     <div>
                       <h3 className="text-lg font-semibold text-[var(--ops-text)]">
-                        Selecciona un style
+                        {PRODUCTS.variants.empty.selectStyle}
                       </h3>
                       <p className="mt-2 text-sm leading-6 text-[var(--ops-text-muted)]">
-                        Desde aqui definiras tallas, colores y la generacion de SKU por
-                        combinacion.
+                        {PRODUCTS.variants.empty.selectStyleDesc}
                       </p>
                     </div>
                   </div>
                 )}
-              </article>
-            ) : null}
+            </article>
+          ) : null}
+        </div>
+        <OpsDialog
+          open={Boolean(pendingStatusVariant)}
+          onOpenChange={(open) => { if (!open) setPendingStatusVariant(null) }}
+          title={pendingStatusVariant?.active ? PRODUCTS.variants.confirmModal.deactivateTitle : PRODUCTS.variants.confirmModal.activateTitle}
+          description={pendingStatusVariant?.active ? PRODUCTS.variants.confirmModal.deactivateDesc : PRODUCTS.variants.confirmModal.activateDesc}
+          size="sm"
+        >
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" onClick={() => setPendingStatusVariant(null)}>
+              Cancelar
+            </Button>
+            <Button
+              variant={pendingStatusVariant?.active ? "destructive" : "accent"}
+              disabled={Boolean(pendingStatusVariant && togglingVariantId === pendingStatusVariant.variant_id)}
+              onClick={() => {
+                if (pendingStatusVariant) {
+                  void handleToggleVariantActive(pendingStatusVariant);
+                }
+              }}
+            >
+              {Boolean(pendingStatusVariant && togglingVariantId === pendingStatusVariant.variant_id) ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : pendingStatusVariant?.active ? (
+                PRODUCTS.actions.deactivate
+              ) : (
+                PRODUCTS.actions.activate
+              )}
+            </Button>
           </div>
-          <AdminConfirmModal
-            open={Boolean(pendingStatusVariant)}
-            title={pendingStatusVariant?.active ? "Inactivar variante" : "Activar variante"}
-            description={
-              pendingStatusVariant
-                ? `${pendingStatusVariant.sku} cambiará a estado ${
-                    pendingStatusVariant.active ? "inactivo" : "activo"
-                  }.`
-                : ""
-            }
-            confirmLabel={pendingStatusVariant?.active ? "Inactivar" : "Activar"}
-            confirmTone={pendingStatusVariant?.active ? "danger" : "accent"}
-            busy={Boolean(
-              pendingStatusVariant && togglingVariantId === pendingStatusVariant.variant_id
-            )}
-            onCancel={() => setPendingStatusVariant(null)}
-            onConfirm={() => {
-              if (pendingStatusVariant) {
-                void handleToggleVariantActive(pendingStatusVariant);
-              }
-            }}
-          />
-      </OpsPageShell>
-    </TooltipProvider>
+        </OpsDialog>
+    </OpsPageShell>
   );
 }
