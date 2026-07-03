@@ -5,7 +5,7 @@ import { ADMIN } from "./admin-messages"
 import { OpsFormField } from "@/components/ui/ops-form-field"
 import { OpsSelect } from "@/components/ui/ops-selection"
 import { OpsMultiSelectField } from "@/components/ui/ops-multi-select-field"
-import { opsInputCompact, INFO_BOX_MUTED } from "@/components/ui/ops-control-styles"
+import { opsInputCompact, INFO_BOX_MUTED } from "./admin-constants"
 
 export { type UserFormState, type UserFormErrors, EMPTY_USER_FORM } from "./admin-types"
 

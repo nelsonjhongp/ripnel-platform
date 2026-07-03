@@ -5,10 +5,12 @@ const request = require('supertest');
 const { validate } = require('../middlewares/validate');
 const {
   login,
+  changePassword,
   createUser,
   createCustomer,
   createSale,
 } = require('../shared/schemas');
+const { validateNewPassword } = require('../modules/auth/auth.service');
 
 // ---------------------------------------------------------------------------
 // Unit: Zod schema validation rejects SQL injection payloads
@@ -31,6 +33,24 @@ describe('Zod schema validation', () => {
     it('rejects missing password', () => {
       const result = login.safeParse({ username: 'admin' });
       assert.strictEqual(result.success, false);
+    });
+  });
+
+  describe('changePassword schema', () => {
+    it('rejects new passwords under 10 characters', () => {
+      const result = changePassword.safeParse({
+        current_password: 'Temporal22!',
+        new_password: 'Clave1234',
+      });
+      assert.strictEqual(result.success, false);
+    });
+
+    it('accepts new passwords with 10 or more characters', () => {
+      const result = changePassword.safeParse({
+        current_password: 'Temporal22!',
+        new_password: 'NuevaClave22',
+      });
+      assert.strictEqual(result.success, true);
     });
   });
 
@@ -169,6 +189,33 @@ describe('Zod schema validation', () => {
       });
       assert.strictEqual(result.success, true);
     });
+  });
+});
+
+describe('Auth password service validation', () => {
+  it('rejects new passwords under 10 characters', () => {
+    assert.throws(
+      () => validateNewPassword('Clave1234'),
+      /at least 10 characters/
+    );
+  });
+
+  it('rejects new passwords without a letter', () => {
+    assert.throws(
+      () => validateNewPassword('1234567890'),
+      /one letter and one number/
+    );
+  });
+
+  it('rejects new passwords without a number', () => {
+    assert.throws(
+      () => validateNewPassword('NuevaClave'),
+      /one letter and one number/
+    );
+  });
+
+  it('accepts a new password with at least one letter and one number', () => {
+    assert.doesNotThrow(() => validateNewPassword('NuevaClave22'));
   });
 });
 

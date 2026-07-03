@@ -47,8 +47,6 @@ export type SidebarSection = {
   groups: SidebarGroup[];
 };
 
-export const SELLER_FOCUSED_ROLES = ["TIENDA", "VENTAS"];
-
 const ventasGroup: SidebarGroup = {
   title: "Ventas",
   icon: ShoppingCart,
@@ -80,7 +78,7 @@ const cajaGroup: SidebarGroup = {
 const clientesGroup: SidebarGroup = {
   title: "Clientes",
   icon: Users,
-  onlyForRoles: ["ADMIN", "TIENDA", "CAJA", "VENTAS"],
+  permission: "customers.manage",
   items: [
     { title: "Clientes", url: appRoutes.customers },
   ],
@@ -103,8 +101,7 @@ const stockGroup: SidebarGroup = {
     {
       title: "Ajustes de inventario",
       url: appRoutes.inventoryAdjustments,
-      permission: "inventory.view",
-      onlyForRoles: ["ADMIN", "ALMACEN"],
+      permission: "inventory.adjust",
     },
   ],
 };
@@ -136,7 +133,6 @@ const catalogosGroup: SidebarGroup = {
   title: "Catálogos",
   icon: Warehouse,
   permission: "catalogs.manage",
-  excludeRoles: SELLER_FOCUSED_ROLES,
   items: [
     {
       title: productMasterSummaryLink.label,
@@ -155,7 +151,6 @@ const productosGroup: SidebarGroup = {
   title: "Productos",
   icon: ShoppingBag,
   permission: "products.manage",
-  excludeRoles: SELLER_FOCUSED_ROLES,
   items: productMasterLinks.map((link) => ({
     title: link.label,
     url: link.href,
@@ -167,7 +162,6 @@ const preciosGroup: SidebarGroup = {
   title: "Precios",
   icon: Tag,
   permission: "prices.manage",
-  excludeRoles: SELLER_FOCUSED_ROLES,
   items: [
     { title: "Listado de precios", url: appRoutes.prices, icon: Tag },
     { title: "Reglas", url: `${appRoutes.prices}/reglas`, icon: Settings2 },

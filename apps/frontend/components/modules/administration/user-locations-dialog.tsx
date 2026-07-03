@@ -46,6 +46,10 @@ export function UserLocationsDialog({
       setLoadingUserLocations(true)
       setUserLocationsError(null)
       setDefaultLocError(null)
+      Promise.resolve().then(() => {
+        setUserLocationsError(null)
+        setDefaultLocError(null)
+      })
       try {
         const payload = await apiFetchData<UserLocationsPayload>(
           `/api/users/${user!.user_id}/locations`,

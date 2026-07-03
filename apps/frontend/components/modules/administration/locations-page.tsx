@@ -142,14 +142,15 @@ export default function LocationsPage() {
   }
 
   async function saveLocation() {
+    setActionState("validating")
+    setFormErrors(null)
+
     const validation = validateLocationInput(formState, isEdit)
     if (validation) {
       setFormErrors(validation)
+      setActionState("idle")
       return
     }
-
-    setActionState("validating")
-    setFormErrors(null)
 
     try {
       setActionState("saving")
@@ -276,7 +277,7 @@ export default function LocationsPage() {
                   disabled={!hasActiveFilters}
                   variant="outline"
                   size="icon-sm"
-                  className="h-10 w-10 rounded-lg"
+                  className="mt-auto h-10 w-10 rounded-lg"
                   aria-label={ADMIN.filters.clear}
                 >
                   <RotateCcw className="h-4 w-4" />
@@ -317,7 +318,7 @@ export default function LocationsPage() {
                 <>
                   <span className="text-sm tabular-nums text-[var(--ops-text-muted)]">
                     {filteredLocations.length === 0
-                      ? "0 resultados"
+                      ? ADMIN.table.locations.zeroResults
                       : `${firstVisible}-${lastVisible} de ${filteredLocations.length}`}
                   </span>
                   <Pagination

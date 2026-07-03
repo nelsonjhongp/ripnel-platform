@@ -62,3 +62,14 @@ panel-*.png
 sidebar-*.png
 inventario-*.png
 sale-detail-*.png
+
+# Audit, review, backup and snapshot artifacts
+*audit*/
+*audit*.zip
+*review*/
+*review*.zip
+*backup*/
+*snapshot*/
+ripnel-docs-ui-governance-review.zip
+ripnel-ui-pattern-audit.zip
+ui-01-review.zip

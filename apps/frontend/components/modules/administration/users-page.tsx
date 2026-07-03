@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import {
   Check,
   Copy,
+  KeyRound,
   LoaderCircle,
   MapPin,
   PencilLine,
@@ -40,7 +41,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { OpsDialog } from "@/components/ui/ops-dialog"
-import { INFO_BOX_MUTED, CHIP_TONE_ACCENT } from "@/components/ui/ops-control-styles"
+import { INFO_BOX_MUTED, CHIP_TONE_ACCENT } from "./admin-constants"
 
 import {
   type User,
@@ -62,6 +63,15 @@ import { UserForm } from "./user-form"
 import { UserLocationsDialog } from "./user-locations-dialog"
 
 type ActionState = "idle" | "validating" | "saving"
+type UserFormErrorField = Extract<keyof UserFormErrors, keyof UserFormState>
+const USER_FORM_ERROR_FIELDS: UserFormErrorField[] = [
+  "full_name",
+  "username",
+  "email",
+  "role_id",
+  "location_ids",
+  "default_location_id",
+]
 
 export default function UsersPage() {
   const { data: usersData, loading: loadingUsers, error: usersError, refetch: refetchUsers } = useApiGet(
@@ -178,6 +188,38 @@ export default function UsersPage() {
     setUserActionState("idle")
   }
 
+  function handleUserFormChange(next: UserFormState) {
+    const changedFields = (Object.keys(next) as Array<keyof UserFormState>).filter(
+      (key) => next[key] !== userForm[key],
+    )
+
+    setUserForm(next)
+
+    if (changedFields.length === 0 || !userErrors) {
+      return
+    }
+
+    setUserErrors((current) => {
+      if (!current) return current
+
+      const nextErrors: UserFormErrors = { ...current }
+      delete nextErrors._form
+
+      for (const field of USER_FORM_ERROR_FIELDS) {
+        if (changedFields.includes(field)) {
+          delete nextErrors[field]
+        }
+      }
+
+      if (changedFields.includes("location_ids")) {
+        delete nextErrors.location_ids
+        delete nextErrors.default_location_id
+      }
+
+      return Object.keys(nextErrors).length > 0 ? nextErrors : null
+    })
+  }
+
   async function saveUser() {
     setUserActionState("validating")
 
@@ -262,12 +304,55 @@ export default function UsersPage() {
 
   async function copyTempPassword() {
     if (!tempPassword) return
+    let copied = false
+
     try {
-      await navigator.clipboard.writeText(tempPassword.password)
-      setCopiedPassword(true)
-      setTimeout(() => setCopiedPassword(false), 2000)
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(tempPassword.password)
+        copied = true
+      }
     } catch {
-      // fallback: select text
+      copied = false
+    }
+
+    if (!copied) {
+      const textArea = document.createElement("textarea")
+      textArea.value = tempPassword.password
+      textArea.setAttribute("readonly", "")
+      textArea.style.position = "fixed"
+      textArea.style.top = "-9999px"
+      document.body.appendChild(textArea)
+      textArea.select()
+      copied = document.execCommand("copy")
+      document.body.removeChild(textArea)
+    }
+
+    if (copied) {
+      setCopiedPassword(true)
+      showSuccess(ADMIN.dialog.temporaryPasswordCopied)
+      setTimeout(() => setCopiedPassword(false), 2000)
+      return
+    }
+
+    showError(ADMIN.dialog.temporaryPasswordCopyError)
+  }
+
+  async function regeneratePassword(user: User) {
+    try {
+      const result = await apiFetchData<User>(
+        `/api/users/${user.user_id}/reset-password`,
+        { method: "POST", body: JSON.stringify({}) },
+      )
+      if (result.temporary_password) {
+        setTempPassword({
+          username: result.username,
+          password: result.temporary_password,
+        })
+        setCopiedPassword(false)
+      }
+      showSuccess(ADMIN.toast.passwordRegenerated)
+    } catch (error) {
+      showError(ADMIN.toast.userSaveError, error instanceof Error ? error.message : "")
     }
   }
 
@@ -454,6 +539,15 @@ export default function UsersPage() {
                           icon: <PencilLine className="h-3.5 w-3.5" />,
                           onSelect: () => openUserForm(user),
                         },
+                        ...(user.must_change_password
+                          ? [
+                              {
+                                label: ADMIN.actions.regeneratePassword,
+                                icon: <KeyRound className="h-3.5 w-3.5" />,
+                                onSelect: () => regeneratePassword(user),
+                              } as const,
+                            ]
+                          : []),
                         {
                           label: user.active ? ADMIN.actions.inactivate : ADMIN.actions.activate,
                           icon: <Power className="h-3.5 w-3.5" />,
@@ -516,7 +610,7 @@ export default function UsersPage() {
         <UserForm
           state={userForm}
           errors={userErrors}
-          onChange={setUserForm}
+          onChange={handleUserFormChange}
           mode={isEdit ? "edit" : "create"}
           roles={roles}
           loadingRoles={loadingRoles}
@@ -574,6 +668,7 @@ export default function UsersPage() {
                   size="icon-sm"
                   className="rounded-lg"
                   onClick={() => void copyTempPassword()}
+                  aria-label={ADMIN.dialog.copyTemporaryPassword}
                 >
                   {copiedPassword ? (
                     <Check className="h-4 w-4 text-[var(--ripnel-accent)]" />
