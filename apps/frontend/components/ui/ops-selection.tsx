@@ -1,6 +1,6 @@
 "use client"
 
-import type { ReactNode } from "react"
+import { useId, useState, type ReactNode } from "react"
 import { Check, ChevronDown, Plus, X } from "lucide-react"
 
 import {
@@ -71,6 +71,7 @@ function OpsOptionContent({ option }: { option: OpsOption }) {
 }
 
 export function OpsSelect({
+  id,
   value,
   onValueChange,
   onChange,
@@ -84,7 +85,10 @@ export function OpsSelect({
   className,
   triggerClassName,
   error,
+  "aria-describedby": ariaDescribedBy,
+  "aria-invalid": ariaInvalid,
 }: {
+  id?: string
   value: string
   onValueChange?: (value: string) => void
   onChange?: (value: string) => void
@@ -98,21 +102,36 @@ export function OpsSelect({
   className?: string
   triggerClassName?: string
   error?: string | null
+  "aria-describedby"?: string
+  "aria-invalid"?: boolean | "true" | "false"
 }) {
+  const generatedId = useId()
+  const contentId = useId()
+  const [open, setOpen] = useState(false)
   const handleChange = onValueChange || onChange || (() => {})
   const selectedOption = options.find((option) => option.value === value) || null
   const resolvedPlaceholder = placeholder || "Seleccionar..."
+  const triggerId = id ?? (label && !inlineLabel ? generatedId : undefined)
+  const hasError = Boolean(error) || ariaInvalid === true || ariaInvalid === "true"
 
   const trigger = (
     <SelectPrimitive.Trigger asChild>
       <button
+        id={triggerId}
         type="button"
+        role="combobox"
         disabled={disabled}
+        aria-controls={contentId}
+        aria-describedby={ariaDescribedBy}
+        aria-expanded={open}
+        aria-invalid={hasError ? true : ariaInvalid}
+        data-ops-select-trigger
+        data-invalid={hasError ? "true" : undefined}
         className={cn(
           opsSelectTriggerClassName,
           inlineLabel && label ? "justify-between gap-3" : "",
           !label ? className : triggerClassName,
-          error ? "border-[var(--ops-tone-danger-border)]" : "",
+          hasError && "border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)]",
         )}
       >
         {inlineLabel && label ? (
@@ -141,6 +160,7 @@ export function OpsSelect({
   const content = (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
+        id={contentId}
         position="popper"
         sideOffset={4}
         className={opsSelectContentClassName}
@@ -164,7 +184,13 @@ export function OpsSelect({
   )
 
   const selectElement = (
-    <SelectPrimitive.Root value={value} onValueChange={handleChange} disabled={disabled}>
+    <SelectPrimitive.Root
+      value={value}
+      onValueChange={handleChange}
+      disabled={disabled}
+      open={open}
+      onOpenChange={setOpen}
+    >
       {trigger}
       {content}
     </SelectPrimitive.Root>
@@ -175,7 +201,7 @@ export function OpsSelect({
   return (
     <div className={className}>
       {!inlineLabel && (
-        <label className={`mb-1 ${opsFieldLabelClassName}`}>{label}</label>
+        <label htmlFor={triggerId} className={`mb-1 ${opsFieldLabelClassName}`}>{label}</label>
       )}
       {selectElement}
     </div>

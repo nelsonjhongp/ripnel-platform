@@ -108,5 +108,6 @@ module.exports = {
   loginWithUsernamePassword,
   getMe,
   changePassword,
+  validateNewPassword,
 };
 

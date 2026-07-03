@@ -7,6 +7,7 @@ const {
   findUserById,
   insertUser,
   updateUser,
+  resetUserPassword,
   findLocationsByIds,
   findUserLocationsByUserId,
   replaceUserLocations,
@@ -46,16 +47,36 @@ function normalizeUsername(value) {
   return normalized.toLowerCase();
 }
 
-function buildTemporaryPassword(username) {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
-  const passwordLength = 14;
-  let password = '';
+function buildTemporaryPassword() {
+  const words = [
+    'Luna',
+    'Tela',
+    'Rosa',
+    'Nube',
+    'Menta',
+    'Sol',
+    'Ropa',
+    'Caja',
+    'Venta',
+    'Seda',
+    'Punto',
+    'Moda',
+    'Tienda',
+    'Stock',
+    'Lista',
+    'Orden',
+  ];
+  const digits = '23456789';
+  const firstWord = words[crypto.randomInt(words.length)];
+  let secondWord = words[crypto.randomInt(words.length)];
 
-  for (let index = 0; index < passwordLength; index += 1) {
-    password += alphabet[crypto.randomInt(alphabet.length)];
+  while (secondWord === firstWord) {
+    secondWord = words[crypto.randomInt(words.length)];
   }
 
-  return password;
+  const number = `${digits[crypto.randomInt(digits.length)]}${digits[crypto.randomInt(digits.length)]}`;
+
+  return `${firstWord}${number}${secondWord}!`;
 }
 
 function buildUserConflictError(error) {
@@ -153,7 +174,7 @@ async function createUser(input = {}) {
   }
 
   const client = await pool.connect();
-  const temporaryPassword = buildTemporaryPassword(username);
+  const temporaryPassword = buildTemporaryPassword();
 
   try {
     await client.query('begin');
@@ -318,6 +339,28 @@ async function getUserLocations(userId) {
   return buildUserLocationsPayload(user, assignments);
 }
 
+async function resetUserPass(userId) {
+  const normalizedUserId = normalizeUuid(userId);
+
+  if (!normalizedUserId) {
+    throw new AppError('User id is required', 400);
+  }
+
+  const user = await findUserById(normalizedUserId);
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  const temporaryPassword = buildTemporaryPassword();
+  const updatedUser = await resetUserPassword(normalizedUserId, temporaryPassword);
+
+  return {
+    ...updatedUser,
+    temporary_password: temporaryPassword,
+  };
+}
+
 async function updateUserLocations(userId, input = {}) {
   const normalizedUserId = normalizeUuid(userId);
   const assignments = normalizeAssignments(input.assignments);
@@ -382,6 +425,8 @@ module.exports = {
   listUsers,
   createUser,
   patchUser,
+  resetUserPass,
   getUserLocations,
   updateUserLocations,
+  buildTemporaryPassword,
 };

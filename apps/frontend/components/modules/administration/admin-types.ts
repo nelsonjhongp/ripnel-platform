@@ -123,9 +123,11 @@ export const EMPTY_LOCATION_FORM: LocationFormState = {
   active: true,
 }
 
+import { ADMIN } from "./admin-messages"
+
 export const LOCATION_TYPE_OPTIONS = [
-  { value: "store", label: "Tienda" },
-  { value: "warehouse", label: "Almacén" },
-  { value: "workshop", label: "Taller" },
-  { value: "third_party", label: "Tercero" },
+  { value: "store", label: ADMIN.locationTypes.store },
+  { value: "warehouse", label: ADMIN.locationTypes.warehouse },
+  { value: "workshop", label: ADMIN.locationTypes.workshop },
+  { value: "third_party", label: ADMIN.locationTypes.thirdParty },
 ] as const

@@ -3,6 +3,7 @@
 import React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "./AuthProvider";
+import { LOGIN } from "./login-messages";
 import { ProtectedLoadingPage } from "@/components/feedback/status-page";
 import { appRoutes } from "@/lib/routes";
 
@@ -11,7 +12,7 @@ export function ProtectedGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const requiresPasswordChange = Boolean(user?.must_change_password);
-  const isPasswordChangePage = pathname === appRoutes.accountSecurity;
+  const isPasswordChangePage = pathname === appRoutes.firstAccess;
 
   React.useEffect(() => {
     if (!loading && !user) {
@@ -31,13 +32,13 @@ export function ProtectedGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (!loading && user?.must_change_password && pathname !== appRoutes.accountSecurity) {
-      router.replace(appRoutes.accountSecurity);
+    if (!loading && user?.must_change_password && pathname !== appRoutes.firstAccess) {
+      router.replace(appRoutes.firstAccess);
     }
   }, [loading, user, router, pathname, sessionExpired, signedOutIntentional]);
 
   if (loading) {
-    return <ProtectedLoadingPage title="Validando sesión" description="Estamos confirmando tu acceso antes de abrir el módulo." />;
+    return <ProtectedLoadingPage title={LOGIN.guard.validatingSession} description={LOGIN.guard.validatingDesc} />;
   }
 
   if (!user) return null;

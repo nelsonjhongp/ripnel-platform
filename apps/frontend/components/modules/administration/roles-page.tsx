@@ -12,6 +12,7 @@ import {
 import { apiFetchData } from "@/lib/api"
 import { useApiGet } from "@/hooks/use-api-get"
 import { activeBadgeLabel } from "@/lib/badge-utils"
+import { formatDate } from "@/lib/date-utils"
 import { showSuccess, showError } from "@/lib/toast"
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import { usePagination } from "@/hooks/use-pagination"
@@ -172,14 +173,15 @@ export default function RolesPage() {
   }
 
   async function saveRole() {
+    setRoleActionState("validating")
+    setRoleErrors(null)
+
     const validation = validateRoleInput(roleForm)
     if (validation) {
       setRoleErrors(validation)
+      setRoleActionState("idle")
       return
     }
-
-    setRoleActionState("validating")
-    setRoleErrors(null)
 
     try {
       setRoleActionState("saving")
@@ -395,7 +397,7 @@ export default function RolesPage() {
                     </OpsStatusBadge>
                   </td>
                   <td className="px-4 py-[var(--ops-row-py)] align-top text-xs text-[var(--ops-text-muted)]">
-                    {new Date(role.updated_at).toLocaleString("es-PE")}
+                    {formatDate(role.updated_at)}
                   </td>
                   <td className="w-[4.5rem] px-4 py-[var(--ops-row-py)] align-top">
                     <AdminRowActionsMenu

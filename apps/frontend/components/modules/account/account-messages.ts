@@ -1,4 +1,5 @@
 export const ACC = {
+  brandName: "Ripnel",
   title: "Cuenta",
   back: "Volver a perfil",
   sections: {
@@ -20,12 +21,36 @@ export const ACC = {
     noDefaultLocation: "Sin sede default",
     appearance: "Apariencia",
   },
+  preferences: {
+    theme: {
+      lightStone: "Claro neutro",
+      lightSlate: "Gris operativo",
+      darkGraphite: "Oscuro grafito",
+    },
+  },
+  locationTypes: {
+    store: "Tienda",
+    warehouse: "Almacen",
+    workshop: "Taller",
+    thirdParty: "Tercero",
+    generic: "Ubicacion",
+  },
   security: {
     title: "Seguridad",
     description: "Cambiar contrasena",
+    requiredTitle: "Cambia tu contrasena",
+    requiredSubtitle: "Antes de continuar, registra una contrasena propia para tu cuenta.",
+    requiredEyebrow: "Primer ingreso",
     currentPassword: "Contrasena actual",
+    currentPasswordPlaceholder: "Ingresa tu contrasena temporal",
     newPassword: "Nueva contrasena",
+    newPasswordPlaceholder: "Ingresa una nueva contrasena",
     newPasswordHint: "Minimo 10 caracteres, una letra y un numero.",
+    checklist: {
+      minLength: "10 caracteres minimo",
+      letter: "Incluye una letra",
+      number: "Incluye un numero",
+    },
     confirm: "Confirmar",
     submit: "Actualizar contrasena",
     saving: "Guardando...",
@@ -39,5 +64,18 @@ export const ACC = {
     success: "Contrasena actualizada.",
     error: "No se pudo actualizar la contrasena.",
     loading: "Cargando cuenta...",
+    footer: "Creaciones Ripnel - Sistema ERP",
+    errors: {
+      currentRequired: "Ingresa tu contrasena temporal o actual.",
+      currentInvalid: "La contrasena actual no es correcta.",
+      newRequired: "Ingresa una nueva contrasena.",
+      confirmRequired: "Confirma la nueva contrasena.",
+      tooShort: "La nueva contrasena debe tener al menos 10 caracteres.",
+      missingLetter: "La nueva contrasena debe incluir al menos una letra.",
+      missingNumber: "La nueva contrasena debe incluir al menos un numero.",
+      missingLetterOrNumber: "La nueva contrasena debe incluir al menos una letra y un numero.",
+      sameAsCurrent: "La nueva contrasena debe ser diferente a la actual.",
+      requiredFields: "Completa la contrasena actual y la nueva contrasena.",
+    },
   },
 } as const
