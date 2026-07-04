@@ -2,12 +2,13 @@ import Link from "next/link";
 import type { ComponentType, ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 
+import { ACC } from "@/components/modules/account/account-messages";
 import { cn } from "@/lib/utils";
 
 export const THEME_CHOICES = [
-  { value: "light-stone", label: "Claro neutro" },
-  { value: "light-slate", label: "Gris operativo" },
-  { value: "dark-graphite", label: "Oscuro grafito" },
+  { value: "light-stone", label: ACC.preferences.theme.lightStone },
+  { value: "light-slate", label: ACC.preferences.theme.lightSlate },
+  { value: "dark-graphite", label: ACC.preferences.theme.darkGraphite },
 ] as const;
 
 export type ThemeChoice = (typeof THEME_CHOICES)[number]["value"];
@@ -37,11 +38,11 @@ export function resolveThemePreference(choice: ThemeChoice) {
 }
 
 export function locationTypeLabel(type: string) {
-  if (type === "store") return "Tienda";
-  if (type === "warehouse") return "Almacen";
-  if (type === "workshop") return "Taller";
-  if (type === "third_party") return "Tercero";
-  return "Ubicacion";
+  if (type === "store") return ACC.locationTypes.store;
+  if (type === "warehouse") return ACC.locationTypes.warehouse;
+  if (type === "workshop") return ACC.locationTypes.workshop;
+  if (type === "third_party") return ACC.locationTypes.thirdParty;
+  return ACC.locationTypes.generic;
 }
 
 export function AccountPageFrame({

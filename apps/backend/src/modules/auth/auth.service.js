@@ -279,4 +279,6 @@ module.exports = {
   REFRESH_TTL_SECONDS,
   MAX_FAILED_ATTEMPTS,
   LOCK_DURATION_MS,
+  validateNewPassword,
 };
+

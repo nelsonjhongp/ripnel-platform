@@ -7,9 +7,7 @@ begin;
 insert into roles (name, description, active)
 values
   ('ADMIN', 'Acceso general al sistema y configuracion base.', true),
-  ('TIENDA', 'Operacion de ventas y consultas.', true),
-  ('CAJA', 'Cobros y registro de ventas.', true),
-  ('VENTAS', 'Operacion comercial y venta rapida.', true),
+  ('VENDEDOR/A', 'Operacion completa de tienda: ventas, caja, stock, transferencias, productos, precios y catalogos.', true),
   ('ALMACEN', 'Operacion de stock y movimientos internos.', true)
 on conflict (name) do update
 set
@@ -59,9 +57,7 @@ set
 with base_roles(role_name) as (
   values
     ('ADMIN'),
-    ('TIENDA'),
-    ('CAJA'),
-    ('VENTAS'),
+    ('VENDEDOR/A'),
     ('ALMACEN')
 ),
 permission_keys(permission_key) as (
@@ -131,49 +127,33 @@ with seeded_role_permissions(role_name, permission_key) as (
     ('ADMIN', 'dashboard.view'),
     ('ADMIN', 'dashboard.global.view'),
 
+    ('VENDEDOR/A', 'sales.pos'),
+    ('VENDEDOR/A', 'cash.view'),
+    ('VENDEDOR/A', 'cash.operate'),
+    ('VENDEDOR/A', 'inventory.view'),
+    ('VENDEDOR/A', 'inventory.adjust'),
+    ('VENDEDOR/A', 'transfers.request.create'),
+    ('VENDEDOR/A', 'transfers.request.view_own'),
+    ('VENDEDOR/A', 'transfers.approve'),
+    ('VENDEDOR/A', 'transfers.ship'),
+    ('VENDEDOR/A', 'transfers.receive'),
+    ('VENDEDOR/A', 'transfers.cancel'),
+    ('VENDEDOR/A', 'customers.manage'),
+    ('VENDEDOR/A', 'products.manage'),
+    ('VENDEDOR/A', 'prices.manage'),
+    ('VENDEDOR/A', 'catalogs.manage'),
+    ('VENDEDOR/A', 'sales.postsale.view'),
+    ('VENDEDOR/A', 'sales.postsale.exchange'),
+    ('VENDEDOR/A', 'sales.postsale.cancel'),
+    ('VENDEDOR/A', 'dashboard.view'),
+
     ('ALMACEN', 'inventory.view'),
     ('ALMACEN', 'inventory.adjust'),
-    ('ALMACEN', 'transfers.manage'),
     ('ALMACEN', 'transfers.approve'),
     ('ALMACEN', 'transfers.ship'),
     ('ALMACEN', 'transfers.receive'),
     ('ALMACEN', 'transfers.cancel'),
-    ('ALMACEN', 'dashboard.view'),
-
-    ('TIENDA', 'catalogs.manage'),
-    ('TIENDA', 'products.manage'),
-    ('TIENDA', 'prices.manage'),
-    ('TIENDA', 'customers.manage'),
-    ('TIENDA', 'inventory.view'),
-    ('TIENDA', 'transfers.request.create'),
-    ('TIENDA', 'transfers.request.view_own'),
-    ('TIENDA', 'transfers.approve'),
-    ('TIENDA', 'transfers.ship'),
-    ('TIENDA', 'transfers.receive'),
-    ('TIENDA', 'transfers.cancel'),
-    ('TIENDA', 'sales.pos'),
-    ('TIENDA', 'sales.postsale.view'),
-    ('TIENDA', 'sales.postsale.exchange'),
-    ('TIENDA', 'dashboard.view'),
-
-    ('CAJA', 'customers.manage'),
-    ('CAJA', 'sales.pos'),
-    ('CAJA', 'sales.postsale.view'),
-    ('CAJA', 'sales.postsale.cancel'),
-    ('CAJA', 'cash.view'),
-    ('CAJA', 'cash.operate'),
-    ('CAJA', 'dashboard.view'),
-
-    ('VENTAS', 'products.manage'),
-    ('VENTAS', 'customers.manage'),
-    ('VENTAS', 'prices.manage'),
-    ('VENTAS', 'transfers.request.create'),
-    ('VENTAS', 'transfers.request.view_own'),
-    ('VENTAS', 'transfers.approve'),
-    ('VENTAS', 'transfers.cancel'),
-    ('VENTAS', 'sales.pos'),
-    ('VENTAS', 'sales.postsale.view'),
-    ('VENTAS', 'sales.postsale.exchange')
+    ('ALMACEN', 'dashboard.view')
 )
 insert into role_permissions (
   role_id,

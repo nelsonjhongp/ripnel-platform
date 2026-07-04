@@ -51,7 +51,7 @@ export function usePermissions() {
   }
 
   const canAccessCatalogs = (): boolean => {
-    return hasAnyRole(["ADMIN", "TIENDA", "VENTAS"])
+    return hasPermission("catalogs.manage")
   }
 
   const canAccessTransfers = (): boolean => {
@@ -59,7 +59,7 @@ export function usePermissions() {
   }
 
   const canAccessInventory = (): boolean => {
-    return hasAnyRole(["ALMACEN", "TIENDA", "ADMIN"])
+    return hasPermission("inventory.view")
   }
 
   return {

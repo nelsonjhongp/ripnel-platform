@@ -35,4 +35,24 @@ async function sendReceiptEmail({ to, subject, text, pdfBuffer, pdfFilename }) {
   await transport.sendMail(mailOptions);
 }
 
-module.exports = { sendReceiptEmail };
+async function sendWelcomeEmail({ to, username, temporaryPassword }) {
+  const transport = getTransporter();
+  const mailOptions = {
+    from: env.smtpFrom || env.smtpUser,
+    to,
+    subject: 'Bienvenido a RIPNEL - Credenciales de acceso',
+    text: [
+      'Hola,',
+      '',
+      'Tu cuenta en RIPNEL ha sido creada.',
+      '',
+      `Usuario: ${username}`,
+      `Clave temporal: ${temporaryPassword}`,
+      '',
+      'Al ingresar por primera vez, deberas cambiar tu clave.',
+    ].join('\n'),
+  };
+  await transport.sendMail(mailOptions);
+}
+
+module.exports = { sendReceiptEmail, sendWelcomeEmail };

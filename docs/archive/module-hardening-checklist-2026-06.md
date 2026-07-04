@@ -1,3 +1,11 @@
+# Historical module hardening checklist — June 2026
+
+> **Estado: histórico.** Este checklist documenta una campaña de hardening realizada en junio de 2026. No es una regla activa, no debe usarse como puntaje automático de calidad y no debe decidir por sí solo un refactor o rebuild.
+>
+> Consultarlo únicamente cuando una tarea solicite revisar esa campaña histórica o comparar un módulo con el estado de ese periodo. Para decidir cambios actuales, usar `AGENTS.md`, `docs/refactor-vs-rebuild.md` y el alcance funcional de la tarea.
+
+---
+
 # Module Review Checklist
 
 Guia paso a paso para auditar cualquier modulo frontend contra el gold standard (`ventas`).

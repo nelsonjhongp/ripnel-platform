@@ -7,7 +7,7 @@ const login = z.object({
 
 const changePassword = z.object({
   current_password: z.string({ message: 'current_password is required' }).min(1),
-  new_password: z.string({ message: 'new_password is required' }).min(8, 'new_password must be at least 8 characters'),
+  new_password: z.string({ message: 'new_password is required' }).min(10, 'new_password must be at least 10 characters'),
 });
 
 const userAssignment = z.object({
@@ -33,6 +33,8 @@ const patchUser = z.object({
   role_id: z.string().uuid('invalid role_id').optional().nullable(),
   active: z.boolean().optional(),
 });
+
+const resetUserPassword = z.object({});
 
 const createCustomer = z.object({
   document_type: z.enum(['none', 'dni', 'ruc', 'ce', 'passport']).optional().default('none'),
@@ -133,6 +135,7 @@ module.exports = {
   changePassword,
   createUser,
   patchUser,
+  resetUserPassword,
   createCustomer,
   patchCustomer,
   createSale,
