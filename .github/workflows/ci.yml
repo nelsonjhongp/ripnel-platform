@@ -56,4 +56,4 @@ jobs:
       - name: Typecheck
         run: npm run typecheck --workspace @ripnel/frontend
       - name: Unit tests
-        run: npm run test --workspace @ripnel/frontend
+        run: npx playwright test --project=unit
