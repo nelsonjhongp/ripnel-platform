@@ -63,25 +63,11 @@ Principios:
 - Mantener soporte claro y oscuro para todo cambio visual.
 - No añadir texto explicativo persistente cuando labels, estructura y acciones ya comunican el flujo. Usar ayuda contextual solo cuando previene un error o aclara una decisión.
 
-### Núcleo recomendado para código nuevo
+### Elección de componentes
 
-Usar el componente existente que corresponda al problema antes de crear uno nuevo:
+Usar el componente existente que corresponda al problema antes de crear uno nuevo. La lista canónica de componentes compartidos está en `docs/frontend-component-inventory.md`.
 
-- `Button`
-- `Input` y textarea operativo
-- `OpsFormField`
-- `OpsSelect`
-- `OpsSearchField`
-- `OpsDialog`
-- `OpsDataTable`
-- `OpsStatusBadge`
-- `OpsPageShell`
-- `OpsPanelSection`
-- `OpsEmptyState`
-- `Pagination`
-- `Tooltip`
-
-Esto no obliga a envolver toda vista con todos esos componentes. Son un núcleo de referencia, no una plantilla rígida.
+Esto no obliga a usar componentes compartidos en cada bloque de una vista. El inventario orienta la elección según semántica y necesidad, no impone una plantilla rígida.
 
 ### Reutilización y extracción
 
@@ -134,7 +120,8 @@ Para cambios visuales, revisar tema claro y oscuro cuando el componente use toke
 ## Documentación y decisiones
 
 - `README.md`: onboarding, arquitectura breve, comandos, módulos y rutas actuales.
-- `DESIGN.md`: reglas visuales y núcleo de componentes.
+- `DESIGN.md`: reglas visuales, tokens, tipografía y densidad.
+- `docs/frontend-component-inventory.md`: contrato canónico de componentes compartidos, dominio y legacy.
 - `docs/frontend-architecture-standard.md`: ubicación de rutas, pantallas y helpers.
 - `docs/frontend-page-standard.md`: arquetipos y composición de página.
 - `docs/frontend-ui-ux-operativo.md`: criterio de uso operativo.

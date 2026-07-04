@@ -70,41 +70,15 @@ Los controles compartidos deben sentirse como una familia:
 - foco, hover, disabled y error consistentes;
 - error visible con borde y fondo semántico, no solo texto rojo.
 
-Para código nuevo, el punto de partida es:
-
-- `Input` para entrada simple;
-- `OpsFormField` para label, requerido, hint y error;
-- `OpsSelect` para selección simple;
-- `OpsSearchField` para búsqueda en listados;
-- `OpsDialog` para acciones modales;
-- `Button` para acciones;
-- `Tooltip` para ayuda breve o iconos ambiguos.
-
-No crear otra familia de campos solo porque una pantalla necesite una variación visual. Componer sobre los controles existentes o mantener la variación dentro del módulo si no tiene repetición real.
+La lista canónica de componentes está en `docs/frontend-component-inventory.md`. No crear otra familia de campos solo porque una pantalla necesite una variación visual. Componer sobre los controles existentes o mantener la variación dentro del módulo si no tiene repetición real.
 
 ## Componentes y composición
 
-### Núcleo compartido
-
-| Necesidad | Componente de referencia |
-|---|---|
-| shell y layout de página | `OpsPageShell` |
-| tabla de datos | `OpsDataTable` o tabla semántica cuando el caso lo requiera |
-| formulario | `OpsFormField`, `Input`, `OpsSelect` |
-| diálogo | `OpsDialog` |
-| estado de negocio | `OpsStatusBadge` |
-| sección con información agrupada | `OpsPanelSection` |
-| estado vacío | `OpsEmptyState` |
-| paginación | `Pagination` |
-| ayuda contextual | `Tooltip` |
-
-### Componentes específicos
+El catálogo canónico de componentes compartidos, dominio y legacy está en `docs/frontend-component-inventory.md`.
 
 POS, productos, caja, postventa y transferencias pueden usar composiciones propias cuando representan una interacción del dominio. Esas composiciones no se convierten automáticamente en estándar global.
 
-### Compatibilidad
-
-Existen componentes legacy o aliases por compatibilidad. No se usan como primera opción en código nuevo, pero tampoco se inicia una migración masiva solo para retirarlos. La migración sucede cuando se trabaja funcionalmente en el flujo afectado.
+Los componentes legacy se conservan por compatibilidad. No se usan como primera opción en código nuevo, pero tampoco se inicia una migración masiva solo para retirarlos. La migración sucede cuando se trabaja funcionalmente en el flujo afectado.
 
 ## Paneles, tablas y métricas
 
@@ -128,21 +102,9 @@ Existen componentes legacy o aliases por compatibilidad. No se usan como primera
 
 Cada nuevo uso de tokens o estado semántico debe conservar contraste en ambos temas. No fijar colores claros que desaparezcan en tema oscuro ni sombras que dependan de un fondo blanco.
 
-## Anti-patrones
-
-- fondos grandes en violeta o múltiples acentos compitiendo;
-- cards altas para contenido que una tabla o fila compacta comunica mejor;
-- descripción persistente que repite el título o el label;
-- KPIs que repiten el mismo dato ya visible;
-- scroll horizontal de la página;
-- componentes compartidos creados para una sola pantalla;
-- clases visuales copiadas de forma masiva sin patrón semántico;
-- una migración global de componentes legacy sin objetivo funcional;
-- usar la demo como una orden de adoptar todos los componentes.
-
 ## Referencias
 
+- `docs/frontend-component-inventory.md`: contrato canónico de componentes compartidos, dominio y legacy.
 - `docs/frontend-page-standard.md`: composición de listados, detalles, formularios y workspaces.
-- `docs/frontend-ui-ux-operativo.md`: criterios de uso real y anti-patrones.
+- `docs/frontend-ui-ux-operativo.md`: criterios de uso, copy, anti-patrones y flujos sensibles.
 - `docs/frontend-operational-components.md`: elección de componentes por interacción.
-- `docs/frontend-component-inventory.md`: inventario factual; no es un checklist ni una orden de migración.

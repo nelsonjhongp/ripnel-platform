@@ -24,8 +24,9 @@
 
 | ID | Trabajo | Estado | Siguiente evidencia requerida |
 |---|---|---|---|
-| UI-01 | Contrato de controles operativos | Aceptado | Overflow global corregido y validación 1366×768 cerrada |
-| DOC-01 | Router documental y workflow frontend | En curso | Crear `INDEX.md`, `FRONTEND-WORKFLOW.md` y corregir nombre de tracker |
+| UI-01 | Contrato de controles operativos | Aceptado | Validación visual completada a 1366×768 |
+| DOC-01 | Router documental y workflow frontend | Implementado | Cerrado; tareas documentales completadas |
+| DOC-02 | Consolidación del contrato frontend | Implementado | Cerrado; inventario canónico y consolidación completados |
 | AUTH-01 | Roles, permisos, sedes, sidebar y guards | Preparación | Revisar cambios locales, migración y pruebas por rol |
 | OPS-01 | Flujo operativo integral caja → venta → stock → postventa → cierre | En cola | Iniciar solo después de AUTH-01 |
 
@@ -36,7 +37,7 @@
 | Backend conserva reglas ERP, autorización, stock, precios y transacciones | Vigente | El frontend no sustituye validación de dominio. |
 | Frontend consume backend para operaciones ERP | Vigente | No acceso directo a Supabase para reglas de negocio. |
 | shadcn es base y `Ops*` es capa operativa | Vigente | No crear familias nuevas sin dos usos reales. |
-| Input, OpsSelect, OpsSearchField y OpsFormField comparten contrato operativo | Implementado; validar | Componentes base ajustados el 2026-07-03. |
+| Input, OpsSelect, OpsSearchField y OpsFormField comparten contrato operativo | Aceptado; validado visualmente a 1366×768 | Componentes base ajustados el 2026-07-03. |
 | Strings simples locales pueden quedar inline | Vigente | Centralizar errores, toasts, validaciones, estados y copy reutilizado. |
 | No crear `messages`, `types`, `constants` o `utils` por convención | Vigente | Solo por dominio, repetición o complejidad real. |
 | Graphify es diagnóstico estructural opcional | Vigente | No es requisito para tarea visual o cambio localizado. |
@@ -130,14 +131,51 @@ Lint: OK, 0 errores; warnings existentes fuera del cambio
 - [ ] definir matriz mínima de roles × módulo × sede;
 - [ ] ejecutar pruebas backend/frontend existentes y completar casos críticos.
 
+## DOC-02 — Consolidación del contrato frontend
+
+**Estado:** Implementado
+
+**Objetivo:** eliminar duplicación documental y dejar un contrato frontend claro sobre componentes canonical, utilidades, dominio, legacy y pantallas de referencia.
+
+**Alcance:** archivos documentales dentro de `docs/` y raíz.
+
+**No tocar:** código, configuración, migraciones, seeds, `docs/archive/`, `docs/frontend-operational-components.md`, `docs/frontend-architecture-standard.md`, `docs/frontend-pos-architecture.md`.
+
+**Implementado:**
+
+```text
+docs/frontend-component-inventory.md  → reescritura como contrato canónico
+DESIGN.md                             → eliminados anti-patrones y catálogo duplicado
+docs/frontend-ui-ux-operativo.md      → anti-patrones consolidados, densidad delegada
+docs/frontend-page-standard.md        → pantallas de referencia por arquetipo
+docs/working/FRONTEND-WORKFLOW.md     → sección "Modo revisión / triage"
+AGENTS.md                             → lista de componentes reemplazada por referencia canónica
+docs/INDEX.md                         → rol del inventory actualizado
+docs/working/IMPLEMENTATION-TRACKER.md → entrada DOC-02
+```
+
+**Resultado:**
+- `frontend-component-inventory.md` es el documento canónico para componentes compartidos, dominio, legacy y reglas de creación.
+- `DESIGN.md` conserva solo tokens, tipografía, densidad, tema y reglas visuales.
+- `frontend-ui-ux-operativo.md` conserva copy, ayuda contextual, flujos sensibles y una única lista consolidada de anti-patrones.
+- `frontend-page-standard.md` contiene referencias reales por arquetipo con rutas verificadas.
+- `demo-page.tsx` queda marcado como playground visual, no referencia de UX operativa.
+- Se agregó sección "Modo revisión / triage" en `FRONTEND-WORKFLOW.md`.
+- Componentes no clasificados quedan en "Pendientes de clasificación" dentro del inventory.
+
+**Hallazgos fuera de alcance:** ninguno. La clasificación de componentes pendientes se realizará en tareas posteriores según necesidad funcional.
+
+**Siguiente:** mantener el inventory como fuente canónica; clasificar pendientes solo cuando un flujo lo requiera.
+
 ## Registro de decisiones y hallazgos
 
 | Fecha | ID | Hallazgo / decisión | Estado |
 |---|---|---|---|
 | 2026-07-03 | UI-01 | Inputs, selects y búsqueda tenían geometrías y estados distintos. | Implementado; validar visualmente |
 | 2026-07-03 | UI-01 | OpsFormField no propagaba por completo atributos a OpsSelect. | Implementado; validar en pantalla |
-| 2026-07-03 | DOC-01 | Reglas absolutas inducían refactors masivos. | Gobernanza simplificada; completar router/workflow |
-| 2026-07-03 | DOC-01 | El tracker creado quedó como `MENTATION-TRACKER.md`. | Renombrar a `IMPLEMENTATION-TRACKER.md` |
+| 2026-07-03 | DOC-01 | Router documental, workflow frontend e INDEX.md creados. | Implementado |
+| 2026-07-03 | DOC-01 | El tracker creado quedó como `MENTATION-TRACKER.md`. | Renombrado a `IMPLEMENTATION-TRACKER.md` |
+| 2026-07-04 | DOC-02 | Consolidación del contrato frontend. `frontend-component-inventory.md` como canónico. Duplicación eliminada entre DESIGN, ui-ux-operativo y page-standard. | Implementado |
 | 2026-07-03 | ARCH-01 | Graphify representa commit `f48c6039`, pero hay cambios locales no incluidos. | Usar solo como snapshot; actualizar en revisión estructural |
 
 ## Plantilla para nueva entrada

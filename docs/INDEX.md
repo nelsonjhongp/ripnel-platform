@@ -20,7 +20,7 @@ Después, leer únicamente los documentos del dominio o interacción afectados y
 
 | Tarea | Documentos adicionales | Código que debe verificarse |
 |---|---|---|
-| UI general, formulario, tabla o diálogo | `DESIGN.md`, `docs/frontend-page-standard.md`, `docs/frontend-ui-ux-operativo.md`, `docs/frontend-operational-components.md` | componente UI, pantalla y estilos/tokens que usa |
+| UI general, formulario, tabla o diálogo | `DESIGN.md`, `docs/frontend-component-inventory.md`, `docs/frontend-page-standard.md`, `docs/frontend-ui-ux-operativo.md`, `docs/frontend-operational-components.md` | componente UI, pantalla y estilos/tokens que usa |
 | Nueva ruta o reorganización de pantalla | `docs/frontend-architecture-standard.md` | `app/`, `components/modules/`, `lib/routes.ts` |
 | POS o venta nueva | `docs/frontend-pos-architecture.md` | módulo POS, contratos de ventas y caja |
 | Caja | `docs/cash-functional-spec.md`, `docs/cash-database-spec.md` | backend cash, pantallas de caja y pruebas relacionadas |
@@ -36,11 +36,11 @@ Después, leer únicamente los documentos del dominio o interacción afectados y
 | Documento | Rol |
 |---|---|
 | `AGENTS.md` | reglas estables del proyecto y límites técnicos |
-| `DESIGN.md` | intención visual, tokens y núcleo compartido |
+| `DESIGN.md` | tokens, tipografía, densidad, tema y reglas de estilo |
 | `frontend-page-standard.md` | arquetipos de página y composición |
 | `frontend-ui-ux-operativo.md` | criterios de operación, densidad y anti-patrones |
 | `frontend-operational-components.md` | elección de componentes por interacción |
-| `frontend-component-inventory.md` | inventario factual; no es checklist ni obligación de migración |
+| `frontend-component-inventory.md` | contrato canónico de componentes compartidos, dominio, legacy y reglas de creación |
 | `frontend-architecture-standard.md` | ubicación de rutas, módulos y lógica |
 | `working/FRONTEND-WORKFLOW.md` | método de trabajo para tareas y refactors |
 | `working/IMPLEMENTATION-TRACKER.md` | estado, decisiones y trazabilidad actual |

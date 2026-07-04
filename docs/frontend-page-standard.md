@@ -111,6 +111,62 @@ Criterios:
 
 Usar una columna más estrecha, secciones continuas y controles de baja densidad. Evitar convertir preferencias o seguridad en un dashboard de tarjetas sin relación.
 
+## Pantallas de referencia por arquetipo
+
+Rutas verificadas del repositorio que ejemplifican cada arquetipo. La ruta es la referencia principal; el archivo de entrada se incluye como complemento.
+
+### Listado operativo
+
+| Ruta | Entrada |
+|---|---|
+| `/clientes` | `components/modules/customers/customers-page.tsx` |
+| `/inventario` | `components/modules/inventory/inventory-page.tsx` |
+| `/kardex` | `components/modules/kardex/kardex-page.tsx` |
+| `/administracion/usuarios` | `components/modules/administration/users-page.tsx` |
+| `/transferencias` | `components/modules/transfers/transfers-list-page.tsx` |
+| `/postventa` | `components/modules/postsales/postsales-page.tsx` |
+| `/productos` | `components/modules/products/products-overview-page.tsx` |
+
+### Detalle o consulta
+
+| Ruta | Entrada |
+|---|---|
+| `/ventas/[saleId]` | `components/modules/sales/sale-detail-page.tsx` |
+| `/inventario/ajustes/[adjustmentId]` | `components/modules/inventory/adjustments-detail-page.tsx` |
+| `/caja/historial/[id]` | `components/modules/cash/cash-history-detail-page.tsx` |
+| `/transferencias/[transferId]` | `components/modules/transfers/transfers-detail-page.tsx` |
+| `/postventa/[saleId]` | `components/modules/postsales/postsale-detail-page.tsx` |
+
+### Formulario operativo
+
+| Ruta | Entrada |
+|---|---|
+| `/productos/nuevo` | `components/modules/products/product-create-page.tsx` |
+| `/caja/control` | `components/modules/cash/cash-control-page.tsx` |
+| `/clientes` — modal “Nuevo cliente” | `components/modules/customers/customer-form.tsx` |
+| `/administracion/usuarios` — modal “Nuevo usuario” | `components/modules/administration/user-form.tsx` |
+
+### Workspace o flujo multietapa
+
+| Ruta | Entrada |
+|---|---|
+| `/ventas/nueva` | `components/modules/sales/pos/pos-page.tsx` |
+| `/inventario/ajustes/nuevo` | `components/modules/inventory/inventory-adjustments-create-page.tsx` |
+| `/transferencias/solicitar` | `components/modules/transfers/transfers-request-page.tsx` |
+
+### Cuenta y settings
+
+| Ruta | Entrada |
+|---|---|
+| `/cuenta` | `components/modules/account/account-page.tsx` |
+| `/cuenta/seguridad` | `components/modules/account/account-security-page.tsx` |
+| `/administracion/roles` | `components/modules/administration/roles-page.tsx` |
+| `/administracion/ubicaciones` | `components/modules/administration/locations-page.tsx` |
+
+### Demo
+
+`/demo` (`components/modules/demo/demo-page.tsx`) es un playground visual para explorar componentes. No usar como referencia de UX operativa ni como arquetipo de página real.
+
 ## Encabezados y contexto
 
 - El título debe nombrar la tarea, no repetir el módulo del sidebar sin aportar contexto.
