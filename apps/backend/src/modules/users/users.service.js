@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { pool } = require('../../shared/db');
+const { pool, attachActor } = require('../../shared/db');
 const { AppError } = require('../../shared/errors');
 const { findRoleById } = require('../roles/roles.repo');
 const {
@@ -89,7 +89,7 @@ async function listUsers() {
   return findAllUsers();
 }
 
-async function createUser(input = {}) {
+async function createUser(input = {}, { actorUserId = null, actorRole = null } = {}) {
   const fullName = normalizeText(input.full_name);
   const username = normalizeUsername(input.username);
   const email = normalizeEmail(input.email);
@@ -157,6 +157,7 @@ async function createUser(input = {}) {
 
   try {
     await client.query('begin');
+    await attachActor(client, { actorUserId, actorRole });
     const executor = client.query.bind(client);
 
     const createdUser = await insertUser(
@@ -192,7 +193,7 @@ async function createUser(input = {}) {
   }
 }
 
-async function patchUser(userId, input = {}) {
+async function patchUser(userId, input = {}, { actorUserId = null, actorRole = null } = {}) {
   const normalizedUserId = normalizeUuid(userId);
 
   if (!normalizedUserId) {
@@ -318,7 +319,7 @@ async function getUserLocations(userId) {
   return buildUserLocationsPayload(user, assignments);
 }
 
-async function updateUserLocations(userId, input = {}) {
+async function updateUserLocations(userId, input = {}, { actorUserId = null, actorRole = null } = {}) {
   const normalizedUserId = normalizeUuid(userId);
   const assignments = normalizeAssignments(input.assignments);
 
@@ -366,6 +367,7 @@ async function updateUserLocations(userId, input = {}) {
 
   try {
     await client.query('begin');
+    await attachActor(client, { actorUserId, actorRole });
     await replaceUserLocations(normalizedUserId, assignments, client.query.bind(client));
     await client.query('commit');
   } catch (error) {

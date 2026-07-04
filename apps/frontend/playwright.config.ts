@@ -1,4 +1,4 @@
-import { defineConfig } from "@playwright/test"
+import { defineConfig, devices } from "@playwright/test"
 
 export default defineConfig({
   testDir: "./__tests__",
@@ -11,6 +11,16 @@ export default defineConfig({
     {
       name: "unit",
       testMatch: /.*\.test\.ts$/,
+      testIgnore: /.*\.e2e\.ts$/,
+    },
+    {
+      name: "e2e",
+      testMatch: /.*\.e2e\.ts$/,
+      use: {
+        ...devices["Desktop Chrome"],
+        baseURL: "http://localhost:3000",
+      },
+      timeout: 30000,
     },
   ],
 })
