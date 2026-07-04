@@ -49,6 +49,8 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
       - name: Lint
         run: npm run lint:frontend
       - name: Typecheck
