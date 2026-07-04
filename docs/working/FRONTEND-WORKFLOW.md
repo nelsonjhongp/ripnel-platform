@@ -120,6 +120,17 @@ No usarlo como paso obligatorio para cambios pequeños ni como criterio automát
 
 El reporte debe considerarse un snapshot: si el working tree cambió desde su commit base, confirmar frescura antes de usarlo. Actualizarlo para una revisión estructural concreta, no después de cada ajuste de UI.
 
+## Modo revisión / triage
+
+Cuando la tarea es revisar sin implementar cambios:
+
+1. **Revisión sin cambios**: observar, no editar. Si el análisis sugiere una mejora, registrarla como hallazgo fuera de alcance, no como implementación.
+2. **Máximo 3 candidatos**: si se identifican oportunidades de mejora, seleccionar las tres con mayor relación costo/beneficio. No listar todo lo encontrado.
+3. **Separar hechos, inferencias y preguntas abiertas**: cada observación debe distinguir qué está confirmado en el código, qué se infiere del contexto y qué requiere verificación adicional.
+4. **Evidencia obligatoria**: toda afirmación sobre estado, riesgo o divergencia debe respaldarse con archivo, ruta, línea o comportamiento observable.
+5. **Sin refactors globales**: una revisión no habilita migraciones masivas, renombres ni reestructuraciones. Las oportunidades detectadas se canalizan como tareas separadas con su propio alcance.
+6. **La IA recomienda, no decide prioridad**: el producto, sprint y prioridad los define el equipo. La IA entrega análisis, no un backlog.
+
 ## Cierre de una tarea
 
 Al terminar:

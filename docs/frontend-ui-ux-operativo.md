@@ -22,13 +22,7 @@ RIPNEL es una interfaz de trabajo. La UI debe ayudar a vender, registrar, consul
 
 ## Densidad y jerarquía
 
-- Referencia: 1366×768 a 100% de zoom.
-- No debe existir scroll horizontal de página.
-- Las tablas amplias pueden desplazarse dentro de su contenedor.
-- Evitar panel dentro de panel salvo que cada capa tenga una decisión distinta.
-- No elevar una cifra a KPI si la tabla, paginación o rango ya expresa esa misma información.
-- Preferir filas compactas y metadata secundaria antes que cards altas.
-- El título puede vivir como texto; no necesita panel solo para existir.
+La referencia de densidad y composición visual está en `docs/frontend-page-standard.md`. Este documento conserva solo consideraciones de copy, feedback y flujos sensibles.
 
 ## Color semántico
 
@@ -65,18 +59,27 @@ Nunca usar color como única señal para una regla de negocio. Acompañarlo con 
 ## Anti-patrones
 
 - dashboard decorativo con muchas cards sin pregunta operativa;
-- texto explicativo repetido;
-- múltiples acentos fuertes en una sola pantalla;
-- controls con affordance débil o sin foco;
+- texto explicativo repetido o descripción persistente que repite título, labels o datos visibles;
+- fondos grandes en violeta o múltiples acentos fuertes en una sola pantalla;
+- cards altas para contenido que una tabla o fila compacta comunica mejor;
+- KPIs que repiten el mismo dato ya visible en tabla, paginación o rango;
+- scroll horizontal de la página;
+- controls con affordance débil o sin foco distinguible;
 - alertas de alta prioridad usadas para información neutra;
 - componentes compartidos creados para un solo caso;
+- wrappers que solo agregan una clase Tailwind o renombran un componente;
+- clases visuales copiadas de forma masiva sin patrón semántico;
 - migraciones visuales masivas que no resuelven un flujo;
+- usar la demo como una orden de adoptar todos los componentes;
 - una pantalla que oculta por completo la siguiente acción cuando existe un bloqueo.
 
-## Revisión breve
+## Revisión
 
-- ¿La pantalla ayuda a completar una tarea real?
-- ¿Un operador identifica qué está viendo, qué puede hacer y qué lo bloquea?
-- ¿La acción principal tiene jerarquía?
-- ¿Hay ayuda, paneles o métricas que se puedan retirar sin perder decisión?
-- ¿El uso de color respeta significado y contraste?
+La checklist de revisión por arquetipo de página está en `docs/frontend-page-standard.md`.
+
+## Referencias
+
+- `DESIGN.md`: tokens visuales, tipografía y controles operativos.
+- `docs/frontend-page-standard.md`: arquetipos de página, composición y checklist.
+- `docs/frontend-component-inventory.md`: catálogo canónico de componentes.
+- `docs/frontend-operational-components.md`: elección de componentes por interacción.
