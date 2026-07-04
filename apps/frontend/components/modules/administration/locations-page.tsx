@@ -18,7 +18,6 @@ import { usePagination } from "@/hooks/use-pagination"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader"
 import { Button } from "@/components/ui/button"
 import {
-  AdminConfirmModal,
   AdminRowActionsMenu,
 } from "@/components/admin/admin-ui"
 import { OpsSelect } from "@/components/ui/ops-selection"
@@ -143,14 +142,15 @@ export default function LocationsPage() {
   }
 
   async function saveLocation() {
+    setActionState("validating")
+    setFormErrors(null)
+
     const validation = validateLocationInput(formState, isEdit)
     if (validation) {
       setFormErrors(validation)
+      setActionState("idle")
       return
     }
-
-    setActionState("validating")
-    setFormErrors(null)
 
     try {
       setActionState("saving")
@@ -277,7 +277,7 @@ export default function LocationsPage() {
                   disabled={!hasActiveFilters}
                   variant="outline"
                   size="icon-sm"
-                  className="h-10 w-10 rounded-lg"
+                  className="mt-auto h-10 w-10 rounded-lg"
                   aria-label={ADMIN.filters.clear}
                 >
                   <RotateCcw className="h-4 w-4" />
@@ -318,7 +318,7 @@ export default function LocationsPage() {
                 <>
                   <span className="text-sm tabular-nums text-[var(--ops-text-muted)]">
                     {filteredLocations.length === 0
-                      ? "0 resultados"
+                      ? ADMIN.table.locations.zeroResults
                       : `${firstVisible}-${lastVisible} de ${filteredLocations.length}`}
                   </span>
                   <Pagination
@@ -488,22 +488,49 @@ export default function LocationsPage() {
         </div>
       </OpsDialog>
 
-      <AdminConfirmModal
+      <OpsDialog
         open={Boolean(activeChangeLocation)}
+        onOpenChange={(open) => { if (!open) setActiveChangeLocation(null) }}
         title={activeChangeLocation?.active ? ADMIN.dialog.locationActiveTitle : ADMIN.dialog.locationInactiveTitle}
         description={
-          activeChangeLocation ? (
-            <span>
-              {ADMIN.dialog.locationActiveDesc(activeChangeLocation.name, activeChangeLocation.active)}
-            </span>
-          ) : null
+          activeChangeLocation
+            ? ADMIN.dialog.locationActiveDesc(activeChangeLocation.name, activeChangeLocation.active)
+            : undefined
         }
-        confirmLabel={activeChangeLocation?.active ? ADMIN.dialog.confirmInactivate : ADMIN.dialog.confirmActivate}
-        confirmTone={activeChangeLocation?.active ? "danger" : "accent"}
-        busy={savingActiveChange}
-        onCancel={() => setActiveChangeLocation(null)}
-        onConfirm={() => void confirmLocationActiveChange()}
-      />
+        size="sm"
+        bodyClassName="px-5 py-5"
+        footer={
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-lg px-4"
+              onClick={() => setActiveChangeLocation(null)}
+              disabled={savingActiveChange}
+            >
+              {ADMIN.dialog.cancel}
+            </Button>
+            <Button
+              variant={activeChangeLocation?.active ? "destructive" : "accent"}
+              size="sm"
+              className="rounded-lg px-4"
+              onClick={() => void confirmLocationActiveChange()}
+              disabled={savingActiveChange}
+            >
+              {savingActiveChange ? (
+                <span className="inline-flex items-center gap-2">
+                  <LoaderCircle className="h-4 w-4 animate-spin" />
+                  {ADMIN.dialog.processing}
+                </span>
+              ) : activeChangeLocation?.active ? (
+                ADMIN.dialog.confirmInactivate
+              ) : (
+                ADMIN.dialog.confirmActivate
+              )}
+            </Button>
+          </div>
+        }
+      >{null}</OpsDialog>
     </OpsPageShell>
   )
 }

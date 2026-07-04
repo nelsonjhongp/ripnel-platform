@@ -1,133 +1,85 @@
-# Frontend UI UX Operativo
+# Frontend UI/UX Operativo
 
-Guia breve para futuras interfaces operativas de RIPNEL.
+## Propósito
 
-Este documento complementa a `docs/frontend-page-standard.md`. No redefine la estructura base del `page header`; solo agrega criterios operativos de densidad, ayuda contextual y anti-patrones.
+RIPNEL es una interfaz de trabajo. La UI debe ayudar a vender, registrar, consultar y corregir con rapidez, no comportarse como una página de marketing.
 
-## Cuando usar ayudas contextuales
+## Principios
 
-- Evitar texto explicativo permanente cuando la pantalla ya se entiende por jerarquia visual.
-- No agregar texto o informacion adicional no solicitada dentro de la interfaz; si la duda puede resolverse con ayuda puntual, responderla primero en chat o usar ayuda contextual minima.
-- Usar iconos de informacion para aclarar metricas, estados o reglas de negocio que no sean obvias.
-- Reutilizar el patron de `Tooltip` ya existente antes de crear nuevos bloques de apoyo visual.
-- Mantener los tooltips como ayuda puntual, no como reemplazo de errores, alertas o validaciones criticas.
-- Preferir ayuda contextual en:
-  - tarjetas resumen;
-  - encabezados de secciones;
-  - etiquetas como `Minorista`, `Mayorista`, `Cobertura`, `Vigencia`;
-  - estados que dependen de reglas del negocio.
+- Reducir pasos, ambigüedad y cambios de contexto.
+- Mantener densidad suficiente para escritorio sin sacrificar legibilidad.
+- Mostrar primero lo que permite decidir: producto, importe, estado, sede, fecha, usuario o acción.
+- Usar superficies y paneles para agrupar decisiones, no para decorar.
+- Mantener la acción principal visible y el feedback cerca del problema.
 
-## Anotaciones y comentarios visuales
+## Copy y ayuda contextual
 
-- Considerar un patron reutilizable de anotaciones ligeras para UI review y refinamiento visual.
-- Las anotaciones deben servir para detectar:
-  - copy redundante;
-  - exceso de cajas o paneles;
-  - falta de densidad en vistas ERP;
-  - estados que pueden explicarse mejor con iconos o color semantico;
-  - lugares donde conviene colapsar detalle.
-- Cuando una observacion se repita en varias pantallas, convertirla en criterio de interfaz y no dejarla solo como comentario puntual.
-- Cuando una observacion nazca en un modulo puntual, como un listado concreto, convertirla en regla general solo si resuelve una familia de pantallas parecida.
+- No añadir descripciones que repiten título, labels o datos visibles.
+- Usar tooltip o hint solo cuando una regla no sea autoexplicativa, pueda producir error o tenga impacto operativo.
+- Explicar bloqueos con causa y siguiente paso: “No puedes confirmar porque la caja está cerrada” es mejor que “Operación no disponible”.
+- Evitar mensajes positivos permanentes si no cambian una decisión.
+- Las labels locales, placeholders y botones simples pueden vivir junto al componente; mensajes de dominio, errores, toasts y confirmaciones reutilizables deben centralizarse.
 
-## Criterios de densidad para modulos ERP
+## Densidad y jerarquía
 
-- Priorizar lectura operacional sobre decoracion.
-- Evitar bloques grandes para datos repetitivos como precios, tallas, stock o estados.
-- Cuando una entidad tenga varias subvariantes, intentar primero:
-  - filas compactas;
-  - chips pequenos;
-  - resumen por grupo;
-  - detalle desplegable.
-- Reservar tarjetas grandes solo para informacion realmente primaria o accionable.
+La referencia de densidad y composición visual está en `docs/frontend-page-standard.md`. Este documento conserva solo consideraciones de copy, feedback y flujos sensibles.
 
-## Alertas y color semantico
+## Color semántico
 
-- Un estado `0 alertas` debe verse neutro, no alarmante.
-- Usar color de atencion solo cuando exista un problema real que requiera accion.
-- Diferenciar entre:
-  - ayuda contextual;
-  - aviso operativo;
-  - error o bloqueo.
+- Acento Ripnel: acción primaria, foco, selección y estado activo.
+- Success: operación completada o saldo/cobertura positiva.
+- Warning: atención, pendiente o riesgo que aún permite actuar.
+- Danger: error, bloqueo o acción destructiva.
+- Neutral: metadata, estado inactivo o información no prioritaria.
 
-## Patron recomendado para futuras vistas
+Nunca usar color como única señal para una regla de negocio. Acompañarlo con texto, icono o ambos cuando la decisión sea importante.
 
-- Header corto y util.
-- Metricas compactas con ayuda contextual.
-- Lista principal con densidad alta.
-- Detalle expandible solo cuando agregue contexto real.
-- Copy corto, operativo y consistente con el lenguaje ERP del proyecto.
+## Formularios y settings
 
-## Cuando un resumen si aporta
+- Formularios: labels normales, agrupación por decisión y errores cerca del campo.
+- Settings y cuenta: columna más estrecha, secciones continuas y pocos elementos simultáneos.
+- No convertir seguridad, apariencia o preferencias en dashboard de tarjetas.
+- Los campos de solo lectura deben comunicarlo sin parecer editables.
+- Un selector simple suele ser mejor que una pared de cards de opciones; usar selección visual expandida solo cuando comparar opciones sea parte de la tarea.
 
-Un resumen compacto si aporta cuando:
+## Caja y flujos sensibles
 
-- adelanta una prioridad;
-- muestra un agregado que no se ve facil en filas;
-- compara estados o volumenes relevantes;
-- evita abrir varias paginas o recorrer toda la tabla.
+- Mostrar el estado de caja de forma visible antes de permitir una venta o movimiento dependiente.
+- Las alertas de cierre, descuadre o operación bloqueada deben indicar impacto y acción siguiente.
+- En acciones irreversibles o de alto impacto, confirmar de forma explícita y mantener el contexto del importe, documento o stock afectado.
 
-Un resumen sobra cuando:
+## Tablas y acciones
 
-- repite el mismo total que ya muestra la paginacion;
-- reexpresa un filtro activo;
-- vuelve a contar una sola categoria evidente del listado;
-- no cambia ninguna decision operativa.
+- La acción de fila debe ser visible cuando hay una sola acción frecuente.
+- Usar menú de acciones cuando varias acciones compiten por ancho o son menos frecuentes.
+- Iconos sin texto solo para acciones universales y con tooltip.
+- Mantener encabezados discretos y filas escaneables.
+- Diferenciar dato principal y metadata por peso tipográfico, no por multiplicar colores.
 
-## Patron compacto derivado de inicio
+## Anti-patrones
 
-- Header corto como texto; seguir `docs/frontend-page-standard.md` para su composicion y no usar hero-card si no agrega una decision operativa.
-- Priorizar acciones urgentes o recurrentes en topbar o en una fila superior compacta.
-- Mantener pendientes, accesos rapidos y metricas como secciones ligeras; no deben vivir en paneles pesados por defecto.
-- Agrupar metricas cerca de la decision o del bloque que representan; evitar dispersarlas en muchas tarjetas.
-- Minimizar `panel dentro de panel`; usar superficies internas puntuales solo para resaltar grupos o estados.
-- Si la vista ya se entiende por contexto, no repetir sede, rol o modulo en varios niveles visuales.
+- dashboard decorativo con muchas cards sin pregunta operativa;
+- texto explicativo repetido o descripción persistente que repite título, labels o datos visibles;
+- fondos grandes en violeta o múltiples acentos fuertes en una sola pantalla;
+- cards altas para contenido que una tabla o fila compacta comunica mejor;
+- KPIs que repiten el mismo dato ya visible en tabla, paginación o rango;
+- scroll horizontal de la página;
+- controls con affordance débil o sin foco distinguible;
+- alertas de alta prioridad usadas para información neutra;
+- componentes compartidos creados para un solo caso;
+- wrappers que solo agregan una clase Tailwind o renombran un componente;
+- clases visuales copiadas de forma masiva sin patrón semántico;
+- migraciones visuales masivas que no resuelven un flujo;
+- usar la demo como una orden de adoptar todos los componentes;
+- una pantalla que oculta por completo la siguiente acción cuando existe un bloqueo.
 
-## Anti patrones a evitar
+## Revisión
 
-- Hero-card pesada con texto redundante.
-- Panel padre para titulo mas paneles hijos para cada item.
-- Subtitulos que solo repiten el nombre de la seccion.
-- Bloques altos para datos que caben en una fila compacta.
-- Acciones urgentes escondidas dentro del scroll cuando podrian vivir arriba.
-- Boton de `refresh` ocupando el lugar de un filtro principal cuando podria vivir como accion secundaria del header.
-- Conteo repetido a la vez en pills, franja de filtros y pie de tabla.
-- Estados demasiado saturados en tema oscuro para valores estables que no requieren accion.
+La checklist de revisión por arquetipo de página está en `docs/frontend-page-standard.md`.
 
-## Patron para cuenta y configuracion operativa
+## Referencias
 
-- Tratar `Cuenta` y ajustes como vistas operativas, no como perfil decorativo.
-- Preferir anchos mas contenidos para configuracion y preferencias; una referencia razonable es una columna principal tipo `max-w-4xl` o menor, no full width si la lectura no lo necesita.
-- Priorizar una superficie continua con secciones separadas por bordes antes que varias cards independientes apiladas como dashboard.
-- Evitar KPIs grandes o bloques resumen si el dato ya aparece en campos principales.
-- Preferir layouts compactos de dos paneles o dos columnas, con poco espacio muerto.
-- Si una seccion como `Apariencia` o `Sede operativa` ya se entiende por su titulo, no agregar parrafos visibles debajo salvo que la accion sea ambigua.
-- Si el ajuste es evidente por contexto, no agregar tooltip ni copy de apoyo.
-- Para elecciones como sede default:
-  - preferir `select` o dropdown cuando el usuario solo necesita escoger una opcion;
-  - usar tarjetas/radios solo si la comparacion simultanea entre opciones aporta una decision real.
-- En ajustes de apariencia:
-  - usar filas cortas;
-  - label breve a la izquierda;
-  - control o selector a la derecha;
-  - evitar exponer ajustes que no se entiendan claramente para el usuario final;
-  - los controles deben mostrar affordance visible: `cursor-pointer`, hover y focus claros.
-- Para temas visuales de modulos operativos y settings, preferir fondos sobrios y solidos en grises o grafito antes que gradientes protagonistas.
-
-## Patron para modulos de caja
-
-- Separar claramente:
-  - `Caja del dia` como vista operativa;
-  - `Historial` como vista densa de sesiones;
-  - consolas administrativas multi-sede como vistas aparte.
-- Evitar texto redundante en headers o tarjetas cuando la pagina ya se entiende por contexto.
-- Usar tooltips para explicar:
-  - fecha operativa;
-  - total del dia;
-  - pagos del sistema;
-  - diferencia o consistencia.
-- En historiales de caja, preferir:
-  - filas o tablas compactas;
-  - filtros visibles y breves;
-  - paginacion cuando la entidad se repite.
-- Usar el estado `Pendiente de cierre` para sesiones abiertas en listados operativos cuando comunique mejor la accion esperada.
-- Los mini graficos solo deben entrar si resumen una decision real, como tendencia diaria o comparativo por sede.
+- `DESIGN.md`: tokens visuales, tipografía y controles operativos.
+- `docs/frontend-page-standard.md`: arquetipos de página, composición y checklist.
+- `docs/frontend-component-inventory.md`: catálogo canónico de componentes.
+- `docs/frontend-operational-components.md`: elección de componentes por interacción.

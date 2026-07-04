@@ -18,6 +18,7 @@ export const ADMIN = {
     activate: "Activar",
     inactivate: "Inactivar",
     locations: "Sedes",
+    regeneratePassword: "Regenerar clave",
     actionsFor: (name: string) => `Acciones para ${name}`,
   },
   filters: {
@@ -47,6 +48,7 @@ export const ADMIN = {
       },
       loadingM: "Cargando usuarios...",
       errorTitle: "Error al cargar usuarios",
+      emptyDb: "No hay usuarios registrados todavia.",
       empty: "No hay usuarios para este filtro.",
     },
     roles: {
@@ -64,6 +66,7 @@ export const ADMIN = {
       noPermissions: "Sin permisos",
     },
     locations: {
+      zeroResults: "0 resultados",
       columns: {
         nombre: "Nombre",
         codigo: "Codigo",
@@ -88,8 +91,6 @@ export const ADMIN = {
     activeLocations: "Activas",
   },
   status: {
-    active: "Activo",
-    inactive: "Inactivo",
     pendingPassword: "Clave pendiente",
     withoutRole: "Sin rol",
   },
@@ -107,7 +108,7 @@ export const ADMIN = {
     userCreateTitle: "Nuevo usuario",
     userCreateDesc: "Registra un nuevo usuario en el sistema.",
     userEditTitle: "Editar usuario",
-    userEditDesc: "Modifica los datos del usuario.",
+    userEditDesc: "Modifica los datos del perfil. Las sedes se gestionan con la accion Sedes del menu.",
     roleCreateTitle: "Nuevo rol",
     roleCreateDesc: "Los permisos se asignan al rol, no al usuario individual.",
     roleEditTitle: "Editar rol",
@@ -140,7 +141,18 @@ export const ADMIN = {
       `Usuario: ${username}`,
     temporaryPasswordLabel: "Clave temporal",
     temporaryPasswordHint: "Entrega esta clave al usuario para su primer ingreso.",
+    copyTemporaryPassword: "Copiar clave temporal",
     temporaryPasswordCopied: "Clave copiada al portapapeles",
+    temporaryPasswordCopyError: "No se pudo copiar la clave. Seleccionala manualmente.",
+    rePasswordTitle: "Regenerar clave temporal",
+    rePasswordDesc: (username: string) =>
+      `Se generara una nueva clave temporal para ${username}.`,
+  },
+  locationTypes: {
+    store: "Tienda",
+    warehouse: "Almacen",
+    workshop: "Taller",
+    thirdParty: "Tercero",
   },
   toast: {
     userCreated: "Usuario creado",
@@ -151,6 +163,7 @@ export const ADMIN = {
     locationsUpdated: "Sedes actualizadas",
     locationsError: "No se pudo guardar sedes",
     locationsLoadError: "No se pudo cargar sedes",
+    passwordRegenerated: "Clave temporal regenerada.",
     roleCreated: "Rol creado",
     roleUpdated: "Rol actualizado",
     roleActivated: "Rol activado",
@@ -171,12 +184,11 @@ export const ADMIN = {
     operation: "Operacion",
     sections: {
       sedes: "Sedes",
-      sedesDesc: "Elige acceso y sede default.",
     },
     fullName: "Nombre completo",
     fullNamePlaceholder: "Nombre completo",
     username: "Usuario",
-    emailOptional: "Email opcional",
+    email: "Email",
     emailPlaceholder: "email@ejemplo.com",
     role: "Rol",
     rolePlaceholder: (loading: boolean, error: string | null) =>

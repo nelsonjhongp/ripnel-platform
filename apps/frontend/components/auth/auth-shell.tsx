@@ -9,6 +9,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { AUTH_BACK_BUTTON_TEXT, AUTH_CARD_BORDER } from "./auth-constants"
+import { LOGIN } from "./login-messages"
 import { cn } from "@/lib/utils"
 
 type AuthShellProps = {
@@ -19,22 +21,17 @@ type AuthShellProps = {
 
 export function AuthShell({ children, onBack, footer }: AuthShellProps) {
   return (
-    <div className="relative flex min-h-svh items-center justify-center overflow-hidden bg-[var(--ops-page-background)] px-4 py-8 sm:px-5 sm:py-10 md:px-6 md:py-14">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_0%,rgb(176_122_228_/_0.06)_0%,transparent_60%)] dark:bg-[radial-gradient(ellipse_80%_50%_at_50%_0%,rgb(142_93_183_/_0.04)_0%,transparent_60%)]"
-      />
-
+    <div className="relative flex min-h-svh items-center justify-center overflow-hidden bg-[var(--ops-page-background)] px-4 py-4 sm:px-5 sm:py-6 md:px-6 md:py-8">
       {onBack ? (
         <Button
           type="button"
           variant="ghost"
           size="sm"
           onClick={onBack}
-          className="absolute left-4 top-4 z-10 gap-1.5 rounded-lg px-2.5 text-[0.8125rem] text-[color:color-mix(in_srgb,var(--ops-text-muted)_55%,transparent)] hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)] sm:left-5 sm:top-5 md:left-6 md:top-6"
+          className={`absolute left-4 top-4 z-10 gap-1.5 rounded-lg px-2.5 text-[0.8125rem] ${AUTH_BACK_BUTTON_TEXT} hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-text)] sm:left-5 sm:top-5 md:left-6 md:top-6`}
         >
           <ArrowLeft className="h-3.5 w-3.5" />
-          <span>Volver</span>
+          <span>{LOGIN.actions.back}</span>
         </Button>
       ) : null}
 
@@ -68,7 +65,7 @@ export function AuthCard({
   return (
     <Card
       className={cn(
-        "w-full gap-0 rounded-[1.125rem] border border-[color:color-mix(in_srgb,var(--ops-border-strong)_80%,var(--ripnel-accent)_20%)] bg-[var(--ops-surface)] py-0 shadow-[0_1px_2px_rgb(0_0_0_/_0.04),0_4px_16px_rgb(15_23_42_/_0.06)] dark:border-[var(--ops-border-strong)] dark:shadow-[0_1px_3px_rgb(0_0_0_/_0.12),0_8px_24px_rgb(0_0_0_/_0.2)]",
+        `w-full gap-0 rounded-[1.125rem] ${AUTH_CARD_BORDER} bg-[var(--ops-surface)] py-0 shadow-sm dark:border-[var(--ops-border-strong)]`,
         className
       )}
     >

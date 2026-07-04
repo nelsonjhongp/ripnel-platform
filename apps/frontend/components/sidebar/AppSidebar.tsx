@@ -277,6 +277,10 @@ export function AppSidebar({
               if (item.url.endsWith("/recepciones")) {
                 return transferCapabilities.receive;
               }
+
+              if (item.url.endsWith("/historial")) {
+                return transferCapabilities.visible;
+              }
             }
 
             if (item.url === "/transferencias") {

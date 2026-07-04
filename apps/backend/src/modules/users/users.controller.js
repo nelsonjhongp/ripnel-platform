@@ -2,6 +2,7 @@ const {
   listUsers,
   createUser,
   patchUser,
+  resetUserPass,
   getUserLocations,
   updateUserLocations,
 } = require('./users.service');
@@ -55,10 +56,20 @@ async function putUserLocationsByUserId(req, res, next) {
   }
 }
 
+async function resetUserPassword(req, res, next) {
+  try {
+    const user = await resetUserPass(req.params.userId);
+    res.json({ ok: true, data: user });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   getUsers,
   postUser,
   patchUserById,
   getUserLocationsByUserId,
   putUserLocationsByUserId,
+  resetUserPassword,
 };

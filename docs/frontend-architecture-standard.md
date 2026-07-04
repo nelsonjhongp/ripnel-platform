@@ -1,122 +1,58 @@
 # Frontend Architecture Standard
 
-Guia breve para mantener ordenada la arquitectura frontend de RIPNEL sin forzar una reescritura completa.
-
-Este documento complementa `docs/frontend-page-standard.md`, `docs/frontend-ui-ux-operativo.md` y `docs/frontend-operational-components.md`. Si hay duda visual, manda el estandar de pagina; si hay duda de ubicacion de archivos, manda este documento.
-
 ## Objetivo
 
-- Mantener clara la frontera entre rutas reales de Next y pantallas operativas.
-- Evitar que `app/(protected)` vuelva a crecer como carpeta de pantallas mezcladas.
-- Usar TypeScript de forma progresiva y consistente.
-- Documentar excepciones actuales para no tratarlas como patrones nuevos.
+Mantener claras las fronteras entre rutas de Next.js, pantallas de dominio, componentes compartidos y lógica reutilizable sin imponer una estructura idéntica a todos los módulos.
 
-## Regla Base
+## Regla base
 
-`app/(protected)` representa URLs reales de Next.js. Debe contener:
+- `app/` contiene rutas reales, layouts, loading/error boundaries, redirects y wrappers finos.
+- `components/modules/<dominio>/` contiene pantallas, formularios, diálogos y piezas cercanas al dominio.
+- `components/ui/` contiene primitivas y patrones compartidos.
+- `components/feedback/` contiene estados de loading, error, forbidden y empty cuando sean transversales.
+- `lib/` contiene rutas, contratos, llamadas API y helpers reutilizables sin renderizado React.
 
-- `layout.tsx`, `loading.tsx`, `error.tsx` y rutas especiales de App Router.
-- `page.tsx` finos que importan una pantalla desde `components/modules/<domain>`.
-- redirects legacy o rutas de compatibilidad.
-- dispatchers de rutas dinamicas cuando el segmento mezcla slugs internos e ids reales.
+Una ruta `page.tsx` debe ser fina cuando la pantalla tiene lógica o UI de dominio. Una excepción es válida si la página es realmente pequeña o actúa como dispatcher/redirect.
 
-`components/modules/<domain>` contiene pantallas operativas de dominio. Cada dominio agrupa sus paginas, formularios y piezas compartidas cercanas.
+## Archivos y extracción
 
-`lib` contiene contratos, rutas, helpers o llamadas API reutilizables que no dependen de renderizado React.
+- `.tsx`: JSX.
+- `.ts`: lógica, tipos, cálculos, formatters o contratos sin UI.
+- Crear `*-types.ts`, `*-utils.ts`, `*-constants.ts`, `*-messages.ts` o `*-shared.ts` solo cuando hay más de un consumidor, una regla de dominio clara o complejidad que justifique separarlo.
+- No crear archivos por simetría ni reexportar estilos globales desde cada módulo.
+- Mantener composiciones específicas dentro del módulo hasta que exista reutilización real.
 
-## Extensiones
+## Rutas
 
-- Usar `.tsx` para todo archivo que renderiza JSX.
-- Usar `.ts` para tipos, helpers, constantes, formatters, calculos y logica sin UI.
-- No crear `.ts` por simetria. Crear `*-shared.ts`, `*-types.ts` o `*-utils.ts` solo cuando mas de una pantalla del dominio comparte esa logica.
-- No agregar nuevos `.jsx`. Los `.jsx` actuales son deuda temporal documentada.
+- Usar `apps/frontend/lib/routes.ts` para rutas centrales, builders o slugs repetidos.
+- Las URLs visibles de módulos operativos se mantienen en español cuando corresponda.
+- Rutas legacy se resuelven con redirects o compatibilidad existente; no son ejemplos para rutas nuevas.
+- Las rutas dinámicas y dispatchers deben conservar contratos claros en `routes.ts` o metadata de dominio, no strings repetidos.
 
-Estado actual:
+Rutas canónicas frecuentes:
 
-- `inventory` tiene `inventory-adjustments-shared.ts` porque comparte tipos/helpers entre listado y creacion de ajustes.
-- `transfers` tiene `transfers-shared.ts` porque varias pantallas comparten estado, fechas y clases de estado.
-- `catalogs` y `customers` pueden vivir solo con `.tsx` mientras sus helpers esten pegados al formulario o a una sola pantalla.
+- `/inicio`, `/panel`, `/cuenta`, `/cuenta/seguridad`;
+- `/ventas/nueva`, `/ventas/historial`, `/ventas/[saleId]`;
+- `/inventario`, `/inventario/ajustes`, `/inventario/movimientos`, `/kardex`;
+- `/administracion/usuarios`, `/administracion/roles`, `/administracion/ubicaciones`.
 
-## Rutas y URLs
+Consultar el árbol de `apps/frontend/app` antes de documentar una ruta como actual.
 
-Las rutas operativas canonicas usan espanol cuando el modulo es visible para usuarios. Las URLs antiguas se conservan como compatibilidad en `next.config.ts` y dentro de `app/(protected)/(legacy)`.
+## Cómo agregar una página
 
-- Usar `apps/frontend/lib/routes.ts` para rutas centrales, slugs especiales y builders.
-- Usar `next.config.ts` para redirects legacy que deben ocurrir antes del shell protegido.
-- Labels visibles pueden estar en espanol aunque el nombre interno sea ingles.
-- Nombres internos de archivos, carpetas, tipos y helpers deben preferir ingles.
-- No crear nuevas rutas canonicas en ingles para modulos operativos del ERP.
-- Excepciones actuales razonables: `/bi` por acronimo de negocio y `/kardex` por termino operativo.
+1. Confirmar que la URL representa una necesidad real del flujo.
+2. Crear `app/(protected)/<ruta>/page.tsx` o la ruta pública correspondiente.
+3. Crear una pantalla en `components/modules/<dominio>/` cuando la vista tenga lógica, composición o estado propio.
+4. Registrar rutas reutilizables en `routes.ts` cuando corresponda.
+5. Extraer helpers solo si serán compartidos o reducen una complejidad demostrable.
+6. Verificar permisos, navegación, loading/error y responsive del flujo.
 
-Rutas canonicas normalizadas:
+## Checklist breve
 
-- `/cuenta` y `/cuenta/seguridad`.
-- `/panel`.
-- `/inventario` y `/inventario/ajustes`.
-- `/ventas/nueva`, `/ventas/historial` y `/ventas/[saleId]`.
-
-Rutas legacy actuales:
-
-- `/account`, `/account-mockup`, `/account/seguridad`, `/account/apariencia` y `/account/operacion` redirigen a `/cuenta`.
-- `/dashboard` redirige a `/panel`.
-- `/inventory`, `/inventory/ajustes` y `/inventory/ajustes/nuevo` redirigen a `/inventario`.
-- `/purchase-system`, `/purchase-system/[saleId]`, `/purchase-system/checkout` y `/purchase-system/checkout-payment` redirigen a `/ventas/nueva`.
-- `/transaction-history` redirige a `/ventas/historial`.
-- `/administracion/roles&usuarios` redirige a `/administracion/usuarios`.
-- `/administracion/usuarios/nuevo`, `/administracion/roles/nuevo` y `/administracion/ubicaciones/nuevo` redirigen a sus respectivos listados (dialogs unificados).
-- `/clientes/dashboards` redirige a `/bi?view=clientes`.
-- `/precios/listado-de-precios` redirige a `/precios`.
-- `/precios/crear-y-editar-precio` redirige a `/precios/crear` preservando `style_id`.
-
-## Rutas Dinamicas
-
-No partir ni renombrar estas rutas sin una fase especifica:
-
-- `transferencias/[transferId]` mezcla slugs de modulo con ids reales de transferencia.
-- `productos/[productId]` funciona como dispatcher de submodulos (`estilos`, `variantes`), no como detalle real de producto.
-- `catalogos/[catalogId]` usa slugs de catalogo desde `product-master-metadata`.
-
-Los slugs especiales deben vivir en `routes.ts` o metadata de dominio, no repetidos como strings sueltos.
-
-## Auditoria Actual de `app/(protected)`
-
-Estas pantallas grandes ya viven como modulos de dominio y sus rutas en `app/(protected)` deben mantenerse como wrappers finos:
-
-- ventas y POS en `components/modules/sales`.
-- postventa en `components/modules/postsales`.
-- caja en `components/modules/cash`.
-- administracion en `components/modules/administration`.
-- dashboard, inicio, BI, inventario principal, kardex y account en sus carpetas de dominio.
-
-Pantallas ya alineadas con wrappers finos desde fases previas:
-
-- `catalogos`, `clientes`, `precios`, `productos`, `inventario/ajustes` y `transferencias` en sus rutas module-driven.
-- `account`, `dashboard`, `inventory`, `purchase-system` y `transaction-history` quedan solo como rutas legacy dentro de `(legacy)`.
-
-## JSX Temporal
-
-Solo debe quedar esta excepcion funcional conocida:
-
-- `apps/frontend/components/modules/sales/pos/pos-page.jsx`: conservar hasta una fase de extraccion POS.
-
-`PaymentMethods` queda convertido a TSX en `components/modules/sales/legacy`; sigue siendo candidato a eliminacion si no se recupera para un flujo activo.
-
-No usar estas excepciones como referencia para nuevas paginas.
-
-## Como Agregar Una Pagina Nueva
-
-- Crear la URL en `app/(protected)/<ruta>/page.tsx`.
-- Si la pantalla tendra logica o UI propia, crear el componente en `components/modules/<domain>/<name>-page.tsx` y dejar la ruta como wrapper fino.
-- Si la ruta solo reemplaza una URL antigua, implementar redirect y agregarla a `legacyAppRoutes`.
-- Si necesita links compartidos, agregar constantes o builders en `routes.ts`.
-- Si aparecen helpers compartidos por mas de una pantalla, extraerlos a `.ts` dentro del dominio o a `lib` si son transversales.
-
-## Checklist
-
-- La ruta nueva tiene una URL real y necesaria?
-- El `page.tsx` es fino o existe una razon concreta para que sea una pantalla completa?
-- El archivo con JSX usa `.tsx`?
-- La logica sin UI vive en `.ts` solo si realmente se comparte?
-- Los links usan `routes.ts` cuando son rutas centrales o repetidas?
-- No se agrego un nuevo `.jsx`?
-- La pantalla respeta `docs/frontend-page-standard.md` y los tokens operativos?
+- ¿La ruta es necesaria y canónica?
+- ¿La página queda fina cuando hay una pantalla de dominio?
+- ¿JSX usa `.tsx`?
+- ¿La lógica compartida se extrae por necesidad real?
+- ¿Las rutas repetidas usan `routes.ts`?
+- ¿La pantalla respeta permisos, sede y contratos backend cuando aplica?
+- ¿La composición visual sigue el estándar de página sin copiar una pantalla existente de forma literal?
