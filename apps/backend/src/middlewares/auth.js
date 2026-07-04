@@ -2,6 +2,21 @@ const { env } = require('../config/env');
 const { AppError } = require('../shared/errors');
 const { parseCookies } = require('../shared/cookies');
 const { verifyJwt } = require('../shared/jwt');
+const {
+  isAccessRevoked,
+  rotateRefreshSession,
+} = require('../modules/auth/auth.service');
+const {
+  buildSessionCookie,
+  buildRefreshCookie,
+} = require('../modules/auth/session-cookie');
+
+const PASSWORD_CHANGE_ALLOWED_PATHS = [
+  ['GET', '/api/auth/me'],
+  ['POST', '/api/auth/change-password'],
+  ['POST', '/api/auth/logout'],
+  ['POST', '/api/auth/refresh'],
+];
 
 function normalizeOrigin(value) {
   if (!value) {
@@ -131,7 +146,19 @@ function requireTrustedOriginMiddleware(req, _res, next) {
   }
 }
 
-function requireAuth(req, _res, next) {
+function applyMustChangePasswordGate(req) {
+  if (!req.auth?.must_change_password) return;
+
+  const allowed = PASSWORD_CHANGE_ALLOWED_PATHS.some(
+    ([method, path]) => req.method === method && req.originalUrl.split('?')[0] === path
+  );
+
+  if (!allowed) {
+    throw new AppError('Password change required', 403, { code: 'PASSWORD_CHANGE_REQUIRED' });
+  }
+}
+
+async function requireAuth(req, res, next) {
   if (!env.jwtSecret) {
     return next(new AppError('JWT_SECRET is not configured', 500, { code: 'CONFIG_ERROR' }));
   }
@@ -140,35 +167,65 @@ function requireAuth(req, _res, next) {
     requireTrustedOrigin(req);
 
     const cookies = parseCookies(req.headers.cookie);
-    const token = cookies.ripnel_session;
+    const accessCookie = cookies.ripnel_session
+      ? decodeURIComponent(cookies.ripnel_session)
+      : null;
 
-    if (!token) {
-      return next(new AppError('Not authenticated', 401, { code: 'AUTH_REQUIRED' }));
+    if (accessCookie) {
+      const result = verifyJwt(accessCookie, env.jwtSecret);
+      if (result.ok) {
+        if (result.payload?.jti && (await isAccessRevoked(result.payload.jti))) {
+          return next(
+            new AppError('Session revoked', 401, { code: 'SESSION_REVOKED' })
+          );
+        }
+        req.auth = result.payload;
+        applyMustChangePasswordGate(req);
+        return next();
+      }
+      if (result.reason !== 'expired') {
+        return next(new AppError('Invalid session', 401, { code: 'INVALID_SESSION' }));
+      }
     }
 
-    const result = verifyJwt(token, env.jwtSecret);
-    if (!result.ok) {
-      if (result.reason === 'expired') {
+    // Access missing or expired — attempt transparent refresh.
+    const rawRefresh = cookies.ripnel_refresh
+      ? decodeURIComponent(cookies.ripnel_refresh)
+      : null;
+
+    if (rawRefresh) {
+      try {
+        const { pair, permissions, user } = await rotateRefreshSession({
+          rawRefresh,
+          ip: req.ip || req.socket?.remoteAddress || null,
+        });
+        res.setHeader('Set-Cookie', [
+          buildSessionCookie({ token: pair.access }),
+          buildRefreshCookie({ token: pair.refresh }),
+        ]);
+        req.auth = {
+          sub: user.user_id,
+          role_id: user.role_id,
+          role_name: user.role_name,
+          permissions,
+          must_change_password: Boolean(user.must_change_password),
+        };
+        applyMustChangePasswordGate(req);
+        return next();
+      } catch (refreshError) {
+        // Refresh invalid — clear both cookies and force re-login.
+        res.setHeader('Set-Cookie', [
+          buildSessionCookie({ clear: true }),
+          buildRefreshCookie({ clear: true }),
+        ]);
+        if (refreshError instanceof AppError) {
+          return next(refreshError);
+        }
         return next(new AppError('Session expired', 401, { code: 'SESSION_EXPIRED' }));
       }
-
-      return next(new AppError('Invalid session', 401, { code: 'INVALID_SESSION' }));
     }
 
-    req.auth = result.payload;
-    if (req.auth?.must_change_password) {
-      const allowedDuringPasswordChange = [
-        ['GET', '/api/auth/me'],
-        ['POST', '/api/auth/change-password'],
-        ['POST', '/api/auth/logout'],
-      ].some(([method, path]) => req.method === method && req.originalUrl.split('?')[0] === path);
-
-      if (!allowedDuringPasswordChange) {
-        return next(new AppError('Password change required', 403, { code: 'PASSWORD_CHANGE_REQUIRED' }));
-      }
-    }
-
-    return next();
+    return next(new AppError('Not authenticated', 401, { code: 'AUTH_REQUIRED' }));
   } catch (error) {
     return next(error);
   }
