@@ -1,9 +1,41 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const CircuitBreaker = require('opossum');
 const { z } = require('zod');
 const { env } = require('../../config/env');
 const { AppError } = require('../../shared/errors');
 const { query } = require('../../shared/db');
 const repo = require('./chatbot.repo');
+
+const FALLBACK_RESPONSE =
+  'El asistente no esta disponible en este momento. Intenta nuevamente en un momento.';
+
+function callGemini(fn) {
+  return new CircuitBreaker(fn, {
+    timeout: 20000,
+    errorThresholdPercentage: 50,
+    resetTimeout: 30000,
+    rollingCountTimeout: 30000,
+    rollingCountBuckets: 5,
+    name: 'gemini',
+  });
+}
+
+const embeddingBreaker = callGemini(async function embed(text) {
+  const genAI = getGenAI();
+  const model = genAI.getGenerativeModel({ model: EMBED_MODEL });
+  const result = await model.embedContent(text);
+  return result.embedding.values;
+});
+
+const chatBreaker = callGemini(async function sendChat({ chat, payload }) {
+  return chat.sendMessage(payload);
+});
+
+embeddingBreaker.fallback(() => null);
+chatBreaker.fallback(() => ({
+  response: { text: () => FALLBACK_RESPONSE, candidates: [{ content: { parts: [{}] } }] },
+  _fallback: true,
+}));
 
 const CHAT_MODEL = 'models/gemini-2.5-flash';
 const EMBED_MODEL = 'models/text-embedding-004';
@@ -228,11 +260,9 @@ REGLAS ESTRICTAS:
 async function generateEmbedding(text) {
   if (!env.geminiApiKey) return null;
   try {
-    const genAI = getGenAI();
-    const model = genAI.getGenerativeModel({ model: EMBED_MODEL });
-    const result = await model.embedContent(text);
-    return result.embedding.values;
+    return await embeddingBreaker.fire(text);
   } catch (err) {
+    if (embeddingBreaker.opened) return null;
     console.warn('Error generando embedding semantico:', err.message);
     return null;
   }
@@ -326,7 +356,7 @@ async function processPrompt(input) {
   const MAX_FUNCTION_CALLS = 5;
 
   try {
-    let result = await chat.sendMessage(prompt);
+    let result = await chatBreaker.fire({ chat, payload: prompt });
 
     while (functionCallCount < MAX_FUNCTION_CALLS) {
       const candidate = result.response.candidates?.[0];
@@ -348,7 +378,7 @@ async function processPrompt(input) {
         },
       };
 
-      result = await chat.sendMessage([funcResultObj]);
+      result = await chatBreaker.fire({ chat, payload: [funcResultObj] });
       functionCallCount++;
     }
 
@@ -356,6 +386,14 @@ async function processPrompt(input) {
       responseText = result.response.text();
     }
   } catch (err) {
+    if (chatBreaker.opened) {
+      return {
+        conversation_id: activeConversationId,
+        response: FALLBACK_RESPONSE,
+        cached: false,
+        fallback: true,
+      };
+    }
     if (err.status === 429 || err.statusCode === 429 || (err.message && err.message.includes('429'))) {
       throw new AppError('El asistente esta procesando muchas solicitudes. Intenta en un minuto.', 429, { code: 'RATE_LIMITED' });
     }

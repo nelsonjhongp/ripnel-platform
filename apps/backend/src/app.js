@@ -2,7 +2,6 @@ const os = require('os');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 const { env } = require('./config/env');
 const authRoutes = require('./modules/auth/auth.routes');
 const healthRoutes = require('./modules/health/health.routes');
@@ -25,6 +24,7 @@ const homeRoutes = require('./modules/home/home.routes');
 const productsRoutes = require('./modules/products/products.routes');
 const notificationsRoutes = require('./modules/notifications/notifications.routes');
 const chatbotRoutes = require('./modules/chatbot/chatbot.routes');
+const auditRoutes = require('./modules/audit/audit.routes');
 const { AppError } = require('./shared/errors');
 const {
   errorHandler,
@@ -177,19 +177,31 @@ app.use(
     },
   })
 );
-app.use(helmet());
-
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    ok: false,
-    message: 'Too many login attempts, please try again later',
-    code: 'RATE_LIMIT_EXCEEDED',
-  },
-});
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        formAction: ["'none'"],
+        baseUri: ["'self'"],
+        objectSrc: ["'none'"],
+        imgSrc: ["'self'", "data:", "blob:"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'", "data:"],
+      },
+    },
+    strictTransportSecurity: {
+      maxAge: 63072000,
+      includeSubDomains: true,
+      preload: true,
+    },
+    crossOriginResourcePolicy: { policy: "same-origin" },
+    crossOriginEmbedderPolicy: false,
+  })
+);
 
 app.use(express.json({ limit: '1mb' }));
 
@@ -213,6 +225,7 @@ app.use('/api/cash', cashRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/home', homeRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/audit', auditRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 
 app.use(notFoundHandler);

@@ -16,9 +16,13 @@ async function getUsers(req, res, next) {
   }
 }
 
+function actorFrom(req) {
+  return { actorUserId: req.auth?.sub || null, actorRole: req.auth?.role_name || null };
+}
+
 async function postUser(req, res, next) {
   try {
-    const user = await createUser(req.body);
+    const user = await createUser(req.body, actorFrom(req));
     res.status(201).json({ ok: true, data: user });
   } catch (error) {
     next(error);
@@ -27,7 +31,7 @@ async function postUser(req, res, next) {
 
 async function patchUserById(req, res, next) {
   try {
-    const user = await patchUser(req.params.userId, req.body);
+    const user = await patchUser(req.params.userId, req.body, actorFrom(req));
     res.json({ ok: true, data: user });
   } catch (error) {
     next(error);
@@ -45,7 +49,7 @@ async function getUserLocationsByUserId(req, res, next) {
 
 async function putUserLocationsByUserId(req, res, next) {
   try {
-    const payload = await updateUserLocations(req.params.userId, req.body);
+    const payload = await updateUserLocations(req.params.userId, req.body, actorFrom(req));
     res.json({ ok: true, data: payload });
   } catch (error) {
     next(error);
