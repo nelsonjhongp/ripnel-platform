@@ -39,7 +39,7 @@ export function translateLoginError(error: unknown): string {
 
   const explained = explainApiError(error, LOGIN.error.fallback)
 
-  if (explained === "La sesion ya no es valida. Inicia sesion otra vez para continuar.") {
+  if (explained === LOGIN.error.invalidSession) {
     return LOGIN.error.invalidSession
   }
 

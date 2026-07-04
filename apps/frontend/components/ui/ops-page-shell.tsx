@@ -1,6 +1,10 @@
 import type { InputHTMLAttributes, ReactNode } from "react"
 import { Search } from "lucide-react"
 
+import {
+  opsControlClassName,
+  opsFieldLabelClassName,
+} from "@/components/ui/ops-control-styles"
 import { cn } from "@/lib/utils"
 
 export function OpsPageShell({
@@ -124,13 +128,18 @@ export function OpsSearchField({
   onFocus?: () => void
   density?: "default" | "compact"
 }) {
-  const height = density === "compact" ? "h-9" : "h-10"
   return (
     <div>
-      <label className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+      <label className={`mb-1 ${opsFieldLabelClassName}`}>
         {label}
       </label>
-      <div className={`sales-field flex ${height} items-center gap-2 rounded-lg px-3 transition hover:bg-[var(--ops-surface-muted)] focus-within:border-[var(--ripnel-accent)] focus-within:ring-2 focus-within:ring-[var(--ripnel-accent-soft)]`}>
+      <div
+        data-density={density ?? "default"}
+        className={cn(
+          opsControlClassName,
+          "flex items-center gap-2 py-0 focus-within:border-[var(--ripnel-accent)]",
+        )}
+      >
         <Search className="h-4 w-4 shrink-0 text-[var(--ops-text-muted)]" />
         <input
           type="text"
@@ -142,7 +151,7 @@ export function OpsSearchField({
           onFocus={onFocus}
           placeholder={placeholder}
           aria-label={ariaLabel}
-          className="h-full w-full bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[var(--ops-text-muted)]"
+          className="h-full w-full bg-transparent text-sm text-[var(--ops-text)] outline-none placeholder:text-[color:color-mix(in_srgb,var(--ops-text-muted)_92%,transparent)]"
         />
       </div>
     </div>

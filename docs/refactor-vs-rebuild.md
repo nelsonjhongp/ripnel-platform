@@ -1,239 +1,98 @@
 # Refactor vs Rebuild Decision Guide
 
-Marco para decidir si un modulo se arregla incrementalmente (refactor) o se reescribe
-desde `page.tsx` (rebuild). Usar despues de ejecutar `docs/module-review-checklist.md`.
+## Propósito
 
----
+Este documento ayuda a decidir si una pantalla o módulo requiere corrección incremental, refactor estructural o una reconstrucción acotada. No debe usarse como una auditoría automática ni basarse en contar strings, aliases, `color-mix()` o selects.
 
-## Decision Matrix
+La pregunta central es:
 
-Evaluar cada criterio. Si la mayoria apunta a una columna, esa es la direccion.
+> ¿El flujo puede mejorar de forma segura reutilizando su estructura actual, o la estructura impide entregar una experiencia correcta?
 
-| Criterio | Refactor | Rebuild |
-|----------|----------|---------|
-| **Lineas de codigo a modificar** | <40% del modulo | >50% del modulo |
-| **Anti-patrones criticos (🔴)** | 0-3 | 4+ |
-| **Archivo de mensajes** | Existe, parcialmente usado | No existe o totalmente ignorado |
-| **Hook composition** | Orquestador existe, solo ajustar | Un solo hook monolito sin split |
-| **Componentes usados** | Mayormente Ops* canonicos | Raw HTML, otras librerias, componentes deprecados |
-| **CSS approach** | Tailwind + tokens CSS | CSS modules, styled-jsx, inline styles |
-| **Tests** | Existen, pasan | No existen o todos rotos |
-| **Estado del backend** | API estable, tipos definidos | API en flujo, cambia seguido |
-| **Complejidad de dominio** | Baja-media (CRUD, listados) | Alta (flujos multi-step, estado distribuido) |
-| **Deuda en UI/UX** | Layout funcional, mejorar densidad | Layout roto, flujo confuso para el usuario |
-| **Tiempo desde ultimo cambio** | <3 meses | >6 meses sin mantenimiento |
+## Antes de decidir
 
----
+Revisar primero:
 
-## Sistema de Tiers
+- el flujo real del usuario y qué está fallando;
+- contratos backend y reglas de dominio;
+- permisos, sede, transacciones y estados bloqueantes;
+- componentes compartidos ya disponibles;
+- pruebas o caminos de verificación existentes;
+- el alcance que realmente puede completarse sin detener el producto.
 
-### Tier 1: Cosmetico
+No iniciar una reconstrucción por deuda estética aislada.
 
-**Que es:** El modulo funciona, la arquitectura es correcta, solo hay detalles.
+## Decisión
 
-**Hallazgos tipicos:**
-- 1-5 strings hardcodeados
-- 1-2 aria-labels sin mensaje
-- Imports no usados
-- Tooltip redundante en campo auto-explicativo
-- Una constante CSS duplicada
+| Señal | Mantenimiento o refactor incremental | Refactor estructural | Rebuild acotado |
+|---|---|---|---|
+| Flujo de usuario | funciona; hay fricción puntual | funciona parcialmente; decisiones mezcladas | no permite completar la tarea con claridad o seguridad |
+| Backend y contratos | estables | estables con adaptaciones claras | incompletos o contradicen el flujo; resolver backend primero |
+| Estado y datos | localizado | demasiado acoplado, pero rescatable | estado impredecible y ligado a UI sin límites claros |
+| Presentación | inconsistente en piezas puntuales | jerarquía, layout o composición dificultan operar | la estructura impide representar el flujo correcto |
+| Riesgo | pequeño y verificable | requiere fases pequeñas | menor riesgo rehacer la capa de presentación que parchearla |
+| Cobertura | smoke test/manual viable | requiere ampliar verificación | no existe forma de confiar sin construir pruebas o casos nuevos |
 
-**Score checklist:** 0-5 (🟢 Verde)
+## Tipos de trabajo
 
-**Duracion estimada:** 1-2 horas
+### Mantenimiento localizado
 
-**Accion:**
-1. Agregar strings faltantes a `<module>-messages.ts`
-2. Reemplazar strings hardcodeados por keys
-3. Limpiar imports
-4. Verificar typecheck + tests
+Usar cuando el flujo es sano y el problema está aislado:
 
-**Ejemplo:** Modulo `customers` — ya usa `OpsDialog`, `OpsSelect`, tiene mensajes; solo se encontraron 3 strings en aria-labels.
+- ajuste visual de un control compartido;
+- corrección de validación o copy;
+- error de permisos o datos en una acción;
+- mejora puntual de tabla, diálogo o feedback;
+- actualización de un contrato bien delimitado.
 
----
+Mantener el alcance pequeño y verificable.
 
-### Tier 2: Estructural
+### Refactor estructural
 
-**Que es:** El modulo funciona pero tiene vicios arquitectonicos que creceran con el tiempo.
+Usar cuando una pieza impide mantener el módulo, pero la lógica de negocio sigue siendo válida:
 
-**Hallazgos tipicos:**
-- 6-15 strings hardcodeados
-- 1-3 `color-mix()` fuera de `ops-control-styles.ts`
-- 1-2 `<select>` nativos
-- Utils >500 lineas sin split
-- Hook >400 lineas pero logica separable
-- 2-3 dialogs sin `description` o footer no canonico
-- Sin tests
+- una pantalla concentra demasiados estados que pueden separarse por responsabilidad;
+- se repite una regla de dominio en varios lugares;
+- tabla, filtros y paginación están mezclados de forma que bloquean cambios;
+- una composición visual hace difícil comprender el flujo;
+- una abstracción compartida ya tiene dos o más usos reales y necesita consolidarse.
 
-**Score checklist:** 6-15 (🟡 Amarillo)
+Dividirlo en fases que preserven comportamiento. Cada fase debe poder probarse y revertirse conceptualmente.
 
-**Duracion estimada:** 4-8 horas
+### Rebuild acotado
 
-**Accion:**
-1. Centralizar strings
-2. Extraer `color-mix()` a `ops-control-styles.ts`
-3. Reemplazar `<select>` por `OpsSelect`
-4. Split de utils por dominio
-5. Extraer sub-hooks del orquestador
-6. Corregir dialogs (description, footer, loading)
-7. Agregar tests para funciones puras
-8. Verificar typecheck + tests + lint
+Usar solo cuando el flujo principal, la estructura de estado y la presentación están tan entrelazados que corregirlos de forma incremental cuesta más riesgo que reconstruir la capa de interfaz.
 
-**Ejemplo hipotetico:** Modulo `inventory` — 480 lineas en utils mezclando movimientos, ajustes, kardex; 2 selects nativos; 8 strings hardcodeados.
+Un rebuild no significa borrar dominio, backend o migraciones. Normalmente se conserva:
 
----
+- reglas de negocio puras;
+- contratos válidos;
+- tipos útiles;
+- endpoints y transacciones existentes;
+- pruebas o fixtures aprovechables.
 
-### Tier 3: Refactor mayor
+El rebuild debe tener un objetivo funcional explícito, una ruta de migración, verificación por etapas y una decisión de qué código se retira al final.
 
-**Que es:** El modulo tiene deuda significativa pero la logica de negocio y el backend son solidos. Conviene re-arquitecturar por partes, no tirar todo.
+## Lo que no justifica un rebuild
 
-**Hallazgos tipicos:**
-- 16-30 strings hardcodeados (casi todo)
-- 4+ `color-mix()` dispersos
-- Multiples `<select>` nativos
-- Sin archivo de mensajes o minimo
-- Hook monolito 600+ lineas
-- `section + h2 + article` en vez de `OpsPanelSection`
-- Dialogs sin patron canonico (muchos)
-- Page type no coincide con el estandar
-- CSS modules o clases propias compitiendo con Tailwind
-- Sin tests
+- strings locales inline;
+- un componente legacy aislado;
+- clases Tailwind repetidas sin impacto visible;
+- un select o diálogo antiguo que funciona;
+- diferencias menores de radio, padding o color;
+- un archivo grande cuyo flujo aún es entendible y estable;
+- una auditoría basada solo en grep o métricas de estilo.
 
-**Score checklist:** 16-30 (🔶 Naranja)
+## Plan mínimo de una decisión grande
 
-**Duracion estimada:** 1-3 dias
-
-**Accion (por fases):**
-
-**Fase A — Cimientos (4h):**
-1. Crear `<module>-messages.ts` con todos los strings
-2. Crear/actualizar `<module>-constants.ts` re-exportando de `ops-control-styles.ts`
-3. Reemplazar todos los strings hardcodeados
-4. Extraer todo `color-mix()` a `ops-control-styles.ts`
-
-**Fase B — Componentes (4h):**
-5. Reemplazar `<select>` por `OpsSelect`
-6. Reemplazar `section+h2+article` por `OpsPanelSection`
-7. Migrar dialogs a `OpsDialog` con patron canonico
-8. Corregir header (PosHeader con meta, no badge en title)
-
-**Fase C — Arquitectura (4h):**
-9. Split de utils por dominio
-10. Split del hook orquestador en sub-hooks
-11. Ajustar page type al estandar (lista, detalle, form)
-
-**Fase D — Verificacion (2h):**
-12. Typecheck
-13. Agregar tests para funciones puras
-14. Lint
-
-**Ejemplo real:** `ventas` (POS) — era Tier 3. Tenia 807 lineas en el orquestador, strings dispersos, `color-mix()` en utils. Se completo en 5 fases documentadas en AGENTS.md hardening checklist.
-
----
-
-### Tier 4: Rebuild
-
-**Que es:** El modulo esta tan desalineado que arreglarlo pieza por pieza tomaria mas tiempo y riesgo que rehacerlo usando los patrones canonicos desde `page.tsx`.
-
-**Hallazgos tipicos:**
-- 31+ score en checklist
-- >50% del codigo necesita cambiar
-- 5+ anti-patrones criticos
-- Usa librerias o patrones deprecados (ej: class components, CSS modules, otra UI library)
-- Layout fundamentalmente roto (no es cuestion de ajustar padding)
-- Flujo de usuario confuso o incompleto
-- API backend cambia o no existe
-- Sin tests y la logica esta enredada con UI
-
-**Score checklist:** 31+ (🔴 Rojo)
-
-**Duracion estimada:** 3-5 dias
-
-**Accion:**
-
-1. **Auditar backend primero** — verificar que los endpoints necesarios existen y devuelven los tipos correctos
-2. **Crear el file map** desde cero siguiendo `ventas` como template:
-   ```
-   components/modules/<module>/
-   ├── <module>-messages.ts
-   ├── <module>-types.ts
-   ├── <module>-constants.ts
-   ├── <module>-utils.ts (core)
-   ├── <module>-<domain>-utils.ts (× N si aplica)
-   ├── use-<feature>.ts (× N, un hook por responsabilidad)
-   ├── <module>-page.tsx (componente principal)
-   ├── stage-<section>.tsx (× N si es wizard)
-   └── <module>-dialogs/
-       └── <dialog-name>.tsx (× N)
-   ```
-3. **Escribir los mensajes primero** — todas las strings visibles antes de cualquier JSX
-4. **Escribir los tipos** — interfaces para API responses y estado interno
-5. **Implementar hooks** — logica de negocio pura, testeable
-6. **Implementar UI** — usando solo componentes canonicos Ops*
-7. **Escribir tests** — al menos para utils y hooks
-8. **Migrar datos/estado** — si hay localStorage, URL params, etc.
-9. **Redirigir rutas** — mantener URLs antiguas con redirects en `next.config.ts`
-10. **Eliminar codigo viejo** — solo cuando el nuevo este en prod y estable
-
-**Que NO se bota:**
-- Logica de negocio pura (calculo de precios, validaciones, transformaciones)
-- Tipos e interfaces que sigan siendo validos
-- Backend routes, controllers, services (son backend, no frontend)
-- Migraciones de base de datos
-
-**Que SI se reescribe:**
-- Toda la capa de presentacion (JSX/TSX)
-- Hooks y estado
-- Utils (aprovechando logica rescatable)
-- Mensajes (centralizados desde cero)
-
----
-
-## Ejemplos aplicados
-
-### Ventas (POS + historial + detalle)
-
-| Criterio | Antes (Ene 2026) | Evaluacion |
-|----------|------------------|------------|
-| Archivo de mensajes | Existia, parcial | 🟡 |
-| Hook orquestador | 807 lineas, mezclado | 🔴 |
-| strings hardcodeados | ~25 en utils y stages | 🟡 |
-| color-mix disperso | 2 en pos-utils.ts | 🟡 |
-| Componentes | 100% canonicos | ✅ |
-| Tests | 71 tests existentes | ✅ |
-
-**Score:** ~18 → 🔶 Tier 3. **Resultado:** Refactor completado en 5 fases.
-
-### Postsales (estimado)
-
-| Criterio | Probable estado | Evaluacion |
-|----------|----------------|------------|
-| Archivo de mensajes | Probablemente parcial | 🟡 |
-| Hook estructura | Desconocido | ? |
-| Componentes | Usa OpsDialog, OpsPanelSection | ✅ |
-| Page types | Detalle parece correcto | ✅ |
-
-**Probable Tier:** 1-2. **Requiere auditoria primero.**
-
-### Modulo nuevo desde cero
-
-Usar Tier 4 como guia de creacion, no como indicador de problema.
-El file map y orden de implementacion del Tier 4 aplican igual.
-
----
+1. Describir el flujo actual y el problema observable.
+2. Definir el resultado de operación esperado.
+3. Identificar contratos backend y reglas que no deben romperse.
+4. Elegir mantenimiento, refactor estructural o rebuild acotado.
+5. Delimitar archivos y módulos fuera de alcance.
+6. Definir pruebas manuales y automáticas proporcionales.
+7. Implementar por etapas pequeñas.
+8. Eliminar compatibilidad o código viejo solo cuando el flujo nuevo esté validado.
 
 ## Regla de oro
 
-> **Refactoriza cuando el esqueleto es sano. Rebuild cuando el esqueleto esta roto.**
-
-"Esqueleto sano" significa:
-- Los datos entran y salen correctamente (API estable)
-- Los tipos representan la realidad
-- La arquitectura de archivos es reconocible (hooks, utils, messages)
-- Los componentes principales son los canonicos (OpsDialog, OpsSelect, OpsPanelSection)
-
-"Esqueleto roto" significa:
-- Usa otra libreria de componentes o HTML nativo para todo
-- Los datos se pasan por props de forma impredecible
-- No hay separacion entre logica y presentacion
-- El flujo de usuario no es rescatable (confunde al operador)
+> Refactoriza para mejorar un flujo real. Reconstruye solo cuando el esqueleto impide entregar ese flujo de forma correcta y verificable.

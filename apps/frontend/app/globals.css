@@ -392,7 +392,7 @@ html[data-theme-preset="graphite"] {
   }
 
   .sales-field {
-    background: var(--ops-surface);
+    background: var(--ops-field);
     border: 1px solid var(--ops-border-strong);
     color: var(--ops-text);
   }
@@ -400,8 +400,11 @@ html[data-theme-preset="graphite"] {
   [data-field-error="true"] .sales-field,
   [data-field-error="true"] input:not([type="button"]):not([type="submit"]),
   [data-field-error="true"] select,
-  [data-field-error="true"] textarea {
+  [data-field-error="true"] textarea,
+  [data-field-error="true"] [data-ops-select-trigger],
+  [data-ops-select-trigger][data-invalid="true"] {
     border-color: var(--ops-tone-danger-border);
+    background: var(--ops-tone-danger-bg);
   }
 
   .sales-field-interactive {
@@ -422,10 +425,21 @@ html[data-theme-preset="graphite"] {
     color: color-mix(in srgb, var(--ops-text-muted) 92%, transparent);
   }
 
-  .sales-field:focus-visible {
+  .sales-field:focus-visible,
+  .sales-field:focus-within {
     outline: none;
     border-color: var(--ripnel-accent);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--ripnel-accent-soft) 82%, transparent);
+  }
+
+  [data-field-error="true"] .sales-field:focus-visible,
+  [data-field-error="true"] .sales-field:focus-within,
+  [data-field-error="true"] input:not([type="button"]):not([type="submit"]):focus-visible,
+  [data-field-error="true"] textarea:focus-visible,
+  [data-field-error="true"] [data-ops-select-trigger]:focus-visible,
+  [data-ops-select-trigger][data-invalid="true"]:focus-visible {
+    border-color: var(--ops-tone-danger-border);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ops-tone-danger-bg) 82%, transparent);
   }
 
   .sales-chip {

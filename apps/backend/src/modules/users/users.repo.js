@@ -200,12 +200,39 @@ async function replaceUserLocations(userId, assignments, executor = query) {
   }
 }
 
+async function resetUserPassword(userId, temporaryPassword, executor = query) {
+  const result = await executor(
+    `update users
+     set
+       password_hash = crypt($2, gen_salt('bf')),
+       must_change_password = true,
+       password_changed_at = null,
+       updated_at = current_timestamp
+     where user_id = $1
+     returning
+       user_id,
+       full_name,
+       username,
+       email,
+       role_id,
+       active,
+       must_change_password,
+       password_changed_at,
+       created_at,
+       updated_at`,
+    [userId, temporaryPassword]
+  );
+
+  return result.rows[0] || null;
+}
+
 module.exports = {
   findAllUsers,
   findUserById,
   findUserByEmail,
   insertUser,
   updateUser,
+  resetUserPassword,
   findLocationsByIds,
   findUserLocationsByUserId,
   findDefaultLocationByUserId,

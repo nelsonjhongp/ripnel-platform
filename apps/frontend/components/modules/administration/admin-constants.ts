@@ -1,4 +1,5 @@
 export {
+  CHIP_TONE_ACCENT,
   INFO_BOX,
   INFO_BOX_MUTED,
   INFO_BOX_XL,
@@ -9,7 +10,7 @@ export {
 
 export const LOCATION_TYPE_LABELS: Record<string, string> = {
   store: "Tienda",
-  warehouse: "Almacén",
+  warehouse: "Almacen",
   workshop: "Taller",
   third_party: "Tercero",
 }

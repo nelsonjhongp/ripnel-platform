@@ -23,6 +23,7 @@ export type User = {
   role_name?: string | null
   active: boolean
   must_change_password?: boolean
+  password_changed_at?: string | null
   created_at: string
   updated_at: string
   temporary_password?: string
@@ -122,9 +123,11 @@ export const EMPTY_LOCATION_FORM: LocationFormState = {
   active: true,
 }
 
+import { ADMIN } from "./admin-messages"
+
 export const LOCATION_TYPE_OPTIONS = [
-  { value: "store", label: "Tienda" },
-  { value: "warehouse", label: "Almacén" },
-  { value: "workshop", label: "Taller" },
-  { value: "third_party", label: "Tercero" },
+  { value: "store", label: ADMIN.locationTypes.store },
+  { value: "warehouse", label: ADMIN.locationTypes.warehouse },
+  { value: "workshop", label: ADMIN.locationTypes.workshop },
+  { value: "third_party", label: ADMIN.locationTypes.thirdParty },
 ] as const

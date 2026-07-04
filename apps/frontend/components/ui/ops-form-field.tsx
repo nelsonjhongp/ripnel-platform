@@ -1,6 +1,7 @@
 "use client"
 
 import { type ReactNode, type ReactElement, cloneElement, isValidElement, useId } from "react"
+import { opsFormLabelClassName } from "@/components/ui/ops-control-styles"
 import { cn } from "@/lib/utils"
 
 export function OpsFormField({
@@ -28,13 +29,17 @@ export function OpsFormField({
 }) {
   const generatedId = useId()
   const messageId = useId()
-  const controlId = id ?? generatedId
 
   type FieldChildProps = {
     id?: string
     "aria-describedby"?: string
-    "aria-invalid"?: boolean
+    "aria-invalid"?: boolean | "true" | "false"
   }
+
+  const childProps = isValidElement(children)
+    ? (children as ReactElement<FieldChildProps>).props
+    : null
+  const controlId = id ?? childProps?.id ?? generatedId
 
   const describedChild = isValidElement(children)
     ? (() => {
@@ -62,7 +67,7 @@ export function OpsFormField({
       <label
         htmlFor={controlId}
         className={cn(
-          "block text-[11px] font-semibold uppercase tracking-[0.16em]",
+          opsFormLabelClassName,
           error
             ? "text-[var(--ops-tone-danger-text)]"
             : "text-[var(--ops-text-muted)]",
@@ -72,7 +77,7 @@ export function OpsFormField({
         {required ? (
           <span className="ml-0.5 text-sm leading-none text-[var(--ops-tone-danger-text)]">*</span>
         ) : optionalText ? (
-          <span className="ml-1 normal-case tracking-normal text-[11px] font-medium text-[var(--ops-text-muted)]">
+          <span className="ml-1 text-[11px] font-medium text-[var(--ops-text-muted)]">
             {optionalText}
           </span>
         ) : null}
