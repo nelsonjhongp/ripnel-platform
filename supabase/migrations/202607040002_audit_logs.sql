@@ -59,12 +59,12 @@ begin
   if tg_op = 'DELETE' then
     v_pk := (to_jsonb(OLD) ->> (coalesce(
       (select a.attname from pg_attribute a
-        where a.attrelid = TG_TABLE_OID and a.attnum > 0 and not a.attisdropped
+        where a.attrelid = TG_TABLEOID and a.attnum > 0 and not a.attisdropped
         order by a.attnum limit 1), 'id')));
   else
     v_pk := (to_jsonb(NEW) ->> (coalesce(
       (select a.attname from pg_attribute a
-        where a.attrelid = TG_TABLE_OID and a.attnum > 0 and not a.attisdropped
+        where a.attrelid = TG_TABLEOID and a.attnum > 0 and not a.attisdropped
         order by a.attnum limit 1), 'id')));
   end if;
 
