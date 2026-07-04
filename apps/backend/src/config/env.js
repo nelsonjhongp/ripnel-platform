@@ -48,6 +48,10 @@ const env = {
   smtpUser: process.env.SMTP_USER || '',
   smtpPass: process.env.SMTP_PASS || '',
   smtpFrom: process.env.SMTP_FROM || '',
+  dbSsl: (process.env.DB_SSL ?? 'true').toLowerCase() !== 'false',
+  dbSslRejectUnauthorized:
+    (process.env.DB_SSL_REJECT_UNAUTHORIZED ?? 'true').toLowerCase() !== 'false',
+  caCertPath: process.env.CA_CERT_PATH || '',
 };
 
 module.exports = {

@@ -19,6 +19,7 @@
     "express-rate-limit": "^8.5.2",
     "helmet": "^8.1.0",
     "nodemailer": "^8.0.10",
+    "opossum": "^10.0.0",
     "pg": "^8.20.0",
     "react": "^19.2.0",
     "zod": "^4.4.3"

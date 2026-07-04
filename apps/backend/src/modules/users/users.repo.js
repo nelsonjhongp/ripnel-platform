@@ -82,7 +82,7 @@ async function insertUser(
        active,
        must_change_password
      )
-     values ($1, $2, $3, crypt($4, gen_salt('bf')), $5, $6, $7)
+     values ($1, $2, $3, crypt($4, gen_salt('bf', 10)), $5, $6, $7)
      returning
        user_id,
        full_name,

@@ -45,7 +45,12 @@ function verifyJwt(token, secret) {
   const unsigned = `${headerB64}.${payloadB64}`;
   const expectedSig = signHs256(unsigned, secret);
 
-  const sigOk = crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSig));
+  const sigBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expectedSig);
+  if (sigBuffer.length !== expectedBuffer.length) {
+    return { ok: false, reason: 'invalid_signature' };
+  }
+  const sigOk = crypto.timingSafeEqual(sigBuffer, expectedBuffer);
   if (!sigOk) return { ok: false, reason: 'invalid_signature' };
 
   let payload;
@@ -63,8 +68,23 @@ function verifyJwt(token, secret) {
   return { ok: true, payload };
 }
 
+function generateJti() {
+  return crypto.randomUUID();
+}
+
+function generateOpaqueToken(bytes = 32) {
+  return crypto.randomBytes(bytes).toString('hex');
+}
+
+function hashToken(raw) {
+  return crypto.createHash('sha256').update(String(raw)).digest();
+}
+
 module.exports = {
   signJwt,
   verifyJwt,
+  generateJti,
+  generateOpaqueToken,
+  hashToken,
 };
 
