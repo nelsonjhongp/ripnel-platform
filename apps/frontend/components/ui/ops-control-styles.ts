@@ -1,8 +1,8 @@
 export const opsControlClassName =
-  "w-full rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-field)] text-sm text-[var(--ops-text)] outline-none transition hover:border-[var(--ops-border-soft)] hover:bg-[var(--ops-surface-muted)] focus-visible:border-[var(--ripnel-accent)] focus-visible:shadow-[0_0_0_2px_var(--ripnel-accent-soft)] disabled:cursor-not-allowed disabled:opacity-60"
+  "sales-field h-9 w-full rounded-lg px-3 py-2 text-sm text-[var(--ops-text)] outline-none transition placeholder:text-[color:color-mix(in_srgb,var(--ops-text-muted)_92%,transparent)] hover:border-[color:color-mix(in_srgb,var(--ripnel-accent)_34%,var(--ops-border-strong))] hover:bg-[color:color-mix(in_srgb,var(--ripnel-accent-soft)_40%,var(--ops-surface))] focus-visible:border-[var(--ripnel-accent)] disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-[color:color-mix(in_srgb,var(--ops-surface-muted)_72%,var(--ops-surface))] disabled:opacity-60 aria-invalid:border-[var(--ops-tone-danger-border)] aria-invalid:bg-[var(--ops-tone-danger-bg)]"
 
 export const opsSelectTriggerClassName =
-  `flex h-9 cursor-pointer items-center justify-between px-3.5 text-left ${opsControlClassName}`
+  `${opsControlClassName} flex cursor-pointer items-center justify-between py-0 text-left`
 
 export const opsDropdownContentClassName =
   "max-h-64 min-w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto overscroll-contain rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-1 ring-0"
@@ -16,9 +16,11 @@ export const opsSelectOptionClassName =
 export const opsFieldLabelClassName =
   "block text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]"
 
-/** Input compacto h-9 para formularios operativos (usa .sales-field de globals.css) */
-export const opsInputCompact =
-  "sales-field h-9 w-full rounded-lg px-3 py-2 text-sm"
+export const opsFormLabelClassName =
+  "block text-[13px] font-medium leading-none text-[var(--ops-text)]"
+
+/** Input compacto h-9 para formularios operativos */
+export const opsInputCompact = opsControlClassName
 
 /** Panel informativo standard: borde, fondo surface, padding compacto */
 export const INFO_BOX =

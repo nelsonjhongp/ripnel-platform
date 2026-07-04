@@ -6,6 +6,7 @@ import {
   createSingleFlightRunner,
   finalizeAuthLoginFlow,
 } from "@/components/auth/auth-login-flow";
+import { LOGIN } from "@/components/auth/login-messages";
 
 export type AuthUser = {
   user_id: string;
@@ -90,10 +91,10 @@ function buildLocationState(payload: UserLocationsPayload | null) {
 }
 
 function formatLocationsError(error: unknown) {
-  const message = error instanceof Error ? error.message : "No se pudo cargar sedes";
+  const message = error instanceof Error ? error.message : LOGIN.locations.loadFailed;
 
   if (message === "Not authenticated") {
-    return "No se pudo validar la sesion para cargar sedes. Reingresa y usa el mismo host en frontend y backend (localhost o 127.0.0.1).";
+    return LOGIN.locations.sessionValidationFailed;
   }
 
   return message;
@@ -148,7 +149,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setState((current) =>
         buildSignedOutState({
           authMessage: current.user
-            ? "Tu sesión expiró. Vuelve a iniciar sesión para continuar."
+            ? LOGIN.reason.sessionExpired
             : null,
           sessionExpired: Boolean(current.user) || isSessionExpired,
           signedOutIntentional: false,
@@ -239,9 +240,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           loading: false,
           authMessage: isUnauthorized
             ? sessionExpired
-              ? "Tu sesión expiró. Vuelve a iniciar sesión para continuar."
+              ? LOGIN.reason.sessionExpired
               : null
-            : "No se pudo validar la sesión actual.",
+            : LOGIN.error.sessionValidationFailed,
           sessionExpired,
         })
       );
@@ -307,7 +308,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
               setState(
                 buildSignedOutState({
-                  authMessage: "No se pudo completar el acceso actual.",
+                  authMessage: LOGIN.error.loginContextFailed,
                 })
               )
             },
@@ -393,11 +394,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
 
       if (!userId) {
-        throw new Error("No hay sesión activa");
+        throw new Error(LOGIN.error.noActiveSession);
       }
 
       if (!assignmentExists) {
-        throw new Error("La sede seleccionada no pertenece al usuario");
+        throw new Error(LOGIN.error.locationNotAssigned);
       }
 
       const response = await apiFetch<UserLocationsResponse | UserLocationsPayload>(

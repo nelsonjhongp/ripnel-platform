@@ -3,7 +3,7 @@
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useRef, useState } from "react"
-import { Eye, EyeOff, LoaderCircle } from "lucide-react"
+import { AlertTriangle, Eye, EyeOff, Info, LoaderCircle } from "lucide-react"
 
 import { useAuth } from "@/components/auth/AuthProvider"
 import { AuthCard, AuthShell } from "@/components/auth/auth-shell"
@@ -14,7 +14,6 @@ import {
   sanitizeNextHref,
   translateLoginError,
 } from "@/components/auth/login-utils"
-import { AdminInlineMessage } from "@/components/admin/admin-ui"
 import { Button } from "@/components/ui/button"
 import {
   InputGroup,
@@ -22,6 +21,7 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group"
+import { INFO_BOX_MUTED } from "@/components/ui/ops-control-styles"
 import { OpsFormField, opsFormFieldErrorInputClass } from "@/components/ui/ops-form-field"
 
 type LoginFormState = {
@@ -142,9 +142,23 @@ export default function LoginRipnel() {
       >
         <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
           {reasonMessage && !submitError ? (
-            <AdminInlineMessage tone="warning">{reasonMessage}</AdminInlineMessage>
+            <div
+              role="status"
+              className={`${INFO_BOX_MUTED} flex items-start gap-2.5 border-[var(--ops-tone-warning-border)] bg-[var(--ops-tone-warning-bg)] text-[var(--ops-tone-warning-text)]`}
+            >
+              <Info className="mt-0.5 h-4 w-4 shrink-0" />
+              <span className="leading-5">{reasonMessage}</span>
+            </div>
           ) : null}
-          {submitError ? <AdminInlineMessage tone="danger">{submitError}</AdminInlineMessage> : null}
+          {submitError ? (
+            <div
+              role="alert"
+              className={`${INFO_BOX_MUTED} flex items-start gap-2.5 border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] text-[var(--ops-tone-danger-text)]`}
+            >
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span className="leading-5">{submitError}</span>
+            </div>
+          ) : null}
 
           <OpsFormField
             label={LOGIN.form.usernameLabel}
