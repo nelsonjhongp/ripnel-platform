@@ -19,6 +19,10 @@ Tarea elegida:
 Fuente de evidencia:
 [REPORTE, CAPTURAS, LOGS, LÍNEAS O HALLAZGO CONFIRMADO]
 
+Baseline usado:
+[RUTA/ID DEL BASELINE O AUSENCIA CONFIRMADA. Si no hay baseline, explicar por
+qué el triage puntual basta para planificar.]
+
 Objetivo:
 [RESULTADO OBSERVABLE]
 
@@ -48,23 +52,24 @@ Construye un plan implementable y autónomo con:
 
 1. Resumen del problema confirmado.
 2. Decisión de solución y por qué es proporcional.
-3. Archivos exactos a modificar.
-4. Cambios por archivo.
-5. Invariantes:
+3. Baseline usado o ausencia confirmada.
+4. Archivos exactos a modificar.
+5. Cambios por archivo.
+6. Invariantes:
    - contratos/API;
    - permisos;
    - stock/caja/transacciones;
    - accesibilidad;
    - compatibilidad de datos;
    - otros que correspondan.
-6. Fuera de alcance explícito.
-7. Riesgos y cómo se reducen.
-8. Plan de validación:
+7. Fuera de alcance explícito.
+8. Riesgos y cómo se reducen.
+9. Plan de validación:
    - pruebas técnicas;
    - pruebas manuales;
    - viewport y tema si hay UI;
    - screenshots o mediciones si corresponde.
-9. Actualización exacta requerida en tracker:
+10. Actualización exacta requerida en tracker:
    - qué entrada;
    - qué estado;
    - qué evidencia registrar.
@@ -74,6 +79,7 @@ también para `04`, sin depender de conversación previa.
 
 Debe incluir de forma explícita:
 - tarea autoritativa;
+- baseline usado o ausencia confirmada;
 - archivos permitidos;
 - invariantes;
 - fuera de alcance;

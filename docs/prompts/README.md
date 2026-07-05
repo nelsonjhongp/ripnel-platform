@@ -51,6 +51,63 @@ Después debe leer solo los documentos de dominio, seguridad, UI o pruebas que `
 
 No leer toda la carpeta `docs` por defecto.
 
+## Modelo modular
+
+Los prompts `00` a `04` son el protocolo estable. No crear un prompt nuevo por
+pantalla o hallazgo: para adaptar el trabajo a un módulo real, completar una
+ficha breve de tarea y activar solo los lentes de revisión necesarios.
+
+- **Vertical:** área durable de producto o dominio, por ejemplo `LOC-01`,
+  `STOCK-01`, `POS-01`, `AUTH-01` o `CASH-01`.
+- **Baseline:** mapa factual reutilizable de un módulo grande: rutas,
+  endpoints, permisos, sedes, flujos, pantallas, diálogos, consumidores y
+  riesgos conocidos.
+- **Work item:** tarea pequeña, observable y ejecutable dentro de una vertical.
+- **Fase:** momento del protocolo `00`, `01`, `02`, `03` o `04`; no define por
+  sí sola prioridad, módulo ni alcance.
+- **Lente:** foco opcional de revisión, como permisos, rol/sede, flujo
+  operativo, UI/copy/densidad, consistencia/reutilización o
+  datos/transacciones.
+- **Evidencia:** líneas, rutas, pruebas, screenshots, logs, diff o
+  comportamiento verificable.
+
+Ficha mínima recomendada:
+
+```text
+ID:
+Vertical:
+Fase:
+Objetivo observable:
+Operador / rol:
+Sede o alcance operativo:
+Ruta(s) frontend:
+Endpoint(s) backend:
+Flujo a revisar:
+Lentes activos:
+Evidencia esperada:
+No tocar:
+Criterio de salida:
+Tracker autorizado:
+```
+
+Mantener la ficha en unas 12 líneas útiles. Si no cabe, probablemente se
+necesita un baseline o dividir el trabajo.
+
+### Baseline vs triage puntual
+
+Crear baseline durable solo cuando el módulo tenga varias páginas, diálogos,
+endpoints o consumidores externos; cuando existan permisos, sedes o
+transacciones con riesgo operativo; cuando se estabilizarán varios work items
+del mismo módulo; cuando el conocimiento será reutilizado por chats separados;
+o cuando haya contradicción entre documentación, código y comportamiento.
+
+No crear baseline cuando el hallazgo es localizado, el plan aprobado ya delimita
+archivos e invariantes, el diff y tracker bastan, o la revisión no aporta un
+mapa reutilizable.
+
+Para un work item normal, activar máximo tres lentes. Si requiere cuatro o más,
+hacer baseline primero o dividir la tarea.
+
 ## Trazabilidad
 
 El tracker conserva estado y decisiones. Los reportes y capturas se guardan solo cuando aportan evidencia duradera:
@@ -150,14 +207,23 @@ el alcance de la tarea o declararse como bloqueo según la fase.
 ## Convenciones
 
 - IDs de vertical: `POS-01`, `AUTH-01`, `STOCK-01`.
+- IDs de baseline durable: `POS-01-BASE`, `STOCK-01-BASE`, `LOC-01-BASE`.
 - IDs de tarea: `POS-01-A`, `POS-01-B`, `LOC-01-A`.
-- Fases:
-  - `A` suele ser revisión factual.
-  - `B` suele ser validación o planificación.
-  - `C` suele ser implementación.
-  - Ajustar si una vertical requiere más pasos.
+- Las letras identifican work items dentro de una vertical; no representan
+  fases del workflow.
+- Las fases son exclusivamente `00`, `01`, `02`, `03` y `04`.
+- La fase puede aparecer en el nombre del artefacto: `LOC-01-A-triage`,
+  `LOC-01-A-plan`, `LOC-01-A-validation`.
 - Un prompt no concede permiso para ampliar alcance.
 - Si el agente no puede verificar algo, debe declararlo como pregunta abierta, no como defecto.
+
+## Freeze de gobernanza
+
+Después de cambiar estas plantillas o reglas de workflow, probar el modelo con
+tres work items reales antes de volver a modificarlas. Durante ese periodo,
+registrar fricción como hallazgo, no como cambio inmediato de prompt. Reabrir
+gobernanza solo si al menos dos de las tres tareas fallan por la misma
+ambigüedad del protocolo.
 
 ## Qué no hacer
 
@@ -165,3 +231,5 @@ el alcance de la tarea o declararse como bloqueo según la fase.
 - No crear un prompt por cada pantalla salvo que el flujo sea excepcional y se reutilice.
 - No copiar reglas completas de `AGENTS.md`, `DESIGN.md` o documentos de dominio: la plantilla debe remitir a ellos.
 - No usar un archivo grande, una clase repetida, una ruta antigua o un componente legacy como prueba automática de deuda prioritaria.
+- No crear reportes para correcciones triviales ni baselines para cada módulo.
+- No convertir componentes legacy, strings inline o clases locales en campañas globales.

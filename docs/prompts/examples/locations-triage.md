@@ -2,6 +2,8 @@
 
 > Este archivo demuestra cómo instanciar `01-module-triage.md`.
 > Es un ejemplo/piloto; no crea una familia de prompts por cada módulo.
+> Para otros módulos, conservar el prompt `01` y cambiar la ficha de tarea,
+> baseline y lentes activos; no copiar este archivo como plantilla nueva.
 
 ```text
 Repositorio:
@@ -17,6 +19,14 @@ Pregunta operativa:
 ¿Un administrador puede registrar, editar y desactivar ubicaciones
 operativas sin confundir tipos de sede, estado operativo y asignación
 de usuarios?
+
+Contexto de baseline:
+No requerido: este triage es puntual sobre la pantalla y endpoints de Ubicaciones.
+
+Lentes activos:
+- permisos;
+- UI/copy/densidad;
+- consistencia/reutilización.
 
 Focos específicos de revisión:
 - ruta de Ubicaciones;
