@@ -81,12 +81,12 @@ Debe incluir de forma explícita:
 - entrada de tracker autorizada, o ausencia confirmada de entrada.
 
 Persistencia mínima:
-- tarea trivial: el plan puede pegarse directamente en el prompt de `03`;
-- tarea no trivial o ejecutada en otro chat: el plan aprobado debe guardarse
-  como `docs/working/reports/<TASK-ID>-B-plan.md` o pegarse íntegro en el
-  prompt siguiente.
-
-No crear un handoff adicional. El plan sigue siendo el único handoff formal.
+- fase 02 produce el plan autónomo, pero no crea el archivo de reporte;
+- después de revisión y aprobación humana, el plan puede pegarse íntegro en
+  la fase siguiente o persistirse mediante una acción documental explícitamente
+  autorizada;
+- no crear un handoff adicional; el plan aprobado sigue siendo el único handoff
+  formal.
 
 Reglas:
 - No crear componentes compartidos sin dos usos estables o una necesidad real de
