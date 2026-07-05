@@ -48,7 +48,10 @@ Lee primero:
 - docs/working/FRONTEND-WORKFLOW.md
 
 Del `docs/working/IMPLEMENTATION-TRACKER.md`, localizar únicamente la
-entrada o sección de la vertical indicada. No leer ni resumir el tracker completo.
+entrada o sección autorizada de la vertical o tarea indicada. Si esa entrada no
+existe, registrar su ausencia como hecho. No leer ni resumir otras entradas ni
+el tracker completo. No sustituir la tarea explícita por otra prioridad del
+tracker.
 
 Luego usa INDEX.md para leer únicamente:
 - documentos del dominio;
@@ -62,8 +65,20 @@ Si el módulo expone endpoints backend, verificar:
 - middleware de autenticación;
 - middleware de autorización;
 - permiso o capacidad requerida;
+- definición/asignación de permiso;
+- emisión o carga en claims/contexto auth cuando corresponda;
 - consumidores reales de cada endpoint HTTP mediante búsqueda de
   `api/<recurso>` en frontend, tests, scripts o integraciones.
+
+Para hallazgos de permisos backend, exigir cadena verificable:
+definición/asignación de permiso
+→ emisión o carga en claims/contexto auth
+→ middleware
+→ ruta
+→ consumidores HTTP relevantes para compatibilidad.
+
+No exigir que toda ruta de escritura tenga consumidor frontend para considerarla
+válida o relevante.
 
 No asumas que la documentación reemplaza código.
 
@@ -142,7 +157,8 @@ Entrega:
    - información insuficiente, si existe.
 
 6. Recomendación
-   Recomendar una sola siguiente tarea con:
+   Recomendar una sola siguiente fase o tarea compatible con la tarea revisada,
+   sin repriorizar desde el tracker, con:
    - objetivo;
    - alcance;
    - exclusiones;

@@ -4,9 +4,6 @@
 > Es un ejemplo/piloto; no crea una familia de prompts por cada módulo.
 
 ```text
-Modo: revisión factual de módulo. No modifiques código, documentación,
-configuración, base de datos, migraciones, seeds ni archivos de evidencia.
-
 Repositorio:
 F:\proyectos\software\ripnel-platform
 
@@ -21,14 +18,7 @@ Pregunta operativa:
 operativas sin confundir tipos de sede, estado operativo y asignación
 de usuarios?
 
-Lee primero:
-- AGENTS.md
-- docs/INDEX.md
-- docs/working/FRONTEND-WORKFLOW.md
-- docs/working/IMPLEMENTATION-TRACKER.md
-
-Luego, según INDEX.md, lee los documentos de administración/permisos y las
-referencias de CRUD administrativo. Inspecciona:
+Focos específicos de revisión:
 - ruta de Ubicaciones;
 - módulo frontend de administración;
 - endpoints backend de locations;
@@ -58,13 +48,4 @@ Validar especialmente:
    solo configuración. No ampliar el análisis a SCOPE-01.
 6. Si hay problemas confirmados de copy, jerarquía, formularios, estados o
    permisos directos por URL.
-
-Entrega el formato exigido por `docs/prompts/01-module-triage.md`.
-Máximo tres candidatos.
-No rediseñar.
-No crear componentes.
-No modificar tracker.
-¿Un administrador puede registrar, editar y desactivar ubicaciones
-operativas sin confundir tipos de sede, estado operativo y asignación
-de usuarios?
 ```
