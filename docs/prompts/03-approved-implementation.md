@@ -22,8 +22,18 @@ Antes de editar, lee:
 - AGENTS.md
 - docs/INDEX.md
 - docs/working/FRONTEND-WORKFLOW.md
-- docs/working/IMPLEMENTATION-TRACKER.md
 - documentos de dominio indicados en el plan.
+
+Del `docs/working/IMPLEMENTATION-TRACKER.md`, leer únicamente la entrada
+autorizada por el plan. Si no existe, registrar su ausencia como hecho. No leer
+ni resumir otras entradas ni sustituir la tarea explícita por otra prioridad.
+
+Si la tarea toca migraciones, seguridad, permisos backend o despliegue:
+- confirma que la reconciliación registrada en el plan sigue vigente;
+- compara base Git, working tree y estado remoto relevante solo en el nivel
+  necesario;
+- si difieren de forma material, detén la implementación y reporta bloqueo, sin
+  ampliar alcance.
 
 Primero confirma en máximo 8 líneas:
 - objetivo;
@@ -38,9 +48,12 @@ Reglas:
 - No ampliar alcance.
 - No crear componentes compartidos, docs ni migraciones fuera del plan.
 - No convertir hallazgos laterales en cambios.
+- El plan aprobado prevalece sobre prioridades laterales detectadas en tracker.
 - No reemplazar componentes legacy en masa.
 - Mantener el patrón de pantalla y componentes compartidos solo cuando coincidan
   con la semántica y necesidad del flujo.
+- Si el plan pegado no contiene tarea autoritativa, archivos permitidos,
+  invariantes y pruebas, detenerse y reportar que debe volver a planificación.
 - Si aparece un bloqueo no previsto, detener la implementación y reportarlo.
 
 Al finalizar:
