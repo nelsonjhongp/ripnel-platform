@@ -42,6 +42,14 @@ Ruta o rutas objetivo:
 Pregunta operativa:
 [QUÉ QUIERE COMPLETAR EL USUARIO U OPERADOR]
 
+Contexto de baseline:
+[Existente: <ID/ruta> / No requerido: <razón> / Esta revisión produce baseline: <razón>]
+
+Lentes activos:
+[MÁXIMO 3: permisos; rol/sede; flujo operativo; UI/copy/densidad;
+consistencia/reutilización; datos/transacciones. Si requiere 4 o más, dividir
+la tarea o hacer baseline primero.]
+
 Lee primero:
 - AGENTS.md
 - docs/INDEX.md
@@ -156,7 +164,15 @@ Entrega:
    - contradicciones doc ↔ código, si existen;
    - información insuficiente, si existe.
 
-6. Recomendación
+6. Baseline
+   - si se creó o se recomienda crear baseline durable, explicar por qué cumple
+     los criterios;
+   - si no corresponde, registrar que el triage es puntual y no deja mapa
+     reutilizable;
+   - no crear reportes adicionales si el tracker, el diff futuro o la tarea
+     bastan.
+
+7. Recomendación
    Recomendar una sola siguiente fase o tarea compatible con la tarea revisada,
    sin repriorizar desde el tracker, con:
    - objetivo;
