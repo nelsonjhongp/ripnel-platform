@@ -42,7 +42,10 @@ Antes de cualquier tarea, el agente debe leer:
 - `AGENTS.md`
 - `docs/INDEX.md`
 - `docs/working/FRONTEND-WORKFLOW.md`
-- `docs/working/IMPLEMENTATION-TRACKER.md`
+
+Del tracker (`docs/working/IMPLEMENTATION-TRACKER.md`), consultar únicamente la
+entrada autorizada por la tarea, la evidencia o el plan. Si no existe, registrar
+su ausencia como hecho. No leer ni resumir el tracker completo por defecto.
 
 Después debe leer solo los documentos de dominio, seguridad, UI o pruebas que `INDEX.md` indique para la tarea.
 
