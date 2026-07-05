@@ -26,13 +26,25 @@ Lee primero:
 - AGENTS.md
 - docs/INDEX.md
 - docs/working/FRONTEND-WORKFLOW.md
-- docs/working/IMPLEMENTATION-TRACKER.md
+
+Del `docs/working/IMPLEMENTATION-TRACKER.md`, leer únicamente la entrada
+autorizada por la tarea o la evidencia. Si no existe, registrar su ausencia
+como hecho. No leer ni resumir otras entradas ni sustituir la tarea explícita
+por otra prioridad.
 
 Luego lee solo la documentación y código que INDEX.md indique para esta tarea.
 
 No reabrir una auditoría global. No transformar hipótesis en alcance.
 
-Construye un plan implementable con:
+Si la tarea toca migraciones, seguridad, permisos backend o despliegue,
+confirma primero, en el nivel mínimo necesario:
+- base Git evaluada;
+- working tree relevante;
+- estado remoto o ambiente real relevante.
+
+Si existe una diferencia material, declárala como hecho, dependencia o bloqueo.
+
+Construye un plan implementable y autónomo con:
 
 1. Resumen del problema confirmado.
 2. Decisión de solución y por qué es proporcional.
@@ -56,6 +68,25 @@ Construye un plan implementable con:
    - qué entrada;
    - qué estado;
    - qué evidencia registrar.
+
+El plan aprobado que entregues debe poder pegarse directamente en `03` y servir
+también para `04`, sin depender de conversación previa.
+
+Debe incluir de forma explícita:
+- tarea autoritativa;
+- archivos permitidos;
+- invariantes;
+- fuera de alcance;
+- pruebas técnicas y manuales;
+- entrada de tracker autorizada, o ausencia confirmada de entrada.
+
+Persistencia mínima:
+- tarea trivial: el plan puede pegarse directamente en el prompt de `03`;
+- tarea no trivial o ejecutada en otro chat: el plan aprobado debe guardarse
+  como `docs/working/reports/<TASK-ID>-B-plan.md` o pegarse íntegro en el
+  prompt siguiente.
+
+No crear un handoff adicional. El plan sigue siendo el único handoff formal.
 
 Reglas:
 - No crear componentes compartidos sin dos usos estables o una necesidad real de
