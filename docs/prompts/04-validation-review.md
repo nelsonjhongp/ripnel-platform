@@ -30,14 +30,30 @@ Lee:
 - AGENTS.md
 - docs/INDEX.md
 - docs/working/FRONTEND-WORKFLOW.md
-- docs/working/IMPLEMENTATION-TRACKER.md
 - plan aprobado;
 - archivos modificados;
 - documentos de dominio necesarios para validar invariantes.
 
+Del `docs/working/IMPLEMENTATION-TRACKER.md`, leer únicamente la entrada
+autorizada de esta misma tarea. Si no existe, registrar su ausencia como hecho.
+No leer ni resumir otras entradas ni sustituir la tarea explícita por otra
+prioridad.
+
+Si la tarea toca migraciones, seguridad, permisos backend o despliegue,
+confirma en el nivel mínimo necesario:
+- base Git evaluada;
+- working tree relevante;
+- estado remoto o ambiente real relevante.
+
+Si existe una diferencia material frente a la base validada, regístrala como
+riesgo o bloqueo según corresponda.
+
 Objetivo:
 Determinar si la implementación cumple el plan sin introducir regresiones
 observables ni expansión de alcance.
+
+La validación debe comparar la implementación contra el plan aprobado autónomo
+de `02`, no contra memoria conversacional previa.
 
 Revisar:
 
@@ -69,6 +85,10 @@ Cerrar con una decisión única:
 - Aceptar con seguimiento no bloqueante.
 - Requiere corrección puntual.
 - Rechazar / volver a planificación.
+
+Si el plan aprobado no contiene tarea autoritativa, archivos permitidos,
+invariantes o pruebas, mapearlo a `Rechazar / volver a planificación` por
+handoff insuficiente.
 
 Para una corrección puntual, describir solo:
 - defecto;

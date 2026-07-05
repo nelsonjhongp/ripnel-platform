@@ -67,6 +67,83 @@ Evidencia: `docs/working/reports/LOC-01-A-triage.md`
 Decisión: [aceptado / descartado / pendiente]
 ```
 
+## Contrato mínimo de handoff entre fases
+
+Cada fase nueva debe poder ejecutarse en un chat separado sin depender de la
+memoria de una conversación anterior.
+
+Toda fase nueva requiere:
+
+- prompt de la fase actual;
+- tarea autoritativa;
+- insumo aceptado correspondiente;
+- código y documentos necesarios según `AGENTS.md` e `INDEX.md`.
+
+Para `03 Approved implementation` y `04 Validation review`, el insumo aceptado
+obligatorio es un **plan aprobado autónomo** generado en la fase `02`.
+
+### Campos mínimos del handoff
+
+- **Tarea autoritativa**
+  - ID y nombre exactos.
+  - Objetivo observable.
+  - Exclusiones explícitas.
+- **Evidencia aceptada**
+  - archivo + línea;
+  - prueba;
+  - log;
+  - screenshot;
+  - diff;
+  - comportamiento verificable.
+- **Plan aprobado**
+  - Debe ser autónomo.
+  - Es el único handoff formal entre `02` → `03` → `04`.
+  - Debe incluir archivos permitidos, invariantes, fuera de alcance y pruebas.
+- **Archivos permitidos**
+  - Lista cerrada o patrón acotado.
+- **Invariantes**
+  - Contratos/API.
+  - Permisos/autorización.
+  - Datos, migraciones o transacciones cuando apliquen.
+  - UX, accesibilidad o layout cuando apliquen.
+- **Pruebas**
+  - Técnicas.
+  - Manuales.
+  - Evidencia visual cuando corresponda.
+- **Estado del tracker**
+  - Entrada de tracker autorizada, o ausencia confirmada de entrada.
+  - Rol: contexto, trazabilidad y evidencia enlazada.
+  - Límite: no sustituye la tarea explícita.
+
+### Regla sobre tracker
+
+El tracker conserva estado y decisiones, pero no autoriza cambiar la tarea
+activa. Si el prompt o el plan aprobado fijan una tarea explícita, ninguna fase
+puede sustituirla por otra prioridad encontrada en el tracker.
+
+### Persistencia mínima del plan
+
+- Tarea trivial: el plan aprobado puede pegarse directamente en el prompt de
+  `03`.
+- Tarea no trivial o ejecutada en otro chat: el plan aprobado debe guardarse
+  como `docs/working/reports/<TASK-ID>-B-plan.md` o pegarse íntegro en el
+  prompt siguiente.
+
+No crear un handoff adicional. El plan aprobado sigue siendo el único handoff
+formal.
+
+### Precondición mínima de reconciliación
+
+Para tareas que toquen migraciones, seguridad, permisos backend o despliegue,
+la fase correspondiente debe confirmar, en el nivel mínimo necesario:
+
+- base Git evaluada;
+- working tree relevante;
+- estado remoto o ambiente real relevante.
+
+Si existe una diferencia material, debe registrarse como hecho y resolverse en
+el alcance de la tarea o declararse como bloqueo según la fase.
+
 ## Convenciones
 
 - IDs de vertical: `POS-01`, `AUTH-01`, `STOCK-01`.
