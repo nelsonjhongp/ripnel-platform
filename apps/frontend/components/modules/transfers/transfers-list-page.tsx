@@ -115,7 +115,15 @@ function getVisibleStateCopy(transfer: TransferRecord) {
   };
 }
 
-function getTransferContextCopy(transfer: TransferRecord) {
+function getTransferContextCopy(transfer: TransferRecord, queue: TransferPendingStage) {
+  if (queue === "open_for_store" || transfer.scope_role === "destination") {
+    return TRANS.list.transferContext.inbound;
+  }
+
+  if (transfer.scope_role === "source") {
+    return TRANS.list.transferContext.outbound;
+  }
+
   if (transfer.status === "requested") {
     return TRANS.list.transferContext.outbound;
   }
@@ -184,10 +192,6 @@ function getPrimaryRowAction(queue: TransferPendingStage, transfer: TransferReco
 
   if (queue === "pending_receipts" && transfer.available_actions.receive) {
     return "receive";
-  }
-
-  if (queue === "open_for_store" && transfer.available_actions.cancel) {
-    return "cancel";
   }
 
   return "detail";
@@ -573,7 +577,7 @@ export function TransfersListPage({
                               {transfer.transfer_number || TRANS.table.noNumber}
                             </Link>
                             <p className="text-[13px] text-[var(--ops-text-muted)]">
-                              {getTransferContextCopy(transfer)}
+                              {getTransferContextCopy(transfer, selectedQueue)}
                             </p>
                           </div>
                         </td>

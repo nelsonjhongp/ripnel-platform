@@ -6,17 +6,22 @@ import {
   ArrowUpRight,
   Check,
   CircleAlert,
+  ClipboardList,
   LoaderCircle,
   Plus,
   Trash2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { OpsDialog } from "@/components/ui/ops-dialog";
+import { OpsStatusBadge } from "@/components/ui/ops-status-badge";
 import { PresetTextField } from "@/components/ui/preset-text-field";
 import { cn } from "@/lib/utils";
 import { OpsSelect, type OpsOption } from "@/components/ui/ops-selection";
 import { OpsTableWrap } from "@/components/ui/ops-page-shell";
 import { Pagination } from "@/components/ui/pagination";
+import { OpsHint } from "@/components/ui/ops-hint";
+import { INFO_BOX_XL } from "@/components/ui/ops-control-styles";
 import type {
   DraftLine,
   RequestCandidateSource,
@@ -28,7 +33,6 @@ import { OpsLocationIcon } from "@/components/ui/ops-location-icon"
 import { OpsQuantityStepper } from "@/components/ui/ops-quantity-stepper"
 import { TRANS } from "./transfers-messages"
 
-const panelClass = "ops-surface rounded-xl border";
 const softPanelClass =
   "ops-surface-muted rounded-xl border border-[var(--ops-border-soft)]";
 const fieldLabelClass =
@@ -81,6 +85,159 @@ function ValidationItem({
   );
 }
 
+export function TransferRequestReviewDialog({
+  open,
+  onOpenChange,
+  draftLines,
+  originName,
+  originType,
+  destinationName,
+  destinationType,
+  notes,
+  error,
+  submitting,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  draftLines: DraftLine[];
+  originName: string;
+  originType?: string | null;
+  destinationName: string;
+  destinationType?: string | null;
+  notes: string | null;
+  error?: string | null;
+  submitting: boolean;
+  onConfirm: () => void;
+}) {
+  const totals = useMemo(
+    () => ({
+      lines: draftLines.length,
+      units: draftLines.reduce((accumulator, line) => accumulator + line.qty_requested, 0),
+    }),
+    [draftLines]
+  );
+
+  return (
+    <OpsDialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!submitting) {
+          onOpenChange(nextOpen);
+        }
+      }}
+      title={TRANS.request.reviewTitle}
+      description={TRANS.request.reviewDescription}
+      size="lg"
+      bodyClassName="space-y-4"
+      footer={
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="rounded-lg px-4"
+            onClick={() => onOpenChange(false)}
+            disabled={submitting}
+          >
+            {TRANS.request.reviewCancel}
+          </Button>
+          <Button
+            type="button"
+            variant="accent"
+            size="sm"
+            className="rounded-lg px-4"
+            onClick={onConfirm}
+            disabled={submitting}
+          >
+            {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
+            {submitting ? TRANS.request.reviewSending : TRANS.request.reviewConfirm}
+          </Button>
+        </div>
+      }
+    >
+      {error ? (
+        <div className="rounded-lg border border-[var(--ops-tone-danger-border)] bg-[var(--ops-tone-danger-bg)] px-3 py-2 text-sm text-[var(--ops-tone-danger-text)]">
+          {error}
+        </div>
+      ) : null}
+
+      <div className={cn(INFO_BOX_XL, "space-y-2")}>
+        <FieldLabel>{TRANS.request.reviewRoute}</FieldLabel>
+        <div className="flex items-center gap-2 text-sm">
+          <OpsLocationIcon type={originType} className="h-4 w-4 shrink-0 text-[var(--ops-text)]" />
+          <span className="min-w-0 truncate font-semibold text-[var(--ripnel-accent-hover)]">
+            {originName || TRANS.request.selectOrigin}
+          </span>
+          <ArrowRight className="h-4 w-4 shrink-0 text-[var(--ops-text)]" />
+          <OpsLocationIcon type={destinationType} className="h-4 w-4 shrink-0 text-[var(--ops-text)]" />
+          <span className="min-w-0 truncate font-semibold text-[var(--ops-text)]">
+            {destinationName}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className={INFO_BOX_XL}>
+          <FieldLabel>{TRANS.request.reviewTotals}</FieldLabel>
+          <div className="mt-2 space-y-2 text-sm">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[var(--ops-text-muted)]">{TRANS.request.lines}</span>
+              <span className="font-semibold text-[var(--ops-text)]">{totals.lines}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[var(--ops-text-muted)]">{TRANS.request.units}</span>
+              <span className="font-semibold text-[var(--ops-text)]">{totals.units}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className={INFO_BOX_XL}>
+          <FieldLabel>{TRANS.request.reviewNotes}</FieldLabel>
+          <p className="mt-2 line-clamp-3 text-sm text-[var(--ops-text)]">
+            {notes || TRANS.request.reviewNoNotes}
+          </p>
+        </div>
+      </div>
+
+      <div className={cn(INFO_BOX_XL, "px-0 pb-0")}>
+        <div className="px-3">
+          <FieldLabel>{TRANS.request.reviewProducts}</FieldLabel>
+        </div>
+        <div className="mt-2 max-h-[280px] overflow-y-auto">
+          <OpsTableWrap minWidth="620px">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-[var(--ops-surface-muted)] text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ops-text-muted)]">
+                <tr>
+                  <th className="px-3 py-2">Producto</th>
+                  <th className="px-3 py-2">Variante</th>
+                  <th className="px-3 py-2 text-right">Solicitada</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--ops-border-soft)]">
+                {draftLines.map((line) => (
+                  <tr key={line.variant_id}>
+                    <td className="min-w-0 px-3 py-2.5">
+                      <p className="truncate font-medium text-[var(--ops-text)]">{line.style_name}</p>
+                      <p className="truncate text-[11px] text-[var(--ops-text-muted)]">{line.style_code}</p>
+                    </td>
+                    <td className="px-3 py-2.5 text-[var(--ops-text)]">
+                      {line.color_name} / {line.size_code}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-semibold text-[var(--ops-text)]">
+                      {line.qty_requested}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </OpsTableWrap>
+        </div>
+      </div>
+    </OpsDialog>
+  );
+}
+
 export function RequestRouteField({
   originOptions,
   originValue,
@@ -98,16 +255,10 @@ export function RequestRouteField({
   hasDraftLines: boolean;
   disabled?: boolean;
 }) {
-  const selectedOrigin =
+const selectedOrigin =
     originOptions.find((option) => option.value === originValue) || null;
-  const selectedOriginLabel = selectedOrigin?.label || TRANS.request.selectOrigin;
   return (
-    <section
-      className={cn(
-        panelClass,
-        "space-y-2.5 bg-[var(--ops-surface-muted)] p-4 sm:p-5"
-      )}
-    >
+    <div className="space-y-2.5">
       <div className="flex flex-col gap-3 md:grid md:grid-cols-[minmax(0,1fr)_36px_minmax(0,1fr)] md:items-end">
         <div className="min-w-0 space-y-2">
           <FieldLabel>{TRANS.request.originLabel}</FieldLabel>
@@ -115,17 +266,33 @@ export function RequestRouteField({
             value={originValue}
             onChange={onOriginChange}
             placeholder={TRANS.request.selectOrigin}
-            options={originOptions.map((o) => ({ value: o.value, label: o.label }))}
+            options={originOptions.map((option) => ({
+              value: option.value,
+              label: option.label,
+              leading: (
+                <OpsLocationIcon
+                  type={option.type}
+                  className="h-4 w-4 text-[var(--ops-text-muted)]"
+                />
+              ),
+            }))}
             disabled={disabled}
-            className="sales-field sales-field-interactive flex min-h-12 w-full min-w-0 items-center justify-between gap-3 rounded-2xl border-[color:color-mix(in_srgb,var(--ops-border-strong)_88%,var(--ripnel-accent)_12%)] bg-[var(--ops-surface)] px-4 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] focus-visible:outline-none"
             triggerContent={(opt) => (
               <div className="flex min-w-0 items-center gap-3">
                 <OpsLocationIcon
                   type={selectedOrigin?.type}
-                  className="h-4 w-4 shrink-0 text-[var(--ops-text)]"
+                  className={cn(
+                    "h-4 w-4 shrink-0",
+                    opt ? "text-[var(--ops-text)]" : "text-[var(--ops-text-muted)]"
+                  )}
                 />
-                <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                  {opt?.label ?? selectedOriginLabel}
+                <p
+                  className={cn(
+                    "truncate text-sm font-medium",
+                    opt ? "text-[var(--ops-text)]" : "text-[var(--ops-text-muted)]"
+                  )}
+                >
+                  {opt?.label ?? TRANS.request.selectOrigin}
                 </p>
               </div>
             )}
@@ -138,18 +305,18 @@ export function RequestRouteField({
 
         <div className="min-w-0 space-y-2">
           <FieldLabel>{TRANS.request.destinationLabel}</FieldLabel>
-          <div className="sales-field flex min-h-12 w-full min-w-0 items-center justify-between gap-3 rounded-2xl border-[var(--ops-tone-success-border)] bg-[var(--ops-surface)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)]">
+          <div className="flex h-9 w-full min-w-0 items-center justify-between gap-3 rounded-lg border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] px-3 py-2 text-sm">
             <div className="flex min-w-0 items-center gap-3">
               <OpsLocationIcon
                 type={destinationType}
                 className="h-4 w-4 shrink-0 text-[var(--ops-text)]"
               />
-              <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
+              <p className="truncate font-medium text-[var(--ops-text)]">
                 {destinationName}
               </p>
-              <span className="inline-flex shrink-0 items-center rounded-full border border-[var(--ops-tone-success-border)] bg-[var(--ops-tone-success-bg)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--ops-tone-success-text)]">
+              <OpsStatusBadge tone="success" size="xs" className="shrink-0">
                 {TRANS.scope.current}
-              </span>
+              </OpsStatusBadge>
             </div>
           </div>
         </div>
@@ -164,7 +331,7 @@ export function RequestRouteField({
           {TRANS.request.changeOriginWarning}
         </p>
       ) : null}
-    </section>
+    </div>
   );
 }
 
@@ -519,6 +686,14 @@ export function RequestDraftTable({
     });
   }, [highlightToken, highlightedVariantId]);
 
+  if (draftLines.length === 0) {
+    return (
+      <section>
+        <OpsHint>{TRANS.request.noProducts}</OpsHint>
+      </section>
+    );
+  }
+
   return (
     <section>
       <OpsTableWrap minWidth="860px">
@@ -543,82 +718,71 @@ export function RequestDraftTable({
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--ops-border-strong)] bg-[var(--ops-surface)]">
-              {draftLines.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="px-4 py-12 text-center text-sm text-[var(--ops-text-muted)]"
-                  >
-                    {TRANS.request.noProducts}
+              {paginatedLines.map((line) => (
+                <tr
+                  key={`${line.variant_id}:${highlightedVariantId === line.variant_id ? highlightToken || 0 : 0}`}
+                  ref={(node) => {
+                    rowRefs.current[line.variant_id] = node;
+                  }}
+                  className={cn(
+                    "transition hover:bg-[var(--ops-surface-muted)]",
+                    highlightedVariantId === line.variant_id
+                      ? "animate-[transfer-draft-row-flash_1800ms_ease-out]"
+                      : null
+                  )}
+                >
+                  <td className="px-4 py-2.5">
+                    <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
+                      {line.style_name}
+                    </p>
+                    <p className="mt-0.5 truncate text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ops-text-muted)]">
+                      {line.sku}
+                    </p>
+                  </td>
+
+                  <td className="px-3 py-2.5 text-sm text-[var(--ops-text)]">
+                    {line.color_name}
+                  </td>
+
+                  <td className="px-3 py-2.5 text-sm font-medium text-[var(--ops-text)]">
+                    {line.size_code}
+                  </td>
+
+                  <td className="px-3 py-2.5 text-right text-sm font-semibold tabular-nums text-[var(--ops-text)]">
+                    {line.qty} u.
+                  </td>
+
+                  <td className="px-3 py-2.5">
+                    <div className="flex justify-center">
+                      <OpsQuantityStepper
+                        value={line.qty_requested}
+                        onChange={(value) => onUpdateLineQty(line.variant_id, value)}
+                        onIncrement={() => onUpdateLineQty(line.variant_id, String(Math.min(line.qty_requested + 1, line.qty)))}
+                        onDecrement={() => onUpdateLineQty(line.variant_id, String(Math.max(line.qty_requested - 1, 1)))}
+                        disabled={disabled}
+                        max={line.qty}
+                        className="w-[120px]"
+                      />
+                    </div>
+                  </td>
+
+                  <td className="px-2 py-2.5">
+                    <div className="flex justify-center">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        disabled={disabled}
+                        onClick={() => onRemoveLine(line.variant_id)}
+                        className="rounded-lg text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-tone-danger-text)]"
+                        aria-label={TRANS.request.removeLine}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
-              ) : (
-                paginatedLines.map((line) => (
-                  <tr
-                    key={`${line.variant_id}:${highlightedVariantId === line.variant_id ? highlightToken || 0 : 0}`}
-                    ref={(node) => {
-                      rowRefs.current[line.variant_id] = node;
-                    }}
-                    className={cn(
-                      "transition hover:bg-[var(--ops-surface-muted)]",
-                      highlightedVariantId === line.variant_id
-                        ? "animate-[transfer-draft-row-flash_1800ms_ease-out]"
-                        : null
-                    )}
-                  >
-                    <td className="px-4 py-2.5">
-                      <p className="truncate text-sm font-semibold text-[var(--ops-text)]">
-                        {line.style_name}
-                      </p>
-                      <p className="mt-0.5 truncate text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--ops-text-muted)]">
-                        {line.sku}
-                      </p>
-                    </td>
-
-                    <td className="px-3 py-2.5 text-sm text-[var(--ops-text)]">
-                      {line.color_name}
-                    </td>
-
-                    <td className="px-3 py-2.5 text-sm font-medium text-[var(--ops-text)]">
-                      {line.size_code}
-                    </td>
-
-                    <td className="px-3 py-2.5 text-right text-sm font-semibold tabular-nums text-[var(--ops-text)]">
-                      {line.qty} u.
-                    </td>
-
-                    <td className="px-3 py-2.5">
-                      <div className="flex justify-center">
-                        <OpsQuantityStepper
-                          value={line.qty_requested}
-                          onChange={(value) => onUpdateLineQty(line.variant_id, value)}
-                          onIncrement={() => onUpdateLineQty(line.variant_id, String(Math.min(line.qty_requested + 1, line.qty)))}
-                          onDecrement={() => onUpdateLineQty(line.variant_id, String(Math.max(line.qty_requested - 1, 1)))}
-                          disabled={disabled}
-                          max={line.qty}
-                          className="w-[120px]"
-                        />
-                      </div>
-                    </td>
-
-                    <td className="px-2 py-2.5">
-                      <div className="flex justify-center">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          disabled={disabled}
-                          onClick={() => onRemoveLine(line.variant_id)}
-                          className="rounded-lg text-[var(--ops-text-muted)] hover:bg-[var(--ops-surface-muted)] hover:text-[var(--ops-tone-danger-text)]"
-                          aria-label={TRANS.request.removeLine}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
+              ))}
             </tbody>
           </table>
         </div>
@@ -713,9 +877,29 @@ export function DraftSummaryPanel({
     },
   ];
   const canSubmit = validations.every((item) => item.ok) && !submitting && !submittedTransfer;
+  const headerTone = submittedTransfer ? "success" : canSubmit ? "accent" : "neutral";
+  const headerStatus = submittedTransfer
+    ? TRANS.request.sentSuccess
+    : canSubmit
+      ? TRANS.request.summaryReady
+      : TRANS.request.summaryDraft;
 
   return (
-    <aside className={cn(panelClass, "space-y-4 p-5")}>
+    <aside className="sales-panel space-y-4 rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4 shadow-sm transition-all duration-200 sm:p-5">
+      <div className="flex items-center justify-between gap-3" aria-live="polite">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--ripnel-accent)]">
+            <ClipboardList className="h-4 w-4" />
+          </span>
+          <h2 className="min-w-0 truncate text-[1.05rem] font-semibold text-[var(--ops-text)]">
+            {TRANS.request.summarySection}
+          </h2>
+        </div>
+        <OpsStatusBadge tone={headerTone} size="sm" className="shrink-0">
+          {headerStatus}
+        </OpsStatusBadge>
+      </div>
+
       <section className="space-y-2">
         <FieldLabel>{TRANS.request.status}</FieldLabel>
         <p className="text-sm font-semibold text-[var(--ops-text)]">
