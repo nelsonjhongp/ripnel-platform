@@ -36,6 +36,7 @@ yarn-error.log*
 .DS_Store
 .vercel/
 *.pem
+*.crt
 .codex
 .codex-logs/
 .local/
