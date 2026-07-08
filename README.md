@@ -139,9 +139,25 @@ La verificación funcional debe ser proporcional al cambio: probar permisos y tr
 
 Los documentos en `docs/archive/` son historial y contexto de decisiones anteriores. Consultarlos solo cuando una tarea los cite explícitamente.
 
-## Historial
+## Refactor Julio 2026
 
-El historial técnico se conserva en Git. Para cambios recientes:
+### Reducción de complejidad cognitiva ("Doña Rosa")
+
+Se refactorizaron los componentes con mayor carga cognitiva para operarios sin conocimientos técnicos:
+
+1. **`executeFunctionCall` (chatbot)** — 324 líneas de switch convertidas a mapa de 18 handlers individuales, reduciendo complejidad ciclomática de 28 a 1 por handler.
+
+2. **`InventoryAdjustmentsCreatePage`** — De 950 líneas con 20+ estados en paralelo a wizard lineal de 3 pasos: Configuración → Variantes → Borrador. Cada paso es un componente independiente.
+
+3. **POS (`usePosSale`)** — Hook monolítico de 700 líneas dividido en 3 hooks enfocados: `usePosCart` (productos), `usePosPayment` (pagos/descuentos), `usePosSession` (caja cierre).
+
+4. **`TransfersRequestPage`** — Refactorizada a 2 pasos lineales: Destino/Origen → Productos.
+
+5. **Limpieza general** — 26 archivos con lint warnings corregidos (useMemo wrapping, imports muertos eliminados). 41 warnings → 1 (pre-existente).
+
+6. **Fix CI** — Error `Project(s) 'unit' not found` corregido agregando `--config=apps/frontend/playwright.config.ts` al comando de Playwright.
+
+### Historial técnico
 
 ```bash
 git log --oneline --decorate -20
