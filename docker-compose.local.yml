@@ -1,0 +1,35 @@
+# RIPNEL — PostgreSQL local de desarrollo (INFRA-03-A)
+#
+# Un unico servicio Postgres para desarrollo/pruebas locales, aislado de
+# Supabase remoto. Imagen pgvector/pgvector:pg17 para paridad de major
+# version con el Postgres 17 que corre Supabase hoy y con el destino
+# futuro preferente (DigitalOcean Managed PostgreSQL 17), y para poder
+# aplicar sin friccion la migracion que usa CREATE EXTENSION vector
+# (supabase/migrations/202606010001_chatbot_module.sql).
+#
+# Credenciales: dev-only, solo para este contenedor local descartable.
+# Nunca usar estos valores fuera de este archivo ni en ningun .env real.
+#
+# Ver docs/working/reports/INFRA-03-local-postgres.md para uso completo.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: ripnel-postgres-local
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ripnel_local
+      POSTGRES_USER: ripnel_local_dev
+      POSTGRES_PASSWORD: ripnel_local_dev_only
+    ports:
+      - "5433:5432"
+    volumes:
+      - ripnel_postgres_local_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ripnel_local_dev -d ripnel_local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  ripnel_postgres_local_data:
