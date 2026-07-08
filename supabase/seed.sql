@@ -10,12 +10,14 @@ begin;
 -- 1) BASE ROLES
 -- ============================================================
 
+-- Roles legacy TIENDA, CAJA y VENTAS quedan fuera a proposito: la
+-- migracion 202607020001_role_redesign_vendedora.sql los desactivo y
+-- los reemplazo por VENDEDOR/A. Ese rol lo gestiona esa migracion, no
+-- este archivo. Reintroducirlos aqui con active = true deshacia la
+-- desactivacion cada vez que este seed se re-ejecutaba.
 insert into roles (name, description, active)
 values
   ('ADMIN', 'Acceso general al sistema y configuracion base.', true),
-  ('TIENDA', 'Operacion de ventas y consultas', true),
-  ('CAJA', 'Cobros y cierre diario', true),
-  ('VENTAS', 'Operacion comercial y venta rapida.', true),
   ('ALMACEN', 'Operacion de stock y movimientos internos.', true)
 on conflict (name) do update
 set

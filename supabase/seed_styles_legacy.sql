@@ -11,9 +11,6 @@ begin;
 
 insert into product_styles (
   garment_type_id,
-  fabric_id,
-  fabric_detail_id,
-  target_id,
   style_code,
   name,
   description,
@@ -21,9 +18,6 @@ insert into product_styles (
 )
 select
   gt.garment_type_id,
-  f.fabric_id,
-  null,
-  null,
   seeded.style_code,
   seeded.name,
   seeded.description,
@@ -41,11 +35,45 @@ inner join fabrics f on f.code = seeded.fabric_code
 on conflict (style_code) do update
 set
   garment_type_id = excluded.garment_type_id,
-  fabric_id = excluded.fabric_id,
-  fabric_detail_id = excluded.fabric_detail_id,
-  target_id = excluded.target_id,
   name = excluded.name,
   description = excluded.description,
+  active = excluded.active,
+  updated_at = current_timestamp;
+
+-- ============================================================
+-- 1.1) TECHNICAL PROFILE (fabric_id / fabric_detail_id viven en
+--      product_technical_profiles desde la migracion
+--      202606280001_product_technical_profiles.sql, no en
+--      product_styles). target_id no tiene destino vigente en el
+--      esquema actual y en este seed siempre fue NULL, por lo que
+--      se retira sin perdida real de dato.
+-- ============================================================
+
+insert into product_technical_profiles (
+  style_id,
+  fabric_id,
+  fabric_detail_id,
+  active
+)
+select
+  ps.style_id,
+  f.fabric_id,
+  null,
+  true
+from (
+  values
+    ('JOG-FTER', 'FTER'),
+    ('LEG-SUP', 'SUP'),
+    ('POL-FLIC', 'FLIC'),
+    ('SHO-CHA', 'CHA'),
+    ('CAF-RIP', 'RIP')
+) as seeded(style_code, fabric_code)
+inner join product_styles ps on ps.style_code = seeded.style_code
+inner join fabrics f on f.code = seeded.fabric_code
+on conflict (style_id) do update
+set
+  fabric_id = excluded.fabric_id,
+  fabric_detail_id = excluded.fabric_detail_id,
   active = excluded.active,
   updated_at = current_timestamp;
 
