@@ -42,6 +42,7 @@ export const LOGIN = {
     loginContextFailed: "No se pudo completar el acceso actual.",
     noActiveSession: "No hay sesion activa",
     locationNotAssigned: "La sede seleccionada no pertenece al usuario",
+    rateLimitExceeded: "Demasiados intentos con las mismas credenciales. Intenta de nuevo mas tarde.",
   },
 } as const
 
