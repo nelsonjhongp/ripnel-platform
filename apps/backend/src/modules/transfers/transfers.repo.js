@@ -221,6 +221,51 @@ async function findTransferHeaderById(transferId, executor = query) {
   return result.rows[0] || null;
 }
 
+async function findTransferHeaderByIdForUpdate(transferId, executor = query) {
+  const result = await executor(
+    `select
+       st.transfer_id,
+       st.transfer_number,
+       st.from_location_id,
+       lf.code as from_location_code,
+       lf.name as from_location_name,
+       st.to_location_id,
+       lt.code as to_location_code,
+       lt.name as to_location_name,
+       st.status,
+       st.notes,
+       st.created_by,
+       created_user.full_name as created_by_name,
+       st.approved_by,
+       approved_user.full_name as approved_by_name,
+       st.shipped_by,
+       shipped_user.full_name as shipped_by_name,
+       st.received_by,
+       received_user.full_name as received_by_name,
+       st.cancelled_by,
+       cancelled_user.full_name as cancelled_by_name,
+       st.created_at,
+       st.approved_at,
+       st.shipped_at,
+       st.received_at,
+       st.cancelled_at,
+       st.updated_at
+     from stock_transfers st
+     inner join locations lf on lf.location_id = st.from_location_id
+     inner join locations lt on lt.location_id = st.to_location_id
+     left join users created_user on created_user.user_id = st.created_by
+     left join users approved_user on approved_user.user_id = st.approved_by
+     left join users shipped_user on shipped_user.user_id = st.shipped_by
+     left join users received_user on received_user.user_id = st.received_by
+     left join users cancelled_user on cancelled_user.user_id = st.cancelled_by
+     where st.transfer_id = $1
+     for update of st`,
+    [transferId]
+  );
+
+  return result.rows[0] || null;
+}
+
 async function findTransferLinesByTransferId(transferId, executor = query) {
   const result = await executor(
     `select
@@ -453,6 +498,40 @@ async function markTransferApproved(transferId, approvedBy, executor = query) {
   return result.rows[0] || null;
 }
 
+async function markTransferApprovedIfRequested(transferId, approvedBy, executor = query) {
+  const result = await executor(
+    `update stock_transfers
+     set
+       status = 'approved',
+       approved_by = $2,
+       approved_at = current_timestamp,
+       updated_at = current_timestamp
+     where transfer_id = $1
+       and status = 'requested'
+     returning
+       transfer_id,
+       transfer_number,
+       from_location_id,
+       to_location_id,
+       status,
+       notes,
+       created_by,
+       approved_by,
+       shipped_by,
+       received_by,
+       cancelled_by,
+       created_at,
+       approved_at,
+       shipped_at,
+       received_at,
+       cancelled_at,
+       updated_at`,
+    [transferId, approvedBy]
+  );
+
+  return result.rows[0] || null;
+}
+
 async function markTransferShipped(transferId, shippedBy, executor = query) {
   const result = await executor(
     `update stock_transfers
@@ -462,6 +541,40 @@ async function markTransferShipped(transferId, shippedBy, executor = query) {
        shipped_at = current_timestamp,
        updated_at = current_timestamp
      where transfer_id = $1
+     returning
+       transfer_id,
+       transfer_number,
+       from_location_id,
+       to_location_id,
+       status,
+       notes,
+       created_by,
+       approved_by,
+       shipped_by,
+       received_by,
+       cancelled_by,
+       created_at,
+       approved_at,
+       shipped_at,
+       received_at,
+       cancelled_at,
+       updated_at`,
+    [transferId, shippedBy]
+  );
+
+  return result.rows[0] || null;
+}
+
+async function markTransferShippedIfApproved(transferId, shippedBy, executor = query) {
+  const result = await executor(
+    `update stock_transfers
+     set
+       status = 'shipped',
+       shipped_by = $2,
+       shipped_at = current_timestamp,
+       updated_at = current_timestamp
+     where transfer_id = $1
+       and status = 'approved'
      returning
        transfer_id,
        transfer_number,
@@ -519,6 +632,40 @@ async function markTransferReceived(transferId, receivedBy, executor = query) {
   return result.rows[0] || null;
 }
 
+async function markTransferReceivedIfShipped(transferId, receivedBy, executor = query) {
+  const result = await executor(
+    `update stock_transfers
+     set
+       status = 'received',
+       received_by = $2,
+       received_at = current_timestamp,
+       updated_at = current_timestamp
+     where transfer_id = $1
+       and status = 'shipped'
+     returning
+       transfer_id,
+       transfer_number,
+       from_location_id,
+       to_location_id,
+       status,
+       notes,
+       created_by,
+       approved_by,
+       shipped_by,
+       received_by,
+       cancelled_by,
+       created_at,
+       approved_at,
+       shipped_at,
+       received_at,
+       cancelled_at,
+       updated_at`,
+    [transferId, receivedBy]
+  );
+
+  return result.rows[0] || null;
+}
+
 async function markTransferCancelled(transferId, cancelledBy, executor = query) {
   const result = await executor(
     `update stock_transfers
@@ -552,9 +699,44 @@ async function markTransferCancelled(transferId, cancelledBy, executor = query) 
   return result.rows[0] || null;
 }
 
+async function markTransferCancelledIfOpen(transferId, cancelledBy, executor = query) {
+  const result = await executor(
+    `update stock_transfers
+     set
+       status = 'cancelled',
+       cancelled_by = $2,
+       cancelled_at = current_timestamp,
+       updated_at = current_timestamp
+     where transfer_id = $1
+       and status in ('requested', 'approved')
+    returning
+      transfer_id,
+      transfer_number,
+      from_location_id,
+      to_location_id,
+      status,
+      notes,
+      created_by,
+      approved_by,
+      shipped_by,
+      received_by,
+      cancelled_by,
+      created_at,
+      approved_at,
+      shipped_at,
+       received_at,
+       cancelled_at,
+       updated_at`,
+    [transferId, cancelledBy]
+  );
+
+  return result.rows[0] || null;
+}
+
 module.exports = {
   findAllTransfers,
   findTransferHeaderById,
+  findTransferHeaderByIdForUpdate,
   findTransferLinesByTransferId,
   findTransferRequestCandidateRows,
   insertTransfer,
@@ -562,7 +744,11 @@ module.exports = {
   updateTransferLineShipment,
   updateTransferLineReceipt,
   markTransferApproved,
+  markTransferApprovedIfRequested,
   markTransferShipped,
+  markTransferShippedIfApproved,
   markTransferReceived,
+  markTransferReceivedIfShipped,
   markTransferCancelled,
+  markTransferCancelledIfOpen,
 };

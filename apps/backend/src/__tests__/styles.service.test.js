@@ -170,19 +170,25 @@ describe("styles service", () => {
 
   it("patchStyle rejects technical and identity fields", async () => {
     const service = loadStylesService();
+    const blockedPayloads = [
+      { style_code: "POL-NEW" },
+      { garment_type_id: "33333333-3333-4333-8333-333333333333" },
+      { fabric_id: "33333333-3333-4333-8333-333333333333" },
+      { fabric_detail_id: "33333333-3333-4333-8333-333333333333" },
+      { target_id: "33333333-3333-4333-8333-333333333333" },
+    ];
 
-    await assert.rejects(
-      () =>
-        service.patchStyle(STYLE_ID, {
-          target_id: "33333333-3333-4333-8333-333333333333",
-        }),
-      (error) => {
-        assert.equal(error.name, "AppError");
-        assert.equal(error.statusCode, 400);
-        assert.equal(error.message, "Style identity fields cannot be updated");
-        return true;
-      }
-    );
+    for (const payload of blockedPayloads) {
+      await assert.rejects(
+        () => service.patchStyle(STYLE_ID, payload),
+        (error) => {
+          assert.equal(error.name, "AppError");
+          assert.equal(error.statusCode, 400);
+          assert.equal(error.message, "Style identity fields cannot be updated");
+          return true;
+        }
+      );
+    }
   });
 
   it("patchStyle rejects duplicate commercial names with accents normalized", async () => {
