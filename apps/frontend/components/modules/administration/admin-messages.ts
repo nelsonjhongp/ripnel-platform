@@ -36,6 +36,10 @@ export const ADMIN = {
     orderOldest: "Mas antiguo",
     typeLabel: "Tipo",
     allTypes: "Todos los tipos",
+    statusLabel: "Estado",
+    allStatuses: "Todos los estados",
+    activeOnly: "Activas",
+    inactiveOnly: "Inactivas",
   },
   table: {
     users: {

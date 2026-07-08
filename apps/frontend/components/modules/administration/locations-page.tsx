@@ -254,7 +254,7 @@ export default function LocationsPage() {
 
       <OpsSectionDivider>
         <OpsTableBlock>
-          <OpsFiltersRow className="lg:grid-cols-[minmax(0,1.2fr)_0.92fr_auto]">
+          <OpsFiltersRow className="lg:grid-cols-[minmax(0,1.2fr)_0.92fr_0.92fr_auto]">
             <OpsSearchField
               value={search}
               onChange={(value) => { setSearch(value); setPage(1) }}
@@ -269,6 +269,16 @@ export default function LocationsPage() {
                 ...LOCATION_TYPE_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
               ]}
               onChange={(v) => { setTypeFilter(v as "all" | Location["type"]); setPage(1) }}
+            />
+            <OpsSelect
+              label={ADMIN.filters.statusLabel}
+              value={statusFilter}
+              options={[
+                { value: "all", label: ADMIN.filters.allStatuses },
+                { value: "active", label: ADMIN.filters.activeOnly },
+                { value: "inactive", label: ADMIN.filters.inactiveOnly },
+              ]}
+              onChange={(v) => { setStatusFilter(v as "all" | "active" | "inactive"); setPage(1) }}
             />
             <Tooltip>
               <TooltipTrigger asChild>
