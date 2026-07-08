@@ -1,4 +1,7 @@
 const express = require('express');
+const { requireAuth, requirePermission } = require('../../middlewares/auth');
+const { validate } = require('../../middlewares/validate');
+const { createLocation, patchLocation } = require('../../shared/schemas');
 const {
   getLocations,
   postLocation,
@@ -7,8 +10,8 @@ const {
 
 const router = express.Router();
 
-router.get('/', getLocations);
-router.post('/', postLocation);
-router.patch('/:locationId', patchLocationById);
+router.get('/', requireAuth, getLocations);
+router.post('/', requireAuth, requirePermission('admin.manage'), validate(createLocation), postLocation);
+router.patch('/:locationId', requireAuth, requirePermission('admin.manage'), validate(patchLocation), patchLocationById);
 
 module.exports = router;

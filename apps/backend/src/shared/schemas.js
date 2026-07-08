@@ -130,6 +130,22 @@ const reopenCash = z.object({
   reopen_notes: z.string().min(1, 'El motivo de reapertura es requerido'),
 });
 
+const createLocation = z.object({
+  name: z.string({ message: 'Location name is required' }).min(1, 'Location name is required'),
+  type: z.enum(['store', 'warehouse', 'workshop', 'third_party']),
+  code: z.string().optional().nullable().default(null),
+  address: z.string().optional().nullable().default(null),
+  active: z.boolean().optional().default(true),
+});
+
+const patchLocation = z
+  .object({
+    name: z.string().min(1, 'Location name is required').optional(),
+    address: z.string().optional().nullable(),
+    active: z.boolean().optional(),
+  })
+  .strict();
+
 module.exports = {
   login,
   changePassword,
@@ -144,4 +160,6 @@ module.exports = {
   openCash,
   closeCash,
   reopenCash,
+  createLocation,
+  patchLocation,
 };
