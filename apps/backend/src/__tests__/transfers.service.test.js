@@ -3,6 +3,8 @@ const assert = require("node:assert/strict");
 
 const usersRepo = require("../modules/users/users.repo");
 const transfersRepo = require("../modules/transfers/transfers.repo");
+const inventoryRepo = require("../modules/inventory/inventory.repo");
+const db = require("../shared/db");
 
 const SERVICE_PATH = require.resolve("../modules/transfers/transfers.service");
 
@@ -39,10 +41,25 @@ const originalUsersRepo = {
 const originalTransfersRepo = {
   findAllTransfers: transfersRepo.findAllTransfers,
   findTransferHeaderById: transfersRepo.findTransferHeaderById,
+  findTransferHeaderByIdForUpdate: transfersRepo.findTransferHeaderByIdForUpdate,
   findTransferLinesByTransferId: transfersRepo.findTransferLinesByTransferId,
+  updateTransferLineShipment: transfersRepo.updateTransferLineShipment,
+  updateTransferLineReceipt: transfersRepo.updateTransferLineReceipt,
   markTransferApproved: transfersRepo.markTransferApproved,
+  markTransferApprovedIfRequested: transfersRepo.markTransferApprovedIfRequested,
   markTransferCancelled: transfersRepo.markTransferCancelled,
+  markTransferCancelledIfOpen: transfersRepo.markTransferCancelledIfOpen,
+  markTransferShippedIfApproved: transfersRepo.markTransferShippedIfApproved,
+  markTransferReceivedIfShipped: transfersRepo.markTransferReceivedIfShipped,
 };
+
+const originalInventoryRepo = {
+  findInventoryQtyByLocationAndVariant: inventoryRepo.findInventoryQtyByLocationAndVariant,
+  upsertInventoryQty: inventoryRepo.upsertInventoryQty,
+  insertStockMovement: inventoryRepo.insertStockMovement,
+};
+
+const originalPoolConnect = db.pool.connect;
 
 function buildTransfer(overrides = {}) {
   return {
@@ -138,12 +155,33 @@ function applyBaseStubs(overrides = {}) {
   transfersRepo.findAllTransfers = overrides.findAllTransfers || (async () => []);
   transfersRepo.findTransferHeaderById =
     overrides.findTransferHeaderById || (async () => null);
+  transfersRepo.findTransferHeaderByIdForUpdate =
+    overrides.findTransferHeaderByIdForUpdate || (async () => null);
   transfersRepo.findTransferLinesByTransferId =
     overrides.findTransferLinesByTransferId || (async () => []);
+  transfersRepo.updateTransferLineShipment =
+    overrides.updateTransferLineShipment || (async () => null);
+  transfersRepo.updateTransferLineReceipt =
+    overrides.updateTransferLineReceipt || (async () => null);
   transfersRepo.markTransferApproved =
     overrides.markTransferApproved || (async () => null);
+  transfersRepo.markTransferApprovedIfRequested =
+    overrides.markTransferApprovedIfRequested || (async () => null);
   transfersRepo.markTransferCancelled =
     overrides.markTransferCancelled || (async () => null);
+  transfersRepo.markTransferCancelledIfOpen =
+    overrides.markTransferCancelledIfOpen || (async () => null);
+  transfersRepo.markTransferShippedIfApproved =
+    overrides.markTransferShippedIfApproved || (async () => null);
+  transfersRepo.markTransferReceivedIfShipped =
+    overrides.markTransferReceivedIfShipped || (async () => null);
+
+  inventoryRepo.findInventoryQtyByLocationAndVariant =
+    overrides.findInventoryQtyByLocationAndVariant || (async () => 0);
+  inventoryRepo.upsertInventoryQty = overrides.upsertInventoryQty || (async () => null);
+  inventoryRepo.insertStockMovement = overrides.insertStockMovement || (async () => null);
+
+  db.pool.connect = overrides.poolConnect || (async () => createMockClient().client);
 }
 
 function loadTransfersService(overrides = {}) {
@@ -159,11 +197,40 @@ function restoreStubs() {
 
   transfersRepo.findAllTransfers = originalTransfersRepo.findAllTransfers;
   transfersRepo.findTransferHeaderById = originalTransfersRepo.findTransferHeaderById;
+  transfersRepo.findTransferHeaderByIdForUpdate = originalTransfersRepo.findTransferHeaderByIdForUpdate;
   transfersRepo.findTransferLinesByTransferId = originalTransfersRepo.findTransferLinesByTransferId;
+  transfersRepo.updateTransferLineShipment = originalTransfersRepo.updateTransferLineShipment;
+  transfersRepo.updateTransferLineReceipt = originalTransfersRepo.updateTransferLineReceipt;
   transfersRepo.markTransferApproved = originalTransfersRepo.markTransferApproved;
+  transfersRepo.markTransferApprovedIfRequested =
+    originalTransfersRepo.markTransferApprovedIfRequested;
   transfersRepo.markTransferCancelled = originalTransfersRepo.markTransferCancelled;
+  transfersRepo.markTransferCancelledIfOpen = originalTransfersRepo.markTransferCancelledIfOpen;
+  transfersRepo.markTransferShippedIfApproved = originalTransfersRepo.markTransferShippedIfApproved;
+  transfersRepo.markTransferReceivedIfShipped = originalTransfersRepo.markTransferReceivedIfShipped;
+
+  inventoryRepo.findInventoryQtyByLocationAndVariant =
+    originalInventoryRepo.findInventoryQtyByLocationAndVariant;
+  inventoryRepo.upsertInventoryQty = originalInventoryRepo.upsertInventoryQty;
+  inventoryRepo.insertStockMovement = originalInventoryRepo.insertStockMovement;
+
+  db.pool.connect = originalPoolConnect;
 
   delete require.cache[SERVICE_PATH];
+}
+
+function createMockClient() {
+  const txCalls = [];
+  const client = {
+    query: async (sql) => {
+      if (sql === "begin" || sql === "commit" || sql === "rollback") {
+        txCalls.push(sql);
+      }
+      return { rows: [] };
+    },
+    release() {},
+  };
+  return { client, txCalls };
 }
 
 describe("transfers service", () => {
@@ -496,7 +563,7 @@ describe("transfers service", () => {
       created_by: OTHER_USER_ID,
     });
     const service = loadTransfersService({
-      findTransferHeaderById: async () => requestedTransfer,
+      findTransferHeaderByIdForUpdate: async () => requestedTransfer,
     });
 
     await assert.rejects(
@@ -553,5 +620,537 @@ describe("transfers service", () => {
     assert.equal(detail.available_actions.cancel, true);
     assert.equal(detail.next_owner.location_name, MONTEVIDEO.name);
     assert.doesNotMatch(detail.active_message, /debe aprobar esta solicitud/i);
+  });
+
+  it("approve rechecks origin stock and commits the conditional mark", async () => {
+    const requestedTransfer = buildTransfer({
+      transfer_id: "70000000-0000-4000-8000-000000000006",
+      transfer_number: "TR-APPROVE-OK",
+      from_location_id: MONTEVIDEO.location_id,
+      from_location_code: MONTEVIDEO.code,
+      from_location_name: MONTEVIDEO.name,
+      to_location_id: TIENDA_CENTRO.location_id,
+      to_location_code: TIENDA_CENTRO.code,
+      to_location_name: TIENDA_CENTRO.name,
+      status: "requested",
+      created_by: OTHER_USER_ID,
+    });
+    const requestedLine = buildTransferLine({
+      transfer_id: requestedTransfer.transfer_id,
+      qty_requested: 4,
+    });
+    const approvedTransfer = { ...requestedTransfer, status: "approved" };
+
+    let approvedCall = null;
+    const { client, txCalls } = createMockClient();
+
+    const service = loadTransfersService({
+      findTransferHeaderByIdForUpdate: async () => requestedTransfer,
+      findTransferHeaderById: async () => approvedTransfer,
+      findTransferLinesByTransferId: async () => [requestedLine],
+      findInventoryQtyByLocationAndVariant: async () => 5,
+      markTransferApprovedIfRequested: async (transferId, approvedBy) => {
+        approvedCall = { transferId, approvedBy };
+        return approvedTransfer;
+      },
+    });
+
+    db.pool.connect = async () => client;
+
+    const result = await service.approveTransferById(
+      requestedTransfer.transfer_id,
+      {},
+      buildAuth(["transfers.approve", "transfers.cancel"], "TIENDA")
+    );
+
+    assert.equal(result.status, "approved");
+    assert.deepEqual(approvedCall, {
+      transferId: requestedTransfer.transfer_id,
+      approvedBy: USER_ID,
+    });
+    assert.ok(txCalls.includes("begin"));
+    assert.ok(txCalls.includes("commit"));
+    assert.ok(!txCalls.includes("rollback"));
+  });
+
+  it("approve rejects when origin stock changed before approval", async () => {
+    const requestedTransfer = buildTransfer({
+      transfer_id: "70000000-0000-4000-8000-000000000007",
+      transfer_number: "TR-APPROVE-STOCK",
+      from_location_id: MONTEVIDEO.location_id,
+      from_location_code: MONTEVIDEO.code,
+      from_location_name: MONTEVIDEO.name,
+      to_location_id: TIENDA_CENTRO.location_id,
+      to_location_code: TIENDA_CENTRO.code,
+      to_location_name: TIENDA_CENTRO.name,
+      status: "requested",
+      created_by: OTHER_USER_ID,
+    });
+    const requestedLine = buildTransferLine({
+      transfer_id: requestedTransfer.transfer_id,
+      qty_requested: 4,
+    });
+
+    let approvedCalls = 0;
+    const { client, txCalls } = createMockClient();
+
+    const service = loadTransfersService({
+      findTransferHeaderByIdForUpdate: async () => requestedTransfer,
+      findTransferLinesByTransferId: async () => [requestedLine],
+      findInventoryQtyByLocationAndVariant: async () => 2,
+      markTransferApprovedIfRequested: async () => {
+        approvedCalls++;
+        return null;
+      },
+    });
+
+    db.pool.connect = async () => client;
+
+    await assert.rejects(
+      () =>
+        service.approveTransferById(
+          requestedTransfer.transfer_id,
+          {},
+          buildAuth(["transfers.approve", "transfers.cancel"], "TIENDA")
+        ),
+      (error) => {
+        assert.equal(error.statusCode, 409);
+        assert.equal(error.code, "TRANSFER_APPROVAL_STOCK_CHANGED");
+        return true;
+      }
+    );
+
+    assert.equal(approvedCalls, 0);
+    assert.ok(txCalls.includes("begin"));
+    assert.ok(txCalls.includes("rollback"));
+    assert.ok(!txCalls.includes("commit"));
+  });
+
+  it("rolls back approval when the conditional mark returns null", async () => {
+    const requestedTransfer = buildTransfer({
+      transfer_id: "70000000-0000-4000-8000-000000000008",
+      transfer_number: "TR-APPROVE-RACE",
+      from_location_id: MONTEVIDEO.location_id,
+      from_location_code: MONTEVIDEO.code,
+      from_location_name: MONTEVIDEO.name,
+      to_location_id: TIENDA_CENTRO.location_id,
+      to_location_code: TIENDA_CENTRO.code,
+      to_location_name: TIENDA_CENTRO.name,
+      status: "requested",
+      created_by: OTHER_USER_ID,
+    });
+    const requestedLine = buildTransferLine({
+      transfer_id: requestedTransfer.transfer_id,
+      qty_requested: 4,
+    });
+
+    const { client, txCalls } = createMockClient();
+
+    const service = loadTransfersService({
+      findTransferHeaderByIdForUpdate: async () => requestedTransfer,
+      findTransferLinesByTransferId: async () => [requestedLine],
+      findInventoryQtyByLocationAndVariant: async () => 5,
+      markTransferApprovedIfRequested: async () => null,
+    });
+
+    db.pool.connect = async () => client;
+
+    await assert.rejects(
+      () =>
+        service.approveTransferById(
+          requestedTransfer.transfer_id,
+          {},
+          buildAuth(["transfers.approve", "transfers.cancel"], "TIENDA")
+        ),
+      (error) => {
+        assert.equal(error.statusCode, 409);
+        assert.equal(error.code, "TRANSFER_STATUS_CHANGED");
+        return true;
+      }
+    );
+
+    assert.ok(txCalls.includes("begin"));
+    assert.ok(txCalls.includes("rollback"));
+    assert.ok(!txCalls.includes("commit"));
+  });
+
+  it("cancel commits the conditional mark for open transfers", async () => {
+    const requestedTransfer = buildTransfer({
+      transfer_id: "70000000-0000-4000-8000-000000000009",
+      transfer_number: "TR-CANCEL-OK",
+      status: "requested",
+      created_by: USER_ID,
+    });
+    const cancelledTransfer = { ...requestedTransfer, status: "cancelled" };
+
+    let cancelledCall = null;
+    const { client, txCalls } = createMockClient();
+
+    const service = loadTransfersService({
+      findTransferHeaderByIdForUpdate: async () => requestedTransfer,
+      findTransferHeaderById: async () => cancelledTransfer,
+      markTransferCancelledIfOpen: async (transferId, cancelledBy) => {
+        cancelledCall = { transferId, cancelledBy };
+        return cancelledTransfer;
+      },
+    });
+
+    db.pool.connect = async () => client;
+
+    const result = await service.cancelTransferById(
+      requestedTransfer.transfer_id,
+      {},
+      buildAuth(["transfers.request.create", "transfers.request.view_own", "transfers.cancel"])
+    );
+
+    assert.equal(result.status, "cancelled");
+    assert.deepEqual(cancelledCall, {
+      transferId: requestedTransfer.transfer_id,
+      cancelledBy: USER_ID,
+    });
+    assert.ok(txCalls.includes("begin"));
+    assert.ok(txCalls.includes("commit"));
+    assert.ok(!txCalls.includes("rollback"));
+  });
+
+  it("rolls back cancellation when the conditional mark returns null", async () => {
+    const approvedTransfer = buildTransfer({
+      transfer_id: "70000000-0000-4000-8000-000000000010",
+      transfer_number: "TR-CANCEL-RACE",
+      from_location_id: MONTEVIDEO.location_id,
+      from_location_code: MONTEVIDEO.code,
+      from_location_name: MONTEVIDEO.name,
+      to_location_id: TIENDA_CENTRO.location_id,
+      to_location_code: TIENDA_CENTRO.code,
+      to_location_name: TIENDA_CENTRO.name,
+      status: "approved",
+      created_by: OTHER_USER_ID,
+    });
+
+    const { client, txCalls } = createMockClient();
+
+    const service = loadTransfersService({
+      findTransferHeaderByIdForUpdate: async () => approvedTransfer,
+      markTransferCancelledIfOpen: async () => null,
+    });
+
+    db.pool.connect = async () => client;
+
+    await assert.rejects(
+      () =>
+        service.cancelTransferById(
+          approvedTransfer.transfer_id,
+          {},
+          buildAuth(["transfers.cancel"], "TIENDA")
+        ),
+      (error) => {
+        assert.equal(error.statusCode, 409);
+        assert.equal(error.code, "TRANSFER_STATUS_CHANGED");
+        return true;
+      }
+    );
+
+    assert.ok(txCalls.includes("begin"));
+    assert.ok(txCalls.includes("rollback"));
+    assert.ok(!txCalls.includes("commit"));
+  });
+
+  it("rejects a second shipment when the transfer is already shipped", async () => {
+    const shippedTransfer = buildTransfer({
+      transfer_id: "70000000-0000-4000-8000-000000000001",
+      transfer_number: "TR- DOUBLE-SHIP",
+      from_location_id: MONTEVIDEO.location_id,
+      from_location_code: MONTEVIDEO.code,
+      from_location_name: MONTEVIDEO.name,
+      to_location_id: TIENDA_CENTRO.location_id,
+      to_location_code: TIENDA_CENTRO.code,
+      to_location_name: TIENDA_CENTRO.name,
+      status: "shipped",
+      shipped_at: "2026-06-01T06:00:00.000Z",
+      qty_shipped_total: 4,
+      updated_at: "2026-06-01T06:00:00.000Z",
+    });
+
+    let stockMovementCalls = 0;
+    let inventoryUpsertCalls = 0;
+    const { client } = createMockClient();
+
+    const service = loadTransfersService({
+      findTransferHeaderByIdForUpdate: async () => shippedTransfer,
+      markTransferShippedIfApproved: async () => null,
+      upsertInventoryQty: async () => {
+        inventoryUpsertCalls++;
+        return null;
+      },
+      insertStockMovement: async () => {
+        stockMovementCalls++;
+        return { movement_id: "x" };
+      },
+    });
+
+    db.pool.connect = async () => client;
+
+    await assert.rejects(
+      () =>
+        service.shipTransferById(
+          shippedTransfer.transfer_id,
+          {},
+          buildAuth(["transfers.ship", "transfers.receive"], "TIENDA")
+        ),
+      (error) => {
+        assert.equal(error.statusCode, 400);
+        assert.match(error.message, /Only approved transfers can be shipped/);
+        return true;
+      }
+    );
+
+    assert.equal(stockMovementCalls, 0);
+    assert.equal(inventoryUpsertCalls, 0);
+  });
+
+  it("rejects a second receipt when the transfer is already received", async () => {
+    const receivedTransfer = buildTransfer({
+      transfer_id: "70000000-0000-4000-8000-000000000002",
+      transfer_number: "TR-DOUBLE-RECEIVE",
+      from_location_id: TIENDA_CENTRO.location_id,
+      from_location_code: TIENDA_CENTRO.code,
+      from_location_name: TIENDA_CENTRO.name,
+      to_location_id: MONTEVIDEO.location_id,
+      to_location_code: MONTEVIDEO.code,
+      to_location_name: MONTEVIDEO.name,
+      status: "received",
+      received_at: "2026-06-01T08:00:00.000Z",
+      qty_received_total: 4,
+      updated_at: "2026-06-01T08:00:00.000Z",
+    });
+
+    let stockMovementCalls = 0;
+    let inventoryUpsertCalls = 0;
+    const { client } = createMockClient();
+
+    const service = loadTransfersService({
+      findTransferHeaderByIdForUpdate: async () => receivedTransfer,
+      markTransferReceivedIfShipped: async () => null,
+      upsertInventoryQty: async () => {
+        inventoryUpsertCalls++;
+        return null;
+      },
+      insertStockMovement: async () => {
+        stockMovementCalls++;
+        return { movement_id: "x" };
+      },
+    });
+
+    db.pool.connect = async () => client;
+
+    await assert.rejects(
+      () =>
+        service.receiveTransferById(
+          receivedTransfer.transfer_id,
+          {},
+          buildAuth(["transfers.ship", "transfers.receive"], "TIENDA")
+        ),
+      (error) => {
+        assert.equal(error.statusCode, 400);
+        assert.match(error.message, /Only shipped transfers can be received/);
+        return true;
+      }
+    );
+
+    assert.equal(stockMovementCalls, 0);
+    assert.equal(inventoryUpsertCalls, 0);
+  });
+
+  it("ship creates an OUT stock movement with transfer references", async () => {
+    const approvedTransfer = buildTransfer({
+      transfer_id: "70000000-0000-4000-8000-000000000003",
+      transfer_number: "TR-SHIP-OK",
+      from_location_id: MONTEVIDEO.location_id,
+      from_location_code: MONTEVIDEO.code,
+      from_location_name: MONTEVIDEO.name,
+      to_location_id: TIENDA_CENTRO.location_id,
+      to_location_code: TIENDA_CENTRO.code,
+      to_location_name: TIENDA_CENTRO.name,
+      status: "approved",
+      approved_at: "2026-06-01T05:00:00.000Z",
+      updated_at: "2026-06-01T05:00:00.000Z",
+    });
+    const shippedLine = buildTransferLine({
+      transfer_id: approvedTransfer.transfer_id,
+      qty_requested: 4,
+      qty_shipped: 0,
+    });
+    const shippedTransfer = { ...approvedTransfer, status: "shipped" };
+
+    let stockMovementCalls = [];
+    let inventoryUpsertCalls = [];
+    let markShippedCall = null;
+    const { client, txCalls } = createMockClient();
+
+    const service = loadTransfersService({
+      findTransferHeaderByIdForUpdate: async () => approvedTransfer,
+      findTransferHeaderById: async () => shippedTransfer,
+      findTransferLinesByTransferId: async () => [shippedLine],
+      findInventoryQtyByLocationAndVariant: async () => 10,
+      upsertInventoryQty: async (locationId, variantId, qty) => {
+        inventoryUpsertCalls.push({ locationId, variantId, qty });
+        return null;
+      },
+      insertStockMovement: async (payload) => {
+        stockMovementCalls.push(payload);
+        return { movement_id: "m-1" };
+      },
+      markTransferShippedIfApproved: async (transferId, shippedBy) => {
+        markShippedCall = { transferId, shippedBy };
+        return shippedTransfer;
+      },
+    });
+
+    db.pool.connect = async () => client;
+
+    const result = await service.shipTransferById(
+      approvedTransfer.transfer_id,
+      {},
+      buildAuth(["transfers.ship", "transfers.receive"], "TIENDA")
+    );
+
+    assert.equal(result.status, "shipped");
+    assert.equal(stockMovementCalls.length, 1);
+    assert.equal(stockMovementCalls[0].movement_type, "OUT");
+    assert.equal(stockMovementCalls[0].reference_type, "transfer");
+    assert.equal(stockMovementCalls[0].reference_id, approvedTransfer.transfer_id);
+    assert.equal(stockMovementCalls[0].reference_line_id, shippedLine.transfer_line_id);
+    assert.equal(stockMovementCalls[0].quantity, 4);
+    assert.equal(stockMovementCalls[0].location_id, MONTEVIDEO.location_id);
+    assert.equal(inventoryUpsertCalls.length, 1);
+    assert.equal(inventoryUpsertCalls[0].qty, 6);
+    assert.equal(inventoryUpsertCalls[0].locationId, MONTEVIDEO.location_id);
+    assert.ok(markShippedCall);
+    assert.equal(markShippedCall.transferId, approvedTransfer.transfer_id);
+    assert.ok(txCalls.includes("begin"));
+    assert.ok(txCalls.includes("commit"));
+    assert.ok(!txCalls.includes("rollback"));
+  });
+
+  it("receive creates an IN stock movement with transfer references", async () => {
+    const shippedTransfer = buildTransfer({
+      transfer_id: "70000000-0000-4000-8000-000000000004",
+      transfer_number: "TR-RECEIVE-OK",
+      from_location_id: TIENDA_CENTRO.location_id,
+      from_location_code: TIENDA_CENTRO.code,
+      from_location_name: TIENDA_CENTRO.name,
+      to_location_id: MONTEVIDEO.location_id,
+      to_location_code: MONTEVIDEO.code,
+      to_location_name: MONTEVIDEO.name,
+      status: "shipped",
+      shipped_at: "2026-06-01T06:00:00.000Z",
+      qty_shipped_total: 4,
+      updated_at: "2026-06-01T06:00:00.000Z",
+    });
+    const receivedLine = buildTransferLine({
+      transfer_id: shippedTransfer.transfer_id,
+      qty_requested: 4,
+      qty_shipped: 4,
+      qty_received: 0,
+    });
+    const receivedTransfer = { ...shippedTransfer, status: "received" };
+
+    let stockMovementCalls = [];
+    let inventoryUpsertCalls = [];
+    let markReceivedCall = null;
+    const { client, txCalls } = createMockClient();
+
+    const service = loadTransfersService({
+      findTransferHeaderByIdForUpdate: async () => shippedTransfer,
+      findTransferHeaderById: async () => receivedTransfer,
+      findTransferLinesByTransferId: async () => [receivedLine],
+      findInventoryQtyByLocationAndVariant: async () => 0,
+      upsertInventoryQty: async (locationId, variantId, qty) => {
+        inventoryUpsertCalls.push({ locationId, variantId, qty });
+        return null;
+      },
+      insertStockMovement: async (payload) => {
+        stockMovementCalls.push(payload);
+        return { movement_id: "m-1" };
+      },
+      markTransferReceivedIfShipped: async (transferId, receivedBy) => {
+        markReceivedCall = { transferId, receivedBy };
+        return receivedTransfer;
+      },
+    });
+
+    db.pool.connect = async () => client;
+
+    const result = await service.receiveTransferById(
+      shippedTransfer.transfer_id,
+      {},
+      buildAuth(["transfers.ship", "transfers.receive"], "TIENDA")
+    );
+
+    assert.equal(result.status, "received");
+    assert.equal(stockMovementCalls.length, 1);
+    assert.equal(stockMovementCalls[0].movement_type, "IN");
+    assert.equal(stockMovementCalls[0].reference_type, "transfer");
+    assert.equal(stockMovementCalls[0].reference_id, shippedTransfer.transfer_id);
+    assert.equal(stockMovementCalls[0].reference_line_id, receivedLine.transfer_line_id);
+    assert.equal(stockMovementCalls[0].quantity, 4);
+    assert.equal(stockMovementCalls[0].location_id, MONTEVIDEO.location_id);
+    assert.equal(inventoryUpsertCalls.length, 1);
+    assert.equal(inventoryUpsertCalls[0].qty, 4);
+    assert.equal(inventoryUpsertCalls[0].locationId, MONTEVIDEO.location_id);
+    assert.ok(markReceivedCall);
+    assert.equal(markReceivedCall.transferId, shippedTransfer.transfer_id);
+    assert.ok(txCalls.includes("begin"));
+    assert.ok(txCalls.includes("commit"));
+    assert.ok(!txCalls.includes("rollback"));
+  });
+
+  it("rolls back shipment when the conditional mark returns null", async () => {
+    const approvedTransfer = buildTransfer({
+      transfer_id: "70000000-0000-4000-8000-000000000005",
+      transfer_number: "TR-SHIP-RACE",
+      from_location_id: MONTEVIDEO.location_id,
+      from_location_code: MONTEVIDEO.code,
+      from_location_name: MONTEVIDEO.name,
+      to_location_id: TIENDA_CENTRO.location_id,
+      to_location_code: TIENDA_CENTRO.code,
+      to_location_name: TIENDA_CENTRO.name,
+      status: "approved",
+      approved_at: "2026-06-01T05:00:00.000Z",
+      updated_at: "2026-06-01T05:00:00.000Z",
+    });
+    const shippedLine = buildTransferLine({
+      transfer_id: approvedTransfer.transfer_id,
+      qty_requested: 4,
+    });
+
+    const { client, txCalls } = createMockClient();
+
+    const service = loadTransfersService({
+      findTransferHeaderByIdForUpdate: async () => approvedTransfer,
+      findTransferLinesByTransferId: async () => [shippedLine],
+      findInventoryQtyByLocationAndVariant: async () => 10,
+      markTransferShippedIfApproved: async () => null,
+    });
+
+    db.pool.connect = async () => client;
+
+    await assert.rejects(
+      () =>
+        service.shipTransferById(
+          approvedTransfer.transfer_id,
+          {},
+          buildAuth(["transfers.ship", "transfers.receive"], "TIENDA")
+        ),
+      (error) => {
+        assert.equal(error.statusCode, 409);
+        assert.equal(error.code, "TRANSFER_STATUS_CHANGED");
+        return true;
+      }
+    );
+
+    assert.ok(txCalls.includes("begin"));
+    assert.ok(txCalls.includes("rollback"));
+    assert.ok(!txCalls.includes("commit"));
   });
 });

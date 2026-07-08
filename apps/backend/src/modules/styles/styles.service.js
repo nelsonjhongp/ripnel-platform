@@ -122,7 +122,13 @@ async function patchStyle(styleId, input) {
     throw new AppError('Style id is required', 400);
   }
 
-  const blockedFields = ['style_code', 'garment_type_id', 'fabric_id', 'fabric_detail_id', 'target_id'];
+  const blockedFields = [
+    'style_code',
+    'garment_type_id',
+    'fabric_id',
+    'fabric_detail_id',
+    'target_id',
+  ];
   const hasBlockedFields = blockedFields.some((field) => field in input);
 
   if (hasBlockedFields) {

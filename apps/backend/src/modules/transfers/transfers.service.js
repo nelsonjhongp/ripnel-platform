@@ -3,16 +3,17 @@ const { pool } = require('../../shared/db');
 const {
   findAllTransfers,
   findTransferHeaderById,
+  findTransferHeaderByIdForUpdate,
   findTransferLinesByTransferId,
   findTransferRequestCandidateRows,
   insertTransfer,
   insertTransferLine,
   updateTransferLineShipment,
   updateTransferLineReceipt,
-  markTransferApproved,
-  markTransferShipped,
-  markTransferReceived,
-  markTransferCancelled,
+  markTransferApprovedIfRequested,
+  markTransferShippedIfApproved,
+  markTransferReceivedIfShipped,
+  markTransferCancelledIfOpen,
 } = require('./transfers.repo');
 const {
   normalizeLocationIds,
@@ -738,49 +739,56 @@ async function shipTransferById(transferId, input = {}, auth = {}) {
     throw new AppError('Transfer id is required', 400);
   }
 
-  const transfer = await findTransferHeaderById(normalizedTransferId);
-
-  if (!transfer) {
-    throw new AppError('Transfer not found', 404);
-  }
-
-  if (!canAccessTransferHeader(transfer, actor)) {
-    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
-  }
-
-  if (transfer.status !== 'approved') {
-    throw new AppError('Only approved transfers can be shipped', 400);
-  }
-
-  if (!canActorShipTransfer(transfer, actor)) {
-    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
-  }
-
   const shippedBy = actor.user_id;
-  const lines = await findTransferLinesByTransferId(normalizedTransferId);
-
-  if (!lines.length) {
-    throw new AppError('Transfer has no lines to ship', 400);
-  }
-
-  for (const line of lines) {
-    const availableQty = await findInventoryQtyByLocationAndVariant(
-      transfer.from_location_id,
-      line.variant_id
-    );
-
-    if (availableQty < Number(line.qty_requested)) {
-      throw new AppError(
-        `Insufficient stock to ship ${line.sku} from ${transfer.from_location_code}`,
-        409
-      );
-    }
-  }
-
   const client = await pool.connect();
 
   try {
     await client.query('begin');
+
+    const transfer = await findTransferHeaderByIdForUpdate(
+      normalizedTransferId,
+      client.query.bind(client)
+    );
+
+    if (!transfer) {
+      throw new AppError('Transfer not found', 404);
+    }
+
+    if (!canAccessTransferHeader(transfer, actor)) {
+      throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+    }
+
+    if (transfer.status !== 'approved') {
+      throw new AppError('Only approved transfers can be shipped', 400);
+    }
+
+    if (!canActorShipTransfer(transfer, actor)) {
+      throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+    }
+
+    const lines = await findTransferLinesByTransferId(
+      normalizedTransferId,
+      client.query.bind(client)
+    );
+
+    if (!lines.length) {
+      throw new AppError('Transfer has no lines to ship', 400);
+    }
+
+    for (const line of lines) {
+      const availableQty = await findInventoryQtyByLocationAndVariant(
+        transfer.from_location_id,
+        line.variant_id,
+        client.query.bind(client)
+      );
+
+      if (availableQty < Number(line.qty_requested)) {
+        throw new AppError(
+          `Insufficient stock to ship ${line.sku} from ${transfer.from_location_code}`,
+          409
+        );
+      }
+    }
 
     for (const line of lines) {
       const shippedQty = Number(line.qty_requested);
@@ -815,7 +823,17 @@ async function shipTransferById(transferId, input = {}, auth = {}) {
       );
     }
 
-    await markTransferShipped(normalizedTransferId, shippedBy, client.query.bind(client));
+    const shipped = await markTransferShippedIfApproved(
+      normalizedTransferId,
+      shippedBy,
+      client.query.bind(client)
+    );
+
+    if (!shipped) {
+      throw new AppError('Transfer status changed before shipment', 409, {
+        code: 'TRANSFER_STATUS_CHANGED',
+      });
+    }
 
     await client.query('commit');
   } catch (error) {
@@ -836,39 +854,45 @@ async function receiveTransferById(transferId, input = {}, auth = {}) {
     throw new AppError('Transfer id is required', 400);
   }
 
-  const transfer = await findTransferHeaderById(normalizedTransferId);
-
-  if (!transfer) {
-    throw new AppError('Transfer not found', 404);
-  }
-
-  if (!canAccessTransferHeader(transfer, actor)) {
-    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
-  }
-
-  if (transfer.status !== 'shipped') {
-    throw new AppError('Only shipped transfers can be received', 400);
-  }
-
-  if (!canActorReceiveTransfer(transfer, actor)) {
-    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
-  }
-
   const receivedBy = actor.user_id;
-  const lines = await findTransferLinesByTransferId(normalizedTransferId);
-
-  if (!lines.length) {
-    throw new AppError('Transfer has no lines to receive', 400);
-  }
-
-  if (lines.some((line) => Number(line.qty_shipped) <= 0)) {
-    throw new AppError('Transfer has no shipped quantity to receive', 400);
-  }
-
   const client = await pool.connect();
 
   try {
     await client.query('begin');
+
+    const transfer = await findTransferHeaderByIdForUpdate(
+      normalizedTransferId,
+      client.query.bind(client)
+    );
+
+    if (!transfer) {
+      throw new AppError('Transfer not found', 404);
+    }
+
+    if (!canAccessTransferHeader(transfer, actor)) {
+      throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+    }
+
+    if (transfer.status !== 'shipped') {
+      throw new AppError('Only shipped transfers can be received', 400);
+    }
+
+    if (!canActorReceiveTransfer(transfer, actor)) {
+      throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+    }
+
+    const lines = await findTransferLinesByTransferId(
+      normalizedTransferId,
+      client.query.bind(client)
+    );
+
+    if (!lines.length) {
+      throw new AppError('Transfer has no lines to receive', 400);
+    }
+
+    if (lines.some((line) => Number(line.qty_shipped) <= 0)) {
+      throw new AppError('Transfer has no shipped quantity to receive', 400);
+    }
 
     for (const line of lines) {
       const receivedQty = Number(line.qty_shipped);
@@ -903,7 +927,17 @@ async function receiveTransferById(transferId, input = {}, auth = {}) {
       );
     }
 
-    await markTransferReceived(normalizedTransferId, receivedBy, client.query.bind(client));
+    const received = await markTransferReceivedIfShipped(
+      normalizedTransferId,
+      receivedBy,
+      client.query.bind(client)
+    );
+
+    if (!received) {
+      throw new AppError('Transfer status changed before receipt', 409, {
+        code: 'TRANSFER_STATUS_CHANGED',
+      });
+    }
 
     await client.query('commit');
   } catch (error) {
@@ -924,25 +958,51 @@ async function cancelTransferById(transferId, input = {}, auth = {}) {
     throw new AppError('Transfer id is required', 400);
   }
 
-  const transfer = await findTransferHeaderById(normalizedTransferId);
+  const client = await pool.connect();
 
-  if (!transfer) {
-    throw new AppError('Transfer not found', 404);
+  try {
+    await client.query('begin');
+
+    const transfer = await findTransferHeaderByIdForUpdate(
+      normalizedTransferId,
+      client.query.bind(client)
+    );
+
+    if (!transfer) {
+      throw new AppError('Transfer not found', 404);
+    }
+
+    if (!canAccessTransferHeader(transfer, actor)) {
+      throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+    }
+
+    if (!['requested', 'approved'].includes(transfer.status)) {
+      throw new AppError('Only requested or approved transfers can be cancelled', 400);
+    }
+
+    if (!canActorCancelTransfer(transfer, actor)) {
+      throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+    }
+
+    const cancelled = await markTransferCancelledIfOpen(
+      normalizedTransferId,
+      actor.user_id,
+      client.query.bind(client)
+    );
+
+    if (!cancelled) {
+      throw new AppError('Transfer status changed before cancellation', 409, {
+        code: 'TRANSFER_STATUS_CHANGED',
+      });
+    }
+
+    await client.query('commit');
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
   }
-
-  if (!canAccessTransferHeader(transfer, actor)) {
-    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
-  }
-
-  if (!['requested', 'approved'].includes(transfer.status)) {
-    throw new AppError('Only requested or approved transfers can be cancelled', 400);
-  }
-
-  if (!canActorCancelTransfer(transfer, actor)) {
-    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
-  }
-
-  await markTransferCancelled(normalizedTransferId, actor.user_id);
 
   return getTransferById(normalizedTransferId, auth);
 }
@@ -955,25 +1015,76 @@ async function approveTransferById(transferId, input = {}, auth = {}) {
     throw new AppError('Transfer id is required', 400);
   }
 
-  const transfer = await findTransferHeaderById(normalizedTransferId);
+  const client = await pool.connect();
 
-  if (!transfer) {
-    throw new AppError('Transfer not found', 404);
+  try {
+    await client.query('begin');
+
+    const transfer = await findTransferHeaderByIdForUpdate(
+      normalizedTransferId,
+      client.query.bind(client)
+    );
+
+    if (!transfer) {
+      throw new AppError('Transfer not found', 404);
+    }
+
+    if (!canAccessTransferHeader(transfer, actor)) {
+      throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+    }
+
+    if (transfer.status !== 'requested') {
+      throw new AppError('Only requested transfers can be approved', 400);
+    }
+
+    if (!canActorApproveTransfer(transfer, actor)) {
+      throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
+    }
+
+    const lines = await findTransferLinesByTransferId(
+      normalizedTransferId,
+      client.query.bind(client)
+    );
+
+    if (!lines.length) {
+      throw new AppError('Transfer has no lines to approve', 400);
+    }
+
+    for (const line of lines) {
+      const availableQty = await findInventoryQtyByLocationAndVariant(
+        transfer.from_location_id,
+        line.variant_id,
+        client.query.bind(client)
+      );
+
+      if (availableQty < Number(line.qty_requested)) {
+        throw new AppError(
+          `Stock insuficiente para aprobar ${line.sku} desde ${transfer.from_location_code}`,
+          409,
+          { code: 'TRANSFER_APPROVAL_STOCK_CHANGED' }
+        );
+      }
+    }
+
+    const approved = await markTransferApprovedIfRequested(
+      normalizedTransferId,
+      actor.user_id,
+      client.query.bind(client)
+    );
+
+    if (!approved) {
+      throw new AppError('Transfer status changed before approval', 409, {
+        code: 'TRANSFER_STATUS_CHANGED',
+      });
+    }
+
+    await client.query('commit');
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
   }
-
-  if (!canAccessTransferHeader(transfer, actor)) {
-    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
-  }
-
-  if (transfer.status !== 'requested') {
-    throw new AppError('Only requested transfers can be approved', 400);
-  }
-
-  if (!canActorApproveTransfer(transfer, actor)) {
-    throw new AppError('Forbidden', 403, { code: 'FORBIDDEN' });
-  }
-
-  await markTransferApproved(normalizedTransferId, actor.user_id);
 
   return getTransferById(normalizedTransferId, auth);
 }
