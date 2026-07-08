@@ -6,6 +6,11 @@ import {
   createSingleFlightRunner,
   finalizeAuthLoginFlow,
 } from "@/components/auth/auth-login-flow";
+import {
+  createLoginRateLimiter,
+  deriveLoginKey,
+  LoginRateLimitError,
+} from "@/components/auth/login-rate-limiter";
 import { LOGIN } from "@/components/auth/login-messages";
 
 export type AuthUser = {
@@ -133,6 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     username: string
     password: string
   }], void>> | null>(null)
+  const loginRateLimiterRef = React.useRef<ReturnType<typeof createLoginRateLimiter> | null>(null)
 
   React.useEffect(() => {
     function handleAuthError(event: Event) {
@@ -260,8 +266,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   const login = React.useCallback(async (input: { username: string; password: string }) => {
+    if (!loginRateLimiterRef.current) {
+      loginRateLimiterRef.current = createLoginRateLimiter()
+    }
+
+    const rateLimiter = loginRateLimiterRef.current
+    const key = deriveLoginKey(input.username, input.password)
+    const check = rateLimiter.check(key)
+
+    if (!check.allowed) {
+      throw new LoginRateLimitError(check.retryAfter)
+    }
+
     if (!loginRunnerRef.current) {
       loginRunnerRef.current = createSingleFlightRunner(async (nextInput: { username: string; password: string }) => {
+        const currentKey = deriveLoginKey(nextInput.username, nextInput.password)
+
         setState((s) => ({ ...s, loading: true, authMessage: null }));
         try {
           const data = await apiFetch<{ user: AuthUser; permissions: string[] }>("/api/auth/login", {
@@ -313,7 +333,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               )
             },
           })
+
+          rateLimiter.reset(currentKey)
         } catch (error) {
+          rateLimiter.record(currentKey)
           setState((current) => ({ ...current, loading: false }))
           throw error
         }
