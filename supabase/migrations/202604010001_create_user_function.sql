@@ -53,5 +53,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-/* Permitir que clientes anónimos ejecuten esta función (para Supabase) */
-GRANT EXECUTE ON FUNCTION create_user_with_password(VARCHAR, VARCHAR, VARCHAR, VARCHAR, UUID) TO anon, authenticated;
+/* Legado: función no expuesta por RPC. El backend crea usuarios con SQL
+   propio en apps/backend/src/modules/users/users.repo.js (insertUser).
+   Se revoca el acceso por defecto de PUBLIC a esta función SECURITY DEFINER
+   para que no quede ejecutable sin permiso explícito. */
+REVOKE ALL ON FUNCTION create_user_with_password(
+  VARCHAR,
+  VARCHAR,
+  VARCHAR,
+  VARCHAR,
+  UUID
+) FROM PUBLIC;
