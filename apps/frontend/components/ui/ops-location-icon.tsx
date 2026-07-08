@@ -1,7 +1,6 @@
 "use client"
 
 import { Building2, Store, Warehouse } from "lucide-react"
-import { cn } from "@/lib/utils"
 
 type OpsLocationIconProps = {
   type?: string | null

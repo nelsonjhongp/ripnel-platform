@@ -1,9 +1,5 @@
 import type {
   PaymentDraft,
-  PosPricingConfig,
-  PriceModeOverride,
-  EffectivePriceMode,
-  CartItem,
 } from "./pos-types"
 import { PAYMENT_METHODS } from "./pos-types"
 import { POS } from "./pos-messages"

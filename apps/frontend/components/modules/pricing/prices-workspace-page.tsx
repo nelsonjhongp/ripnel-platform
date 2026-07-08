@@ -20,7 +20,6 @@ import { formatDate } from "@/lib/date-utils";
 import { formatCurrency } from "@/lib/format-utils";
 import type {
   PriceType,
-  PriceWorkspace,
 } from "@/lib/prices-types";
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge"
 import { cn } from "@/lib/utils"

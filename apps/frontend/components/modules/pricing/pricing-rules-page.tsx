@@ -38,8 +38,8 @@ function createRuleDraft(rule: PricingRuleRow | null) {
 }
 
 export function PricingRulesPage() {
-  const { data: rulesData, loading, error, refetch } = useApiGet(() => fetchPricingRules(), [])
-  const rules = rulesData ?? []
+  const { data: rulesData, loading, refetch } = useApiGet(() => fetchPricingRules(), [])
+  const rules = useMemo(() => rulesData ?? [], [rulesData])
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
