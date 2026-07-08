@@ -9,7 +9,7 @@ export const PRICE = {
     redirecting: "Redirigiendo al listado de precios...",
   },
   overview: {
-    searchPlaceholder: "Buscar por style, codigo o tela",
+    searchPlaceholder: "Buscar por style o codigo",
     searchAria: "Buscar estilos de precios",
     coverage: "Cobertura",
     coverageAll: "Toda cobertura",
