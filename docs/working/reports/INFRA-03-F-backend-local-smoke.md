@@ -90,7 +90,7 @@ Los tres resultados coinciden exactamente con lo sembrado en INFRA-03-C3/D: usua
 ## `git status --short` final
 
 ```
-?? docs/working/reports/INFRA-03-F-backend-local-smoke.md
+(working tree limpio — este reporte quedó trackeado en un commit posterior)
 ```
 
-Único archivo sin trackear: este mismo reporte. No se creó, modificó ni tocó ningún archivo de código, seed o migración en esta fase. No se ejecutó `git add` ni commit.
+Commit posterior en que se incluyó este archivo. No se tocó código, seeds ni migraciones en esta fase.
