@@ -18,6 +18,7 @@ import { OpsStepSectionHeading } from "@/components/ui/ops-step-section-heading"
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
 import { PresetTextField } from "@/components/ui/preset-text-field";
 import { SearchablePicker } from "@/components/ui/searchable-picker";
+import { WORKSPACE_SECTION_CLASS } from "@/components/ui/ops-control-styles";
 import { apiFetchData } from "@/lib/api";
 import { appRoutes, buildAdjustmentDetailRoute } from "@/lib/routes";
 import { showError, showSuccess } from "@/lib/toast";
@@ -54,8 +55,6 @@ const ADJUSTMENT_REASON_PRESETS: readonly string[] = [
 ];
 
 const NOTES_MAX = 200;
-const STAGE_SECTION_CLASS =
-  "relative space-y-3 rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4 shadow-sm transition-all duration-200 sm:p-5";
 
 type AdjustmentActionState = "idle" | "saving_draft" | "reviewing" | "confirming";
 
@@ -456,7 +455,7 @@ export function InventoryAdjustmentsCreatePage() {
 
       <div className="mt-5 grid gap-5 border-t border-[var(--ops-border-soft)] pt-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.65fr)] xl:items-start">
         <div className="min-w-0 space-y-4">
-          <section className={STAGE_SECTION_CLASS}>
+          <section className={WORKSPACE_SECTION_CLASS}>
             <OpsStepSectionHeading step={1} title={ADJ.create.configSection} />
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -560,7 +559,7 @@ export function InventoryAdjustmentsCreatePage() {
             </div>
           </section>
 
-          <section className={STAGE_SECTION_CLASS}>
+          <section className={WORKSPACE_SECTION_CLASS}>
             <OpsStepSectionHeading
               step={2}
               title={ADJ.create.variantsSection}
@@ -728,7 +727,7 @@ export function InventoryAdjustmentsCreatePage() {
             ) : null}
           </section>
 
-          <section className={STAGE_SECTION_CLASS}>
+          <section className={WORKSPACE_SECTION_CLASS}>
             <OpsStepSectionHeading
               step={3}
               title={ADJ.create.draftSection}
