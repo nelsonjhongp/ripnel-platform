@@ -26,11 +26,14 @@ import { useTransferCapabilities } from "@/hooks/use-transfer-capabilities";
 import { Button } from "@/components/ui/button";
 import { TransferRequestReviewDialog } from "./transfers-request-ui";
 import { TransferRequestWorkspace } from "./transfers-request-workspace";
+import { TransferDestinationStep } from "./TransferDestinationStep";
+import { TransferProductsStep } from "./TransferProductsStep";
 import type {
   RequestCandidate,
   RequestLocationOption,
   RequestProductGroup,
 } from "./transfers-shared";
+import { TRANS } from "./transfers-messages";
 import { useTransferDraft } from "./use-transfer-draft";
 
 type LocationOption = {
@@ -509,6 +512,9 @@ export function TransfersRequestPage() {
     );
   }
 
+  const hasOriginSelected = Boolean(originId);
+  const transferCompleted = Boolean(submittedTransfer);
+
   return (
     <TransferRequestWorkspace
       headerActions={
@@ -588,6 +594,55 @@ export function TransfersRequestPage() {
           />
         </>
       }
-    />
+    >
+      {transferCompleted ? (
+        <section className="ops-surface rounded-xl border p-6">
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-[var(--ops-text)]">
+              {TRANS.request.sentSuccess}
+            </p>
+            <p className="text-sm text-[var(--ops-text-muted)]">
+              {TRANS.request.draftClosed} Puedes revisar el detalle o iniciar una nueva
+              solicitud desde el panel de resumen.
+            </p>
+          </div>
+        </section>
+      ) : (
+        <>
+          <TransferDestinationStep
+            originOptions={requestLocationOptions}
+            originId={originId}
+            onOriginChange={handleOriginChange}
+            destinationName={defaultLocation?.name || "Sin sede"}
+            destinationType={defaultLocation?.type}
+            hasDraftLines={draftLines.length > 0}
+          />
+          <TransferProductsStep
+            originId={originId}
+            hasOriginSelected={hasOriginSelected}
+            requestQuery={requestQuery}
+            onRequestQueryChange={handleRequestQueryChange}
+            requestPickerOpen={requestPickerOpen}
+            onRequestPickerOpenChange={setRequestPickerOpen}
+            requestProducts={requestProducts}
+            loadingRequestProducts={activeLoadingCandidates}
+            requestProductsError={activeRequestQueryError}
+            requestProductsEmptyMessage={requestSearchEmptyMessage}
+            highlightedRequestIndex={visibleHighlightedRequestIndex}
+            onHighlightedRequestIndexChange={setHighlightedRequestIndex}
+            requestSearchInputRef={requestSearchInputRef}
+            selectedRequestProduct={selectedRequestProduct}
+            onSelectRequestProduct={handleSelectRequestProduct}
+            onClearRequestProduct={handleClearRequestProduct}
+            onAddRequestLine={addRequestLine}
+            duplicateDraftVariant={duplicateDraftVariant}
+            draftLines={draftLines}
+            onUpdateLineQty={updateLineQty}
+            onRemoveLine={removeLine}
+            onRequestClearDraft={() => setClearDraftModalOpen(true)}
+          />
+        </>
+      )}
+    </TransferRequestWorkspace>
   );
 }
