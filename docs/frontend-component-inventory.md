@@ -29,8 +29,12 @@ Estos componentes están aprobados como núcleo compartido. Usar por defecto cua
 | `OpsEmptyState` | Estado vacío con siguiente acción | `components/ui/ops-empty-state.tsx` |
 | `Pagination` | Paginación de resultados | `components/ui/pagination.tsx` |
 | `Tooltip` | Ayuda contextual breve o iconos ambiguos | `components/ui/tooltip.tsx` |
+| `OpsMultiSelectMenu` | Menú desplegable con búsqueda para selección múltiple | `components/ui/ops-selection.tsx` |
+| `OpsSelectionChip` | Chip que representa un elemento seleccionado | `components/ui/ops-selection.tsx` |
+| `OpsToggleChip` | Chip toggle para conjuntos cortos con selección visible | `components/ui/ops-selection.tsx` |
+| `OpsColorSwatch` | Muestra de color del catálogo (dato real, no decoración) | `components/ui/ops-selection.tsx` |
 
-Estos trece componentes forman el núcleo. No es obligatorio envolver toda vista con todos ellos; usar solo los que el flujo requiera.
+Estos diecisiete componentes forman el núcleo. No es obligatorio envolver toda vista con todos ellos; usar solo los que el flujo requiera.
 
 ## Componentes de dominio
 
@@ -45,7 +49,7 @@ Componentes y pantallas específicas de cada módulo de negocio. Mantener cerca 
 | Inventario | `/inventario` | `inventory/inventory-page.tsx`, `inventory/inventory-detail-page.tsx`, `inventory/inventory-adjustments-page.tsx`, `inventory/inventory-adjustments-create-page.tsx`, `inventory/adjustments-detail-page.tsx`, `inventory/adjustment-summary-stage.tsx` |
 | Clientes | `/clientes` | `customers/customers-page.tsx`, `customers/customer-form.tsx`, `customers/pos-customer-form.tsx`, `customers/customer-document-guard.ts` |
 | Transferencias | `/transferencias` | `transfers/transfers-list-page.tsx`, `transfers/transfers-detail-page.tsx`, `transfers/transfers-manage-page.tsx`, `transfers/transfers-request-page.tsx`, `transfers/transfers-pending-page.tsx`, `transfers/transfers-history-page.tsx` |
-| Postventa | `/postventa` | `postsales/postsales-page.tsx`, `postsales/postsale-detail-page.tsx`, `postsales/postsale-cancel-dialog.tsx`, `postsales/postsale-exchange-dialog.tsx` |
+| Postventa | `/postventa` | `postsales/postsales-page.tsx`, `postsales/postsale-detail-page.tsx`, `postsales/postsale-detail-sections.tsx`, `postsales/postsale-exchange-dialog.tsx`, `postsales/use-cancel-form.ts`, `postsales/use-exchange-form.ts`, `postsales/use-replacement-search.ts` |
 | Precios | `/precios` | `pricing/prices-overview-page.tsx`, `pricing/prices-workspace-page.tsx`, `pricing/pricing-rules-page.tsx`, `pricing/coverage-bar.tsx` |
 | Catálogos | `/catalogos` | `catalogs/catalog-hub-page.tsx`, `catalogs/catalog-crud-page.tsx`, `catalogs/catalog-form-page.tsx`, `catalogs/catalog-item-form.tsx` |
 | Administración | `/administracion` | `administration/users-page.tsx`, `administration/user-form.tsx`, `administration/roles-page.tsx`, `administration/locations-page.tsx`, `administration/user-locations-dialog.tsx` |
@@ -89,6 +93,7 @@ Componentes en `components/ui/` cuyo estatus canónico no está confirmado. No f
 | `OpsSegmentedControl` | `components/ui/ops-segmented-control.tsx` | Control segmentado; uso limitado |
 | `OpsMultiSelectCatalog`, `OpsMultiSelectField` | `components/ui/ops-multi-select-*.tsx` | Variantes de multiselección con búsqueda |
 | `OpsQuantityStepper` | `components/ui/ops-quantity-stepper.tsx` | Stepper de cantidad; uso principal en POS |
+| `OpsHint` | `components/ui/ops-hint.tsx` | Mensaje breve para estado vacío dentro de un stage; borde dashed, padding compacto |
 | `SearchablePicker` | `components/ui/searchable-picker.tsx` | Selector con búsqueda integrada |
 | `DateFilterPicker` | `components/ui/date-filter-picker.tsx` | Selector de rango de fechas para filtros |
 | `preset-text-field` | `components/ui/preset-text-field.tsx` | Campo de texto con valores predefinidos |

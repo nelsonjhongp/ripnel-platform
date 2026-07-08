@@ -8,7 +8,11 @@ components/modules/sales/pos/
   pos-types.ts          Domain types, enums, constants (DOC_TYPES, PAYMENT_METHODS, TAX_RATE).
   pos-constants.ts      CSS class constants + PAYMENT_TOLERANCE.
   pos-messages.ts       Centralized UI strings (~200 labels, errors, hints).
-  pos-utils.ts          Pure functions: pricing, search, validation, summary derivation.
+  pos-utils.ts          Core utilities (formatting, rounding, amount parsing).
+  pos-pricing-utils.ts  Pricing calculations: totals, tax, discounts, overrides.
+  pos-search-utils.ts   Product search ranking and results building.
+  pos-customer-utils.ts Customer form building, validation, display helpers.
+  pos-summary-utils.ts  Summary state derivation and discount allocation.
   pos-stage-props.ts    Typed props per stage (shared between page and stages).
   pos-icons.tsx         Icon renderers for documents and payment methods.
   stage-section.tsx     Wrapper for each operational section (products/customer/payment).
@@ -30,11 +34,17 @@ components/modules/sales/pos/
     price-adjustment-dialog.tsx
     product-config-dialog.tsx
     remove-item-dialog.tsx
+    clear-sale-dialog.tsx
+    cash-open-dialog.tsx
+    cash-reopen-dialog.tsx
 
 components/ui/purchase-system/
   PosHeader.tsx                 POS header (eyebrow + title + meta/actions).
+  SalesWizardRail.tsx           Left rail with stage navigation steps.
   sale-review-dialog.tsx        Pre-confirmation review.
   sale-confirmation-dialog.tsx  Post-confirmation (receipt, new sale, detail).
+  ReceiptOptionsModal.tsx       Receipt format selection and print options.
+  receipt-messages.ts           Receipt-related UI strings.
 ```
 
 ## Hook composition

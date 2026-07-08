@@ -76,12 +76,12 @@ Las rutas legacy pueden existir como redirects, pero no se documentan como rutas
 | Ventas | `/ventas/nueva`, `/ventas/historial`, `/ventas/[saleId]` |
 | Postventa | `/postventa`, `/postventa/[saleId]` |
 | Caja | `/caja`, `/caja/control`, `/caja/historial`, `/caja/historial/[id]` |
-| Inventario | `/inventario`, `/inventario/[styleId]`, `/inventario/ajustes`, `/inventario/ajustes/nuevo`, `/inventario/movimientos`, `/kardex` |
+| Inventario | `/inventario`, `/inventario/[styleId]`, `/inventario/ajustes`, `/inventario/ajustes/nuevo`, `/inventario/ajustes/[adjustmentId]`, `/inventario/movimientos`, `/kardex` |
 | Transferencias | `/transferencias`, `/transferencias/solicitar`, `/transferencias/recepciones`, `/transferencias/historial`, `/transferencias/[transferId]` |
-| Productos y catálogos | `/productos`, `/productos/nuevo`, `/productos/[productId]`, `/catalogos`, `/catalogos/[catalogId]` |
-| Comercial | `/precios`, `/precios/crear`, `/precios/reglas`, `/clientes`, `/bi` |
-| Administración | `/administracion/usuarios`, `/administracion/roles`, `/administracion/ubicaciones` |
-| Cuenta | `/cuenta`, `/cuenta/seguridad`, `/contrasena` |
+| Productos y catálogos | `/productos`, `/productos/nuevo`, `/productos/[productId]`, `/catalogos`, `/catalogos/[catalogId]`, `/catalogos/[catalogId]/nuevo` |
+| Comercial | `/precios`, `/precios/crear`, `/precios/crear-y-editar-precio`, `/precios/listado-de-precios`, `/precios/reglas`, `/clientes`, `/clientes/dashboards`, `/bi` |
+| Administración | `/administracion/usuarios`, `/administracion/roles`, `/administracion/roles&usuarios`, `/administracion/ubicaciones` |
+| Cuenta | `/cuenta`, `/cuenta/seguridad` |
 
 ## Flujos críticos
 
@@ -106,9 +106,13 @@ La verificación funcional debe ser proporcional al cambio: probar permisos y tr
 
 ### Base del proyecto
 
+- [Índice de documentación](./docs/INDEX.md) — punto de entrada; orienta qué leer según la tarea
 - [Guía del proyecto](./AGENTS.md)
 - [Sistema de diseño](./DESIGN.md)
 - [Arquitectura frontend](./docs/frontend-architecture-standard.md)
+- [Arquitectura backend](./docs/backend-architecture-standard.md)
+- [Convenciones de consumo de API](./docs/api-conventions.md)
+- [Estándar de paginación backend](./docs/backend-pagination-standard.md)
 - [Estándar de páginas frontend](./docs/frontend-page-standard.md)
 - [Criterios UI/UX operativos](./docs/frontend-ui-ux-operativo.md)
 - [Componentes operativos](./docs/frontend-operational-components.md)
@@ -116,6 +120,12 @@ La verificación funcional debe ser proporcional al cambio: probar permisos y tr
 
 ### Dominio y operación
 
+- [Ventas](./docs/sales-domain.md)
+- [Postventa](./docs/postsales-domain.md)
+- [Inventario](./docs/inventory-domain.md)
+- [Transferencias](./docs/transfers-domain.md)
+- [Comercial (clientes, precios, catálogos, sedes)](./docs/commercial-domain.md)
+- [Módulos de soporte (dashboard, auditoría, notificaciones, chatbot)](./docs/support-modules.md)
 - [Workflow Backend + Supabase](./docs/backend-supabase-workflow.md)
 - [Seguridad backend](./docs/seguridad-backend.md)
 - [Permisos, roles y sidebar](./docs/permisos-roles-sidebar.md)
