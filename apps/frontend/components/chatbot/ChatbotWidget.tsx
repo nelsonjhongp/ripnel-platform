@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react"
 import {
   Bot,
-  ChevronDown,
   Maximize2,
   MessageSquare,
   Minimize2,
@@ -31,7 +30,6 @@ export function ChatbotWidget() {
     setMaximized,
     setActiveConversation,
     sendMessage,
-    loadConversations,
     deleteConversation,
     clearError,
   } = useChatStore()

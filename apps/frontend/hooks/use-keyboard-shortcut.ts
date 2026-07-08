@@ -31,7 +31,7 @@ export function useKeyboardShortcut(shortcut: ShortcutDef) {
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [shortcut.key, shortcut.ctrl, shortcut.alt, shortcut.shift, shortcut.enabled])
+  }, [shortcut])
 }
 
 export function useKeyboardShortcuts(shortcuts: ShortcutDef[]) {

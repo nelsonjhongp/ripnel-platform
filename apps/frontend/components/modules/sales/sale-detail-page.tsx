@@ -47,7 +47,7 @@ import {
 import { formatCurrency, round2 } from "@/lib/format-utils"
 import { formatDateTime } from "@/lib/date-utils"
 import { SH } from "./sales-history-messages"
-import { ACCENT_HIGHLIGHT_PANEL, ACCENT_LABEL_TEXT, INFO_BOX, INFO_BOX_MUTED, INFO_BOX_XL } from "./sales-history-constants"
+import { ACCENT_HIGHLIGHT_PANEL, ACCENT_LABEL_TEXT, INFO_BOX_MUTED, INFO_BOX_XL } from "./sales-history-constants"
 import {
   formatDocumentType,
   formatPaymentMethod,

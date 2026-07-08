@@ -65,7 +65,7 @@ export default function LocationsPage() {
     () => apiFetchData<Location[]>("/api/locations", { cache: "no-store" }),
     [],
   )
-  const locations = locationsData || []
+  const locations = useMemo(() => locationsData || [], [locationsData])
 
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all")

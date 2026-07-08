@@ -110,7 +110,7 @@ export function CatalogCrudPage({
     () => fetchCatalogItems(endpoint),
     [endpoint]
   );
-  const items = data ?? [];
+  const items = useMemo(() => data ?? [], [data]);
 
   const filteredItems = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();

@@ -1,5 +1,6 @@
 import { explainApiError } from "@/lib/error-utils"
 import { LOGIN, type LoginReason } from "@/components/auth/login-messages"
+import { LoginRateLimitError } from "@/components/auth/login-rate-limiter"
 
 const reasonMessageMap: Record<LoginReason, string> = {
   "session-expired": LOGIN.reason.sessionExpired,
@@ -23,6 +24,10 @@ export function sanitizeNextHref(nextPath: string | null | undefined): string {
 }
 
 export function translateLoginError(error: unknown): string {
+  if (error instanceof LoginRateLimitError) {
+    return `Demasiados intentos con las mismas credenciales. Intenta de nuevo en ${error.retryAfter} segundos.`
+  }
+
   if (error instanceof Error) {
     if (error.message === "Invalid credentials") {
       return LOGIN.error.invalidCredentials

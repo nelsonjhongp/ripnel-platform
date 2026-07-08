@@ -47,7 +47,7 @@ type InventoryItem = {
 };
 
 export function TransfersManagePage() {
-  const { loading: authLoading, defaultLocation, permissions, user } = useAuth();
+  const { loading: authLoading, defaultLocation } = useAuth();
   const [originId, setOriginId] = useState("");
   const [destinationId, setDestinationId] = useState("");
 
@@ -71,7 +71,7 @@ export function TransfersManagePage() {
       : null,
     [originId]
   );
-  const inventory = inventoryRaw ?? [];
+  const inventory = useMemo(() => inventoryRaw ?? [], [inventoryRaw]);
 
   const {
     draftLines,

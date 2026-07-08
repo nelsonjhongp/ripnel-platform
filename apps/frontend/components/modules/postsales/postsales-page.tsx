@@ -106,7 +106,7 @@ export default function PostsalePage() {
     [dateFrom, dateTo, debouncedSearch, status],
   )
 
-  const sales: EligibleSale[] = Array.isArray(data) ? data : []
+  const sales: EligibleSale[] = useMemo(() => Array.isArray(data) ? data : [], [data])
 
   const stats = useMemo(() => {
     const exchangeReady = sales.filter((s) => s.availability.exchange.allowed).length
