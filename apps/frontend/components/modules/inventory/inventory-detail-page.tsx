@@ -11,7 +11,6 @@ import {
 } from "@/components/feedback/status-page";
 import { Button } from "@/components/ui/button";
 import { OpsSelect } from "@/components/ui/ops-selection";
-import { OpsMetricInlineGroup } from "@/components/ui/ops-metric-inline-group";
 import { OpsPageShell, OpsTableWrap } from "@/components/ui/ops-page-shell";
 import { OpsPanelSection } from "@/components/ui/ops-panel-section";
 import { OpsStatusBadge } from "@/components/ui/ops-status-badge";

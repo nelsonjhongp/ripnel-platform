@@ -60,7 +60,7 @@ export default function TransactionHistoryPage() {
     [currentPage, dateFrom, dateTo, debouncedSearch, status]
   )
 
-  const sales = Array.isArray(data?.items) ? data.items : []
+  const sales = useMemo(() => Array.isArray(data?.items) ? data.items : [], [data])
   const totalResults = Number(data?.total || 0)
   const totalPages = Math.max(1, Math.ceil(totalResults / PAGE_SIZE))
   const safeCurrentPage = Math.min(currentPage, totalPages)

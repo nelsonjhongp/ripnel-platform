@@ -120,8 +120,8 @@ export function InventoryAdjustmentsPage() {
     []
   );
 
-  const adjustments = adjustmentData?.rows || [];
-  const locations: Location[] = adjustmentData?.meta?.available_locations || [];
+  const adjustments = useMemo(() => adjustmentData?.rows || [], [adjustmentData]);
+  const locations: Location[] = useMemo(() => adjustmentData?.meta?.available_locations || [], [adjustmentData]);
 
   // ── Auto-scope to default location ──
   const locationAutoSet = useRef(false);

@@ -61,7 +61,7 @@ export function useApiGet<T>(
       active = false
       controller.abort()
     }
-  }, [nonce, ...deps])
+  }, [nonce, fetcher, ...deps])
 
   return { data, loading, error, refetch }
 }

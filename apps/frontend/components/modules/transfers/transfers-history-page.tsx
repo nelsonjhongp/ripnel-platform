@@ -75,7 +75,7 @@ const defaultFrom = (() => {
 })()
 
 export function TransfersHistoryPage() {
-  const { loading: authLoading, permissions, user } = useAuth();
+  const { loading: authLoading } = useAuth();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<TransferHistoryStatus>("closed");
   const [scope, setScope] = useState<TransferScope>("current");
@@ -113,7 +113,7 @@ export function TransfersHistoryPage() {
     },
     [debouncedQuery, scope, status, dateFrom, dateTo]
   );
-  const items = itemsRaw ?? [];
+  const items = useMemo(() => itemsRaw ?? [], [itemsRaw]);
 
   const receivedCount = useMemo(
     () => items.filter((transfer) => transfer.status === "received").length,

@@ -78,7 +78,7 @@ export default function UsersPage() {
     () => apiFetchData<User[]>("/api/users"),
     [],
   )
-  const users = usersData || []
+  const users = useMemo(() => usersData || [], [usersData])
 
   const { data: rolesData, loading: loadingRoles, error: rolesError } = useApiGet(
     () => apiFetchData<Role[]>("/api/roles"),

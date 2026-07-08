@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { apiFetch } from "@/lib/api"
 import { showError, showSuccess } from "@/lib/toast"
-import { explainApiError, parseAmountInput, round2, trimOrNull } from "./pos-utils"
+import { explainApiError, parseAmountInput, trimOrNull } from "./pos-utils"
 import { POS } from "./pos-messages"
 import type {
   CartItem,
@@ -11,7 +11,7 @@ import type {
   PosCustomer,
   SaleDiscountState,
 } from "./pos-types"
-import { createDefaultMixedPayments } from "./pos-utils"
+
 
 interface UseSaleConfirmationInput {
   cartItems: CartItem[]

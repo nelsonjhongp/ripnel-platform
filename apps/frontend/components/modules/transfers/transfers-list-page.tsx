@@ -43,11 +43,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  formatTransferQueueLabel,
   TRANSFER_QUEUE_OPTIONS,
   TRANSFER_SCOPE_OPTIONS,
   TRANSFER_ACTION_CONFIG,
-  type TransferActionConfig,
   type TransferActionKey,
   type TransferInboxItem,
   type TransferInboxResponse,
@@ -255,9 +253,7 @@ function buildQueueRows(
   return inbox.queues[queue];
 }
 
-function getQueueEmptyMessage(queue: TransferPendingStage) {
-  return TRANS.table.empty;
-}
+
 
 export function TransfersListPage({
   initialQueue,
@@ -265,7 +261,7 @@ export function TransfersListPage({
   initialQueue?: TransferPendingStage;
 }) {
   const router = useRouter();
-  const { loading: authLoading, permissions, user } = useAuth();
+  const { loading: authLoading } = useAuth();
   const defaultQueue = initialQueue || "open_for_store";
   const [scope, setScope] = useState<TransferScope>("current");
 

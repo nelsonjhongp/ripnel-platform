@@ -121,7 +121,6 @@ export default function NuevaVentaPage() {
     cashStatus,
     canOpenCashModule,
     canReopenCash,
-    derivedSummary,
     submitDisabled,
     hasDraftSale,
     cartCount,

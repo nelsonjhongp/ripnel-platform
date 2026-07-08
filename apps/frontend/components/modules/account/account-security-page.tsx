@@ -128,7 +128,6 @@ export function AccountPasswordForm({
   showConfirmPassword,
   currentPasswordPlaceholder,
   newPasswordPlaceholder,
-  confirmPasswordPlaceholder,
   onFieldChange,
   onToggleCurrent,
   onToggleNew,
@@ -144,7 +143,6 @@ export function AccountPasswordForm({
   showConfirmPassword: boolean;
   currentPasswordPlaceholder?: string;
   newPasswordPlaceholder?: string;
-  confirmPasswordPlaceholder?: string;
   onFieldChange: (field: PasswordField, value: string) => void;
   onToggleCurrent: () => void;
   onToggleNew: () => void;
