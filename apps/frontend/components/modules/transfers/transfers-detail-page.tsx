@@ -224,6 +224,11 @@ export function TransferDetailPage({
 
   const primaryAction = visibleActions.find((a) => a !== "cancel") || null;
   const secondaryActions = visibleActions.filter((a) => a !== primaryAction);
+  const nextStepLabel = transfer?.next_step
+    ? transfer.next_owner?.location_name
+      ? `Siguiente: ${formatTransferNextStep(transfer.next_step)} en ${transfer.next_owner.location_name}`
+      : `Siguiente: ${formatTransferNextStep(transfer.next_step)}`
+    : TRANS.detail.completedFlow;
 
   const totalLinesPages = Math.max(1, Math.ceil((transfer?.lines.length || 0) / DETAIL_PAGE_SIZE));
   const safeLinesPage = Math.min(Math.max(linesPage, 1), totalLinesPages);
@@ -336,9 +341,7 @@ export function TransferDetailPage({
             <span className="text-xs text-[var(--ops-text-muted)]">
               {TRANS.detail.createdBy} {transfer.created_by_name || "Sin usuario"} &middot;{" "}
               {formatDateTime(transfer.created_at)} &middot;{" "}
-              {transfer.next_step
-                ? `Siguiente: ${formatTransferNextStep(transfer.next_step)}`
-                : TRANS.detail.completedFlow}
+              {nextStepLabel}
             </span>
           }
           actions={

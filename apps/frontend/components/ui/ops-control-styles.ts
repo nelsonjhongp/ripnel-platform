@@ -132,3 +132,9 @@ export const CHIP_INTENT_OPENING =
 /** Chip de intencion — ajuste (neutral) — inventory adjustments */
 export const CHIP_INTENT_ADJUSTMENT =
   "border-[var(--ops-border-strong)] bg-[var(--ops-surface-muted)] text-[var(--ops-text-muted)]"
+
+/** Panel de etapa para flujos workspace (POS, ajustes, transferencias).
+ *  Contrato visual unificado: borde, fondo surface, padding, sombra y transicion.
+ *  Usar en secciones con OpsStepSectionHeading como primer hijo. */
+export const WORKSPACE_SECTION_CLASS =
+  "relative space-y-3 rounded-xl border border-[var(--ops-border-strong)] bg-[var(--ops-surface)] p-4 shadow-sm transition-all duration-200 sm:p-5"

@@ -10,9 +10,7 @@ import {
   useState,
 } from "react";
 import {
-  ClipboardList,
   RotateCcw,
-  Trash2,
 } from "lucide-react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -25,18 +23,9 @@ import type { ApiEnvelope } from "@/lib/api";
 import { apiFetch, unwrapApiData } from "@/lib/api";
 import { useApiGet } from "@/hooks/use-api-get";
 import { useTransferCapabilities } from "@/hooks/use-transfer-capabilities";
-import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
-import { AdminInlineMessage } from "@/components/admin/admin-ui";
-import { SearchablePicker } from "@/components/ui/searchable-picker";
 import { Button } from "@/components/ui/button";
-import { OpsPageShell, OpsSectionDivider } from "@/components/ui/ops-page-shell";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import {
-  DraftSummaryPanel,
-  RequestDraftTable,
-  RequestProductComposer,
-  RequestRouteField,
-} from "./transfers-request-ui";
+import { TransferRequestReviewDialog } from "./transfers-request-ui";
+import { TransferRequestWorkspace } from "./transfers-request-workspace";
 import type {
   RequestCandidate,
   RequestLocationOption,
@@ -61,23 +50,6 @@ const REQUEST_NOTE_PRESETS = [
 ] as const;
 
 const REQUEST_NOTE_MAX_LENGTH = 200;
-
-function TransferSectionHeading({
-  step,
-  title,
-}: {
-  step: number;
-  title: string;
-}) {
-  return (
-    <div className="flex items-center gap-2.5">
-      <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--ripnel-accent)] text-xs font-semibold text-white">
-        {step}
-      </span>
-      <h2 className="text-lg font-semibold text-[var(--ops-text)]">{title}</h2>
-    </div>
-  );
-}
 
 function DraftClearConfirmModal({
   open,
@@ -123,18 +95,48 @@ function DraftClearConfirmModal({
   );
 }
 
-function buildProductOptionSummary(product: RequestProductGroup) {
-  const colorsCount = new Set(
-    product.variants.map((variant) => variant.color_name).filter(Boolean)
-  ).size;
-  const sizesCount = new Set(
-    product.variants.map((variant) => variant.size_code).filter(Boolean)
-  ).size;
+function OriginChangeConfirmModal({
+  open,
+  onCancel,
+  onConfirm,
+}: {
+  open: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  if (!open) {
+    return null;
+  }
 
-  return {
-    colorsCount,
-    sizesCount,
-  };
+  return (
+    <div className="ops-overlay-backdrop fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-sm rounded-2xl bg-[var(--ops-surface)] px-5 py-5 shadow-[0_18px_60px_rgba(15,23,42,0.18)]">
+        <h3 className="text-lg font-semibold text-[var(--ops-text)]">¿Cambiar origen?</h3>
+        <p className="mt-3 text-sm leading-6 text-[var(--ops-text-muted)]">
+          Se quitarán las líneas agregadas al borrador para evitar mezclar stock de otra sede.
+        </p>
+
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            className="h-9 rounded-lg px-3"
+          >
+            Mantener origen
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={onConfirm}
+            className="h-9 rounded-lg px-3"
+          >
+            Cambiar y limpiar
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function TransfersRequestPage() {
@@ -143,7 +145,7 @@ export function TransfersRequestPage() {
     typeof window === "undefined"
       ? new URLSearchParams()
       : new URLSearchParams(window.location.search);
-  const { loading: authLoading, defaultLocation, permissions, user } = useAuth();
+  const { loading: authLoading, defaultLocation } = useAuth();
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [requestQuery, setRequestQuery] = useState("");
   const [requestCandidates, setRequestCandidates] = useState<RequestCandidate[]>([]);
@@ -151,11 +153,16 @@ export function TransfersRequestPage() {
   const [selectedRequestProduct, setSelectedRequestProduct] =
     useState<RequestProductGroup | null>(null);
   const [requestLocationFilter, setRequestLocationFilter] = useState(
-    () => initialSearchParams.get("origin_id") || "all"
+    () => {
+      const originParam = initialSearchParams.get("origin_id") || "";
+      return originParam === "all" ? "" : originParam;
+    }
   );
   const [requestPickerOpen, setRequestPickerOpen] = useState(false);
   const [highlightedRequestIndex, setHighlightedRequestIndex] = useState(0);
   const [clearDraftModalOpen, setClearDraftModalOpen] = useState(false);
+  const [pendingOriginChange, setPendingOriginChange] = useState<string | null>(null);
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const requestSearchInputRef = useRef<HTMLInputElement | null>(null);
 
   const transferCapabilities = useTransferCapabilities();
@@ -188,10 +195,10 @@ export function TransfersRequestPage() {
   } = useTransferDraft({
     isStoreRequestMode: true,
     selectedRequestProduct,
-    originId: requestLocationFilter === "all" ? "" : requestLocationFilter,
+    originId: requestLocationFilter,
     setOriginId: (value: string) => {
       if (value === "") {
-        setRequestLocationFilter("all");
+        setRequestLocationFilter("");
         setRequestQuery("");
         setRequestPickerOpen(false);
         setRequestCandidates([]);
@@ -209,8 +216,7 @@ export function TransfersRequestPage() {
     loadInventory: async () => {},
   });
 
-  const originId = requestLocationFilter === "all" ? "" : requestLocationFilter;
-  const hasOriginSelected = Boolean(originId);
+  const originId = requestLocationFilter;
   const requestCompleted = Boolean(submittedTransfer);
 
   const loadRequestCandidates = useCallback(async (queryValue: string) => {
@@ -352,8 +358,6 @@ export function TransfersRequestPage() {
     return "Selecciona un producto para continuar.";
   }, [activeLoadingCandidates, requestProducts.length]);
 
-  const requestInputValue = requestQuery;
-
   const requestLocationOptions = useMemo<RequestLocationOption[]>(() => {
     const destinationLocationId = defaultLocation?.location_id;
     const activeLocations = (locations || []).filter(
@@ -362,22 +366,45 @@ export function TransfersRequestPage() {
         location.type !== "workshop"
     );
 
-    return [
-      { value: "all", label: "Seleccionar origen", type: null },
-      ...activeLocations.map((location) => ({
-        value: location.location_id,
-        label: location.name,
-        type: location.type,
-      })),
-    ];
+    return activeLocations.map((location) => ({
+      value: location.location_id,
+      label: location.name,
+      type: location.type,
+    }));
   }, [defaultLocation?.location_id, locations]);
   const selectedOriginOption =
     requestLocationOptions.find((option) => option.value === requestLocationFilter) || null;
 
   const selectedOriginName =
-    selectedOriginOption?.label || "Pendiente";
+    selectedOriginOption?.label || "";
+  const requestSummaryContext = useMemo(
+    () => ({
+      originName: selectedOriginName,
+      originType: selectedOriginOption?.type || null,
+      destinationName: defaultLocation?.name || "Sin sede",
+      destinationType: defaultLocation?.type || null,
+      lines: draftLines.length,
+      units: draftLines.reduce((accumulator, line) => accumulator + line.qty_requested, 0),
+      notes: notes.trim() || null,
+    }),
+    [defaultLocation?.name, defaultLocation?.type, draftLines, notes, selectedOriginName, selectedOriginOption?.type]
+  );
+
   function resetDraftForOriginChange() {
     resetDraft();
+  }
+
+  function applyOriginChange(nextValue: string, resetCurrentDraft: boolean) {
+    if (resetCurrentDraft) {
+      resetDraftForOriginChange();
+    }
+
+    setRequestLocationFilter(nextValue);
+    setRequestQuery("");
+    setSelectedRequestProduct(null);
+    setRequestPickerOpen(false);
+    setHighlightedRequestIndex(0);
+    clearDuplicateDraftVariant();
   }
 
   function handleOriginChange(nextValue: string) {
@@ -390,27 +417,58 @@ export function TransfersRequestPage() {
     }
 
     if (draftLines.length > 0) {
-      resetDraftForOriginChange();
+      setPendingOriginChange(nextValue);
+      return;
     }
 
-    setRequestLocationFilter(nextValue);
+    applyOriginChange(nextValue, false);
+  }
+
+  function handleConfirmOriginChange() {
+    if (pendingOriginChange === null) {
+      return;
+    }
+
+    applyOriginChange(pendingOriginChange, true);
+    setPendingOriginChange(null);
+  }
+
+  function handleCancelOriginChange() {
+    setPendingOriginChange(null);
+  }
+
+  function handleRequestQueryChange(value: string) {
+    setRequestQuery(value);
+    if (selectedRequestProduct) {
+      setSelectedRequestProduct(null);
+    }
+    clearDuplicateDraftVariant();
+  }
+
+  function handleSelectRequestProduct(product: RequestProductGroup) {
+    setRequestQuery("");
+    setSelectedRequestProduct(product);
+    setRequestPickerOpen(false);
+    clearDuplicateDraftVariant();
+  }
+
+  function handleClearRequestProduct() {
     setRequestQuery("");
     setSelectedRequestProduct(null);
     setRequestPickerOpen(false);
     setHighlightedRequestIndex(0);
     clearDuplicateDraftVariant();
+    window.requestAnimationFrame(() => {
+      requestSearchInputRef.current?.focus();
+    });
   }
 
-  async function handleSubmit() {
-    await submitTransferDraft(originId, "", defaultLocation, {
-      originName: selectedOriginName,
-      originType: selectedOriginOption?.type || null,
-      destinationName: defaultLocation?.name || "Sin sede",
-      destinationType: defaultLocation?.type || null,
-      lines: draftLines.length,
-      units: draftLines.reduce((accumulator, line) => accumulator + line.qty_requested, 0),
-      notes: notes.trim() || null,
-    });
+  function handleReviewSubmit() {
+    setReviewDialogOpen(true);
+  }
+
+  async function handleConfirmSubmit() {
+    await submitTransferDraft(originId, "", defaultLocation, requestSummaryContext);
   }
 
   function handleClearNotes() {
@@ -418,7 +476,13 @@ export function TransfersRequestPage() {
   }
 
   function handleStartNewRequest() {
+    setReviewDialogOpen(false);
     startNewRequest();
+  }
+
+  function handleViewSubmittedTransfer() {
+    if (!submittedTransfer) return;
+    router.push(`/transferencias/${submittedTransfer.transfer_id}`);
   }
 
   if (authLoading) {
@@ -446,226 +510,84 @@ export function TransfersRequestPage() {
   }
 
   return (
-    <OpsPageShell width="wide" className="max-w-[1380px]">
-      <TooltipProvider delayDuration={120}>
-        <div className="space-y-4">
-          <PosHeader
-            eyebrow="Transferencias"
-            title="Solicitar transferencia"
-            actions={
-              <Button asChild variant="outline" size="sm" className="rounded-full">
-                <Link href="/transferencias/recepciones">
-                  <RotateCcw className="h-4 w-4" />
-                  Pendientes de recepción
-                </Link>
-              </Button>
-            }
+    <TransferRequestWorkspace
+      headerActions={
+        <Button asChild variant="outline" size="sm" className="rounded-full">
+          <Link href="/transferencias/recepciones">
+            <RotateCcw className="h-4 w-4" />
+            Pendientes de recepción
+          </Link>
+        </Button>
+      }
+      pageError={reviewDialogOpen ? null : error}
+      originOptions={requestLocationOptions}
+      originId={originId}
+      onOriginChange={handleOriginChange}
+      destinationName={defaultLocation?.name || "Sin sede"}
+      destinationType={defaultLocation?.type}
+      requestQuery={requestQuery}
+      onRequestQueryChange={handleRequestQueryChange}
+      requestPickerOpen={requestPickerOpen}
+      onRequestPickerOpenChange={setRequestPickerOpen}
+      requestProducts={requestProducts}
+      loadingRequestProducts={activeLoadingCandidates}
+      requestProductsError={activeRequestQueryError}
+      requestProductsEmptyMessage={requestSearchEmptyMessage}
+      highlightedRequestIndex={visibleHighlightedRequestIndex}
+      onHighlightedRequestIndexChange={setHighlightedRequestIndex}
+      requestSearchInputRef={requestSearchInputRef}
+      selectedRequestProduct={selectedRequestProduct}
+      onSelectRequestProduct={handleSelectRequestProduct}
+      onClearRequestProduct={handleClearRequestProduct}
+      onAddRequestLine={addRequestLine}
+      duplicateDraftVariant={duplicateDraftVariant}
+      draftLines={draftLines}
+      onUpdateLineQty={updateLineQty}
+      onRemoveLine={removeLine}
+      onRequestClearDraft={() => setClearDraftModalOpen(true)}
+      notes={notes}
+      onNotesChange={setNotes}
+      onClearNotes={handleClearNotes}
+      notePresets={REQUEST_NOTE_PRESETS}
+      notesMaxLength={REQUEST_NOTE_MAX_LENGTH}
+      submittedTransfer={submittedTransfer}
+      submittedSummary={submittedSummary}
+      onViewSubmittedTransfer={handleViewSubmittedTransfer}
+      onStartNewRequest={handleStartNewRequest}
+      submitting={submitting}
+      onRequestReview={handleReviewSubmit}
+      dialogLayer={
+        <>
+          <TransferRequestReviewDialog
+            open={reviewDialogOpen && !submittedTransfer}
+            onOpenChange={setReviewDialogOpen}
+            draftLines={draftLines}
+            originName={selectedOriginName}
+            originType={selectedOriginOption?.type}
+            destinationName={defaultLocation?.name || "Sin sede"}
+            destinationType={defaultLocation?.type}
+            notes={notes.trim() || null}
+            error={reviewDialogOpen ? error : null}
+            submitting={submitting}
+            onConfirm={handleConfirmSubmit}
           />
 
-          {error ? <AdminInlineMessage tone="danger">{error}</AdminInlineMessage> : null}
-          <OpsSectionDivider>
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.72fr)_minmax(360px,400px)] xl:items-start">
-              <div className="space-y-6">
-                {requestCompleted ? (
-                  <section className="ops-surface rounded-xl border p-6">
-                    <div className="space-y-2">
-                      <p className="text-sm font-semibold text-[var(--ops-text)]">
-                        Solicitud enviada
-                      </p>
-                      <p className="text-sm text-[var(--ops-text-muted)]">
-                        El borrador se cerró correctamente. Puedes revisar el detalle o iniciar
-                        una nueva solicitud desde el panel de resumen.
-                      </p>
-                    </div>
-                  </section>
-                ) : (
-                  <>
-                    <section className="space-y-3">
-                      <TransferSectionHeading step={1} title="Datos de transferencia" />
-                      <RequestRouteField
-                        originOptions={requestLocationOptions}
-                        originValue={requestLocationFilter}
-                        onOriginChange={handleOriginChange}
-                        destinationName={defaultLocation?.name || "Sin sede"}
-                        destinationType={defaultLocation?.type}
-                        hasDraftLines={draftLines.length > 0}
-                        disabled={requestCompleted}
-                      />
-                    </section>
+          <DraftClearConfirmModal
+            open={clearDraftModalOpen}
+            onCancel={() => setClearDraftModalOpen(false)}
+            onConfirm={() => {
+              clearDraftLines();
+              setClearDraftModalOpen(false);
+            }}
+          />
 
-                    <section className="space-y-3">
-                      <TransferSectionHeading step={2} title="Agregar productos" />
-
-                      <div className="ops-surface space-y-4 rounded-xl border p-4 sm:p-5">
-                        <SearchablePicker
-                          value={requestInputValue}
-                          onChange={(value) => {
-                            if (!hasOriginSelected || requestCompleted) return;
-                            setRequestQuery(value);
-                            if (selectedRequestProduct) {
-                              setSelectedRequestProduct(null);
-                            }
-                            clearDuplicateDraftVariant();
-                          }}
-                          onFocus={() => {
-                            if (!hasOriginSelected || requestCompleted) return;
-                            if (!requestQuery) {
-                              setHighlightedRequestIndex(0);
-                            }
-                          }}
-                          placeholder={
-                            hasOriginSelected
-                              ? "Buscar producto..."
-                              : "Selecciona origen primero"
-                          }
-                          disabled={!hasOriginSelected || requestCompleted}
-                          label="Buscar producto"
-                          open={requestPickerOpen}
-                          onOpenChange={setRequestPickerOpen}
-                          items={requestProducts}
-                          loading={activeLoadingCandidates}
-                          error={activeRequestQueryError}
-                          loadingMessage="Buscando productos disponibles..."
-                          emptyMessage={requestSearchEmptyMessage}
-                          maxVisibleItems={8}
-                          highlightedIndex={visibleHighlightedRequestIndex}
-                          onHighlightChange={setHighlightedRequestIndex}
-                          inputRef={requestSearchInputRef}
-                          getItemKey={(product) => product.product_key}
-                          renderItem={(product) => {
-                            const { colorsCount, sizesCount } = buildProductOptionSummary(product);
-                            return (
-                              <div className="flex min-w-0 items-center">
-                                <p className="min-w-0 truncate text-sm text-[var(--ops-text)]">
-                                  <span className="font-semibold">{product.style_name}</span>
-                                  <span className="text-[var(--ops-text-muted)]">
-                                    {` · ${colorsCount} ${colorsCount === 1 ? "color" : "colores"} · ${sizesCount} ${sizesCount === 1 ? "talla" : "tallas"} · stock: ${product.total_available} u.`}
-                                  </span>
-                                </p>
-                              </div>
-                            );
-                          }}
-                          onSelect={(product) => {
-                            setRequestQuery("");
-                            setSelectedRequestProduct(product);
-                            setRequestPickerOpen(false);
-                            clearDuplicateDraftVariant();
-                          }}
-                          onClear={() => {
-                            setRequestQuery("");
-                            setSelectedRequestProduct(null);
-                            setRequestPickerOpen(false);
-                            setHighlightedRequestIndex(0);
-                            clearDuplicateDraftVariant();
-                            window.requestAnimationFrame(() => {
-                              requestSearchInputRef.current?.focus();
-                            });
-                          }}
-                          showClear={Boolean(requestInputValue && !(!hasOriginSelected || requestCompleted))}
-                          selectedItemKey={selectedRequestProduct?.product_key}
-                        />
-
-                        <div className="pt-1">
-                          {selectedRequestProduct && !requestCompleted ? (
-                            <RequestProductComposer
-                              key={`${selectedRequestProduct.product_key}:${originId || "all"}`}
-                              product={selectedRequestProduct}
-                              lockedOriginId={originId}
-                              onAdd={addRequestLine}
-                              duplicateDraftVariant={duplicateDraftVariant}
-                            />
-                          ) : (
-                            <div className="ops-empty-state-compact rounded-xl px-5 py-10 text-center text-sm">
-                              {hasOriginSelected
-                                ? "Selecciona un producto para revisar variante, stock en origen y cantidad solicitada."
-                                : "Elige el origen para empezar a buscar productos disponibles."}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </section>
-
-                    <section className="space-y-3">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-2.5">
-                          <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--ripnel-accent)] text-xs font-semibold text-white">
-                            3
-                          </span>
-                          <h2 className="text-lg font-semibold text-[var(--ops-text)]">
-                            Productos solicitados
-                            <span className="ml-1.5 text-[15px] font-medium text-[var(--ops-text-muted)]">
-                              ({draftLines.length})
-                            </span>
-                          </h2>
-                        </div>
-
-                        {draftLines.length > 0 ? (
-                          <button
-                            type="button"
-                            onClick={() => setClearDraftModalOpen(true)}
-                            className="inline-flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 text-sm font-medium text-[color:color-mix(in_srgb,#dc2626_88%,var(--ops-text))] transition hover:bg-[color:color-mix(in_srgb,#dc2626_10%,transparent)] hover:text-[color:color-mix(in_srgb,#b91c1c_92%,var(--ops-text))] hover:[&_svg]:translate-y-[-0.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:color-mix(in_srgb,#dc2626_18%,transparent)]"
-                          >
-                            <Trash2 className="h-4 w-4 transition-transform" />
-                            <span>Limpiar todo</span>
-                          </button>
-                        ) : null}
-                      </div>
-                      <RequestDraftTable
-                        draftLines={draftLines}
-                        onUpdateLineQty={updateLineQty}
-                        onRemoveLine={removeLine}
-                        highlightedVariantId={duplicateDraftVariant?.variantId || null}
-                        highlightToken={duplicateDraftVariant?.token}
-                        disabled={requestCompleted}
-                      />
-                    </section>
-                  </>
-                )}
-              </div>
-
-              <section className="space-y-3 xl:sticky xl:top-20 xl:self-start">
-                <div className="flex items-center gap-2.5">
-                  <ClipboardList className="h-4 w-4 text-[var(--ripnel-accent-hover)]" />
-                  <h2 className="text-lg font-semibold text-[var(--ops-text)]">
-                    Resumen de transferencia
-                  </h2>
-                </div>
-                <DraftSummaryPanel
-                  draftLines={draftLines}
-                  destinationName={defaultLocation?.name || "Sin sede"}
-                  destinationType={defaultLocation?.type}
-                  originName={originId ? selectedOriginName : ""}
-                  originType={selectedOriginOption?.type}
-                  originSelected={Boolean(originId)}
-                  submittedSummary={submittedSummary}
-                  notes={notes}
-                  onNotesChange={setNotes}
-                  onClearNotes={handleClearNotes}
-                  notesMaxLength={REQUEST_NOTE_MAX_LENGTH}
-                  notePresets={REQUEST_NOTE_PRESETS}
-                  submittedTransfer={submittedTransfer}
-                  onViewSubmittedTransfer={() => {
-                    if (!submittedTransfer) return;
-                    router.push(`/transferencias/${submittedTransfer.transfer_id}`);
-                  }}
-                  onStartNewRequest={handleStartNewRequest}
-                  submitting={submitting}
-                  onSubmit={handleSubmit}
-                />
-              </section>
-            </div>
-          </OpsSectionDivider>
-        </div>
-
-        <DraftClearConfirmModal
-          open={clearDraftModalOpen}
-          onCancel={() => setClearDraftModalOpen(false)}
-          onConfirm={() => {
-            clearDraftLines();
-            setClearDraftModalOpen(false);
-          }}
-        />
-      </TooltipProvider>
-    </OpsPageShell>
+          <OriginChangeConfirmModal
+            open={pendingOriginChange !== null}
+            onCancel={handleCancelOriginChange}
+            onConfirm={handleConfirmOriginChange}
+          />
+        </>
+      }
+    />
   );
 }
