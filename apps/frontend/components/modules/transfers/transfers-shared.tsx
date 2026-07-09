@@ -300,6 +300,92 @@ export type RequestProductGroup = {
   variants: RequestProductVariant[]
 }
 
+export function buildTransferRequestProductGroups({
+  candidates,
+  originId,
+  query,
+}: {
+  candidates: RequestCandidate[]
+  originId: string
+  query: string
+}): RequestProductGroup[] {
+  const normalizedQuery = query.trim().toLowerCase()
+  const grouped = new Map<string, RequestProductGroup>()
+
+  for (const candidate of candidates) {
+    const visibleSources = candidate.candidate_sources.filter((source) =>
+      originId ? source.location_id === originId : true
+    )
+
+    if (visibleSources.length === 0) {
+      continue
+    }
+
+    const productKey = `${candidate.style_code}::${candidate.style_name}`
+    const variantTotalAvailable = visibleSources.reduce(
+      (accumulator, source) => accumulator + Number(source.qty_available || 0),
+      0
+    )
+
+    if (!grouped.has(productKey)) {
+      grouped.set(productKey, {
+        product_key: productKey,
+        style_code: candidate.style_code,
+        style_name: candidate.style_name,
+        garment_type_name: candidate.garment_type_name || null,
+        secondary_code: candidate.style_code || candidate.sku,
+        total_available: 0,
+        variants: [],
+      })
+    }
+
+    const product = grouped.get(productKey)!
+    product.total_available += variantTotalAvailable
+    product.variants.push({
+      variant_id: candidate.variant_id,
+      sku: candidate.sku,
+      size_code: candidate.size_code,
+      color_name: candidate.color_name,
+      total_available: variantTotalAvailable,
+      candidate_sources: visibleSources,
+    })
+  }
+
+  return [...grouped.values()]
+    .map((product) => ({
+      ...product,
+      variants: product.variants.sort((left, right) => {
+        const colorCompare = left.color_name.localeCompare(right.color_name, "es", {
+          sensitivity: "base",
+        })
+
+        if (colorCompare !== 0) return colorCompare
+
+        return left.size_code.localeCompare(right.size_code, "es", {
+          sensitivity: "base",
+        })
+      }),
+    }))
+    .sort((left, right) => {
+      const leftName = left.style_name.toLowerCase()
+      const rightName = right.style_name.toLowerCase()
+      const leftStartsWith = normalizedQuery ? leftName.startsWith(normalizedQuery) : false
+      const rightStartsWith = normalizedQuery ? rightName.startsWith(normalizedQuery) : false
+
+      if (leftStartsWith !== rightStartsWith) {
+        return leftStartsWith ? -1 : 1
+      }
+
+      if (left.total_available !== right.total_available) {
+        return right.total_available - left.total_available
+      }
+
+      return left.style_name.localeCompare(right.style_name, "es", {
+        sensitivity: "base",
+      })
+    })
+}
+
 export type DraftLine = {
   location_id: string
   location_code: string

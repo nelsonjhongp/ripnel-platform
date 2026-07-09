@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { useDebouncedApiSearch } from "@/hooks/use-debounced-api-search"
 import { apiFetch } from "@/lib/api"
 import type { PriceModeOverride, SaleVariant, SearchableStyle } from "./pos-types"
 import { POS } from "./pos-messages"
@@ -14,8 +15,6 @@ import {
 
 export function useProductSearch(locationId: string | undefined) {
   const [query, setQuery] = useState("")
-  const [variants, setVariants] = useState<SaleVariant[]>([])
-  const [loadingVariants, setLoadingVariants] = useState(false)
   const [productPickerOpen, setProductPickerOpen] = useState(false)
   const [highlightedProductIndex, setHighlightedProductIndex] = useState(0)
   const [selectedProductStyle, setSelectedProductStyle] =
@@ -24,47 +23,48 @@ export function useProductSearch(locationId: string | undefined) {
   const [selectedColorCode, setSelectedColorCode] = useState("")
   const [pricingModeOverride, setPricingModeOverride] =
     useState<PriceModeOverride>("auto")
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!locationId) {
       void Promise.resolve().then(() => {
-        setVariants([])
         setProductPickerOpen(false)
         setSelectedProductStyle(null)
       })
-      return
     }
+  }, [locationId])
 
-    let active = true
-    const timeoutId = window.setTimeout(async () => {
-      setLoadingVariants(true)
+  const fetchSellableVariants = useCallback(
+    async (signal: AbortSignal) => {
+      const params = new URLSearchParams()
+      if (query.trim()) params.set("q", query.trim())
+      const path = params.toString()
+        ? `/api/sales/sellable-variants?${params.toString()}`
+        : "/api/sales/sellable-variants"
+      const response = await apiFetch<SaleVariant[]>(path, {
+        cache: "no-store",
+        signal,
+      })
 
-      try {
-        const params = new URLSearchParams()
-        if (query.trim()) params.set("q", query.trim())
-        const path = params.toString()
-          ? `/api/sales/sellable-variants?${params.toString()}`
-          : "/api/sales/sellable-variants"
-        const response = await apiFetch(path)
+      return Array.isArray(response) ? response : []
+    },
+    [query],
+  )
 
-        if (!active) return
-        setError(null)
-        setVariants(Array.isArray(response) ? response : [])
-      } catch (fetchError) {
-        if (!active) return
-        setVariants([])
-        setError(explainApiError(fetchError, POS.error.loadProducts))
-      } finally {
-        if (active) setLoadingVariants(false)
-      }
-    }, 250)
+  const getProductSearchErrorMessage = useCallback(
+    (fetchError: unknown) => explainApiError(fetchError, POS.error.loadProducts),
+    [],
+  )
 
-    return () => {
-      active = false
-      window.clearTimeout(timeoutId)
-    }
-  }, [locationId, query])
+  const {
+    results: variants,
+    loading: loadingVariants,
+    error,
+  } = useDebouncedApiSearch<SaleVariant>({
+    enabled: Boolean(locationId),
+    fetcher: fetchSellableVariants,
+    getErrorMessage: getProductSearchErrorMessage,
+    searchValue: query,
+  })
 
   const styles = useMemo(() => groupVariantsByStyle(variants), [variants])
   const catalogStyles = useMemo(
@@ -181,7 +181,6 @@ export function useProductSearch(locationId: string | undefined) {
     sizeOptions,
     colorOptions,
     error,
-    setError,
     selectProductStyle,
     catalogStyles,
   }

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react"
 import { apiFetch } from "@/lib/api"
 import { explainApiError } from "@/lib/error-utils"
+import { useDebouncedApiSearch } from "@/hooks/use-debounced-api-search"
 import type { PostsaleContext, SellableVariant } from "@/types/postsales"
 import { PS } from "./postsales-messages"
 
@@ -13,68 +14,49 @@ export function useReplacementSearch(
   excludeVariantId?: string,
 ) {
   const [search, setSearch] = useState("")
-  const [results, setResults] = useState<SellableVariant[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [hasSearched, setHasSearched] = useState(false)
   const [selectedVariantId, setSelectedVariantId] = useState("")
   const [selectedReplacement, setSelectedReplacement] =
     useState<SellableVariant | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [highlightedIndex, setHighlightedIndex] = useState(0)
 
-  useEffect(() => {
-    if (!open) return
+  const canSearch =
+    open &&
+    Boolean(context) &&
+    hasPermission &&
+    Boolean(context?.availability.exchange.allowed)
 
-    const canSearch =
-      Boolean(context) &&
-      hasPermission &&
-      context?.availability.exchange.allowed &&
-      search.trim().length >= 2
+  const fetchReplacements = useCallback(
+    async (signal: AbortSignal) => {
+      const params = new URLSearchParams({ q: search.trim() })
+      const data = await apiFetch<SellableVariant[]>(
+        `/api/sales/sellable-variants?${params.toString()}`,
+        { cache: "no-store", signal },
+      )
 
-    if (!canSearch) {
-      queueMicrotask(() => {
-        setResults([])
-        setLoading(false)
-        setError(null)
-        setHasSearched(false)
-      })
-      return
-    }
+      return Array.isArray(data) ? data : []
+    },
+    [search],
+  )
 
-    const controller = new AbortController()
-    let active = true
+  const getSearchErrorMessage = useCallback(
+    (loadError: unknown) => explainApiError(loadError, PS.exchangeDialog.noResults),
+    [],
+  )
 
-    const timeoutId = window.setTimeout(async () => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const params = new URLSearchParams({ q: search.trim() })
-        const data = await apiFetch<SellableVariant[]>(
-          `/api/sales/sellable-variants?${params.toString()}`,
-          { cache: "no-store", signal: controller.signal },
-        )
-
-        if (active) setResults(Array.isArray(data) ? data : [])
-      } catch (loadError) {
-        if (!active || controller.signal.aborted) return
-        setResults([])
-        setError(explainApiError(loadError, PS.exchangeDialog.noResults))
-      } finally {
-        if (active) {
-          setHasSearched(true)
-          setLoading(false)
-        }
-      }
-    }, 250)
-
-    return () => {
-      active = false
-      controller.abort()
-      window.clearTimeout(timeoutId)
-    }
-  }, [context, hasPermission, search, open])
+  const {
+    results,
+    loading,
+    error,
+    hasSearched,
+    reset: resetSearch,
+  } = useDebouncedApiSearch<SellableVariant>({
+    enabled: canSearch,
+    fetcher: fetchReplacements,
+    getErrorMessage: getSearchErrorMessage,
+    minSearchLength: 2,
+    searchValue: search,
+  })
 
   const filteredResults = useMemo(
     () =>
@@ -89,10 +71,9 @@ export function useReplacementSearch(
     setSelectedReplacement(variant)
     setPickerOpen(false)
     setSearch("")
-    setResults([])
-    setHasSearched(false)
+    resetSearch()
     setHighlightedIndex(0)
-  }, [])
+  }, [resetSearch])
 
   const handleSearchChange = useCallback((val: string) => {
     setSearch(val)
@@ -105,12 +86,10 @@ export function useReplacementSearch(
     setSelectedVariantId("")
     setSelectedReplacement(null)
     setSearch("")
-    setResults([])
-    setError(null)
-    setHasSearched(false)
+    resetSearch()
     setPickerOpen(false)
     setHighlightedIndex(0)
-  }, [])
+  }, [resetSearch])
 
   useEffect(() => {
     if (!open) queueMicrotask(clearSelection)

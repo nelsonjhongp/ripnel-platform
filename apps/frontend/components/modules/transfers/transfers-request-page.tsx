@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   useCallback,
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -22,16 +21,18 @@ import {
 import type { ApiEnvelope } from "@/lib/api";
 import { apiFetch, unwrapApiData } from "@/lib/api";
 import { useApiGet } from "@/hooks/use-api-get";
+import { useDebouncedApiSearch } from "@/hooks/use-debounced-api-search";
 import { useTransferCapabilities } from "@/hooks/use-transfer-capabilities";
 import { Button } from "@/components/ui/button";
 import { TransferRequestReviewDialog } from "./transfers-request-ui";
 import { TransferRequestWorkspace } from "./transfers-request-workspace";
 import { TransferDestinationStep } from "./TransferDestinationStep";
 import { TransferProductsStep } from "./TransferProductsStep";
-import type {
-  RequestCandidate,
-  RequestLocationOption,
-  RequestProductGroup,
+import {
+  buildTransferRequestProductGroups,
+  type RequestCandidate,
+  type RequestLocationOption,
+  type RequestProductGroup,
 } from "./transfers-shared";
 import { TRANS } from "./transfers-messages";
 import { useTransferDraft } from "./use-transfer-draft";
@@ -149,10 +150,7 @@ export function TransfersRequestPage() {
       ? new URLSearchParams()
       : new URLSearchParams(window.location.search);
   const { loading: authLoading, defaultLocation } = useAuth();
-  const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [requestQuery, setRequestQuery] = useState("");
-  const [requestCandidates, setRequestCandidates] = useState<RequestCandidate[]>([]);
-  const [requestQueryError, setRequestQueryError] = useState<string | null>(null);
   const [selectedRequestProduct, setSelectedRequestProduct] =
     useState<RequestProductGroup | null>(null);
   const [requestLocationFilter, setRequestLocationFilter] = useState(
@@ -177,6 +175,46 @@ export function TransfersRequestPage() {
       }).then((p) => (unwrapApiData(p) || []).filter((l) => l.active)),
     []
   );
+
+  const originId = requestLocationFilter;
+  const fetchRequestCandidates = useCallback(
+    async (signal: AbortSignal) => {
+      const normalizedQuery = requestQuery.trim();
+      const params = new URLSearchParams({ query: normalizedQuery });
+      if (originId) {
+        params.set("source_location_id", originId);
+      }
+
+      const payload = await apiFetch<ApiEnvelope<RequestCandidate[]> | RequestCandidate[]>(
+        `/api/transfers/request-candidates?${params.toString()}`,
+        { cache: "no-store", signal }
+      );
+
+      return unwrapApiData(payload) || [];
+    },
+    [originId, requestQuery]
+  );
+
+  const getRequestCandidatesErrorMessage = useCallback(
+    (requestError: unknown) =>
+      requestError instanceof Error
+        ? requestError.message
+        : "No se pudo buscar stock para la transferencia",
+    []
+  );
+
+  const {
+    results: requestCandidates,
+    loading: loadingCandidates,
+    error: requestQueryError,
+    reset: resetRequestCandidates,
+    refetch: refetchRequestCandidates,
+  } = useDebouncedApiSearch<RequestCandidate>({
+    enabled: Boolean(originId) && (requestPickerOpen || Boolean(requestQuery.trim())),
+    fetcher: fetchRequestCandidates,
+    getErrorMessage: getRequestCandidatesErrorMessage,
+    searchValue: requestQuery,
+  });
 
   const {
     draftLines,
@@ -204,8 +242,7 @@ export function TransfersRequestPage() {
         setRequestLocationFilter("");
         setRequestQuery("");
         setRequestPickerOpen(false);
-        setRequestCandidates([]);
-        setRequestQueryError(null);
+        resetRequestCandidates();
         setHighlightedRequestIndex(0);
       } else {
         setRequestLocationFilter(value);
@@ -214,56 +251,16 @@ export function TransfersRequestPage() {
     setSelectedRequestProduct,
     requestQuery,
     loadRequestCandidates: async (query: string) => {
-      await loadRequestCandidates(query);
+      if (query !== requestQuery) {
+        setRequestQuery(query);
+        return;
+      }
+      refetchRequestCandidates();
     },
     loadInventory: async () => {},
   });
 
-  const originId = requestLocationFilter;
   const requestCompleted = Boolean(submittedTransfer);
-
-  const loadRequestCandidates = useCallback(async (queryValue: string) => {
-    const normalizedQuery = queryValue.trim();
-
-    setLoadingCandidates(true);
-    setRequestQueryError(null);
-
-    try {
-      const params = new URLSearchParams({ query: normalizedQuery });
-      if (originId) {
-        params.set("source_location_id", originId);
-      }
-      const payload = await apiFetch<ApiEnvelope<RequestCandidate[]> | RequestCandidate[]>(
-        `/api/transfers/request-candidates?${params.toString()}`,
-        { cache: "no-store" }
-      );
-      setRequestCandidates(unwrapApiData(payload) || []);
-    } catch (requestError) {
-      setRequestQueryError(
-        requestError instanceof Error
-          ? requestError.message
-          : "No se pudo buscar stock para la transferencia"
-      );
-    } finally {
-      setLoadingCandidates(false);
-    }
-  }, [originId]);
-
-  useEffect(() => {
-    if (!originId) {
-      return;
-    }
-
-    if (!requestPickerOpen && !requestQuery.trim()) {
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      void loadRequestCandidates(requestQuery);
-    }, 250);
-
-    return () => clearTimeout(timer);
-  }, [loadRequestCandidates, originId, requestQuery, requestPickerOpen]);
 
   const activeRequestCandidates = useMemo(
     () => (requestPickerOpen || requestQuery.trim() || selectedRequestProduct ? requestCandidates : []),
@@ -273,81 +270,11 @@ export function TransfersRequestPage() {
   const activeLoadingCandidates = requestPickerOpen || requestQuery.trim() ? loadingCandidates : false;
 
   const requestProducts = useMemo<RequestProductGroup[]>(() => {
-    const normalizedQuery = requestQuery.trim().toLowerCase();
-    const grouped = new Map<string, RequestProductGroup>();
-
-    for (const candidate of activeRequestCandidates) {
-      const visibleSources = candidate.candidate_sources.filter((source) =>
-        originId ? source.location_id === originId : true
-      );
-
-      if (visibleSources.length === 0) {
-        continue;
-      }
-
-      const productKey = `${candidate.style_code}::${candidate.style_name}`;
-      const variantTotalAvailable = visibleSources.reduce(
-        (accumulator, source) => accumulator + Number(source.qty_available || 0),
-        0
-      );
-
-      if (!grouped.has(productKey)) {
-        grouped.set(productKey, {
-          product_key: productKey,
-          style_code: candidate.style_code,
-          style_name: candidate.style_name,
-          garment_type_name: candidate.garment_type_name || null,
-          secondary_code: candidate.style_code || candidate.sku,
-          total_available: 0,
-          variants: [],
-        });
-      }
-
-      const product = grouped.get(productKey)!;
-      product.total_available += variantTotalAvailable;
-      product.variants.push({
-        variant_id: candidate.variant_id,
-        sku: candidate.sku,
-        size_code: candidate.size_code,
-        color_name: candidate.color_name,
-        total_available: variantTotalAvailable,
-        candidate_sources: visibleSources,
-      });
-    }
-
-    return [...grouped.values()]
-      .map((product) => ({
-        ...product,
-        variants: product.variants.sort((left, right) => {
-          const colorCompare = left.color_name.localeCompare(right.color_name, "es", {
-            sensitivity: "base",
-          });
-
-          if (colorCompare !== 0) return colorCompare;
-
-          return left.size_code.localeCompare(right.size_code, "es", {
-            sensitivity: "base",
-          });
-        }),
-      }))
-      .sort((left, right) => {
-        const leftName = left.style_name.toLowerCase();
-        const rightName = right.style_name.toLowerCase();
-        const leftStartsWith = normalizedQuery ? leftName.startsWith(normalizedQuery) : false;
-        const rightStartsWith = normalizedQuery ? rightName.startsWith(normalizedQuery) : false;
-
-        if (leftStartsWith !== rightStartsWith) {
-          return leftStartsWith ? -1 : 1;
-        }
-
-        if (left.total_available !== right.total_available) {
-          return right.total_available - left.total_available;
-        }
-
-        return left.style_name.localeCompare(right.style_name, "es", {
-          sensitivity: "base",
-        });
-      });
+    return buildTransferRequestProductGroups({
+      candidates: activeRequestCandidates,
+      originId,
+      query: requestQuery,
+    });
   }, [activeRequestCandidates, originId, requestQuery]);
 
   const visibleHighlightedRequestIndex =

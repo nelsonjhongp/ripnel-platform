@@ -13,6 +13,7 @@ import { OpsMetricRow } from "@/components/ui/ops-metric-row";
 import { OpsPageShell } from "@/components/ui/ops-page-shell";
 import { type OpsOption } from "@/components/ui/ops-selection";
 import { PosHeader } from "@/components/ui/purchase-system/PosHeader";
+import { useDebouncedApiSearch } from "@/hooks/use-debounced-api-search";
 import { apiFetchData } from "@/lib/api";
 import { appRoutes, buildAdjustmentDetailRoute } from "@/lib/routes";
 import { showError, showSuccess } from "@/lib/toast";
@@ -74,8 +75,6 @@ export function InventoryAdjustmentsCreatePage() {
   );
   const [pickerOpen, setPickerOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
-  const [variantResults, setVariantResults] = useState<AdjustmentVariant[]>([]);
-  const [loadingVariants, setLoadingVariants] = useState(false);
   const [selectedStyle, setSelectedStyle] = useState<GroupedAdjustmentStyle | null>(null);
 
   const [draftLines, setDraftLines] = useState<DraftAdjustmentLine[]>([]);
@@ -145,38 +144,32 @@ export function InventoryAdjustmentsCreatePage() {
   const canSearchVariants =
     effectiveCreateLocationId.length > 0 && normalizedVariantQuery.length >= 2;
 
-  useEffect(() => {
-    if (!canSearchVariants) return;
+  const fetchAdjustmentVariants = useCallback(
+    async (signal: AbortSignal) => {
+      const params = new URLSearchParams({
+        location_id: effectiveCreateLocationId,
+        query: normalizedVariantQuery,
+      });
+      const data = await apiFetchData<AdjustmentVariantsData>(
+        `/api/inventory/adjustment-variants?${params.toString()}`,
+        { signal, cache: "no-store" }
+      );
 
-    const controller = new AbortController();
-    let active = true;
+      return data?.rows || [];
+    },
+    [effectiveCreateLocationId, normalizedVariantQuery]
+  );
 
-    const timer = setTimeout(async () => {
-      setLoadingVariants(true);
-
-      try {
-        const params = new URLSearchParams({
-          location_id: effectiveCreateLocationId,
-          query: normalizedVariantQuery,
-        });
-        const data = await apiFetchData<AdjustmentVariantsData>(
-          `/api/inventory/adjustment-variants?${params.toString()}`,
-          { signal: controller.signal, cache: "no-store" }
-        );
-        if (active) setVariantResults(data?.rows || []);
-      } catch {
-        if (active && !controller.signal.aborted) setVariantResults([]);
-      } finally {
-        if (active) setLoadingVariants(false);
-      }
-    }, 250);
-
-    return () => {
-      active = false;
-      controller.abort();
-      clearTimeout(timer);
-    };
-  }, [canSearchVariants, effectiveCreateLocationId, normalizedVariantQuery]);
+  const {
+    results: variantResults,
+    setResults: setVariantResults,
+    loading: loadingVariants,
+  } = useDebouncedApiSearch<AdjustmentVariant>({
+    enabled: effectiveCreateLocationId.length > 0,
+    fetcher: fetchAdjustmentVariants,
+    minSearchLength: 2,
+    searchValue: normalizedVariantQuery,
+  });
 
   const visibleVariantResults = useMemo(
     () => (canSearchVariants ? variantResults : []),
