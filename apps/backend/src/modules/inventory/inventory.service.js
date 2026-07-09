@@ -1,5 +1,5 @@
 const { AppError } = require('../../shared/errors');
-const { pool } = require('../../shared/db');
+const { pool, attachActor } = require('../../shared/db');
 const { normalizeUuid } = require('../../shared/uuid');
 const { findActiveUserById } = require('../auth/auth.repo');
 const { findUserByEmail } = require('../users/users.repo');
@@ -823,6 +823,7 @@ async function createAdjustment(input, auth = {}) {
 
   try {
     await client.query('begin');
+    await attachActor(client, { actorUserId: auth.sub || auth.user_id, actorRole: auth.role_name });
 
     const adjustment = await insertAdjustment(
       {
@@ -916,6 +917,7 @@ async function confirmAdjustmentById(adjustmentId, input = {}, auth = {}) {
 
   try {
     await client.query('begin');
+    await attachActor(client, { actorUserId: auth.sub || auth.user_id, actorRole: auth.role_name });
 
     for (const line of lines) {
       const countedQty = Number(line.counted_qty);

@@ -1,5 +1,5 @@
 const { AppError } = require('../../shared/errors');
-const { pool } = require('../../shared/db');
+const { pool, attachActor } = require('../../shared/db');
 const {
   findAllTransfers,
   findTransferHeaderById,
@@ -669,6 +669,7 @@ async function createTransfer(input, auth = {}) {
 
   try {
     await client.query('begin');
+    await attachActor(client, { actorUserId: actor.user_id, actorRole: actor.role_name });
 
     for (const line of normalizedLines) {
       const availableQty = await findInventoryQtyByLocationAndVariant(
@@ -744,6 +745,7 @@ async function shipTransferById(transferId, input = {}, auth = {}) {
 
   try {
     await client.query('begin');
+    await attachActor(client, { actorUserId: actor.user_id, actorRole: actor.role_name });
 
     const transfer = await findTransferHeaderByIdForUpdate(
       normalizedTransferId,
@@ -859,6 +861,7 @@ async function receiveTransferById(transferId, input = {}, auth = {}) {
 
   try {
     await client.query('begin');
+    await attachActor(client, { actorUserId: actor.user_id, actorRole: actor.role_name });
 
     const transfer = await findTransferHeaderByIdForUpdate(
       normalizedTransferId,
@@ -962,6 +965,7 @@ async function cancelTransferById(transferId, input = {}, auth = {}) {
 
   try {
     await client.query('begin');
+    await attachActor(client, { actorUserId: actor.user_id, actorRole: actor.role_name });
 
     const transfer = await findTransferHeaderByIdForUpdate(
       normalizedTransferId,
@@ -1019,6 +1023,7 @@ async function approveTransferById(transferId, input = {}, auth = {}) {
 
   try {
     await client.query('begin');
+    await attachActor(client, { actorUserId: actor.user_id, actorRole: actor.role_name });
 
     const transfer = await findTransferHeaderByIdForUpdate(
       normalizedTransferId,

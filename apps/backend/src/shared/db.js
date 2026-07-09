@@ -92,4 +92,5 @@ module.exports = {
   query,
   pool,
   withTransaction,
+  attachActor,
 };

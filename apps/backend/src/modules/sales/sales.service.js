@@ -1,5 +1,5 @@
 const { AppError } = require('../../shared/errors');
-const { pool } = require('../../shared/db');
+const { pool, attachActor } = require('../../shared/db');
 const { round2 } = require('../../shared/numbers');
 const { normalizeUuid } = require('../../shared/uuid');
 const { resolveDashboardScope } = require('../dashboard/dashboard-scope');
@@ -745,6 +745,7 @@ async function createSale(input = {}) {
 
   try {
     await client.query('begin');
+    await attachActor(client, { actorUserId: user.user_id, actorRole: user.role_name });
     const clientQuery = client.query.bind(client);
     await assertOpenCashForLocation(location, clientQuery);
     const wholesaleRule = await findActiveWholesaleMinQtyRule(clientQuery);
